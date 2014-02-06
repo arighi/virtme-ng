@@ -1,5 +1,11 @@
 #!/usr/bin/python3
 # -*- mode: python -*-
+# cpiowriter: A barebones initramfs writer
+# Copyright © 2014 Andy Lutomirski
+# Licensed under the GPLv2, which is available in the virtme distribution
+# as a file called LICENSE with SHA-256 hash:
+# 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+
 import sys
 
 class CpioWriter(object):
