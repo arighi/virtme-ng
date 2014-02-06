@@ -14,4 +14,10 @@ rm "$tmpfile"
 v_mki="$(dirname $0)/virtme-mkinitramfs"
 "$v_mki" >&3
 
-exec qemu-kvm -virtfs local,id=rootfs,path=/,security_model=passthrough,mount_tag=hostroot,readonly -initrd /proc/self/fd/3 -kernel "$@" 
+if which qemu-kvm &>/dev/null; then
+    qemu=qemu-kvm
+else
+    qemu=qemu
+fi
+
+exec "$qemu" -virtfs local,id=rootfs,path=/,security_model=passthrough,mount_tag=hostroot,readonly -initrd /proc/self/fd/3 -machine accel=kvm:tcg -kernel "$@" 

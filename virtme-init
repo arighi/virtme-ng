@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # virtme-init: virtme's basic init (PID 1) process
 # Copyright © 2014 Andy Lutomirski
 # Licensed under the GPLv2, which is available in the virtme distribution
@@ -9,7 +9,10 @@ export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export TERM=linux
 
 # Set up a minimally functional system
-mount -t proc -o nosuid,noexec,nodev proc /proc/
+if ! mount -t proc -o nosuid,noexec,nodev proc /proc/; then
+    echo "Warning: failed to mount /proc.  This probably means that your copy of qemu is old and buggy.  This is unlikely to work very well..."
+    sleep 2
+fi
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 mount -t tmpfs tmpfs /tmp/
