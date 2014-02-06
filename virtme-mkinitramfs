@@ -1,0 +1,54 @@
+#!/usr/bin/python3
+# -*- mode: python -*-
+# virtme-mkinitramfs: Generate an initramfs image for virtme
+# Copyright © 2013 Andy Lutomirski
+# Licensed under the GPLv2, which is available in the virtme distribution
+# as a file called LICENSE with SHA-256 hash:
+# 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+
+import argparse
+import shutil
+import cpiowriter
+import inspect
+import io
+import os.path
+import shlex
+
+def make_base_layout(cw):
+    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot'):
+        cw.mkdir(dir, 0o755)
+
+    cw.symlink(b'bin', b'sbin')
+    cw.symlink(b'lib', b'lib64')
+
+def install_busybox(cw):
+    bbpath = shutil.which('busybox')
+    with open(bbpath, 'rb') as busybox:
+        cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
+
+    for tool in ('sh', 'mount', 'umount', 'modprobe', 'switch_root'):
+        cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
+
+def generate_init():
+    mypath = os.path.dirname(os.path.abspath(
+        inspect.getfile(inspect.currentframe())))
+
+    out = io.StringIO()
+    out.write('#!/bin/sh\n')
+    out.write('echo \'Mounting hostfs...\'\n')
+    out.write('/bin/mount -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/\n')    
+
+    out.write('exec /bin/switch_root /newroot %s\n' % shlex.quote(os.path.join(mypath, 'virtme-init')))
+    return out.getvalue().encode('utf-8')
+
+def main():
+    import sys
+    cw = cpiowriter.CpioWriter(sys.stdout.buffer)
+    make_base_layout(cw)
+    install_busybox(cw)
+    cw.write_file(b'init', body=generate_init(), mode=0o755)
+    cw.write_trailer()
+    return 0
+
+if __name__ == '__main__':
+    exit(main())
