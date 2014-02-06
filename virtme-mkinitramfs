@@ -15,38 +15,59 @@ import os.path
 import shlex
 
 def make_base_layout(cw):
-    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot'):
+    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev'):
         cw.mkdir(dir, 0o755)
 
     cw.symlink(b'bin', b'sbin')
     cw.symlink(b'lib', b'lib64')
+
+def make_dev_nodes(cw):
+    cw.mkchardev(b'dev/console', (5, 1), mode=0x700)
 
 def install_busybox(cw):
     bbpath = shutil.which('busybox')
     with open(bbpath, 'rb') as busybox:
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
-    for tool in ('sh', 'mount', 'umount', 'modprobe', 'switch_root'):
+    for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep'):
         cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
+
+    cw.mkdir(b'bin/real_progs', mode=0o755)
+    cw.symlink(b'../busybox', b'bin/real_progs/modprobe')
+
+def install_modprobe(cw):
+    cw.write_file(name=b'bin/modprobe', body=b'\n'.join([
+        b'#!/bin/sh',
+        b'echo "Kernel requests $3" >/dev/console',
+        b'if ! /bin/real_progs/modprobe "$@"; then'
+        b'  echo "modprobe $@ failed!" >/dev/console',
+        b'fi']), mode=0o755)
 
 def generate_init():
     mypath = os.path.dirname(os.path.abspath(
         inspect.getfile(inspect.currentframe())))
 
     out = io.StringIO()
-    out.write('#!/bin/sh\n')
-    out.write('echo \'Mounting hostfs...\'\n')
-    out.write('/bin/mount -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/\n')    
-    out.write('echo \'Initramfs is done; switching to real root\'\n')
-
-    out.write('exec /bin/switch_root /newroot %s\n' % shlex.quote(os.path.join(mypath, 'virtme-init')))
+    out.write('\n'.join([
+        '#!/bin/sh',
+        'echo \'Mounting hostfs...\'',
+        'if ! /bin/mount -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/; then',
+        '  echo "Failed to switch to real root.  We are stuck."',
+        '  sleep 5',
+        'fi',
+        'echo \'Initramfs is done; switching to real root\'',
+        ('exec /bin/switch_root /newroot %s' %
+         shlex.quote(os.path.join(mypath, 'virtme-init')))
+    ]))
     return out.getvalue().encode('utf-8')
 
 def main():
     import sys
     cw = cpiowriter.CpioWriter(sys.stdout.buffer)
     make_base_layout(cw)
+    make_dev_nodes(cw)
     install_busybox(cw)
+    install_modprobe(cw)
     cw.write_file(b'init', body=generate_init(), mode=0o755)
     cw.write_trailer()
     return 0

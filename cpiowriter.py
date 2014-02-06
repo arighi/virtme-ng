@@ -12,6 +12,7 @@ class CpioWriter(object):
     TYPE_DIR =     0o0040000
     TYPE_REG =     0o0100000
     TYPE_SYMLINK = 0o0120000
+    TYPE_CHRDEV =  0o0020000
     TYPE_MASK =    0o0170000
 
     def __init__(self, f):
@@ -78,3 +79,9 @@ class CpioWriter(object):
 
     def write_file(self, name, body, mode):
         self.write_object(name=name, body=body, mode=CpioWriter.TYPE_REG | mode)
+
+    def mkchardev(self, name, dev, mode):
+        major,minor = dev
+        self.write_object(name=name, mode=CpioWriter.TYPE_CHRDEV | mode,
+                          devmajor=major, devminor=minor,
+                          body=b'')
