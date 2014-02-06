@@ -37,6 +37,7 @@ def generate_init():
     out.write('#!/bin/sh\n')
     out.write('echo \'Mounting hostfs...\'\n')
     out.write('/bin/mount -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/\n')    
+    out.write('echo \'Initramfs is done; switching to real root\'\n')
 
     out.write('exec /bin/switch_root /newroot %s\n' % shlex.quote(os.path.join(mypath, 'virtme-init')))
     return out.getvalue().encode('utf-8')

@@ -9,8 +9,8 @@ export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export TERM=linux
 
 # Set up a minimally functional system
-mount -t proc -o nosuid,noexec,nodev /proc/
-mount -t sysfs -o nosuid,noexec,nodev /sys/
+mount -t proc -o nosuid,noexec,nodev proc /proc/
+mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 mount -t tmpfs tmpfs /tmp/
 mount -t tmpfs tmpfs /run/
