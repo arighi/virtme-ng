@@ -21,8 +21,14 @@ else
     udevd=`which udevd`
 fi
 
-# Ideally we'll use devtmpfs
-if mount -t devtmpfs -o mode=0755,nosuid,noexec none /dev &>/dev/null; then
+# Ideally we'll use devtmpfs (but don't rely on /dev/null existing)
+if [[ -c /dev/null ]]; then
+    mount -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev &>/dev/null
+else
+    mount -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+fi
+
+if (( $? == 0 )); then
     "$udevd" --daemon --resolve-names=never
 else
     # The running kernel doesn't have devtmpfs.  Use regular tmpfs.

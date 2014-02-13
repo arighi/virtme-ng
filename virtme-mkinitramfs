@@ -22,14 +22,16 @@ def make_base_layout(cw):
     cw.symlink(b'lib', b'lib64')
 
 def make_dev_nodes(cw):
-    cw.mkchardev(b'dev/console', (5, 1), mode=0x700)
+    cw.mkchardev(b'dev/null', (1, 3), mode=0o666)
+    cw.mkchardev(b'dev/console', (5, 1), mode=0o660)
 
 def install_busybox(cw):
     bbpath = shutil.which('busybox')
     with open(bbpath, 'rb') as busybox:
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
-    for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir'):
+    for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir',
+                 'mknod'):
         cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
 
     cw.mkdir(b'bin/real_progs', mode=0o755)
@@ -67,8 +69,8 @@ if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
       mount --bind "$i" /newroot/"$i"
     fi
   done
+  mknod /newroot/dev/null c 1 3
   mount -o remount,ro -t tmpfs root_workaround /newroot
-  mount -t tmpfs yet_another_dev /newroot/dev
   umount -l /tmproot
 else
   umount /newroot/proc  # Don't leave garbage behind
