@@ -60,13 +60,15 @@ if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
   mount --move /newroot /tmproot
   mount -t tmpfs root_workaround /newroot/
   cd tmproot
+  mkdir /newroot/proc /newroot/sys /newroot/dev /newroot/run /newroot/tmp
   for i in *; do
-    if [[ -d "$i" ]]; then
+    if [[ -d "$i" && \! -d "/newroot/$i" ]]; then
       mkdir /newroot/"$i"
       mount --bind "$i" /newroot/"$i"
     fi
   done
   mount -o remount,ro -t tmpfs root_workaround /newroot
+  mount -t tmpfs yet_another_dev /newroot/dev
   umount -l /tmproot
 else
   umount /newroot/proc  # Don't leave garbage behind

@@ -31,8 +31,7 @@ Your host system will need to satisfy some prerequisites:
 * You need a statically linked `busybox` binary somewhere in your path.
 * You need Python 3.3.
 * Some versions of Ubuntu have very odd defaults for the symlink called qemu.  Try `update-alternatives --config qemu` if your boot hangs.
-* QEMU 1.6 or higher is recommended.  QEMU 1.4 and 1.5 are supported using
-  a rather ugly kludge.
+* QEMU 1.6 or higher is recommended.  QEMU 1.4 and 1.5 are partially supported using a rather ugly kludge.
 
 virtme-runkernel does not (yet) support modular virtio or 9p, so you
 can't use your distro kernel.  (virtme-mkinitramfs does, but there's no
