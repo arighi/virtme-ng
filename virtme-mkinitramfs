@@ -15,7 +15,7 @@ import os.path
 import shlex
 
 def make_base_layout(cw):
-    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev'):
+    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'tmproot'):
         cw.mkdir(dir, 0o755)
 
     cw.symlink(b'bin', b'sbin')
@@ -29,7 +29,7 @@ def install_busybox(cw):
     with open(bbpath, 'rb') as busybox:
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
-    for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep'):
+    for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir'):
         cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
 
     cw.mkdir(b'bin/real_progs', mode=0o755)
@@ -43,22 +43,46 @@ def install_modprobe(cw):
         b'  echo "modprobe $@ failed!" >/dev/console',
         b'fi']), mode=0o755)
 
+_INIT = """#!/bin/sh
+echo 'Mounting hostfs...'
+
+if ! /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/; then
+  echo "Failed to switch to real root.  We are stuck."
+  sleep 5
+fi
+
+# Can we actually use /newroot/ as root?
+if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
+  # QEMU 1.5 and below have a bug in virtfs that prevents mounting
+  # anything on top of a virtfs mount.
+  echo "virtme: your host's virtfs is broken -- using a fallback tmpfs"
+
+  mount --move /newroot /tmproot
+  mount -t tmpfs root_workaround /newroot/
+  cd tmproot
+  for i in *; do
+    if [[ -d "$i" ]]; then
+      mkdir /newroot/"$i"
+      mount --bind "$i" /newroot/"$i"
+    fi
+  done
+  mount -o remount,ro -t tmpfs root_workaround /newroot
+  umount -l /tmproot
+else
+  umount /newroot/proc  # Don't leave garbage behind
+fi
+
+echo 'Initramfs is done; switching to real root'
+exec /bin/switch_root /newroot {hostfsroot}
+"""
+
 def generate_init():
     mypath = os.path.dirname(os.path.abspath(
         inspect.getfile(inspect.currentframe())))
 
     out = io.StringIO()
-    out.write('\n'.join([
-        '#!/bin/sh',
-        'echo \'Mounting hostfs...\'',
-        'if ! /bin/mount -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/; then',
-        '  echo "Failed to switch to real root.  We are stuck."',
-        '  sleep 5',
-        'fi',
-        'echo \'Initramfs is done; switching to real root\'',
-        ('exec /bin/switch_root /newroot %s' %
-         shlex.quote(os.path.join(mypath, 'virtme-init')))
-    ]))
+    out.write(_INIT.format(hostfsroot=shlex.quote(os.path.join(
+        mypath, 'virtme-init'))))
     return out.getvalue().encode('utf-8')
 
 def main():
