@@ -83,5 +83,5 @@ class CpioWriter(object):
     def mkchardev(self, name, dev, mode):
         major,minor = dev
         self.write_object(name=name, mode=CpioWriter.TYPE_CHRDEV | mode,
-                          devmajor=major, devminor=minor,
+                          rdevmajor=major, rdevminor=minor,
                           body=b'')
