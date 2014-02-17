@@ -13,6 +13,13 @@ import inspect
 import io
 import os.path
 import shlex
+import modfinder
+import virtmods
+
+_ARGPARSER = argparse.ArgumentParser(
+    description='Generate initramfs image for virtme',
+)
+_ARGPARSER.add_argument('--mod-kversion', action='store', default=None)
 
 def make_base_layout(cw):
     for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'tmproot'):
@@ -31,21 +38,36 @@ def install_busybox(cw):
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
     for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir',
-                 'mknod'):
+                 'mknod', 'insmod'):
         cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
 
     cw.mkdir(b'bin/real_progs', mode=0o755)
-    cw.symlink(b'../busybox', b'bin/real_progs/modprobe')
 
 def install_modprobe(cw):
     cw.write_file(name=b'bin/modprobe', body=b'\n'.join([
         b'#!/bin/sh',
-        b'echo "Kernel requests $3" >/dev/console',
-        b'if ! /bin/real_progs/modprobe "$@"; then'
-        b'  echo "modprobe $@ failed!" >/dev/console',
-        b'fi']), mode=0o755)
+        b'echo "virtme: initramfs does not have module $3" >/dev/console',
+    ]), mode=0o755)
+
+def install_modules(cw, modfiles):
+    cw.mkdir(b'modules', 0o755)
+    paths = []
+    for mod in modfiles:
+        with open(mod, 'rb') as f:
+            modpath = 'modules/' + os.path.basename(mod)
+            paths.append(modpath)
+            cw.write_file(name=modpath.encode('ascii'),
+                          body=f, mode=0o644)
+
+    script = '\n'.join('echo \'Loading %s...\'; insmod %s' %
+                       (os.path.basename(p), shlex.quote(p)) for p in paths)
+    cw.write_file(name=b'modules/load_all.sh',
+                  body=script.encode('ascii'), mode=0o644)
 
 _INIT = """#!/bin/sh
+
+source /modules/load_all.sh
+
 echo 'Mounting hostfs...'
 
 if ! /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/; then
@@ -91,13 +113,23 @@ def generate_init():
 
 def main():
     import sys
+
+    args = _ARGPARSER.parse_args()
+
+    modfiles = []
+    if args.mod_kversion is not None:
+        modfiles = modfinder.find_modules_from_install(
+            virtmods.MODALIASES, kver=args.mod_kversion)
+
     cw = cpiowriter.CpioWriter(sys.stdout.buffer)
     make_base_layout(cw)
     make_dev_nodes(cw)
     install_busybox(cw)
     install_modprobe(cw)
+    install_modules(cw, modfiles)
     cw.write_file(b'init', body=generate_init(), mode=0o755)
     cw.write_trailer()
+
     return 0
 
 if __name__ == '__main__':
