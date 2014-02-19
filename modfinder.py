@@ -49,3 +49,23 @@ def merge_mods(lists):
 
 def find_modules_from_install(aliases, root=None, kver=None):
     return merge_mods(resolve_dep(a, root=root, kver=kver) for a in aliases)
+
+def find_modules_from_kernelbuild(modpaths, kdir):
+    ret = []
+    for p in modpaths:
+        fullpath = os.path.join(kdir, p)
+        if os.path.isfile(fullpath):
+            ret.append(fullpath)
+    return ret
+
+def generate_modpaths(aliases):
+    """
+    This is a hack that only really works on an allmodconfig kernel.
+    """
+    kver = os.uname().release
+    start = '/lib/modules/%s' % kver
+    paths = find_modules_from_install(aliases, kver=kver)
+    print('MODPATHS = [')
+    for p in paths:
+        print('    %r,' % os.path.relpath(p, start))
+    print(']')

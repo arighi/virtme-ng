@@ -19,3 +19,17 @@ MODALIASES = [
     'pci:v00001AF4d00001009sv00001AF4sd00000009bc00sc02i00',  # 9pnet
     'pci:v00001AF4d00001003sv00001AF4sd00000003bc07sc80i00',  # virtconsole
 ]
+
+
+# This is a heuristic to allow virtme to work even if depmod hasn't
+# been run.
+MODPATHS = [
+    'kernel/fs/fscache/fscache.ko',
+    'kernel/net/9p/9pnet.ko',
+    'kernel/fs/9p/9p.ko',
+    'kernel/drivers/virtio/virtio.ko',
+    'kernel/drivers/virtio/virtio_ring.ko',
+    'kernel/net/9p/9pnet_virtio.ko',
+    'kernel/drivers/char/virtio_console.ko',
+    'kernel/drivers/virtio/virtio_pci.ko',
+]
