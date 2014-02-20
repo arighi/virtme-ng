@@ -67,6 +67,7 @@ echo 'Mounting hostfs...'
 if ! /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any hostroot /newroot/; then
   echo "Failed to switch to real root.  We are stuck."
   sleep 5
+  exit 1
 fi
 
 # Can we actually use /newroot/ as root?
