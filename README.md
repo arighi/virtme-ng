@@ -18,13 +18,15 @@ Virtme is hosted at kernel.org in utils/kernel/virtme/virtme.git ([web][korg-web
 How to use virtme
 =================
 
-You'll need a Linux kernel compiled with these options:
+You'll need a Linux kernel that has these options (built-in or as modules):
 
-    CONFIG_VIRTIO=y
-    CONFIG_VIRTIO_PCI=y
-    CONFIG_NET_9P=y
-    CONFIG_NET_9P_VIRTIO=y
-    CONFIG_9P_FS=y
+    CONFIG_VIRTIO
+    CONFIG_VIRTIO_PCI
+    CONFIG_NET_9P
+    CONFIG_NET_9P_VIRTIO
+    CONFIG_9P_FS
+
+That kernel needs to be sane.  If you're using allmodconfig, you get an insane kernel.  You will, at least, need to have CONFIG_BINFMT_SCRIPT built-in, and you should probably turn off CONFIG_EMBEDDED and possibly CONFIG_EXPERT as well.  If you're trying to run from the kernel directory as opposed to from an installed kernel, you should turn off CONFIG_MODULE_SIG_FORCE.
 
 Your host system will need to satisfy some prerequisites:
 
@@ -34,8 +36,7 @@ Your host system will need to satisfy some prerequisites:
 * QEMU 1.6 or higher is recommended.  QEMU 1.4 and 1.5 are partially supported using a rather ugly kludge.
 
 virtme-runkernel does not (yet) support modular virtio or 9p, so you
-can't use your distro kernel.  (virtme-mkinitramfs does, but there's no
-easy UI.)  Fixing this is a high priority.
+can't use your distro kernel.  (virtme-run does, but it's not documented yet.)
 
 Once you have such a kernel, run:
 

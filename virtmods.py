@@ -11,6 +11,7 @@ MODALIASES = [
     'fs-9p',
     'virtio:d00000009v00001AF4',  # 9pnet_virtio
     'virtio:d00000003v00001AF4',  # virtio_console
+    'unix',
 
     # For virtio_pci architectures (which are, hopefully, all that we care
     # about), there's really only one required driver, virtio_pci.
@@ -24,12 +25,13 @@ MODALIASES = [
 # This is a heuristic to allow virtme to work even if depmod hasn't
 # been run.
 MODPATHS = [
-    'kernel/fs/fscache/fscache.ko',
-    'kernel/net/9p/9pnet.ko',
-    'kernel/fs/9p/9p.ko',
-    'kernel/drivers/virtio/virtio.ko',
-    'kernel/drivers/virtio/virtio_ring.ko',
-    'kernel/net/9p/9pnet_virtio.ko',
-    'kernel/drivers/char/virtio_console.ko',
-    'kernel/drivers/virtio/virtio_pci.ko',
+    'fs/fscache/fscache.ko',
+    'net/9p/9pnet.ko',
+    'fs/9p/9p.ko',
+    'drivers/virtio/virtio.ko',
+    'drivers/virtio/virtio_ring.ko',
+    'net/9p/9pnet_virtio.ko',
+    'drivers/char/virtio_console.ko',
+    'net/unix/unix.ko',
+    'drivers/virtio/virtio_pci.ko',
 ]

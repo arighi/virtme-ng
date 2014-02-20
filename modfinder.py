@@ -58,13 +58,16 @@ def find_modules_from_kernelbuild(modpaths, kdir):
             ret.append(fullpath)
     return ret
 
-def generate_modpaths(aliases):
+def generate_modpaths(aliases, kver=None, root=None):
     """
     This is a hack that only really works on an allmodconfig kernel.
     """
-    kver = os.uname().release
-    start = '/lib/modules/%s' % kver
-    paths = find_modules_from_install(aliases, kver=kver)
+    if kver is None:
+        kver = os.uname().release
+    if root is None:
+        root = '/'
+    start = os.path.join(root, 'lib/modules', kver, 'kernel')
+    paths = find_modules_from_install(aliases, kver=kver, root=root)
     print('MODPATHS = [')
     for p in paths:
         print('    %r,' % os.path.relpath(p, start))
