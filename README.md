@@ -26,7 +26,16 @@ You'll need a Linux kernel that has these options (built-in or as modules):
     CONFIG_NET_9P_VIRTIO
     CONFIG_9P_FS
 
-That kernel needs to be sane.  If you're using allmodconfig, you get an insane kernel.  You will, at least, need to have CONFIG_BINFMT_SCRIPT built-in, and you should probably turn off CONFIG_EMBEDDED and possibly CONFIG_EXPERT as well.  If you're trying to run from the kernel directory as opposed to from an installed kernel, you should turn off CONFIG_MODULE_SIG_FORCE.
+That kernel needs to be sane.  Your kernel is probably sane, but allmodconfig and allyesconfig generate insane kernels.  Sanity includes:
+
+    CONFIG_CMDLINE_OVERRIDE=n
+    CONFIG_BINFMT_SCRIPT=y
+
+You may also have better luck if you set:
+
+    CONFIG_EMBEDDED=n
+    CONFIG_EXPERT=n
+    CONFIG_MODULE_SIG_FORCE=n
 
 Your host system will need to satisfy some prerequisites:
 

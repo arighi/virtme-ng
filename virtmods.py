@@ -11,7 +11,6 @@ MODALIASES = [
     'fs-9p',
     'virtio:d00000009v00001AF4',  # 9pnet_virtio
     'virtio:d00000003v00001AF4',  # virtio_console
-    'unix',
 
     # For virtio_pci architectures (which are, hopefully, all that we care
     # about), there's really only one required driver, virtio_pci.
@@ -19,6 +18,13 @@ MODALIASES = [
     # for basic functionality.
     'pci:v00001AF4d00001009sv00001AF4sd00000009bc00sc02i00',  # 9pnet
     'pci:v00001AF4d00001003sv00001AF4sd00000003bc07sc80i00',  # virtconsole
+
+    # Basic system functionality
+    'unix',  # UNIX sockets, needed by udev
+
+    # Basic emulated hardware
+    'i8042',
+    'atkbd',
 ]
 
 
@@ -32,6 +38,10 @@ MODPATHS = [
     'drivers/virtio/virtio_ring.ko',
     'net/9p/9pnet_virtio.ko',
     'drivers/char/virtio_console.ko',
-    'net/unix/unix.ko',
     'drivers/virtio/virtio_pci.ko',
+    'net/unix/unix.ko',
+    'drivers/input/serio/serio.ko',
+    'drivers/input/serio/i8042.ko',
+    'drivers/input/serio/libps2.ko',
+    'drivers/input/keyboard/atkbd.ko',
 ]
