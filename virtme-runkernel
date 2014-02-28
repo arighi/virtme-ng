@@ -20,4 +20,4 @@ else
     qemu=qemu
 fi
 
-exec "$qemu" -virtfs local,id=rootfs,path=/,security_model=passthrough,mount_tag=hostroot,readonly -initrd /proc/self/fd/3 -machine accel=kvm:tcg -kernel "$@" 
+exec "$qemu" -virtfs local,id=rootfs,path=/,security_model=passthrough,mount_tag=virtme.root,readonly -initrd /proc/self/fd/3 -machine accel=kvm:tcg -kernel "$@" 
