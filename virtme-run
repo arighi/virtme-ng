@@ -1,0 +1,114 @@
+#!/usr/bin/python3
+# -*- mode: python -*-
+# virtme-runkernel: A silly script to run a kernel image
+# Copyright © 2014 Andy Lutomirski
+# Licensed under the GPLv2, which is available in the virtme distribution
+# as a file called LICENSE with SHA-256 hash:
+# 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+
+import argparse
+import virtmods
+import modfinder
+import tempfile
+import shutil
+import os
+import fcntl
+import sys
+from mkinitramfs import mkinitramfs
+
+uname = os.uname()
+
+def make_parser():
+    parser = argparse.ArgumentParser(
+        description='Virtualize your system (or another) under a kernel image',
+    )
+
+    g = parser.add_argument_group(title='Selection of kernel and modules').add_mutually_exclusive_group()
+    g.add_argument('--installed-kernel', action='store', nargs='?',
+                   const=uname.release, default=None, metavar='VERSION',
+                   help='Use an installed kernel and its associated modules.  If no version is specified, the running kernel will be used.')
+
+    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
+                   help='Use a compiled kernel source directory')
+
+    g = parser.add_argument_group(title='Virtualizer settings')
+    g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
+                   metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.')
+
+    return parser
+
+_ARGPARSER = make_parser()
+
+def arg_fail(message):
+    print(message)
+    _ARGPARSER.print_usage()
+    sys.exit(1)
+
+def find_qemu(machine=None):
+    if machine is None:
+        machine = os.uname().machine
+
+    qemu = shutil.which('qemu-system-%s' % machine)
+    if qemu is not None:
+        return qemu
+
+    qemu = shutil.which('qemu-kvm')
+    if qemu is not None:
+        return qemu
+
+    return None
+
+def find_kernel_and_mods(args):
+    if args.installed_kernel is not None:
+        kver = args.installed_kernel
+        modfiles = modfinder.find_modules_from_install(
+            virtmods.MODALIASES, kver=kver)
+        kimg = '/boot/vmlinuz-%s' % kver
+    elif args.kernel_build_dir is not None:
+        kimg = os.path.join(args.kernel_build_dir, 'arch/x86/boot/bzImage')
+        modfiles = modfinder.find_modules_from_install(
+            virtmods.MODALIASES,
+            moddir=os.path.join(args.kernel_build_dir, '.tmp_moddir'))
+    else:
+        arg_fail('You must specify a kernel to use.')
+
+    return kimg,modfiles
+
+def main():
+    args = _ARGPARSER.parse_args()
+
+    qemu = find_qemu()
+
+    kimg, modfiles = find_kernel_and_mods(args)
+
+    tmpfd,tmpname = tempfile.mkstemp('irfs')
+    os.unlink(tmpname)
+    tmpfile = os.fdopen(tmpfd, 'r+b')
+    
+    mkinitramfs(tmpfile, modfiles=modfiles)
+    tmpfile.flush()
+
+    qemuargs = [qemu]
+
+    # Set up virtfs
+    qemuargs.extend(['-virtfs', 'local,id=rootfs,path=/,security_model=passthrough,mount_tag=virtme.root,readonly'])
+
+    # Turn on KVM if available
+    qemuargs.extend(['-machine', 'accel=kvm:tcg'])
+
+    # Ask QEMU to load the kernel image directly
+    qemuargs.extend(['-kernel', kimg])
+
+    # Set up the initramfs (warning: hack ahead)
+    fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
+    qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
+
+    # Handle --qemu-opts
+    if args.qemu_opts is not None:
+        qemuargs.extend(args.qemu_opts)
+
+    # Go!
+    os.execv(qemu, qemuargs)
+
+if __name__ == '__main__':
+    exit(main())
