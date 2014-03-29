@@ -67,6 +67,7 @@ def find_kernel_and_mods(args):
         kver = args.installed_kernel
         modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=kver)
+        moddir = os.path.join('/lib/modules', kver)
         kimg = '/boot/vmlinuz-%s' % kver
 #    Disabled until kmod gets fixed.
 #    elif args.kernel_build_dir is not None:
@@ -77,17 +78,18 @@ def find_kernel_and_mods(args):
     elif args.kimg is not None:
         kimg = args.kimg
         modfiles = []
+        moddir = None
     else:
         arg_fail('You must specify a kernel to use.')
 
-    return kimg,modfiles
+    return kimg,modfiles,moddir
 
 def main():
     args = _ARGPARSER.parse_args()
 
     qemu = find_qemu()
 
-    kimg, modfiles = find_kernel_and_mods(args)
+    kimg,modfiles,moddir = find_kernel_and_mods(args)
 
     tmpfd,tmpname = tempfile.mkstemp('irfs')
     os.unlink(tmpname)
@@ -100,6 +102,10 @@ def main():
 
     # Set up virtfs
     qemuargs.extend(['-virtfs', 'local,id=rootfs,path=/,security_model=passthrough,mount_tag=virtme.root,readonly'])
+
+    # Map modules
+    if moddir is not None:
+        qemuargs.extend(['-virtfs', 'local,path=%s,security_model=passthrough,mount_tag=virtme.moddir,readonly' % moddir])
 
     # Turn on KVM if available
     qemuargs.extend(['-machine', 'accel=kvm:tcg'])
