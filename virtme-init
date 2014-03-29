@@ -51,12 +51,12 @@ else
     mknod -m 0666 /dev/null c 1 3
     mknod -m 0660 /dev/kmsg c 1 11
     mknod -m 0600 /dev/console c 5 1
-
-    # Try to get udevd to coldplug everything
-    "$udevd" --daemon --resolve-names=never
-    udevadm trigger --action=add  >/dev/null 2>&1
-    udevadm settle
 fi
+
+# Try to get udevd to coldplug everything
+"$udevd" --daemon --resolve-names=never
+udevadm trigger --action=add  >/dev/null 2>&1
+udevadm settle
 
 mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
