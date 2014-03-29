@@ -19,13 +19,15 @@ import itertools
 
 _INSMOD_RE = re.compile('insmod (.*[^ ]) *$')
 
-def resolve_dep(modalias, root=None, kver=None):
+def resolve_dep(modalias, root=None, kver=None, moddir=None):
     args = ['modprobe', '--show-depends']
     args += ['-C', '/var/empty']
     if root is not None:
         args += ['-d', root]
     if kver is not None:
         args += ['-S', kver]
+    if moddir is not None:
+        args += ['--moddir', moddir]
     args += ['--', modalias]
 
     deps = []
@@ -47,28 +49,6 @@ def merge_mods(lists):
             mods.append(mod)
     return mods
 
-def find_modules_from_install(aliases, root=None, kver=None):
-    return merge_mods(resolve_dep(a, root=root, kver=kver) for a in aliases)
-
-def find_modules_from_kernelbuild(modpaths, kdir):
-    ret = []
-    for p in modpaths:
-        fullpath = os.path.join(kdir, p)
-        if os.path.isfile(fullpath):
-            ret.append(fullpath)
-    return ret
-
-def generate_modpaths(aliases, kver=None, root=None):
-    """
-    This is a hack that only really works on an allmodconfig kernel.
-    """
-    if kver is None:
-        kver = os.uname().release
-    if root is None:
-        root = '/'
-    start = os.path.join(root, 'lib/modules', kver, 'kernel')
-    paths = find_modules_from_install(aliases, kver=kver, root=root)
-    print('MODPATHS = [')
-    for p in paths:
-        print('    %r,' % os.path.relpath(p, start))
-    print(']')
+def find_modules_from_install(aliases, root=None, kver=None, moddir=None):
+    return merge_mods(resolve_dep(a, root=root, kver=kver, moddir=moddir)
+                      for a in aliases)

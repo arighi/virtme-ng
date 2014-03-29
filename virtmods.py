@@ -26,22 +26,3 @@ MODALIASES = [
     'i8042',
     'atkbd',
 ]
-
-
-# This is a heuristic to allow virtme to work even if depmod hasn't
-# been run.
-MODPATHS = [
-    'fs/fscache/fscache.ko',
-    'net/9p/9pnet.ko',
-    'fs/9p/9p.ko',
-    'drivers/virtio/virtio.ko',
-    'drivers/virtio/virtio_ring.ko',
-    'net/9p/9pnet_virtio.ko',
-    'drivers/char/virtio_console.ko',
-    'drivers/virtio/virtio_pci.ko',
-    'net/unix/unix.ko',
-    'drivers/input/serio/serio.ko',
-    'drivers/input/serio/i8042.ko',
-    'drivers/input/serio/libps2.ko',
-    'drivers/input/keyboard/atkbd.ko',
-]
