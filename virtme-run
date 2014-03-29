@@ -28,8 +28,12 @@ def make_parser():
                    const=uname.release, default=None, metavar='VERSION',
                    help='Use an installed kernel and its associated modules.  If no version is specified, the running kernel will be used.')
 
-    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
-                   help='Use a compiled kernel source directory')
+    g.add_argument('--kimg', action='store',
+                   help='Use specified kernel image with no modules')
+
+#    Disabled until kmod gets fixed.
+#    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
+#                   help='Use a compiled kernel source directory')
 
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
@@ -64,11 +68,15 @@ def find_kernel_and_mods(args):
         modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=kver)
         kimg = '/boot/vmlinuz-%s' % kver
-    elif args.kernel_build_dir is not None:
-        kimg = os.path.join(args.kernel_build_dir, 'arch/x86/boot/bzImage')
-        modfiles = modfinder.find_modules_from_install(
-            virtmods.MODALIASES,
-            moddir=os.path.join(args.kernel_build_dir, '.tmp_moddir'))
+#    Disabled until kmod gets fixed.
+#    elif args.kernel_build_dir is not None:
+#        kimg = os.path.join(args.kernel_build_dir, 'arch/x86/boot/bzImage')
+#        modfiles = modfinder.find_modules_from_install(
+#            virtmods.MODALIASES,
+#            moddir=os.path.join(args.kernel_build_dir, '.tmp_moddir'))
+    elif args.kimg is not None:
+        kimg = args.kimg
+        modfiles = []
     else:
         arg_fail('You must specify a kernel to use.')
 
