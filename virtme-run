@@ -117,6 +117,10 @@ def main():
     fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
     qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
 
+    # Set up / override baseline devices
+    qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
+    qemuargs.extend(['-balloon', 'virtio'])
+
     # Handle --qemu-opts
     if args.qemu_opts is not None:
         qemuargs.extend(args.qemu_opts)
