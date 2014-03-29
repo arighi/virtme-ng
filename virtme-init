@@ -13,6 +13,7 @@ mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 mount -t tmpfs tmpfs /tmp/
 mount -t tmpfs tmpfs /run/
+[[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
 
 # Find udevd
 if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
