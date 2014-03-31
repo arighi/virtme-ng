@@ -94,7 +94,7 @@ else
 fi
 
 echo 'Initramfs is done; switching to real root'
-exec /bin/switch_root /newroot {hostfsroot}
+exec /bin/switch_root /newroot {virtme_init}
 """
 
 def generate_init():
@@ -102,7 +102,7 @@ def generate_init():
         inspect.getfile(inspect.currentframe())))
 
     out = io.StringIO()
-    out.write(_INIT.format(hostfsroot=shlex.quote(os.path.join(
+    out.write(_INIT.format(virtme_init=shlex.quote(os.path.join(
         mypath, 'virtme-init'))))
     return out.getvalue().encode('utf-8')
 
