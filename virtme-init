@@ -23,6 +23,9 @@ if [[ -n "${mount_tags[virtme.moddir]}" ]]; then
     mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.moddir /lib/modules/"$kver"
 fi
 
+# Load modules
+"$(dirname $0)/virtme-loadmods"
+
 mount -t tmpfs tmpfs /tmp/
 mount -t tmpfs tmpfs /run/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
@@ -41,13 +44,11 @@ else
     mount -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
 fi
 
-if (( $? == 0 )); then
-    "$udevd" --daemon --resolve-names=never
-else
+if (( $? != 0 )); then
     # The running kernel doesn't have devtmpfs.  Use regular tmpfs.
     mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
 
-    # Make some basic devices first, let udev handle the rest
+    # Make some basic devices first, and let udev handle the rest
     mknod -m 0666 /dev/null c 1 3
     mknod -m 0660 /dev/kmsg c 1 11
     mknod -m 0600 /dev/console c 5 1

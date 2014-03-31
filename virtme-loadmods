@@ -1,0 +1,59 @@
+#!/usr/bin/python3
+# -*- mode: python -*-
+# virtme-loadmods: load modules for all available devices
+# Copyright © 2014 Andy Lutomirski
+# Licensed under the GPLv2, which is available in the virtme distribution
+# as a file called LICENSE with SHA-256 hash:
+# 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+
+import os
+import time
+import subprocess
+
+class State(object):
+    def __init__(self):
+        self.known = set()    # All modaliases we've heard of
+        self.pending = set()  # Modaliases that we need to try
+
+    def add(self, alias):
+        if alias not in self.known:
+            self.known.add(alias)
+            self.pending.add(alias)
+
+    def load_pending(self):
+        if len(self.pending) != 0:
+            args = ['modprobe', '-q', '-a', '--'] + list(self.pending)
+            self.pending = set()
+            try:
+                subprocess.check_call(args)
+            except subprocess.CalledProcessError:
+                pass
+
+    def run_pass(self):
+        # find is much faster than os.walk
+        filenames = subprocess.check_output(
+            ['find', '/sys/devices', '-type', 'f', '-name', 'modalias', '-print0']
+        ).decode('utf-8')
+
+        for fn in filenames.split('\0'):
+            if fn:
+                with open(fn, 'r') as f:
+                    self.add(f.read().rstrip())
+
+        if len(self.pending) != 0:
+            print("virtme-loadmods: requesting %d modaliases" %
+                  len(self.pending))
+            self.load_pending()
+            return True
+        else:
+            return False
+
+def main():
+    start = time.time()
+    state = State()
+    while state.run_pass():
+        pass
+    print("virtme-loadmods: done after %.0fms" % (1000 * (time.time() - start)))
+
+if __name__ == '__main__':
+    exit(main())
