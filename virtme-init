@@ -8,7 +8,6 @@
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export TERM=linux
 
-mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 declare -A mount_tags
@@ -29,6 +28,11 @@ fi
 mount -t tmpfs tmpfs /tmp/
 mount -t tmpfs tmpfs /run/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
+
+# Fix up /etc a little bit
+touch /tmp/fstab
+mount --bind /tmp/fstab /etc/fstab
+rm /tmp/fstab
 
 # Find udevd
 if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
@@ -54,14 +58,20 @@ if (( $? != 0 )); then
     mknod -m 0600 /dev/console c 5 1
 fi
 
+######## The remainder of this script is a very simple init (PID 1) ########
+
 # Try to get udevd to coldplug everything
 "$udevd" --daemon --resolve-names=never
 udevadm trigger --action=add  >/dev/null 2>&1
 udevadm settle
 
+# Set up filesystems that live in /dev
 mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
+
+# Mount proc
+mount -t proc -o nosuid,noexec,nodev proc /proc/
 
 # Bring up networking
 ip link set dev lo up
