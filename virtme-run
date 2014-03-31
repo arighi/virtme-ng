@@ -35,6 +35,10 @@ def make_parser():
 #    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
 #                   help='Use a compiled kernel source directory')
 
+    g = parser.add_argument_group(title='Canned settings')
+    g.add_argument('--console', action='store_true',
+                   help='Run headless -- use ctrl-A, x to exit')
+
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
                    metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.')
@@ -123,6 +127,19 @@ def main():
     qemuargs.extend(['-device', 'virtio-rng-pci'])
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
+
+    if args.console:
+        # It would be nice to use virtconsole, but it's terminally broken
+        # in current kernels.  Nonetheless, I'm configuring the console
+        # manually to make it easier to tweak in the future.
+        qemuargs.extend(['-echr', '1'])
+        qemuargs.extend(['-serial', 'none'])
+        qemuargs.extend(['-chardev', 'stdio,id=console,signal=off,mux=on'])
+        qemuargs.extend(['-device', 'isa-serial,chardev=console'])
+        qemuargs.extend(['-mon', 'chardev=console'])
+        qemuargs.extend(['-append', 'console=ttyS0 earlyprintk=serial,ttyS0,115200'])
+        qemuargs.extend(['-vga', 'none'])
+        qemuargs.extend(['-display', 'none'])
 
     # Handle --qemu-opts
     if args.qemu_opts is not None:
