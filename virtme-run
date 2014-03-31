@@ -1,6 +1,6 @@
 #!/usr/bin/python3
 # -*- mode: python -*-
-# virtme-runkernel: A silly script to run a kernel image
+# virtme-run: The main command-line virtme frontend
 # Copyright © 2014 Andy Lutomirski
 # Licensed under the GPLv2, which is available in the virtme distribution
 # as a file called LICENSE with SHA-256 hash:
