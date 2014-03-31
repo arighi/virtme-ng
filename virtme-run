@@ -120,6 +120,9 @@ def main():
     # Set up / override baseline devices
     qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
     qemuargs.extend(['-balloon', 'virtio'])
+    qemuargs.extend(['-device', 'virtio-rng-pci'])
+    qemuargs.extend(['-parallel', 'none'])
+    qemuargs.extend(['-net', 'none'])
 
     # Handle --qemu-opts
     if args.qemu_opts is not None:
