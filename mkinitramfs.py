@@ -44,6 +44,15 @@ def install_modprobe(cw):
         b'echo "virtme: initramfs does not have module $3" >/dev/console',
     ]), mode=0o755)
 
+_LOGFUNC = """log() {
+    if [[ -e /dev/kmsg ]]; then
+	echo "<6>virtme initramfs: $*" >/dev/kmsg
+    else
+	echo "virtme initramfs: $*"
+    fi
+}
+"""
+
 def install_modules(cw, modfiles):
     cw.mkdir(b'modules', 0o755)
     paths = []
@@ -54,20 +63,15 @@ def install_modules(cw, modfiles):
             cw.write_file(name=modpath.encode('ascii'),
                           body=f, mode=0o644)
 
-    script = '\n'.join('echo \'Loading %s...\'; insmod %s' %
+    script = _LOGFUNC + '\n'.join('log \'loading %s...\'; insmod %s' %
                        (os.path.basename(p), shlex.quote(p)) for p in paths)
     cw.write_file(name=b'modules/load_all.sh',
                   body=script.encode('ascii'), mode=0o644)
 
 _INIT = """#!/bin/sh
 
-log() {{
-    if [[ -e /dev/kmsg ]]; then
-	echo "<6>virtme initramfs: $*" >/dev/kmsg
-    else
-	echo "virtme initramfs: $*"
-    fi
-}}
+{logfunc}
+
 source /modules/load_all.sh
 
 log 'mounting hostfs...'
@@ -110,8 +114,9 @@ def generate_init():
         inspect.getfile(inspect.currentframe())))
 
     out = io.StringIO()
-    out.write(_INIT.format(virtme_init=shlex.quote(os.path.join(
-        mypath, 'virtme-init'))))
+    out.write(_INIT.format(
+        virtme_init=shlex.quote(os.path.join(mypath, 'virtme-init')),
+        logfunc=_LOGFUNC))
     return out.getvalue().encode('utf-8')
 
 def mkinitramfs(out, modfiles=[]):
