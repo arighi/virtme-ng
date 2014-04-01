@@ -42,6 +42,8 @@ def make_parser():
     g = parser.add_argument_group(title='Canned settings')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit')
+    g.add_argument('--net', action='store_true',
+                   help='Enable basic network access')
 
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
@@ -145,6 +147,11 @@ def main():
         kernelargs.extend(['console=ttyS0 earlyprintk=serial,ttyS0,115200'])
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
+
+    if args.net:
+        qemuargs.extend(['-net', 'nic,model=virtio'])
+        qemuargs.extend(['-net', 'user'])
+        kernelargs.extend(['virtme.dhcp'])
 
     # Insert kernel options
     if kernelargs:

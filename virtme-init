@@ -86,6 +86,15 @@ mount -t proc -o nosuid,noexec,nodev proc /proc/
 # Bring up networking
 ip link set dev lo up
 
+if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
+    if [[ -f /etc/resolv.conf ]]; then
+	tmpfile="`mktemp --tmpdir=/tmp`"
+	mount --bind "$tmpfile" /etc/resolv.conf
+	rm "$tmpfile"
+    fi
+    busybox udhcpc -i eth0 -t 1 -n -q -f -s "$(dirname $0)/virtme-udhcpc-script"
+fi
+
 # Create some VTs
 deallocvt
 openvt -c 2 -- /bin/bash
