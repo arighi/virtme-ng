@@ -35,13 +35,17 @@ def make_parser():
 #    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
 #                   help='Use a compiled kernel source directory')
 
+    g = parser.add_argument_group(title='Kernel options')
+    g.add_argument('-a', '--kopt', action='append', default=[],
+                   help='Add a kernel option.  You can specify this more than once.')
+
     g = parser.add_argument_group(title='Canned settings')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit')
 
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
-                   metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.')
+                   metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.  Avoid using -append; use --kopt instead.')
 
     return parser
 
@@ -103,6 +107,7 @@ def main():
     tmpfile.flush()
 
     qemuargs = [qemu]
+    kernelargs = []
 
     # Set up virtfs
     qemuargs.extend(['-virtfs', 'local,id=rootfs,path=/,security_model=passthrough,mount_tag=virtme.root,readonly'])
@@ -137,9 +142,13 @@ def main():
         qemuargs.extend(['-chardev', 'stdio,id=console,signal=off,mux=on'])
         qemuargs.extend(['-device', 'isa-serial,chardev=console'])
         qemuargs.extend(['-mon', 'chardev=console'])
-        qemuargs.extend(['-append', 'console=ttyS0 earlyprintk=serial,ttyS0,115200'])
+        kernelargs.extend(['console=ttyS0 earlyprintk=serial,ttyS0,115200'])
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
+
+    # Insert kernel options
+    if kernelargs:
+        qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
 
     # Handle --qemu-opts
     if args.qemu_opts is not None:
