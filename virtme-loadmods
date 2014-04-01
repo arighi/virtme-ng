@@ -18,7 +18,7 @@ log() {
 }
 
 log 'looking for modaliases'
-mods="$(find /sys/devices -type f -name modalias -print0 |xargs -0 cat)"
+mods="$(find /sys/devices -type f -name modalias -print0 |xargs -0 cat |sort |uniq)"
 
 log "requesting $(echo "$mods" |wc -w) modules"
 modprobe -q -a -- $mods
