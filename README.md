@@ -26,6 +26,8 @@ You'll need a Linux kernel that has these options (built-in or as modules)
     CONFIG_NET_9P_VIRTIO
     CONFIG_9P_FS
 
+For networking support, you also need CONFIG_VIRTIO_NET.
+
 That kernel needs to be sane.  Your kernel is probably sane, but allmodconfig and allyesconfig generate insane kernels.  Sanity includes:
 
     CONFIG_CMDLINE_OVERRIDE=n
@@ -40,7 +42,7 @@ You may also have better luck if you set:
 Your host system will need to satisfy some prerequisites:
 
 * You need a statically linked `busybox` binary somewhere in your path.
-* You need Python 3.3.
+* You need Python 3.3 or higher.
 * QEMU 1.6 or higher is recommended.  QEMU 1.4 and 1.5 are partially supported using a rather ugly kludge.
 
 Once you have such a kernel, run one of:
@@ -64,3 +66,4 @@ In the near term, the high-priority features are:
 
 * Support for modular virtfs and 9p for non-installed kernels.
 * Some way to configure writable mounts.
+* A clean way to run a script in the guest for testing.
