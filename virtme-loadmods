@@ -10,6 +10,13 @@ import os
 import time
 import subprocess
 
+def log(msg):
+    if os.path.exists('/dev/kmsg'):
+        with open('/dev/kmsg', 'w') as f:
+            f.write('<6>virtme-loadmods: %s\n' % msg)
+    else:
+        print('virtme-loadmods: %s' % msg)
+
 class State(object):
     def __init__(self):
         self.known = set()    # All modaliases we've heard of
@@ -41,8 +48,7 @@ class State(object):
                     self.add(f.read().rstrip())
 
         if len(self.pending) != 0:
-            print("virtme-loadmods: requesting %d modaliases" %
-                  len(self.pending))
+            log("requesting %d modaliases" % len(self.pending))
             self.load_pending()
             return True
         else:
@@ -53,7 +59,7 @@ def main():
     state = State()
     while state.run_pass():
         pass
-    print("virtme-loadmods: done after %.0fms" % (1000 * (time.time() - start)))
+    log("done after %.0fms" % (1000 * (time.time() - start)))
 
 if __name__ == '__main__':
     exit(main())

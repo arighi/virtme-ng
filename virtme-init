@@ -8,6 +8,14 @@
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
 export TERM=linux
 
+log() {
+    if [[ -e /dev/kmsg ]]; then
+	echo "<6>virtme-init: $*" >/dev/kmsg
+    else
+	echo "virtme-init: $*"
+    fi
+}
+
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 declare -A mount_tags
@@ -58,6 +66,8 @@ if (( $? != 0 )); then
     mknod -m 0600 /dev/console c 5 1
 fi
 
+log "basic initialization done"
+
 ######## The remainder of this script is a very simple init (PID 1) ########
 
 # Try to get udevd to coldplug everything
@@ -85,14 +95,14 @@ openvt -c 4 -- /bin/bash
 # Figure out what the main console is
 consdev="`grep ' ... (.C' /proc/consoles  |cut -d' ' -f1`"
 if [[ -z "$consdev" ]]; then
-    echo "Can't deduce console device" >&2
+    log "can't deduce console device"
     exec bash --login  # At least try to be helpful
 fi
 if [[ "$consdev" == "tty0" ]]; then
     consdev=tty1  # sigh
 fi
 if [[ ! -e "/dev/$consdev" ]]; then
-    echo "/dev/$consdev doesn't exist."
+    log "/dev/$consdev doesn't exist."
     exec bash --login
 fi
 

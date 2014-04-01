@@ -24,6 +24,7 @@ def make_base_layout(cw):
 
 def make_dev_nodes(cw):
     cw.mkchardev(b'dev/null', (1, 3), mode=0o666)
+    cw.mkchardev(b'dev/kmsg', (1, 11), mode=0o666)
     cw.mkchardev(b'dev/console', (5, 1), mode=0o660)
 
 def install_busybox(cw):
@@ -60,9 +61,16 @@ def install_modules(cw, modfiles):
 
 _INIT = """#!/bin/sh
 
+log() {{
+    if [[ -e /dev/kmsg ]]; then
+	echo "<6>virtme initramfs: $*" >/dev/kmsg
+    else
+	echo "virtme initramfs: $*"
+    fi
+}}
 source /modules/load_all.sh
 
-echo 'Mounting hostfs...'
+log 'mounting hostfs...'
 
 if ! /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.root /newroot/; then
   echo "Failed to switch to real root.  We are stuck."
@@ -74,7 +82,7 @@ fi
 if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
   # QEMU 1.5 and below have a bug in virtfs that prevents mounting
   # anything on top of a virtfs mount.
-  echo "virtme: your host's virtfs is broken -- using a fallback tmpfs"
+  log "your host's virtfs is broken -- using a fallback tmpfs"
 
   mount --move /newroot /tmproot
   mount -t tmpfs root_workaround /newroot/
@@ -93,7 +101,7 @@ else
   umount /newroot/proc  # Don't leave garbage behind
 fi
 
-echo 'Initramfs is done; switching to real root'
+log 'done; switching to real root'
 exec /bin/switch_root /newroot {virtme_init}
 """
 
