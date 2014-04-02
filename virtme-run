@@ -39,13 +39,17 @@ def make_parser():
     g.add_argument('-a', '--kopt', action='append', default=[],
                    help='Add a kernel option.  You can specify this more than once.')
 
-    g = parser.add_argument_group(title='Canned settings')
+    g = parser.add_argument_group(title='Guest features')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit')
     g.add_argument('--net', action='store_true',
                    help='Enable basic network access')
+    g.add_argument('--script', action='store',
+                   help="Run a script in the guest.  The script's stdin will be attached to virtme-run's stdin and the script's stdout and stderr will both be attached to virtme-run's stdout.  Kernel logs will go to stderr.  For now, arguments are not supported.  This behaves oddly if stdin is a terminal; try using 'cat |virtme-run' if you have trouble with script mode.")
 
     g = parser.add_argument_group(title='Virtualizer settings')
+    g.add_argument('-q', '--qemu-opt', action='append', default=[],
+                   help="Add a single QEMU argument.  Use this when --qemu-opts's greedy behavior is problematic.'")
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
                    metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.  Avoid using -append; use --kopt instead.')
 
@@ -144,9 +148,51 @@ def main():
         qemuargs.extend(['-chardev', 'stdio,id=console,signal=off,mux=on'])
         qemuargs.extend(['-device', 'isa-serial,chardev=console'])
         qemuargs.extend(['-mon', 'chardev=console'])
-        kernelargs.extend(['console=ttyS0 earlyprintk=serial,ttyS0,115200'])
+        kernelargs.extend(['console=ttyS0', 'earlyprintk=serial,ttyS0,115200'])
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
+
+    if args.script:
+        if args.console:
+            arg_fail('--script and --console are mutually exclusive')
+
+        if ' ' in args.script:
+            arg_fail('the script path cannot contain a space')
+
+        # Turn off default I/O
+        qemuargs.extend(['-vga', 'none'])
+        qemuargs.extend(['-display', 'none'])
+
+        # Send kernel logs to stderr
+        qemuargs.extend(['-serial', 'none'])
+        qemuargs.extend(['-chardev', 'file,id=console,path=/proc/self/fd/2'])
+        qemuargs.extend(['-device', 'isa-serial,chardev=console'])
+        kernelargs.extend(['console=ttyS0', 'earlyprintk=serial,ttyS0,115200'])
+
+        # Set up a virtserialport for script I/O
+        qemuargs.extend(['-chardev', 'stdio,id=stdio,signal=on,mux=off'])
+        qemuargs.extend(['-device', 'virtio-serial-pci'])
+        qemuargs.extend(['-device', 'virtserialport,name=virtme.scriptio,chardev=stdio'])
+
+        # Ask virtme-init to run the script
+        kernelargs.extend(['virtme.script=%s' % args.script])
+
+        # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
+        # This isn't inherently bad, but it can cause a problem if
+        # another process is reading from 1 or writing to 0, which is
+        # exactly what happens if you're using a terminal and you
+        # redirect some, but not all, of the tty fds.  Work around it
+        # by giving QEMU private copies of the open object if either
+        # of them is a terminal.
+        for oldfd,mode in ((0,os.O_RDONLY), (1,os.O_WRONLY), (2,os.O_WRONLY)):
+            if os.isatty(oldfd):
+                try:
+                    newfd = os.open('/proc/self/fd/%d' % oldfd, mode)
+                except OSError:
+                    pass
+                else:
+                    os.dup2(newfd, oldfd)
+                    os.close(newfd)
 
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])
@@ -157,7 +203,8 @@ def main():
     if kernelargs:
         qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
 
-    # Handle --qemu-opts
+    # Handle --qemu-opt(s)
+    qemuargs.extend(args.qemu_opt)
     if args.qemu_opts is not None:
         qemuargs.extend(args.qemu_opts)
 
