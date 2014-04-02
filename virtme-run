@@ -40,13 +40,19 @@ def make_parser():
     g.add_argument('-a', '--kopt', action='append', default=[],
                    help='Add a kernel option.  You can specify this more than once.')
 
-    g = parser.add_argument_group(title='Guest features')
+    g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit')
     g.add_argument('--net', action='store_true',
                    help='Enable basic network access')
-    g.add_argument('--script', action='store',
-                   help="Run a script in the guest.  The script's stdin will be attached to virtme-run's stdin and the script's stdout and stderr will both be attached to virtme-run's stdout.  Kernel logs will go to stderr.  For now, arguments are not supported.  This behaves oddly if stdin is a terminal; try using 'cat |virtme-run' if you have trouble with script mode.")
+
+    g = parser.add_argument_group(
+        title='Scripting',
+        description="Using any of the scripting options will run a script in the guest.  The script's stdin will be attached to virtme-run's stdin and the script's stdout and stderr will both be attached to virtme-run's stdout.  Kernel logs will go to stderr.  This behaves oddly if stdin is a terminal; try using 'cat |virtme-run' if you have trouble with script mode.")
+    g.add_argument('--script-sh', action='store', metavar='SHELL_COMMAND',
+                   help='Run a one-line shell script in the guest.')
+    g.add_argument('--script-exec', action='store', metavar='BINARY',
+                   help='Run the specified binary in the guest.')
 
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('-q', '--qemu-opt', action='append', default=[],
@@ -145,9 +151,16 @@ def main():
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
 
-    if args.script:
+    has_script = False
+
+    def do_script(shellcmd):
         if args.console:
-            arg_fail('--script and --console are mutually exclusive')
+            arg_fail('scripts and --console are mutually exclusive')
+
+        nonlocal has_script
+        if has_script:
+            arg_fail('conflicting script options')
+        has_script = True
 
         # Turn off default I/O
         qemuargs.extend(['-vga', 'none'])
@@ -167,8 +180,8 @@ def main():
         # Ask virtme-init to run the script
         config.virtme_data[b'script'] = """#!/bin/sh
 
-        exec {scriptpath}
-        """.format(scriptpath=shlex.quote(args.script)).encode('ascii')
+        exec {shellcmd}
+        """.format(shellcmd=shellcmd).encode('ascii')
 
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if
@@ -186,6 +199,13 @@ def main():
                 else:
                     os.dup2(newfd, oldfd)
                     os.close(newfd)
+
+
+    if args.script_sh is not None:
+        do_script(args.script_sh)
+
+    if args.script_exec is not None:
+        do_script(shlex.quote(args.script_exec))
 
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])
