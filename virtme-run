@@ -108,13 +108,6 @@ def main():
     kimg,modfiles,moddir = find_kernel_and_mods(args)
     config.modfiles = modfiles
 
-    tmpfd,tmpname = tempfile.mkstemp('irfs')
-    os.unlink(tmpname)
-    tmpfile = os.fdopen(tmpfd, 'r+b')
-
-    mkinitramfs.mkinitramfs(tmpfile, config)
-    tmpfile.flush()
-
     qemuargs = [qemu]
     kernelargs = []
 
@@ -130,10 +123,6 @@ def main():
 
     # Ask QEMU to load the kernel image directly
     qemuargs.extend(['-kernel', kimg])
-
-    # Set up the initramfs (warning: hack ahead)
-    fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
-    qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
 
     # Set up / override baseline devices
     qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
@@ -205,6 +194,15 @@ def main():
     # Insert kernel options
     if kernelargs:
         qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
+
+    # Set up the initramfs (warning: hack ahead)
+    tmpfd,tmpname = tempfile.mkstemp('irfs')
+    os.unlink(tmpname)
+    tmpfile = os.fdopen(tmpfd, 'r+b')
+    mkinitramfs.mkinitramfs(tmpfile, config)
+    tmpfile.flush()
+    fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
+    qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
