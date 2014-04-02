@@ -30,9 +30,6 @@ if [[ -n "${mount_tags[virtme.moddir]}" ]]; then
     mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.moddir /lib/modules/"$kver"
 fi
 
-# Load modules
-"$(dirname $0)/virtme-loadmods"
-
 mount -t tmpfs tmpfs /tmp/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
 
@@ -69,7 +66,8 @@ log "basic initialization done"
 
 ######## The remainder of this script is a very simple init (PID 1) ########
 
-# Try to get udevd to coldplug everything
+# Try to get udevd to coldplug everything.
+# We could use virtme-loadmods as a lightweight alternative.
 "$udevd" --daemon --resolve-names=never
 udevadm trigger --action=add  >/dev/null 2>&1
 udevadm settle
