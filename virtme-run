@@ -14,7 +14,7 @@ import shutil
 import os
 import fcntl
 import sys
-from mkinitramfs import mkinitramfs
+import mkinitramfs
 
 uname = os.uname()
 
@@ -103,13 +103,16 @@ def main():
 
     qemu = find_qemu()
 
+    config = mkinitramfs.Config()
+
     kimg,modfiles,moddir = find_kernel_and_mods(args)
+    config.modfiles = modfiles
 
     tmpfd,tmpname = tempfile.mkstemp('irfs')
     os.unlink(tmpname)
     tmpfile = os.fdopen(tmpfd, 'r+b')
-    
-    mkinitramfs(tmpfile, modfiles=modfiles)
+
+    mkinitramfs.mkinitramfs(tmpfile, config)
     tmpfile.flush()
 
     qemuargs = [qemu]

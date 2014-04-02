@@ -119,13 +119,17 @@ def generate_init():
         logfunc=_LOGFUNC))
     return out.getvalue().encode('utf-8')
 
-def mkinitramfs(out, modfiles=[]):
+class Config:
+    def __init__(self):
+        self.modfiles = []
+
+def mkinitramfs(out, config):
     cw = cpiowriter.CpioWriter(out)
     make_base_layout(cw)
     make_dev_nodes(cw)
     install_busybox(cw)
     install_modprobe(cw)
-    if modfiles is not None:
-        install_modules(cw, modfiles)
+    if config.modfiles is not None:
+        install_modules(cw, config.modfiles)
     cw.write_file(b'init', body=generate_init(), mode=0o755)
     cw.write_trailer()

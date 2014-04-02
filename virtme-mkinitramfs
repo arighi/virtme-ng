@@ -9,7 +9,7 @@
 import argparse
 import modfinder
 import virtmods
-from mkinitramfs import mkinitramfs
+import mkinitramfs
 
 _ARGPARSER = argparse.ArgumentParser(
     description='Generate initramfs image for virtme',
@@ -21,12 +21,13 @@ def main():
 
     args = _ARGPARSER.parse_args()
 
-    modfiles = []
+    config = mkinitramfs.Config()
+
     if args.mod_kversion is not None:
-        modfiles = modfinder.find_modules_from_install(
+        config.modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=args.mod_kversion)
 
-    mkinitramfs(sys.stdout.buffer, modfiles)
+    mkinitramfs.mkinitramfs(sys.stdout.buffer, config)
 
     return 0
 
