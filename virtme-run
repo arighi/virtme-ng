@@ -14,6 +14,7 @@ import shutil
 import os
 import fcntl
 import sys
+import shlex
 import mkinitramfs
 
 uname = os.uname()
@@ -148,9 +149,6 @@ def main():
         if args.console:
             arg_fail('--script and --console are mutually exclusive')
 
-        if ' ' in args.script:
-            arg_fail('the script path cannot contain a space')
-
         # Turn off default I/O
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
@@ -167,7 +165,10 @@ def main():
         qemuargs.extend(['-device', 'virtserialport,name=virtme.scriptio,chardev=stdio'])
 
         # Ask virtme-init to run the script
-        kernelargs.extend(['virtme.script=%s' % args.script])
+        config.virtme_data[b'script'] = """#!/bin/sh
+
+        exec {scriptpath}
+        """.format(scriptpath=shlex.quote(args.script)).encode('ascii')
 
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if

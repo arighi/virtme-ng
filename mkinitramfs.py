@@ -16,7 +16,8 @@ import modfinder
 import virtmods
 
 def make_base_layout(cw):
-    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'tmproot'):
+    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'tmproot',
+                b'run_virtme', b'run_virtme/data'):
         cw.mkdir(dir, 0o755)
 
     cw.symlink(b'bin', b'sbin')
@@ -33,7 +34,7 @@ def install_busybox(cw):
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
     for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir',
-                 'mknod', 'insmod'):
+                 'mknod', 'insmod', 'cp'):
         cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
 
     cw.mkdir(b'bin/real_progs', mode=0o755)
@@ -105,6 +106,9 @@ else
   umount /newroot/proc  # Don't leave garbage behind
 fi
 
+mount -t tmpfs run /newroot/run
+cp -a /run_virtme /newroot/run/virtme
+
 log 'done; switching to real root'
 exec /bin/switch_root /newroot {virtme_init}
 """
@@ -122,6 +126,7 @@ def generate_init():
 class Config:
     def __init__(self):
         self.modfiles = []
+        self.virtme_data = {}
 
 def mkinitramfs(out, config):
     cw = cpiowriter.CpioWriter(out)
@@ -131,5 +136,7 @@ def mkinitramfs(out, config):
     install_modprobe(cw)
     if config.modfiles is not None:
         install_modules(cw, config.modfiles)
+    for name,contents in config.virtme_data.items():
+        cw.write_file(b'/run_virtme/data/' + name, body=contents, mode=0o755)
     cw.write_file(b'init', body=generate_init(), mode=0o755)
     cw.write_trailer()

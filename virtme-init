@@ -34,7 +34,6 @@ fi
 "$(dirname $0)/virtme-loadmods"
 
 mount -t tmpfs tmpfs /tmp/
-mount -t tmpfs tmpfs /run/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
 
 # Fix up /etc a little bit
@@ -95,10 +94,7 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     busybox udhcpc -i eth0 -t 1 -n -q -f -s "$(dirname $0)/virtme-udhcpc-script"
 fi
 
-# Implement script mode.  This could be improved considerably.
-if cat /proc/cmdline |grep -q -E '(^| )virtme.script='; then
-    script="`sed -nr -e 's/.*(^| )virtme\.script=([^ ]+)($| ).*/\2/p' /proc/cmdline`"
-
+if [[ -x /run/virtme/data/script ]]; then
     if [[ ! -e "/dev/virtio-ports/virtme.scriptio" ]]; then
 	echo "virtme-init: cannot find script I/O port; make sure virtio-serial is available"
 	poweroff -f
@@ -106,7 +102,7 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.script='; then
     fi
 
     log 'starting script'
-    setsid "$script" <>"/dev/virtio-ports/virtme.scriptio" 2>&1
+    setsid /run/virtme/data/script <>/dev/virtio-ports/virtme.scriptio 2>&1
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.
