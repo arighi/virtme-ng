@@ -1,0 +1,14 @@
+#!/bin/bash
+
+if (( $# != 3 )); then
+    echo 'Usage: xfstests TEST_DEV SCRATCH_DEV PATH_TO_XFSTESTS'
+    echo 'This will reformat TEST_DEV and SCRATCH_DEV'
+    exit 1
+fi
+
+here="`dirname $0`"
+samples_path="`realpath "$here"`"
+xfstests_path="`realpath "$3"`"
+
+# script-sh is awkward for this purpose.  The escaping here is wrong.
+virtme-run --installed-kernel --disk "test=$1" --disk "scratch=$2" --script-sh "$samples_path/xfstests_trampoline $xfstests_path" --qemu-opts -m 2048 -smp 2

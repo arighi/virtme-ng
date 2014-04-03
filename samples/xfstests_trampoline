@@ -1,0 +1,28 @@
+#!/bin/bash
+
+# Observations:
+#
+# - SCRATCH_DIR needs to be in fstab.  TEST_DIR does not.  Go figure.
+# - If TEST_DEV is a symlink, xfstests fails with strange errors.
+# - There appears to be some confusion about RESULT_BASE and RESULTS_BASE.
+#   Neither one is documented.
+
+mkdir /tmp/testmnt
+export TEST_DEV="`realpath /dev/disk/by-id/scsi-0virtme_disk_test`"
+export TEST_DIR=/tmp/testmnt
+mkfs.xfs -f $TEST_DEV
+
+mkdir /tmp/scratchmnt
+export SCRATCH_DEV="`realpath /dev/disk/by-id/scsi-0virtme_disk_scratch`"
+export SCRATCH_DIR=/tmp/scratchmnt
+mkfs.xfs -f $SCRATCH_DEV
+echo "$SCRATCH_DEV	$SCRATCH_DIR	xfs	defaults	0	0" >>/etc/fstab
+mount $SCRATCH_DIR
+
+export RESULT_BASE=/tmp/results
+export RESULTS_BASE="$RESULT_BASE"
+mkdir $RESULT_BASE
+
+cd "$1"
+echo "Starting xfstests"
+./check
