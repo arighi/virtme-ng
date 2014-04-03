@@ -45,6 +45,8 @@ def make_parser():
                    help='Run headless -- use ctrl-A, x to exit')
     g.add_argument('--net', action='store_true',
                    help='Enable basic network access')
+    g.add_argument('--balloon', action='store_true',
+                   help='Allow the host to ask the guest to release memory.')
 
     g = parser.add_argument_group(
         title='Scripting',
@@ -133,7 +135,6 @@ def main():
 
     # Set up / override baseline devices
     qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
-    qemuargs.extend(['-balloon', 'virtio'])
     qemuargs.extend(['-device', 'virtio-rng-pci'])
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
@@ -150,6 +151,9 @@ def main():
         kernelargs.extend(['console=ttyS0', 'earlyprintk=serial,ttyS0,115200'])
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
+
+    if args.balloon:
+        qemuargs.extend(['-balloon', 'virtio'])
 
     has_script = False
 
@@ -199,7 +203,6 @@ def main():
                 else:
                     os.dup2(newfd, oldfd)
                     os.close(newfd)
-
 
     if args.script_sh is not None:
         do_script(args.script_sh)
