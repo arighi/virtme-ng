@@ -30,7 +30,7 @@ def make_parser():
                    help='Use an installed kernel and its associated modules.  If no version is specified, the running kernel will be used.')
 
     g.add_argument('--kimg', action='store',
-                   help='Use specified kernel image with no modules')
+                   help='Use specified kernel image with no modules.')
 
 #    Disabled until kmod gets fixed.
 #    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
@@ -42,11 +42,13 @@ def make_parser():
 
     g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--console', action='store_true',
-                   help='Run headless -- use ctrl-A, x to exit')
+                   help='Run headless -- use ctrl-A, x to exit.')
     g.add_argument('--net', action='store_true',
-                   help='Enable basic network access')
+                   help='Enable basic network access.')
     g.add_argument('--balloon', action='store_true',
                    help='Allow the host to ask the guest to release memory.')
+    g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
+                   help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
 
     g = parser.add_argument_group(
         title='Scripting',
@@ -154,6 +156,22 @@ def main():
 
     if args.balloon:
         qemuargs.extend(['-balloon', 'virtio'])
+
+    if args.disk:
+        qemuargs.extend(['-device', 'virtio-scsi-pci,id=scsi'])
+
+        for i,d in enumerate(args.disk):
+            namefile = d.split('=', 1)
+            if len(namefile) != 2:
+                arg_fail('invalid argument to --disk')
+            name,fn = namefile
+            if '=' in fn or ',' in fn:
+                arg_fail("--disk filenames cannot contain '=' or ','")
+            if '=' in fn or ',' in name:
+                arg_fail("--disk device names cannot contain '=' or ','")
+            driveid = 'disk%d' % i
+            qemuargs.extend(['-drive', 'if=none,id=%s,file=%s' % (driveid, fn),
+                             '-device', 'scsi-hd,drive=%s,vendor=virtme,product=disk,serial=%s' % (driveid, name)])
 
     has_script = False
 
