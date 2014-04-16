@@ -32,11 +32,16 @@ def resolve_dep(modalias, root=None, kver=None, moddir=None):
 
     deps = []
 
-    script = subprocess.check_output(args).decode('utf-8', errors='replace')
-    for line in script.split('\n'):
-        m = _INSMOD_RE.match(line)
-        if m:
-            deps.append(m.group(1))
+    try:
+        with open('/dev/null', 'r+b') as devnull:
+            script = subprocess.check_output(args, stderr=devnull.fileno()).\
+                     decode('utf-8', errors='replace')
+        for line in script.split('\n'):
+            m = _INSMOD_RE.match(line)
+            if m:
+                deps.append(m.group(1))
+    except subprocess.CalledProcessError:
+        pass  # This is most likely because the module is built in.
 
     return deps
 
