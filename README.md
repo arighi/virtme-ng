@@ -44,6 +44,7 @@ Your host system will need to satisfy some prerequisites:
 * You need a statically linked `busybox` binary somewhere in your path.
 * You need Python 3.3 or higher.
 * QEMU 1.6 or higher is recommended.  QEMU 1.4 and 1.5 are partially supported using a rather ugly kludge.
+> * KVM enabled. **Note:** it means that it should be a real machine, not a VirtualBox or a VPS.
 
 Once you have such a kernel, run one of:
 
