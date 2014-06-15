@@ -136,7 +136,9 @@ def main():
     qemuargs.extend(['-kernel', kimg])
 
     # Set up / override baseline devices
-    qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
+    if os.path.exists('/dev/kvm'):
+        # Try not to break the TCG fallback
+        qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
 
