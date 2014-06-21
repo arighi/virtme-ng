@@ -110,7 +110,7 @@ mount -t tmpfs run /newroot/run
 cp -a /run_virtme /newroot/run/virtme
 
 log 'done; switching to real root'
-exec /bin/switch_root /newroot {virtme_init}
+exec /bin/switch_root /newroot {virtme_init} "$@"
 """
 
 def generate_init():
