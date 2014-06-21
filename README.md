@@ -60,6 +60,12 @@ Note that the --kimg mode does not support modules.
 You can then do things like `cd /home/username` and you will have readonly
 access to all your files.
 
+Console
+=======
+
+virtme has usable console support.  Pass --console to virtme-run to use it.
+To exit, type ctrl-a x.
+
 Upcoming features
 =================
 
