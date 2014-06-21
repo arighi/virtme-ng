@@ -155,6 +155,17 @@ def main():
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
 
+        # Fix the terminal defaults (and set iutf8 because that's a better
+        # default nowadays).  I don't know of any way to keep this up to date
+        # after startup, though.
+        terminal_size = os.get_terminal_size()
+        kernelargs.extend(['"virtme_stty_console=rows %d cols %d iutf8"' %
+                           (terminal_size.lines, terminal_size.columns)])
+
+        # Propagate the terminal type
+        if 'TERM' in os.environ:
+            kernelargs.extend(['TERM=%s' % os.environ['TERM']])
+
     if args.balloon:
         qemuargs.extend(['-balloon', 'virtio'])
 

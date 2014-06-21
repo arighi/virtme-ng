@@ -6,7 +6,6 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 export PATH=/bin:/sbin:/usr/bin:/usr/sbin
-export TERM=linux
 
 log() {
     if [[ -e /dev/kmsg ]]; then
@@ -129,6 +128,9 @@ if [[ ! -e "/dev/$consdev" ]]; then
     exec bash --login
 fi
 
+# Parameters that start with virtme_ shouldn't pollute the environment
+for p in "${!virtme_@}"; do export -n "$p"; done
+
 echo "virtme-init: console is $consdev"
 
 # Bring up a functioning shell on the console.  This is a bit magical:
@@ -138,6 +140,11 @@ echo "virtme-init: console is $consdev"
 # Init apparently can't setsid (whether that's a limitation of the
 # setsid binary or the system call, I don't know).
 while true; do
+    # Program the console sensibly
+    if [[ -n "${virtme_stty_console}" ]]; then
+	stty ${virtme_stty_console} <"/dev/$consdev"
+    fi
+
     setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
     echo "Shell died.  Will respawn."
     sleep 0.5
