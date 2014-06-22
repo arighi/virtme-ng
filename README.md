@@ -66,6 +66,8 @@ Console
 virtme has usable console support.  Pass --console to virtme-run to use it.
 To exit, type ctrl-a x.
 
+For now, the virtme console is a serial console -- virtconsole seems to be unusably buggy.  I don't know of any way to keep the tty state in sync between the host and guest, so resizing the host window after starting the guest may confuse guest libraries like readline.
+
 Upcoming features
 =================
 
