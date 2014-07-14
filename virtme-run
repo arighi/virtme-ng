@@ -40,6 +40,9 @@ def make_parser():
     g.add_argument('-a', '--kopt', action='append', default=[],
                    help='Add a kernel option.  You can specify this more than once.')
 
+    g.add_argument('--xen', action='store',
+                   help='Boot Xen using the specified uncompressed hypervisor.')
+
     g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit.')
@@ -131,9 +134,6 @@ def main():
 
     # Turn on KVM if available
     qemuargs.extend(['-machine', 'accel=kvm:tcg'])
-
-    # Ask QEMU to load the kernel image directly
-    qemuargs.extend(['-kernel', kimg])
 
     # Set up / override baseline devices
     if os.path.exists('/dev/kvm'):
@@ -245,10 +245,6 @@ def main():
         qemuargs.extend(['-net', 'user'])
         kernelargs.extend(['virtme.dhcp'])
 
-    # Insert kernel options
-    if kernelargs:
-        qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
-
     # Set up the initramfs (warning: hack ahead)
     tmpfd,tmpname = tempfile.mkstemp('irfs')
     os.unlink(tmpname)
@@ -256,7 +252,21 @@ def main():
     mkinitramfs.mkinitramfs(tmpfile, config)
     tmpfile.flush()
     fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
-    qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
+    initrdpath = '/proc/self/fd/%d' % tmpfile.fileno()
+
+    if args.xen is None:
+        # Load a normal kernel
+        qemuargs.extend(['-kernel', kimg])
+        if kernelargs:
+            qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
+        qemuargs.extend(['-initrd', initrdpath])
+    else:
+        # Use multiboot syntax to load Xen
+        qemuargs.extend(['-kernel', args.xen])
+        qemuargs.extend(['-initrd', '%s %s,%s' % (
+            kimg,
+            ' '.join(a.replace(',', ',,') for a in kernelargs),
+            initrdpath)])
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
