@@ -41,6 +41,8 @@ def make_parser():
                    help='Add a kernel option.  You can specify this more than once.')
 
     g = parser.add_argument_group(title='Common guest options')
+    g.add_argument('--root', action='store', default='/',
+                   help='Local path to use as guest root')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit.')
     g.add_argument('--net', action='store_true',
@@ -109,8 +111,11 @@ def find_kernel_and_mods(args):
 
     return kimg,modfiles,moddir
 
+def qemu_quote(s):
+    return s.replace(',', ',,')
+
 def export_virtfs(qemuargs, path, mount_tag):
-    qemuargs.extend(['-virtfs', 'local,path=%s,security_model=passthrough,mount_tag=%s,readonly' % (path, mount_tag)])
+    qemuargs.extend(['-virtfs', 'local,path=%s,security_model=passthrough,mount_tag=%s,readonly' % (qemu_quote(path), qemu_quote(mount_tag))])
 
 def main():
     args = _ARGPARSER.parse_args()
@@ -126,7 +131,10 @@ def main():
     kernelargs = []
 
     # Set up virtfs
-    export_virtfs(qemuargs, '/', 'virtme.root')
+    export_virtfs(qemuargs, args.root, 'virtme.root')
+    if (args.root != '/'):
+        config.virtme_init_path = '/run/virtme/guesttools/virtme-init'
+        export_virtfs(qemuargs, mkinitramfs.mypath(), 'virtme.guesttools')
 
     # Map modules
     if moddir is not None:

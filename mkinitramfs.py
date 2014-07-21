@@ -17,7 +17,7 @@ import virtmods
 
 def make_base_layout(cw):
     for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'tmproot',
-                b'run_virtme', b'run_virtme/data'):
+                b'run_virtme', b'run_virtme/data', b'run_virtme/guesttools'):
         cw.mkdir(dir, 0o755)
 
     cw.symlink(b'bin', b'sbin')
@@ -109,17 +109,25 @@ fi
 mount -t tmpfs run /newroot/run
 cp -a /run_virtme /newroot/run/virtme
 
+if /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /newroot/run/virtme/guesttools 2>/dev/null; then
+  log 'using separate guest tools'
+fi
+
 log 'done; switching to real root'
 exec /bin/switch_root /newroot {virtme_init} "$@"
 """
 
-def generate_init():
-    mypath = os.path.dirname(os.path.abspath(
+def mypath():
+    return os.path.dirname(os.path.abspath(
         inspect.getfile(inspect.currentframe())))
+
+def generate_init(virtme_init_path = None):
+    if virtme_init_path is None:
+        virtme_init_path = shlex.quote(os.path.join(mypath(), 'virtme-init'))
 
     out = io.StringIO()
     out.write(_INIT.format(
-        virtme_init=shlex.quote(os.path.join(mypath, 'virtme-init')),
+        virtme_init=virtme_init_path,
         logfunc=_LOGFUNC))
     return out.getvalue().encode('utf-8')
 
@@ -127,6 +135,7 @@ class Config:
     def __init__(self):
         self.modfiles = []
         self.virtme_data = {}
+        self.virtme_init_path = None
 
 def mkinitramfs(out, config):
     cw = cpiowriter.CpioWriter(out)
@@ -138,5 +147,6 @@ def mkinitramfs(out, config):
         install_modules(cw, config.modfiles)
     for name,contents in config.virtme_data.items():
         cw.write_file(b'/run_virtme/data/' + name, body=contents, mode=0o755)
-    cw.write_file(b'init', body=generate_init(), mode=0o755)
+    cw.write_file(b'init', body=generate_init(config.virtme_init_path),
+                  mode=0o755)
     cw.write_trailer()
