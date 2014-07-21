@@ -109,6 +109,9 @@ def find_kernel_and_mods(args):
 
     return kimg,modfiles,moddir
 
+def export_virtfs(qemuargs, path, mount_tag):
+    qemuargs.extend(['-virtfs', 'local,path=%s,security_model=passthrough,mount_tag=%s,readonly' % (path, mount_tag)])
+
 def main():
     args = _ARGPARSER.parse_args()
 
@@ -123,11 +126,11 @@ def main():
     kernelargs = []
 
     # Set up virtfs
-    qemuargs.extend(['-virtfs', 'local,id=rootfs,path=/,security_model=passthrough,mount_tag=virtme.root,readonly'])
+    export_virtfs(qemuargs, '/', 'virtme.root')
 
     # Map modules
     if moddir is not None:
-        qemuargs.extend(['-virtfs', 'local,path=%s,security_model=passthrough,mount_tag=virtme.moddir,readonly' % moddir])
+        export_virtfs(qemuargs, moddir, 'virtme.moddir')
 
     # Turn on KVM if available
     qemuargs.extend(['-machine', 'accel=kvm:tcg'])
