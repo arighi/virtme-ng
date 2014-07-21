@@ -60,6 +60,12 @@ def make_parser():
     g.add_argument('--script-exec', action='store', metavar='BINARY',
                    help='Run the specified binary in the guest.')
 
+    g = parser.add_argument_group(
+        title='Architecture',
+        description="Options related to architecture selection")
+    g.add_argument('--busybox', action='store', metavar='PATH_TO_BUSYBOX',
+                   help='Use the specified busybox binary.')
+
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('-q', '--qemu-opt', action='append', default=[],
                    help="Add a single QEMU argument.  Use this when --qemu-opts's greedy behavior is problematic.'")
@@ -250,6 +256,9 @@ def main():
 
     if args.script_exec is not None:
         do_script(shlex.quote(args.script_exec))
+
+    if args.busybox is not None:
+        config.busybox = args.busybox
 
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])

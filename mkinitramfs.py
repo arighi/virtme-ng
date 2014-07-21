@@ -28,8 +28,11 @@ def make_dev_nodes(cw):
     cw.mkchardev(b'dev/kmsg', (1, 11), mode=0o666)
     cw.mkchardev(b'dev/console', (5, 1), mode=0o660)
 
-def install_busybox(cw):
-    bbpath = shutil.which('busybox')
+def install_busybox(cw, config):
+    if config.busybox is not None:
+        bbpath = config.busybox
+    else:
+        bbpath = shutil.which('busybox')
     with open(bbpath, 'rb') as busybox:
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
@@ -132,16 +135,18 @@ def generate_init(virtme_init_path = None):
     return out.getvalue().encode('utf-8')
 
 class Config:
+    __slots__ = ['modfiles', 'virtme_data', 'virtme_init_path', 'busybox']
     def __init__(self):
         self.modfiles = []
         self.virtme_data = {}
         self.virtme_init_path = None
+        self.busybox = None
 
 def mkinitramfs(out, config):
     cw = cpiowriter.CpioWriter(out)
     make_base_layout(cw)
     make_dev_nodes(cw)
-    install_busybox(cw)
+    install_busybox(cw, config)
     install_modprobe(cw)
     if config.modfiles is not None:
         install_modules(cw, config.modfiles)
