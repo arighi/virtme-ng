@@ -17,6 +17,7 @@ import sys
 import shlex
 import inspect
 import mkinitramfs
+import qemu_helpers
 
 uname = os.uname()
 
@@ -64,6 +65,9 @@ def make_parser():
     g = parser.add_argument_group(
         title='Architecture',
         description="Options related to architecture selection")
+    g.add_argument('--arch', action='store', metavar='ARCHITECTURE',
+                   default=os.uname().machine,
+                   help='Guest architecture')
     g.add_argument('--busybox', action='store', metavar='PATH_TO_BUSYBOX',
                    help='Use the specified busybox binary.')
 
@@ -73,6 +77,14 @@ def make_parser():
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
                    metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.  Avoid using -append; use --kopt instead.')
 
+    g = parser.add_argument_group(title='Debugging/testing')
+    g.add_argument('--force-initramfs', action='store_true',
+                   help='Use an initramfs even if unnecessary')
+    g.add_argument('--dry-run', action='store_true',
+                   help="Initialize everything but don't run the guest")
+    g.add_argument('--show-command', action='store_true',
+                   help='Show the VM command line')
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -81,20 +93,6 @@ def arg_fail(message):
     print(message)
     _ARGPARSER.print_usage()
     sys.exit(1)
-
-def find_qemu(machine=None):
-    if machine is None:
-        machine = os.uname().machine
-
-    qemu = shutil.which('qemu-system-%s' % machine)
-    if qemu is not None:
-        return qemu
-
-    qemu = shutil.which('qemu-kvm')
-    if qemu is not None:
-        return qemu
-
-    return None
 
 def find_kernel_and_mods(args):
     if args.installed_kernel is not None:
@@ -118,36 +116,39 @@ def find_kernel_and_mods(args):
 
     return kimg,modfiles,moddir
 
-def qemu_quote(s):
-    return s.replace(',', ',,')
-
-def export_virtfs(qemuargs, path, mount_tag):
+def export_virtfs(qemu, qemuargs, path, mount_tag):
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
     fsid = 'virtfs%d' % len(qemuargs)
-    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu_quote(path))])
-    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=%s,mount_tag=%s' % (fsid, qemu_quote(mount_tag))])
+    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu.quote_optarg(path))])
+    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=%s,mount_tag=%s' % (fsid, qemu.quote_optarg(mount_tag))])
 
 def main():
     args = _ARGPARSER.parse_args()
 
-    qemu = find_qemu()
+    qemu = qemu_helpers.Qemu(args.arch)
+    qemu.probe()
+
+    need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
     config = mkinitramfs.Config()
 
     kimg,modfiles,moddir = find_kernel_and_mods(args)
     config.modfiles = modfiles
+    if config.modfiles:
+        need_initramfs = True
 
-    qemuargs = [qemu]
+    qemuargs = [qemu.qemubin]
     kernelargs = []
 
     # Set up virtfs
-    export_virtfs(qemuargs, args.root, '/dev/root')
+    export_virtfs(qemu, qemuargs, args.root, '/dev/root')
     mypath = os.path.dirname(os.path.abspath(
         inspect.getfile(inspect.currentframe())))
     if (args.root != '/'):
         virtme_init = '/run/virtme/guesttools/virtme-init'
-        export_virtfs(qemuargs, mypath, 'virtme.guesttools')
+        export_virtfs(qemu, qemuargs, mypath, 'virtme.guesttools')
+        need_initramfs = True
     else:
         # Find virtme-init
         virtme_init=os.path.join(mypath, 'virtme-init')
@@ -157,7 +158,7 @@ def main():
 
     # Map modules
     if moddir is not None:
-        export_virtfs(qemuargs, moddir, 'virtme.moddir')
+        export_virtfs(qemu, qemuargs, moddir, 'virtme.moddir')
 
     # Turn on KVM if available
     qemuargs.extend(['-machine', 'accel=kvm:tcg'])
@@ -281,7 +282,7 @@ def main():
         qemuargs.extend(['-net', 'user'])
         kernelargs.extend(['virtme.dhcp'])
 
-    if True:
+    if need_initramfs:
         # Set up the initramfs (warning: hack ahead)
         tmpfd,tmpname = tempfile.mkstemp('irfs')
         os.unlink(tmpname)
@@ -309,8 +310,12 @@ def main():
     if args.qemu_opts is not None:
         qemuargs.extend(args.qemu_opts)
 
+    if args.show_command:
+        print(' '.join(shlex.quote(a) for a in qemuargs))
+
     # Go!
-    os.execv(qemu, qemuargs)
+    if not args.dry_run:
+        os.execv(qemu.qemubin, qemuargs)
 
 if __name__ == '__main__':
     exit(main())
