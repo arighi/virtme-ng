@@ -247,6 +247,9 @@ def main():
         qemuargs.extend(['-device', 'virtio-serial-pci'])
         qemuargs.extend(['-device', 'virtserialport,name=virtme.scriptio,chardev=stdio'])
 
+        # Scripts shouldn't reboot
+        qemuargs.extend(['-no-reboot'])
+
         # Ask virtme-init to run the script
         config.virtme_data[b'script'] = """#!/bin/sh
 
