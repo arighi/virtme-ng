@@ -159,6 +159,9 @@ def main():
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
 
+        # PS/2 probing is slow; give the kernel a hint to speed it up.
+        kernelargs.extend(['psmouse.proto=exps'])
+
         # Fix the terminal defaults (and set iutf8 because that's a better
         # default nowadays).  I don't know of any way to keep this up to date
         # after startup, though.
