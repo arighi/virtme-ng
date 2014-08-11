@@ -31,6 +31,7 @@ fi
 
 mount -t tmpfs tmpfs /tmp/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
+[[ -n "${virtme_run_mounted}" ]] || mount -t tmpfs run /run
 
 # Fix up /etc a little bit
 touch /tmp/fstab
@@ -44,21 +45,28 @@ else
     udevd=`which udevd`
 fi
 
-# Ideally we'll use devtmpfs (but don't rely on /dev/null existing)
-if [[ -c /dev/null ]]; then
-    mount -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev &>/dev/null
-else
-    mount -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
-fi
+# Mount proc (needed for stat, sadly)
+mount -t proc -o nosuid,noexec,nodev proc /proc/
 
-if (( $? != 0 )); then
-    # The running kernel doesn't have devtmpfs.  Use regular tmpfs.
-    mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
+# devtmpfs might be automounted; if not, mount it.
+if [[ "`stat --format=%m /dev`" != "/dev" ]]; then
+    # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
+    if [[ -c /dev/null ]]; then
+	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
+	    &>/dev/null
+    else
+	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+    fi
 
-    # Make some basic devices first, and let udev handle the rest
-    mknod -m 0666 /dev/null c 1 3
-    mknod -m 0660 /dev/kmsg c 1 11
-    mknod -m 0600 /dev/console c 5 1
+    if (( $? != 0 )); then
+	# The running kernel doesn't have devtmpfs.  Use regular tmpfs.
+	mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
+
+	# Make some basic devices first, and let udev handle the rest
+	mknod -m 0666 /dev/null c 1 3
+	mknod -m 0660 /dev/kmsg c 1 11
+	mknod -m 0600 /dev/console c 5 1
+    fi
 fi
 
 log "basic initialization done"
@@ -75,9 +83,6 @@ udevadm settle
 mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
-
-# Mount proc
-mount -t proc -o nosuid,noexec,nodev proc /proc/
 
 # Bring up networking
 ip link set dev lo up

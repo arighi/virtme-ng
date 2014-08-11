@@ -107,6 +107,7 @@ fi
 
 mount -t tmpfs run /newroot/run
 cp -a /run_virtme /newroot/run/virtme
+export virtme_run_mounted=1
 
 # Find init
 mount -t proc none /proc
