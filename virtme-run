@@ -226,9 +226,11 @@ def main():
             arg_fail('scripts and --console are mutually exclusive')
 
         nonlocal has_script
+        nonlocal need_initramfs
         if has_script:
             arg_fail('conflicting script options')
         has_script = True
+        need_initramfs = True  # TODO: Fix this
 
         # Turn off default I/O
         qemuargs.extend(['-vga', 'none'])
