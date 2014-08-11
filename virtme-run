@@ -259,14 +259,24 @@ def main():
     virtme_init=os.path.join(mypath, 'virtme-init')
     kernelargs.append('init=%s' % virtme_init)
 
-    # Set up the initramfs (warning: hack ahead)
-    tmpfd,tmpname = tempfile.mkstemp('irfs')
-    os.unlink(tmpname)
-    tmpfile = os.fdopen(tmpfd, 'r+b')
-    mkinitramfs.mkinitramfs(tmpfile, config)
-    tmpfile.flush()
-    fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
-    qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
+    if False:
+        # Set up the initramfs (warning: hack ahead)
+        tmpfd,tmpname = tempfile.mkstemp('irfs')
+        os.unlink(tmpname)
+        tmpfile = os.fdopen(tmpfd, 'r+b')
+        mkinitramfs.mkinitramfs(tmpfile, config)
+        tmpfile.flush()
+        fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
+        qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
+    else:
+        # No initramfs!  Warning: this is slower than using an initramfs
+        # because the kernel will wait for device probing to finish.
+        # Sigh.
+        kernelargs.extend([
+            'rootfstype=9p',
+            'rootflags=ro,version=9p2000.L,trans=virtio,access=any',
+            'raid=noautodetect',
+        ])
 
     # Insert kernel options
     if kernelargs:
