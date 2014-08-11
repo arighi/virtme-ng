@@ -136,10 +136,7 @@ exec /bin/switch_root /newroot "$init" "$@"
 """
 
 
-def generate_init(virtme_init_path = None):
-    if virtme_init_path is None:
-        virtme_init_path = shlex.quote(os.path.join(mypath(), 'virtme-init'))
-
+def generate_init():
     out = io.StringIO()
     out.write(_INIT.format(
         logfunc=_LOGFUNC))
@@ -163,6 +160,6 @@ def mkinitramfs(out, config):
         install_modules(cw, config.modfiles)
     for name,contents in config.virtme_data.items():
         cw.write_file(b'/run_virtme/data/' + name, body=contents, mode=0o755)
-    cw.write_file(b'init', body=generate_init(config.virtme_init_path),
+    cw.write_file(b'init', body=generate_init(),
                   mode=0o755)
     cw.write_trailer()

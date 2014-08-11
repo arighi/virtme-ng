@@ -126,7 +126,7 @@ def export_virtfs(qemuargs, path, mount_tag):
     # that isn't a valid QEMU identifier.
     fsid = 'virtfs%d' % len(qemuargs)
     qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu_quote(path))])
-    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=rootfs,mount_tag=%s' % qemu_quote(mount_tag)])
+    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=%s,mount_tag=%s' % (fsid, qemu_quote(mount_tag))])
 
 def main():
     args = _ARGPARSER.parse_args()
@@ -142,10 +142,18 @@ def main():
     kernelargs = []
 
     # Set up virtfs
-    export_virtfs(qemuargs, args.root, 'virtme.root')
+    export_virtfs(qemuargs, args.root, '/dev/root')
+    mypath = os.path.dirname(os.path.abspath(
+        inspect.getfile(inspect.currentframe())))
     if (args.root != '/'):
-        config.virtme_init_path = '/run/virtme/guesttools/virtme-init'
-        export_virtfs(qemuargs, mkinitramfs.mypath(), 'virtme.guesttools')
+        virtme_init = '/run/virtme/guesttools/virtme-init'
+        export_virtfs(qemuargs, mypath, 'virtme.guesttools')
+    else:
+        # Find virtme-init
+        virtme_init=os.path.join(mypath, 'virtme-init')
+
+    # TODO: This has escaping issues for now
+    kernelargs.append('init=%s' % virtme_init)
 
     # Map modules
     if moddir is not None:
@@ -273,14 +281,7 @@ def main():
         qemuargs.extend(['-net', 'user'])
         kernelargs.extend(['virtme.dhcp'])
 
-    # Find virtme-init
-    # TODO: This has escaping issues for now
-    mypath = os.path.dirname(os.path.abspath(
-        inspect.getfile(inspect.currentframe())))
-    virtme_init=os.path.join(mypath, 'virtme-init')
-    kernelargs.append('init=%s' % virtme_init)
-
-    if False:
+    if True:
         # Set up the initramfs (warning: hack ahead)
         tmpfd,tmpname = tempfile.mkstemp('irfs')
         os.unlink(tmpname)
