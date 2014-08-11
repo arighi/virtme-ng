@@ -42,6 +42,8 @@ def make_parser():
                    help='Add a kernel option.  You can specify this more than once.')
 
     g = parser.add_argument_group(title='Common guest options')
+    g.add_argument('--root', action='store', default='/',
+                   help='Local path to use as guest root')
     g.add_argument('--console', action='store_true',
                    help='Run headless -- use ctrl-A, x to exit.')
     g.add_argument('--net', action='store_true',
@@ -58,6 +60,12 @@ def make_parser():
                    help='Run a one-line shell script in the guest.')
     g.add_argument('--script-exec', action='store', metavar='BINARY',
                    help='Run the specified binary in the guest.')
+
+    g = parser.add_argument_group(
+        title='Architecture',
+        description="Options related to architecture selection")
+    g.add_argument('--busybox', action='store', metavar='PATH_TO_BUSYBOX',
+                   help='Use the specified busybox binary.')
 
     g = parser.add_argument_group(title='Virtualizer settings')
     g.add_argument('-q', '--qemu-opt', action='append', default=[],
@@ -110,6 +118,16 @@ def find_kernel_and_mods(args):
 
     return kimg,modfiles,moddir
 
+def qemu_quote(s):
+    return s.replace(',', ',,')
+
+def export_virtfs(qemuargs, path, mount_tag):
+    # NB: We can't use -virtfs for this, because it can't handle a mount_tag
+    # that isn't a valid QEMU identifier.
+    fsid = 'virtfs%d' % len(qemuargs)
+    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu_quote(path))])
+    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=rootfs,mount_tag=%s' % qemu_quote(mount_tag)])
+
 def main():
     args = _ARGPARSER.parse_args()
 
@@ -124,14 +142,14 @@ def main():
     kernelargs = []
 
     # Set up virtfs
-    # NB: We can't use -virtfs for this, because it can't handle a mount_tag
-    # that isn't a valid QEMU identifier.
-    qemuargs.extend(['-fsdev', 'local,id=rootfs,path=/,security_model=passthrough,readonly'])
-    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=rootfs,mount_tag=/dev/root'])
+    export_virtfs(qemuargs, args.root, 'virtme.root')
+    if (args.root != '/'):
+        config.virtme_init_path = '/run/virtme/guesttools/virtme-init'
+        export_virtfs(qemuargs, mkinitramfs.mypath(), 'virtme.guesttools')
 
     # Map modules
     if moddir is not None:
-        qemuargs.extend(['-virtfs', 'local,path=%s,security_model=passthrough,mount_tag=virtme.moddir,readonly' % moddir])
+        export_virtfs(qemuargs, moddir, 'virtme.moddir')
 
     # Turn on KVM if available
     qemuargs.extend(['-machine', 'accel=kvm:tcg'])
@@ -246,6 +264,9 @@ def main():
 
     if args.script_exec is not None:
         do_script(shlex.quote(args.script_exec))
+
+    if args.busybox is not None:
+        config.busybox = args.busybox
 
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])

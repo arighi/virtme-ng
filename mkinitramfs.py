@@ -16,7 +16,7 @@ import virtmods
 
 def make_base_layout(cw):
     for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',
-                b'tmproot', b'run_virtme', b'run_virtme/data'):
+                b'tmproot', b'run_virtme', b'run_virtme/data', b'run_virtme/guesttools'):
         cw.mkdir(dir, 0o755)
 
     cw.symlink(b'bin', b'sbin')
@@ -27,8 +27,11 @@ def make_dev_nodes(cw):
     cw.mkchardev(b'dev/kmsg', (1, 11), mode=0o666)
     cw.mkchardev(b'dev/console', (5, 1), mode=0o660)
 
-def install_busybox(cw):
-    bbpath = shutil.which('busybox')
+def install_busybox(cw, config):
+    if config.busybox is not None:
+        bbpath = config.busybox
+    else:
+        bbpath = shutil.which('busybox')
     with open(bbpath, 'rb') as busybox:
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
@@ -124,30 +127,42 @@ if [[ -z "$init" ]]; then
   exit 1
 fi
 
+if /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /newroot/run/virtme/guesttools 2>/dev/null; then
+  log 'using separate guest tools'
+fi
+
 log 'done; switching to real root'
 exec /bin/switch_root /newroot "$init" "$@"
 """
 
-def generate_init():
+
+def generate_init(virtme_init_path = None):
+    if virtme_init_path is None:
+        virtme_init_path = shlex.quote(os.path.join(mypath(), 'virtme-init'))
+
     out = io.StringIO()
     out.write(_INIT.format(
         logfunc=_LOGFUNC))
     return out.getvalue().encode('utf-8')
 
 class Config:
+    __slots__ = ['modfiles', 'virtme_data', 'virtme_init_path', 'busybox']
     def __init__(self):
         self.modfiles = []
         self.virtme_data = {}
+        self.virtme_init_path = None
+        self.busybox = None
 
 def mkinitramfs(out, config):
     cw = cpiowriter.CpioWriter(out)
     make_base_layout(cw)
     make_dev_nodes(cw)
-    install_busybox(cw)
+    install_busybox(cw, config)
     install_modprobe(cw)
     if config.modfiles is not None:
         install_modules(cw, config.modfiles)
     for name,contents in config.virtme_data.items():
         cw.write_file(b'/run_virtme/data/' + name, body=contents, mode=0o755)
-    cw.write_file(b'init', body=generate_init(), mode=0o755)
+    cw.write_file(b'init', body=generate_init(config.virtme_init_path),
+                  mode=0o755)
     cw.write_trailer()
