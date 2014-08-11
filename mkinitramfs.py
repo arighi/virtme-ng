@@ -8,7 +8,6 @@
 
 import shutil
 import cpiowriter
-import inspect
 import io
 import os.path
 import shlex
@@ -16,8 +15,8 @@ import modfinder
 import virtmods
 
 def make_base_layout(cw):
-    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'tmproot',
-                b'run_virtme', b'run_virtme/data'):
+    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',
+                b'tmproot', b'run_virtme', b'run_virtme/data'):
         cw.mkdir(dir, 0o755)
 
     cw.symlink(b'bin', b'sbin')
@@ -34,7 +33,7 @@ def install_busybox(cw):
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
     for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir',
-                 'mknod', 'insmod', 'cp'):
+                 'mknod', 'insmod', 'cp', 'cat'):
         cw.symlink(b'busybox', ('bin/%s' % tool).encode('ascii'))
 
     cw.mkdir(b'bin/real_progs', mode=0o755)
@@ -109,17 +108,28 @@ fi
 mount -t tmpfs run /newroot/run
 cp -a /run_virtme /newroot/run/virtme
 
+# Find init
+mount -t proc none /proc
+for arg in `cat /proc/cmdline`; do
+  if [[ "${{arg%%=*}}" = "init" ]]; then
+    init="${{arg#init=}}"
+    break
+  fi
+done
+umount /proc
+
+if [[ -z "$init" ]]; then
+  log 'no init= option'
+  exit 1
+fi
+
 log 'done; switching to real root'
-exec /bin/switch_root /newroot {virtme_init} "$@"
+exec /bin/switch_root /newroot "$init" "$@"
 """
 
 def generate_init():
-    mypath = os.path.dirname(os.path.abspath(
-        inspect.getfile(inspect.currentframe())))
-
     out = io.StringIO()
     out.write(_INIT.format(
-        virtme_init=shlex.quote(os.path.join(mypath, 'virtme-init')),
         logfunc=_LOGFUNC))
     return out.getvalue().encode('utf-8')
 

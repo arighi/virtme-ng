@@ -15,6 +15,7 @@ import os
 import fcntl
 import sys
 import shlex
+import inspect
 import mkinitramfs
 
 uname = os.uname()
@@ -248,9 +249,12 @@ def main():
         qemuargs.extend(['-net', 'user'])
         kernelargs.extend(['virtme.dhcp'])
 
-    # Insert kernel options
-    if kernelargs:
-        qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
+    # Find virtme-init
+    # TODO: This has escaping issues for now
+    mypath = os.path.dirname(os.path.abspath(
+        inspect.getfile(inspect.currentframe())))
+    virtme_init=os.path.join(mypath, 'virtme-init')
+    kernelargs.append('init=%s' % virtme_init)
 
     # Set up the initramfs (warning: hack ahead)
     tmpfd,tmpname = tempfile.mkstemp('irfs')
@@ -260,6 +264,10 @@ def main():
     tmpfile.flush()
     fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
     qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
+
+    # Insert kernel options
+    if kernelargs:
+        qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
