@@ -123,7 +123,10 @@ def main():
     kernelargs = []
 
     # Set up virtfs
-    qemuargs.extend(['-virtfs', 'local,id=rootfs,path=/,security_model=passthrough,mount_tag=virtme.root,readonly'])
+    # NB: We can't use -virtfs for this, because it can't handle a mount_tag
+    # that isn't a valid QEMU identifier.
+    qemuargs.extend(['-fsdev', 'local,id=rootfs,path=/,security_model=passthrough,readonly'])
+    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=rootfs,mount_tag=/dev/root'])
 
     # Map modules
     if moddir is not None:
