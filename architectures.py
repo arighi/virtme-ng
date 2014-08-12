@@ -13,15 +13,20 @@ class Arch(object):
     def serial_dev_name(index):
         return 'ttyS%d' % index
 
+    @staticmethod
+    def qemuargs(is_native):
+        # Oddly, the i6300esb works on non-x86 architectures.
+        return ['-watchdog', 'i6300esb']
+
 class Arch_unknown(Arch):
     @staticmethod
     def qemuargs(is_native):
-        return []
+        return Arch.qemuargs(is_native)
 
 class Arch_x86(Arch):
     @staticmethod
     def qemuargs(is_native):
-        ret = []
+        ret = Arch.qemuargs(is_native)
 
         if is_native and os.access('/dev/kvm', os.R_OK):
             # If we're likely to use KVM, request a full-featured CPU.
@@ -32,7 +37,7 @@ class Arch_x86(Arch):
 
 class Arch_arm(Arch):
     def qemuargs(is_native):
-        ret = []
+        ret = Arch.qemuargs(is_native)
 
         # Emulate a versatilepb.
         ret.extend(['-M', 'versatilepb'])
