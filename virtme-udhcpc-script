@@ -1,4 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 # virtme-udhcpc-script: A trivial udhcpc script
 # Copyright © 2014 Andy Lutomirski
 # Licensed under the GPLv2, which is available in the virtme distribution
