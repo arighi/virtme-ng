@@ -18,6 +18,7 @@ import shlex
 import inspect
 import mkinitramfs
 import qemu_helpers
+import architectures
 
 uname = os.uname()
 
@@ -66,7 +67,7 @@ def make_parser():
         title='Architecture',
         description="Options related to architecture selection")
     g.add_argument('--arch', action='store', metavar='ARCHITECTURE',
-                   default=os.uname().machine,
+                   default=uname.machine,
                    help='Guest architecture')
     g.add_argument('--busybox', action='store', metavar='PATH_TO_BUSYBOX',
                    help='Use the specified busybox binary.')
@@ -145,7 +146,7 @@ def main():
     export_virtfs(qemu, qemuargs, args.root, '/dev/root')
     mypath = os.path.dirname(os.path.abspath(
         inspect.getfile(inspect.currentframe())))
-    if (args.root != '/'):
+    if args.root != '/':
         virtme_init = '/run/virtme/guesttools/virtme-init'
         export_virtfs(qemu, qemuargs, mypath, 'virtme.guesttools')
         need_initramfs = True
@@ -161,15 +162,17 @@ def main():
         export_virtfs(qemu, qemuargs, moddir, 'virtme.moddir')
 
     # Turn on KVM if available
-    qemuargs.extend(['-machine', 'accel=kvm:tcg'])
+    if args.arch == uname.machine:
+        qemuargs.extend(['-machine', 'accel=kvm:tcg'])
+
+    # Add architecture-specific options
+    arch = architectures.get(args.arch)
+    qemuargs.extend(arch.qemuargs(args.arch == uname.machine))
 
     # Ask QEMU to load the kernel image directly
     qemuargs.extend(['-kernel', kimg])
 
     # Set up / override baseline devices
-    if os.path.exists('/dev/kvm'):
-        # Try not to break the TCG fallback
-        qemuargs.extend(['-cpu', 'host'])  # We can't migrate regardless.
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
 
@@ -180,9 +183,16 @@ def main():
         qemuargs.extend(['-echr', '1'])
         qemuargs.extend(['-serial', 'none'])
         qemuargs.extend(['-chardev', 'stdio,id=console,signal=off,mux=on'])
-        qemuargs.extend(['-device', 'isa-serial,chardev=console'])
+
+        # We should be using the new-style -device serialdev,chardev=xyz,
+        # but many architecture-specific serial devices don't support that.
+        qemuargs.extend(['-serial', 'chardev:console'])
+
         qemuargs.extend(['-mon', 'chardev=console'])
-        kernelargs.extend(['console=ttyS0', 'earlyprintk=serial,ttyS0,115200'])
+
+        serdev = qemu.quote_optarg(arch.serial_dev_name(0))
+        kernelargs.extend(['console=%s' % serdev,
+                           'earlyprintk=serial,%s,115200' % serdev])
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
 
@@ -239,8 +249,14 @@ def main():
         # Send kernel logs to stderr
         qemuargs.extend(['-serial', 'none'])
         qemuargs.extend(['-chardev', 'file,id=console,path=/proc/self/fd/2'])
-        qemuargs.extend(['-device', 'isa-serial,chardev=console'])
-        kernelargs.extend(['console=ttyS0', 'earlyprintk=serial,ttyS0,115200'])
+
+        # We should be using the new-style -device serialdev,chardev=xyz,
+        # but many architecture-specific serial devices don't support that.
+        qemuargs.extend(['-serial', 'chardev:console'])
+
+        serdev = qemu.quote_optarg(arch.serial_dev_name(0))
+        kernelargs.extend(['console=%s' % serdev,
+                           'earlyprintk=serial,%s,115200' % serdev])
 
         # Set up a virtserialport for script I/O
         qemuargs.extend(['-chardev', 'stdio,id=stdio,signal=on,mux=off'])
