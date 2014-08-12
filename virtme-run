@@ -150,7 +150,6 @@ def main():
     def root_has_dir(path):
         # Don't use os.path.join: we want to treat absolute paths
         # as relative.
-        print(path)
         return os.path.isdir(args.root + '/' + path)
 
     if root_has_dir('/usr/local/share/virtme-guest-0'):
