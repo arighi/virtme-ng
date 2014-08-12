@@ -23,7 +23,7 @@ class Arch_x86(Arch):
     def qemuargs(is_native):
         ret = []
 
-        if is_native and os.path.exists('/dev/kvm'):
+        if is_native and os.access('/dev/kvm', os.R_OK):
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
             ret.extend(['-cpu', 'host'])  # We can't migrate regardless.
