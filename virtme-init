@@ -69,6 +69,10 @@ if [[ "`stat --format=%m /dev`" != "/dev" ]]; then
     fi
 fi
 
+if [[ -n "virtme_chdir" ]]; then
+    cd -- "${virtme_chdir}"
+fi
+
 log "basic initialization done"
 
 ######## The remainder of this script is a very simple init (PID 1) ########
