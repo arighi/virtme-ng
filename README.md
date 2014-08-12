@@ -32,19 +32,21 @@ That kernel needs to be sane.  Your kernel is probably sane, but allmodconfig an
 
     CONFIG_CMDLINE_OVERRIDE=n
     CONFIG_BINFMT_SCRIPT=y
+    CONFIG_TMPFS=y
 
 You may also have better luck if you set:
 
     CONFIG_EMBEDDED=n
     CONFIG_EXPERT=n
     CONFIG_MODULE_SIG_FORCE=n
+    CONFIG_DEVTMPFS=y
 
 Your host system will need to satisfy some prerequisites:
 
-* You need a statically linked `busybox` binary somewhere in your path.
 * You need Python 3.3 or higher.
 * QEMU 1.6 or higher is recommended.  QEMU 1.4 and 1.5 are partially supported using a rather ugly kludge.
   * You will have a much better experience if KVM is enabled.  That means that you should be on bare metal with hardware virtualization (VT-x or SVM) enabled or in a VM that supports nested virtualization.  On some Linux distributions, you may need to be a member of the "kvm" group.  Using VirtualBox or most VPS providers will fall back to emulation.
+* Depending on the options you use, you may need a statically linked `busybox` binary somewhere in your path.
 
 Once you have such a kernel, run one of:
 

@@ -146,13 +146,26 @@ def main():
     export_virtfs(qemu, qemuargs, args.root, '/dev/root')
     mypath = os.path.dirname(os.path.abspath(
         inspect.getfile(inspect.currentframe())))
-    if args.root != '/':
-        virtme_init = '/run/virtme/guesttools/virtme-init'
-        export_virtfs(qemu, qemuargs, mypath, 'virtme.guesttools')
-        need_initramfs = True
+
+    def root_has_dir(path):
+        # Don't use os.path.join: we want to treat absolute paths
+        # as relative.
+        print(path)
+        return os.path.isdir(args.root + '/' + path)
+
+    if root_has_dir('/usr/local/share/virtme-guest-0'):
+        virtme_init = '/usr/local/share/virtme-guest-0/virtme-init'
+    elif root_has_dir('/usr/share/virtme-guest-0'):
+        virtme_init = '/usr/share/virtme-guest-0/virtme-init'
+    elif os.path.isfile(os.path.join(mypath, 'virtme-init')):
+        if args.root == '/':
+            virtme_init = os.path.join(mypath, 'virtme-init')
+        else:
+            virtme_init = '/run/virtme/guesttools/virtme-init'
+            export_virtfs(qemu, qemuargs, mypath, 'virtme.guesttools')
+            need_initramfs = True
     else:
-        # Find virtme-init
-        virtme_init=os.path.join(mypath, 'virtme-init')
+        raise ValueError("couldn't find usable virtme guest tools")
 
     # TODO: This has escaping issues for now
     kernelargs.append('init=%s' % virtme_init)
