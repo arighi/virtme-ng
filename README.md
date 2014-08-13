@@ -28,6 +28,10 @@ You'll need a Linux kernel that has these options (built-in or as modules)
 
 For networking support, you also need CONFIG_VIRTIO_NET.
 
+For script support, you need CONFIG_VIRTIO_CONSOLE.
+
+For disk support, you need CONFIG_SCSI_VIRTIO.
+
 That kernel needs to be sane.  Your kernel is probably sane, but allmodconfig and allyesconfig generate insane kernels.  Sanity includes:
 
     CONFIG_CMDLINE_OVERRIDE=n
@@ -40,6 +44,9 @@ You may also have better luck if you set:
     CONFIG_EXPERT=n
     CONFIG_MODULE_SIG_FORCE=n
     CONFIG_DEVTMPFS=y
+
+An easy, somewhat-reliable way to generate a working config is to append
+the `prereqs.config` file to your .config and then run `make defconfig`.
 
 Your host system will need to satisfy some prerequisites:
 
