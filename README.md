@@ -70,6 +70,17 @@ To exit, type ctrl-a x.
 
 For now, the virtme console is a serial console -- virtconsole seems to be unusably buggy.  I don't know of any way to keep the tty state in sync between the host and guest, so resizing the host window after starting the guest may confuse guest libraries like readline.
 
+Architecture support
+====================
+
+By default, virtme will use whatever architecture would be shown by `uname -m`.  You can override this with `--arch`.  Note that you may need to do some poorly documented fiddling for now to get non-native architectures working, and you will almost certainly need to set `--root` to a root that matches the architecture.
+
+x86 (both x86_64 and i386) is fully supported, although some odd KVM configurations may cause problems.
+
+ARM is supported (by default, virtme uses qemu's `versatilepb` machine).  In theory, other machines will work, but PCI is required.  There is no built-in KVM support for ARM right now, although it might work by accident -- I don't own a real KVM-capable ARM machine to test it on.
+
+Other architectures may or may not work.  Adding support is trivial, so ping me if you need another architecture.  Unrecognized architectures use a set of maybe-acceptable defaults.
+
 Upcoming features
 =================
 
