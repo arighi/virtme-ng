@@ -124,6 +124,15 @@ def export_virtfs(qemu, qemuargs, path, mount_tag):
     qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu.quote_optarg(path))])
     qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=%s,mount_tag=%s' % (fsid, qemu.quote_optarg(mount_tag))])
 
+def quote_karg(arg):
+    if '"' in arg:
+        raise ValueError("cannot quote '\"' in kernel args")
+
+    if ' ' in arg:
+        return '"%s"' % arg
+    else:
+        return arg
+
 def main():
     args = _ARGPARSER.parse_args()
 
@@ -215,7 +224,7 @@ def main():
         # default nowadays).  I don't know of any way to keep this up to date
         # after startup, though.
         terminal_size = os.get_terminal_size()
-        kernelargs.extend(['"virtme_stty_console=rows %d cols %d iutf8"' %
+        kernelargs.extend(['virtme_stty_console=rows %d cols %d iutf8' %
                            (terminal_size.lines, terminal_size.columns)])
 
         # Propagate the terminal type
@@ -336,7 +345,9 @@ def main():
 
     # Insert kernel options
     if kernelargs:
-        qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
+        qemuargs.extend(['-append',
+                         ' '.join(quote_karg(a) for a
+                                  in (kernelargs + args.kopt))])
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
