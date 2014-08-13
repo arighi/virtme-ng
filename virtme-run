@@ -144,8 +144,8 @@ def main():
 
     # Set up virtfs
     export_virtfs(qemu, qemuargs, args.root, '/dev/root')
-    mypath = os.path.dirname(os.path.abspath(
-        inspect.getfile(inspect.currentframe())))
+    mypath = os.path.dirname(os.path.realpath(os.path.abspath(
+        inspect.getfile(inspect.currentframe()))))
 
     def root_has_dir(path):
         # Don't use os.path.join: we want to treat absolute paths
