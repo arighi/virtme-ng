@@ -43,6 +43,9 @@ def make_parser():
     g.add_argument('-a', '--kopt', action='append', default=[],
                    help='Add a kernel option.  You can specify this more than once.')
 
+    g.add_argument('--xen', action='store',
+                   help='Boot Xen using the specified uncompressed hypervisor.')
+
     g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--root', action='store', default='/',
                    help='Local path to use as guest root')
@@ -190,9 +193,6 @@ def main():
     arch = architectures.get(args.arch)
     qemuargs.extend(arch.qemuargs(args.arch == uname.machine))
 
-    # Ask QEMU to load the kernel image directly
-    qemuargs.extend(['-kernel', kimg])
-
     # Set up / override baseline devices
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
@@ -332,7 +332,7 @@ def main():
         mkinitramfs.mkinitramfs(tmpfile, config)
         tmpfile.flush()
         fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
-        qemuargs.extend(['-initrd', '/proc/self/fd/%d' % tmpfile.fileno()])
+        initrdpath = '/proc/self/fd/%d' % tmpfile.fileno()
     else:
         # No initramfs!  Warning: this is slower than using an initramfs
         # because the kernel will wait for device probing to finish.
@@ -342,6 +342,22 @@ def main():
             'rootflags=ro,version=9p2000.L,trans=virtio,access=any',
             'raid=noautodetect',
         ])
+        initrdpath = None
+        
+    if args.xen is None:
+        # Load a normal kernel
+        qemuargs.extend(['-kernel', kimg])
+        if kernelargs:
+            qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
+        if initrd is not None:
+            qemuargs.extend(['-initrd', initrdpath])
+    else:
+        # Use multiboot syntax to load Xen
+        qemuargs.extend(['-kernel', args.xen])
+        qemuargs.extend(['-initrd', '%s %s%s' % (
+            kimg,
+            ' '.join(a.replace(',', ',,') for a in kernelargs),
+            (',%s' % initrdpath) if initrdpath is not None else '')])
 
     # Insert kernel options
     if kernelargs:
