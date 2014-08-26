@@ -343,27 +343,23 @@ def main():
             'raid=noautodetect',
         ])
         initrdpath = None
-        
+
     if args.xen is None:
         # Load a normal kernel
         qemuargs.extend(['-kernel', kimg])
         if kernelargs:
-            qemuargs.extend(['-append', ' '.join(kernelargs + args.kopt)])
-        if initrd is not None:
+            qemuargs.extend(['-append',
+                             ' '.join(quote_karg(a) for a
+                                      in (kernelargs + args.kopt))])
+        if initrdpath is not None:
             qemuargs.extend(['-initrd', initrdpath])
     else:
         # Use multiboot syntax to load Xen
         qemuargs.extend(['-kernel', args.xen])
         qemuargs.extend(['-initrd', '%s %s%s' % (
             kimg,
-            ' '.join(a.replace(',', ',,') for a in kernelargs),
+            ' '.join(quote_karg(a).replace(',', ',,') for a in kernelargs),
             (',%s' % initrdpath) if initrdpath is not None else '')])
-
-    # Insert kernel options
-    if kernelargs:
-        qemuargs.extend(['-append',
-                         ' '.join(quote_karg(a) for a
-                                  in (kernelargs + args.kopt))])
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
