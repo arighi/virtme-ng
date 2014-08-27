@@ -15,8 +15,13 @@ class Arch(object):
 
     @staticmethod
     def qemuargs(is_native):
-        # Oddly, the i6300esb works on non-x86 architectures.
-        return ['-watchdog', 'i6300esb']
+        return []
+
+    @staticmethod
+    def virtio_dev_type(virtiotype):
+        # Return a full name for a virtio device.  It would be
+        # nice if QEMU abstracted this away, but it doesn't.
+        return 'virtio-%s-pci' % virtiotype
 
 class Arch_unknown(Arch):
     @staticmethod
@@ -27,6 +32,9 @@ class Arch_x86(Arch):
     @staticmethod
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
+
+        # Add a watchdog.  This is useful for testing.
+        ret.extend(['-watchdog', 'i6300esb'])
 
         if is_native and os.access('/dev/kvm', os.R_OK):
             # If we're likely to use KVM, request a full-featured CPU.
@@ -42,11 +50,19 @@ class Arch_arm(Arch):
         # Emulate a versatilepb.
         ret.extend(['-M', 'versatilepb'])
 
+        # Add a watchdog.  This is useful for testing.  Oddly, this works
+        # fine on ARM even though it's an Intel chipset device.
+        ret.extend(['-watchdog', 'i6300esb'])
+
         return ret
 
     @staticmethod
     def serial_dev_name(index):
         return 'ttyAMA%d' % index
+
+    @staticmethod
+    def virtio_dev_type(virtiotype):
+        return 'virtio-%s-pci' % virtiotype
 
 ARCHES = {
     'x86_64': Arch_x86,

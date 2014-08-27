@@ -120,12 +120,12 @@ def find_kernel_and_mods(args):
 
     return kimg,modfiles,moddir
 
-def export_virtfs(qemu, qemuargs, path, mount_tag):
+def export_virtfs(qemu, arch, qemuargs, path, mount_tag):
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
     fsid = 'virtfs%d' % len(qemuargs)
     qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu.quote_optarg(path))])
-    qemuargs.extend(['-device', 'virtio-9p-pci,fsdev=%s,mount_tag=%s' % (fsid, qemu.quote_optarg(mount_tag))])
+    qemuargs.extend(['-device', '%s,fsdev=%s,mount_tag=%s' % (arch.virtio_dev_type('9p'), fsid, qemu.quote_optarg(mount_tag))])
 
 def quote_karg(arg):
     if '"' in arg:
@@ -151,11 +151,13 @@ def main():
     if config.modfiles:
         need_initramfs = True
 
+    arch = architectures.get(args.arch)
+
     qemuargs = [qemu.qemubin]
     kernelargs = []
 
     # Set up virtfs
-    export_virtfs(qemu, qemuargs, args.root, '/dev/root')
+    export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root')
     mypath = os.path.dirname(os.path.realpath(os.path.abspath(
         inspect.getfile(inspect.currentframe()))))
 
@@ -173,7 +175,7 @@ def main():
             virtme_init = os.path.join(mypath, 'virtme-init')
         else:
             virtme_init = '/run/virtme/guesttools/virtme-init'
-            export_virtfs(qemu, qemuargs, mypath, 'virtme.guesttools')
+            export_virtfs(qemu, arch, qemuargs, mypath, 'virtme.guesttools')
             need_initramfs = True
     else:
         raise ValueError("couldn't find usable virtme guest tools")
@@ -183,14 +185,13 @@ def main():
 
     # Map modules
     if moddir is not None:
-        export_virtfs(qemu, qemuargs, moddir, 'virtme.moddir')
+        export_virtfs(qemu, arch, qemuargs, moddir, 'virtme.moddir')
 
     # Turn on KVM if available
     if args.arch == uname.machine:
         qemuargs.extend(['-machine', 'accel=kvm:tcg'])
 
     # Add architecture-specific options
-    arch = architectures.get(args.arch)
     qemuargs.extend(arch.qemuargs(args.arch == uname.machine))
 
     # Set up / override baseline devices
@@ -235,7 +236,7 @@ def main():
         qemuargs.extend(['-balloon', 'virtio'])
 
     if args.disk:
-        qemuargs.extend(['-device', 'virtio-scsi-pci,id=scsi'])
+        qemuargs.extend(['-device', '%s,id=scsi' % arch.virtio_dev_type('scsi')])
 
         for i,d in enumerate(args.disk):
             namefile = d.split('=', 1)
@@ -281,7 +282,7 @@ def main():
 
         # Set up a virtserialport for script I/O
         qemuargs.extend(['-chardev', 'stdio,id=stdio,signal=on,mux=off'])
-        qemuargs.extend(['-device', 'virtio-serial-pci'])
+        qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
         qemuargs.extend(['-device', 'virtserialport,name=virtme.scriptio,chardev=stdio'])
 
         # Scripts shouldn't reboot
