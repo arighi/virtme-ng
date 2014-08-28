@@ -64,10 +64,32 @@ class Arch_arm(Arch):
     def virtio_dev_type(virtiotype):
         return 'virtio-%s-pci' % virtiotype
 
+class Arch_aarch64(Arch):
+    def qemuargs(is_native):
+        ret = Arch.qemuargs(is_native)
+
+        # Emulate a fully virtual system.
+        ret.extend(['-M', 'virt'])
+
+        # Despite being called qemu-system-aarch64, QEMU defaults to
+        # emulating a 32-bit CPU.  Override it.
+        ret.extend(['-cpu', 'cortex-a57'])
+
+        return ret
+
+    @staticmethod
+    def serial_dev_name(index):
+        return 'ttyAMA%d' % index
+
+    @staticmethod
+    def virtio_dev_type(virtiotype):
+        return 'virtio-%s-device' % virtiotype
+
 ARCHES = {
     'x86_64': Arch_x86,
     'i386': Arch_x86,
     'arm': Arch_arm,
+    'aarch64': Arch_aarch64,
 }
 
 def get(arch):
