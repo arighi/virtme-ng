@@ -318,15 +318,21 @@ def main():
     if args.script_exec is not None:
         do_script(shlex.quote(args.script_exec))
 
-    if args.busybox is not None:
-        config.busybox = args.busybox
-
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])
         qemuargs.extend(['-net', 'user'])
         kernelargs.extend(['virtme.dhcp'])
 
     if need_initramfs:
+        if args.busybox is not None:
+            config.busybox = args.busybox
+        else:
+            config.busybox = mkinitramfs.find_busybox(args.root, is_native)
+            if config.busybox is None:
+                print('virtme-run: initramfs is needed, and no busybox was found',
+                      file=sys.stderr)
+                return 1
+
         # Set up the initramfs (warning: hack ahead)
         tmpfd,tmpname = tempfile.mkstemp('irfs')
         os.unlink(tmpname)

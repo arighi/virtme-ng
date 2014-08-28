@@ -28,11 +28,7 @@ def make_dev_nodes(cw):
     cw.mkchardev(b'dev/console', (5, 1), mode=0o660)
 
 def install_busybox(cw, config):
-    if config.busybox is not None:
-        bbpath = config.busybox
-    else:
-        bbpath = shutil.which('busybox')
-    with open(bbpath, 'rb') as busybox:
+    with open(config.busybox, 'rb') as busybox:
         cw.write_file(name=b'bin/busybox', body=busybox, mode=0o755)
 
     for tool in ('sh', 'mount', 'umount', 'switch_root', 'sleep', 'mkdir',
@@ -163,3 +159,17 @@ def mkinitramfs(out, config):
     cw.write_file(b'init', body=generate_init(),
                   mode=0o755)
     cw.write_trailer()
+
+def find_busybox(root, is_native):
+    for path in ('usr/local/bin/busybux', 'usr/local/sbin/busybox',
+                 'usr/bin/busybox', 'usr/sbin/busybox',
+                 'bin/busybox', 'sbin/busybox'):
+        if os.path.isfile(os.path.join(root, path)):
+            return os.path.join(root, path)
+
+    if is_native:
+        # Try the host's busybox, if any
+        return shutil.which('busybox')
+
+    # We give up.
+    return None
