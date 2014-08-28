@@ -152,6 +152,7 @@ def main():
         need_initramfs = True
 
     arch = architectures.get(args.arch)
+    is_native = (args.arch == uname.machine)
 
     qemuargs = [qemu.qemubin]
     kernelargs = []
@@ -188,11 +189,11 @@ def main():
         export_virtfs(qemu, arch, qemuargs, moddir, 'virtme.moddir')
 
     # Turn on KVM if available
-    if args.arch == uname.machine:
+    if is_native:
         qemuargs.extend(['-machine', 'accel=kvm:tcg'])
 
     # Add architecture-specific options
-    qemuargs.extend(arch.qemuargs(args.arch == uname.machine))
+    qemuargs.extend(arch.qemuargs(is_native))
 
     # Set up / override baseline devices
     qemuargs.extend(['-parallel', 'none'])
