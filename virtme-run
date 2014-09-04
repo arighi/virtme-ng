@@ -213,9 +213,8 @@ def main():
 
         qemuargs.extend(['-mon', 'chardev=console'])
 
-        serdev = qemu.quote_optarg(arch.serial_dev_name(0))
-        kernelargs.extend(['console=%s' % serdev,
-                           'earlyprintk=serial,%s,115200' % serdev])
+        kernelargs.extend(arch.earlyconsole_args())
+        kernelargs.extend(arch.serial_console_args())
         qemuargs.extend(['-vga', 'none'])
         qemuargs.extend(['-display', 'none'])
 
@@ -276,10 +275,6 @@ def main():
         # We should be using the new-style -device serialdev,chardev=xyz,
         # but many architecture-specific serial devices don't support that.
         qemuargs.extend(['-serial', 'chardev:console'])
-
-        serdev = qemu.quote_optarg(arch.serial_dev_name(0))
-        kernelargs.extend(['console=%s' % serdev,
-                           'earlyprintk=serial,%s,115200' % serdev])
 
         # Set up a virtserialport for script I/O
         qemuargs.extend(['-chardev', 'stdio,id=stdio,signal=on,mux=off'])

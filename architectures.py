@@ -23,6 +23,14 @@ class Arch(object):
         # nice if QEMU abstracted this away, but it doesn't.
         return 'virtio-%s-pci' % virtiotype
 
+    @staticmethod
+    def earlyconsole_args():
+        return []
+
+    @staticmethod
+    def serial_console_args():
+        return []
+
 class Arch_unknown(Arch):
     @staticmethod
     def qemuargs(is_native):
@@ -43,6 +51,14 @@ class Arch_x86(Arch):
 
         return ret
 
+    @staticmethod
+    def earlyconsole_args():
+        return ['earlyprintk=serial,ttyS0,115200']
+
+    @staticmethod
+    def serial_console_args():
+        return ['console=ttyS0']
+
 class Arch_arm(Arch):
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
@@ -57,12 +73,16 @@ class Arch_arm(Arch):
         return ret
 
     @staticmethod
-    def serial_dev_name(index):
-        return 'ttyAMA%d' % index
-
-    @staticmethod
     def virtio_dev_type(virtiotype):
         return 'virtio-%s-pci' % virtiotype
+
+    @staticmethod
+    def earlyconsole_args():
+        return ['earlyprintk=serial,ttyAMA0,115200']
+
+    @staticmethod
+    def serial_console_args():
+        return ['console=ttyAMA0']
 
 class Arch_aarch64(Arch):
     def qemuargs(is_native):
@@ -78,12 +98,16 @@ class Arch_aarch64(Arch):
         return ret
 
     @staticmethod
-    def serial_dev_name(index):
-        return 'ttyAMA%d' % index
-
-    @staticmethod
     def virtio_dev_type(virtiotype):
         return 'virtio-%s-device' % virtiotype
+
+    @staticmethod
+    def earlyconsole_args():
+        return ['earlyprintk=serial,ttyAMA0,115200']
+
+    @staticmethod
+    def serial_console_args():
+        return ['console=ttyAMA0']
 
 ARCHES = {
     'x86_64': Arch_x86,
