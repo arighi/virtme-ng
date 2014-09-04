@@ -150,8 +150,8 @@ echo "virtme-init: console is $consdev"
 # setsid binary or the system call, I don't know).
 while true; do
     # Program the console sensibly
-    if [[ -n "${virtme_stty_console}" ]]; then
-	stty ${virtme_stty_console} <"/dev/$consdev"
+    if [[ -n "${virtme_stty_con}" ]]; then
+	stty ${virtme_stty_con} <"/dev/$consdev"
     fi
 
     setsid bash 0<>"/dev/$consdev" 1>&0 2>&0

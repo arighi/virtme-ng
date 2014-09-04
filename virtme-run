@@ -225,7 +225,7 @@ def main():
         # default nowadays).  I don't know of any way to keep this up to date
         # after startup, though.
         terminal_size = os.get_terminal_size()
-        kernelargs.extend(['virtme_stty_console=rows %d cols %d iutf8' %
+        kernelargs.extend(['virtme_stty_con=rows %d cols %d iutf8' %
                            (terminal_size.lines, terminal_size.columns)])
 
         # Propagate the terminal type
