@@ -15,7 +15,6 @@ import os
 import fcntl
 import sys
 import shlex
-import inspect
 import mkinitramfs
 import qemu_helpers
 import architectures
@@ -136,7 +135,7 @@ def quote_karg(arg):
     else:
         return arg
 
-def main():
+def main(mypath = None):
     args = _ARGPARSER.parse_args()
 
     qemu = qemu_helpers.Qemu(args.arch)
@@ -159,8 +158,6 @@ def main():
 
     # Set up virtfs
     export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root')
-    mypath = os.path.dirname(os.path.realpath(os.path.abspath(
-        inspect.getfile(inspect.currentframe()))))
 
     def root_has_dir(path):
         # Don't use os.path.join: we want to treat absolute paths
@@ -171,7 +168,8 @@ def main():
         virtme_init = '/usr/local/share/virtme-guest-0/virtme-init'
     elif root_has_dir('/usr/share/virtme-guest-0'):
         virtme_init = '/usr/share/virtme-guest-0/virtme-init'
-    elif os.path.isfile(os.path.join(mypath, 'virtme-init')):
+    elif (mypath is not None and
+          os.path.isfile(os.path.join(mypath, 'virtme-init'))):
         if args.root == '/':
             virtme_init = os.path.join(mypath, 'virtme-init')
         else:
