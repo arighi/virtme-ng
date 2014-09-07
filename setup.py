@@ -17,7 +17,7 @@ setup(
     author_email='luto@amacapital.net',
     description='simple tools for kernel testing in a virtualized host',
     url='https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git',
-    license=open('./LICENSE').read(),
+    license='GPLv2',
     long_description=open('./README.md').read(),
     packages=['virtme', 'virtme.commands'],
     install_requires=[],
