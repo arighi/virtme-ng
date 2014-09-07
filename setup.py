@@ -17,7 +17,7 @@ setup(
     version='0.0.1',
     author='Andy Lutomirski',
     author_email='luto@amacapital.net',
-    description='Virtualize the running distro or a simple hostfs',
+    description='Virtualize the running distro or a simple rootfs',
     url='https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git',
     license='GPLv2',
     long_description=open(os.path.join(os.path.dirname(__file__),
