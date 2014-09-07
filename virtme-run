@@ -6,9 +6,8 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-import os
+# This file is not installed; it's just use to run virtme from inside
+# a source distribution.
+
 from virtme.commands import run
-
-mypath = os.path.dirname(os.path.realpath(os.path.abspath(__file__)))
-
-exit(run.main(mypath=mypath))
+exit(run.main())

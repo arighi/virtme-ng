@@ -18,6 +18,7 @@ from .. import modfinder
 from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
+from .. import guest_tools
 
 uname = os.uname()
 
@@ -135,7 +136,7 @@ def quote_karg(arg):
     else:
         return arg
 
-def main(mypath = None):
+def main():
     args = _ARGPARSER.parse_args()
 
     qemu = qemu_helpers.Qemu(args.arch)
@@ -159,30 +160,21 @@ def main(mypath = None):
     # Set up virtfs
     export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root')
 
-    def root_has_dir(path):
-        # Don't use os.path.join: we want to treat absolute paths
-        # as relative.
-        return os.path.isdir(args.root + '/' + path)
-
-    if root_has_dir('/usr/local/share/virtme-guest-0'):
-        virtme_init = '/usr/local/share/virtme-guest-0/virtme-init'
-    elif root_has_dir('/usr/share/virtme-guest-0'):
-        virtme_init = '/usr/share/virtme-guest-0/virtme-init'
-    elif (mypath is not None and
-          os.path.isdir(os.path.join(mypath, 'guest-tools'))):
-        if args.root == '/':
-            virtme_init = os.path.join(mypath, 'guest-tools/virtme-init')
-        else:
-            virtme_init = '/run/virtme/guesttools/virtme-init'
-            export_virtfs(qemu, arch, qemuargs,
-                          os.path.join(mypath, 'guest-tools'),
-                          'virtme.guesttools')
-            need_initramfs = True
-    else:
+    guest_tools_in_guest, guest_tools_path = \
+        guest_tools.find_best_guest_tools(args.root)
+    if guest_tools_path is None:
         raise ValueError("couldn't find usable virtme guest tools")
 
+    if guest_tools_in_guest:
+        virtme_init = os.path.join(guest_tools_path, 'virtme-init')
+    else:
+        virtme_init = '/run/virtme/guesttools/virtme-init'
+        export_virtfs(qemu, arch, qemuargs, guest_tools_path,
+                      'virtme.guesttools')
+        need_initramfs = True
+
     # TODO: This has escaping issues for now
-    kernelargs.append('init=%s' % virtme_init)
+    kernelargs.append('init=%s' % os.path.join('/', virtme_init))
 
     # Map modules
     if moddir is not None:

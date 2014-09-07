@@ -19,12 +19,19 @@ setup(
     url='https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git',
     license=open('./LICENSE').read(),
     long_description=open('./README.md').read(),
-    packages=['virtme'],
+    packages=['virtme', 'virtme.commands'],
     install_requires=[],
     entry_points = {
         'console_scripts': [
             'virtme-run = virtme.commands.run:main',
         ]
     },
+    data_files = [
+        ('share/virtme-guest-0',
+         ['virtme/guest/virtme-init',
+          'virtme/guest/virtme-udhcpc-script',
+          'virtme/guest/virtme-loadmods',
+         ]),
+    ],
     classifiers=['Environment :: Console']
 )
