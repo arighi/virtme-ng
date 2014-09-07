@@ -7,17 +7,17 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import argparse
-import virtmods
-import modfinder
 import tempfile
 import shutil
 import os
 import fcntl
 import sys
 import shlex
-import mkinitramfs
-import qemu_helpers
-import architectures
+from .. import virtmods
+from .. import modfinder
+from .. import mkinitramfs
+from .. import qemu_helpers
+from .. import architectures
 
 uname = os.uname()
 
@@ -169,12 +169,14 @@ def main(mypath = None):
     elif root_has_dir('/usr/share/virtme-guest-0'):
         virtme_init = '/usr/share/virtme-guest-0/virtme-init'
     elif (mypath is not None and
-          os.path.isfile(os.path.join(mypath, 'virtme-init'))):
+          os.path.isdir(os.path.join(mypath, 'guest-tools'))):
         if args.root == '/':
-            virtme_init = os.path.join(mypath, 'virtme-init')
+            virtme_init = os.path.join(mypath, 'guest-tools/virtme-init')
         else:
             virtme_init = '/run/virtme/guesttools/virtme-init'
-            export_virtfs(qemu, arch, qemuargs, mypath, 'virtme.guesttools')
+            export_virtfs(qemu, arch, qemuargs,
+                          os.path.join(mypath, 'guest-tools'),
+                          'virtme.guesttools')
             need_initramfs = True
     else:
         raise ValueError("couldn't find usable virtme guest tools")

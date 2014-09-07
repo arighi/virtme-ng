@@ -7,12 +7,12 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import shutil
-import cpiowriter
 import io
 import os.path
 import shlex
-import modfinder
-import virtmods
+from . import cpiowriter
+from . import modfinder
+from . import virtmods
 
 def make_base_layout(cw):
     for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',
