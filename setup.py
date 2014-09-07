@@ -1,8 +1,15 @@
 #!/usr/bin/env python3
+
 try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
+
+import sys
+if sys.version_info.major < 3:
+    print('virtme requires Python 3 or higher')
+    sys.exit(1)
+
 setup(
     name='virtme',
     version='0.0.1',
@@ -14,12 +21,10 @@ setup(
     long_description=open('./README.md').read(),
     packages=['virtme'],
     install_requires=[],
-    scripts=[
-        'bin/virtme-init',
-        'bin/virtme-loadmods',
-        'bin/virtme-mkinitramfs',
-        'bin/virtme-run',
-        'bin/virtme-udhcpc-script',
-    ],
+    entry_points = {
+        'console_scripts': [
+            'virtme-run = virtme.commands.run:main',
+        ]
+    },
     classifiers=['Environment :: Console']
 )
