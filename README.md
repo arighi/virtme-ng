@@ -2,7 +2,8 @@ What is virtme?
 ===============
 
 Virtme is a set of simple tools to run a virtualized Linux kernel that
-uses the host Linux distribution instead of a separate image.
+uses the host Linux distribution or a simple rootfs instead of a whole
+disk image.
 
 Virtme is tiny, easy to use, and makes testing kernel changes quite simple.
 
