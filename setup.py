@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 
+import os
+import sys
+
 try:
     from setuptools import setup
 except ImportError:
     from distutils.core import setup
 
-import sys
 if sys.version_info.major < 3:
     print('virtme requires Python 3 or higher')
     sys.exit(1)
@@ -18,7 +20,8 @@ setup(
     description='simple tools for kernel testing in a virtualized host',
     url='https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git',
     license='GPLv2',
-    long_description=open('./README.md').read(),
+    long_description=open(os.path.join(os.path.dirname(__file__),
+                                       'README.md'), 'r').read(),
     packages=['virtme', 'virtme.commands'],
     install_requires=[],
     entry_points = {
