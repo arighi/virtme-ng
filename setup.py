@@ -36,5 +36,10 @@ setup(
           'virtme/guest/virtme-loadmods',
          ]),
     ],
-    classifiers=['Environment :: Console']
+    classifiers=['Environment :: Console',
+                 'Intended Audience :: Developers',
+                 'Intended Audience :: System Administrators',
+                 'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
+                 'Operating System :: POSIX :: Linux',
+             ]
 )
