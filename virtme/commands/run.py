@@ -49,8 +49,8 @@ def make_parser():
     g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--root', action='store', default='/',
                    help='Local path to use as guest root')
-    g.add_argument('--console', action='store_true',
-                   help='Run headless -- use ctrl-A, x to exit.')
+    g.add_argument('--graphics', action='store_true',
+                   help='Show graphical output instead of using a console.')
     g.add_argument('--net', action='store_true',
                    help='Enable basic network access.')
     g.add_argument('--balloon', action='store_true',
@@ -191,7 +191,7 @@ def main():
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
 
-    if args.console:
+    if not args.graphics and not args.script_sh and not args.script_exec:
         # It would be nice to use virtconsole, but it's terminally broken
         # in current kernels.  Nonetheless, I'm configuring the console
         # manually to make it easier to tweak in the future.
@@ -246,8 +246,8 @@ def main():
     has_script = False
 
     def do_script(shellcmd):
-        if args.console:
-            arg_fail('scripts and --console are mutually exclusive')
+        if args.graphics:
+            arg_fail('scripts and --graphics are mutually exclusive')
 
         nonlocal has_script
         nonlocal need_initramfs

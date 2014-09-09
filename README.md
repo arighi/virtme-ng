@@ -70,13 +70,15 @@ Note that the --kimg mode does not support modules.
 You can then do things like `cd /home/username` and you will have readonly
 access to all your files.
 
-Console
-=======
-
-virtme has usable console support.  Pass --console to virtme-run to use it.
-To exit, type ctrl-a x.
+Virtme gives you console input and output by default.  Type ctrl-a x to exit.
+Type ctrl-a c to access the QEMU monitor.
 
 For now, the virtme console is a serial console -- virtconsole seems to be unusably buggy.  I don't know of any way to keep the tty state in sync between the host and guest, so resizing the host window after starting the guest may confuse guest libraries like readline.
+
+Graphics
+========
+
+If you want graphical output instead of console output, pass --graphics.  Note that this is the opposite of QEMU's default behavior.
 
 Architecture support
 ====================
