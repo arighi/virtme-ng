@@ -98,6 +98,11 @@ Aarch64
 
 Aarch64 works out of the box if you have a new enough version of QEMU.
 
+PPC64
+-----
+
+PPC64 appears to be reasonably functional.
+
 Others
 ------
 
