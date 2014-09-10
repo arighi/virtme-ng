@@ -151,6 +151,29 @@ class Arch_aarch64(Arch):
     def serial_console_args():
         return ['console=ttyAMA0']
 
+# Disabled because it doesn't work.
+class Arch_s390x(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.qemuname = 's390x'
+        self.linuxname = 's390'
+
+    @staticmethod
+    def virtio_dev_type(virtiotype):
+        return 'virtio-%s-device' % virtiotype
+
+    def qemuargs(self, is_native):
+        return [
+            '-device', 'virtio-mmio',
+
+            # This is very buggy.
+            '-device', self.virtio_dev_type('serial'),
+
+            # This is annoying but acceptable.
+            '-device', 'virtconsole,chardev=console',
+        ]
+
 ARCHES = {
     'x86_64': Arch_x86,
     'i386': Arch_x86,
