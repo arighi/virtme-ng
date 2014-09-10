@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- mode: python -*-
 # virtme-configkernel: Configure a kernel for virtme
 # Copyright © 2014 Andy Lutomirski

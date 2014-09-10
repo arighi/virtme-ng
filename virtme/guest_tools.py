@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- mode: python -*-
 # resources.py: Find virtme's resources
 # Copyright © 2014 Andy Lutomirski

@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- mode: python -*-
 # qemu_helpers: Helpers to find QEMU and handle its quirks
 # Copyright © 2014 Andy Lutomirski

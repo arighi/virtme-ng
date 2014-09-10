@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- mode: python -*-
 # modfinder: A simple tool to resolve required modules
 # Copyright © 2014 Andy Lutomirski

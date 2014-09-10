@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- mode: python -*-
 # virtmods: Default module configuration
 # Copyright © 2014 Andy Lutomirski

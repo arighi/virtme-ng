@@ -1,4 +1,3 @@
-#!/usr/bin/python3
 # -*- mode: python -*-
 # virtme-run: The main command-line virtme frontend
 # Copyright © 2014 Andy Lutomirski
