@@ -12,13 +12,16 @@ if sys.version_info.major < 3:
     print('virtme requires Python 3 or higher')
     sys.exit(1)
 
+_VERSION = '0.0.1'
+
 setup(
     name='virtme',
-    version='0.0.1',
+    version=_VERSION,
     author='Andy Lutomirski',
     author_email='luto@amacapital.net',
     description='Virtualize the running distro or a simple rootfs',
     url='https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git',
+    download_url='https://www.kernel.org/pub/linux/utils/kernel/virtme/releases/virtme-%s.tar.xz' % _VERSION,
     license='GPLv2',
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md'), 'r').read(),
