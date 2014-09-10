@@ -27,6 +27,7 @@ setup(
     entry_points = {
         'console_scripts': [
             'virtme-run = virtme.commands.run:main',
+            'virtme-configkernel = virtme.commands.configkernel:main',
         ]
     },
     data_files = [

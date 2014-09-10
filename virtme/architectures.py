@@ -9,6 +9,12 @@
 import os
 
 class Arch(object):
+    def __init__(self, name):
+        self.qemuname = name
+        self.linuxname = name
+
+    defconfig_target = 'defconfig'
+
     @staticmethod
     def serial_dev_name(index):
         return 'ttyS%d' % index
@@ -29,6 +35,10 @@ class Arch(object):
 
     @staticmethod
     def serial_console_args():
+        return []
+
+    @staticmethod
+    def config_base():
         return []
 
 class Arch_unknown(Arch):
@@ -59,7 +69,32 @@ class Arch_x86(Arch):
     def serial_console_args():
         return ['console=ttyS0']
 
+    @staticmethod
+    def config_base():
+        return ['CONFIG_SERIO=y',
+                'CONFIG_PCI=y',
+                'CONFIG_INPUT=y',
+                'CONFIG_INPUT_KEYBOARD=y',
+                'CONFIG_KEYBOARD_ATKBD=y',
+                'CONFIG_SERIAL_8250=y',
+                'CONFIG_SERIAL_8250_CONSOLE=y',
+                'CONFIG_X86_VERBOSE_BOOTUP=y',
+                'CONFIG_VGA_CONSOLE=y',
+                'CONFIG_FB=y',
+                'CONFIG_FB_VESA=y',
+                'CONFIG_FRAMEBUFFER_CONSOLE=y',
+                'CONFIG_RTC_CLASS=y',
+                'CONFIG_RTC_HCTOSYS=y',
+                'CONFIG_RTC_DRV_CMOS=y',
+            ]
+
 class Arch_arm(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.defconfig_target = 'versatile_defconfig'
+
+    @staticmethod
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
 
@@ -85,6 +120,13 @@ class Arch_arm(Arch):
         return ['console=ttyAMA0']
 
 class Arch_aarch64(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.qemuname = 'aarch64'
+        self.linuxname = 'arm64'
+
+    @staticmethod
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
 
@@ -117,4 +159,4 @@ ARCHES = {
 }
 
 def get(arch):
-    return ARCHES.get(arch, Arch_unknown)
+    return ARCHES.get(arch, Arch_unknown)(arch)
