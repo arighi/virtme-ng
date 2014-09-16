@@ -37,7 +37,7 @@ _ARGPARSER = make_parser()
 def arg_fail(message):
     print(message)
     _ARGPARSER.print_usage()
-    sys.exit(1)
+    exit(1)
 
 _GENERIC_CONFIG = [
     '# Generic',
