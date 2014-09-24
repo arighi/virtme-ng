@@ -88,6 +88,10 @@ def make_parser():
     g.add_argument('--show-command', action='store_true',
                    help='Show the VM command line')
 
+    g = parser.add_argument_group(title='Guest userspace configuration')
+    g.add_argument('--pwd', action='store_true',
+                   help='Propagate current working directory to the guest')
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -308,6 +312,13 @@ def main():
         qemuargs.extend(['-net', 'nic,model=virtio'])
         qemuargs.extend(['-net', 'user'])
         kernelargs.extend(['virtme.dhcp'])
+
+    if args.pwd:
+        rel_pwd = os.path.relpath(os.getcwd(), args.root)
+        if rel_pwd.startswith('..'):
+            print('current working directory is not contained in the root')
+            return 1
+        kernelargs.append('virtme_chdir=%s' % rel_pwd)
 
     if need_initramfs:
         if args.busybox is not None:
