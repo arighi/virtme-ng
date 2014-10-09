@@ -8,8 +8,8 @@ try:
 except ImportError:
     from distutils.core import setup
 
-if sys.version_info.major < 3:
-    print('virtme requires Python 3 or higher')
+if sys.version_info < (3,3):
+    print('virtme requires Python 3.3 or higher')
     sys.exit(1)
 
 _VERSION = '0.0.1'

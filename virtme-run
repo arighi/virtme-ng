@@ -9,5 +9,10 @@
 # This file is not installed; it's just use to run virtme from inside
 # a source distribution.
 
+import sys
+if sys.version_info < (3,3):
+    print('virtme requires Python 3.3 or higher')
+    sys.exit(1)
+
 from virtme.commands import run
 exit(run.main())
