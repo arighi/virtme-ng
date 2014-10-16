@@ -85,6 +85,9 @@ class Arch_x86(Arch):
                 'CONFIG_RTC_CLASS=y',
                 'CONFIG_RTC_HCTOSYS=y',
                 'CONFIG_RTC_DRV_CMOS=y',
+                'CONFIG_HYPERVISOR_GUEST=y',
+                'CONFIG_PARAVIRT=y',
+                'CONFIG_KVM_GUEST=y',
             ]
 
 class Arch_arm(Arch):
