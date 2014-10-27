@@ -88,6 +88,11 @@ class Arch_x86(Arch):
                 'CONFIG_HYPERVISOR_GUEST=y',
                 'CONFIG_PARAVIRT=y',
                 'CONFIG_KVM_GUEST=y',
+
+                # Depending on the host kernel, virtme can nest!
+                'CONFIG_KVM=y',
+                'CONFIG_KVM_INTEL=y',
+                'CONFIG_KVM_AMD=y',
             ]
 
 class Arch_arm(Arch):
