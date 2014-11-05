@@ -12,6 +12,7 @@ import os
 import fcntl
 import sys
 import shlex
+import re
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -92,6 +93,10 @@ def make_parser():
     g.add_argument('--pwd', action='store_true',
                    help='Propagate current working directory to the guest')
 
+    g = parser.add_argument_group(title='Sharing resources with guest')
+    g.add_argument('--rwdir', action='append', default=[],
+                   help="Supply a read/write directory to the guest.  Use --rwdir=path or --rwdir=guestpath=hostpath.")
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -123,11 +128,13 @@ def find_kernel_and_mods(args):
 
     return kimg,modfiles,moddir
 
-def export_virtfs(qemu, arch, qemuargs, path, mount_tag):
+def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True):
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
     fsid = 'virtfs%d' % len(qemuargs)
-    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=passthrough,readonly' % (fsid, qemu.quote_optarg(path))])
+    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=%s%s' %
+                     (fsid, qemu.quote_optarg(path),
+                      security_model, ',readonly' if readonly else '')])
     qemuargs.extend(['-device', '%s,fsdev=%s,mount_tag=%s' % (arch.virtio_dev_type('9p'), fsid, qemu.quote_optarg(mount_tag))])
 
 def quote_karg(arg):
@@ -138,6 +145,11 @@ def quote_karg(arg):
         return '"%s"' % arg
     else:
         return arg
+
+# Allowed characters in mount paths.  We can extend this over time if needed.
+_SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.]+'
+_RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
+                       (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
 
 def main():
     args = _ARGPARSER.parse_args()
@@ -182,6 +194,27 @@ def main():
     # Map modules
     if moddir is not None:
         export_virtfs(qemu, arch, qemuargs, moddir, 'virtme.moddir')
+
+    # Set up mounts
+    mount_index = 0
+    for rwdir in args.rwdir:
+        m = _RWDIR_RE.match(rwdir)
+        if not m:
+            arg_fail('invalid --rwdir parameter')
+        if m.group(2) is not None:
+            guestpath = m.group(1)
+            hostpath = m.group(2)
+        else:
+            hostpath = m.group(1)
+            guestpath = os.path.relpath(hostpath, args.root)
+            if guestpath.startswith('..'):
+                arg_fail('%r is not inside the root' % hostpath)
+
+        idx = mount_index
+        mount_index += 1
+        tag = 'virtme.initmount%d' % idx
+        export_virtfs(qemu, arch, qemuargs, hostpath, tag, readonly=False)
+        kernelargs.append('virtme_initmount%d=%s' % (idx, guestpath))
 
     # Turn on KVM if available
     if is_native:

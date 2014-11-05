@@ -69,6 +69,10 @@ if [[ "`stat --format=%m /dev`" != "/dev" ]]; then
     fi
 fi
 
+for tag in "${!virtme_initmount@}"; do
+    mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.initmount${tag:16}" "${!tag}"
+done
+
 if [[ -n "virtme_chdir" ]]; then
     cd -- "${virtme_chdir}"
 fi
