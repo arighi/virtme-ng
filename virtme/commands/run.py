@@ -147,7 +147,7 @@ def quote_karg(arg):
         return arg
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
-_SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.]+'
+_SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.-]+'
 _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
                        (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
 
