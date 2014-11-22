@@ -22,11 +22,15 @@ for i in /sys/bus/virtio/drivers/9pnet_virtio/virtio*/mount_tag; do
     mount_tags["`cat "$i"`"]=1
 done
 
+kver="`uname -r`"
+
 if [[ -n "${mount_tags[virtme.moddir]}" ]]; then
     mount -t tmpfs none /lib/modules
-    kver="`uname -r`"
     mkdir /lib/modules/"$kver"
     mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.moddir /lib/modules/"$kver"
+elif [[ -d "/lib/modules/$kver" ]]; then
+    # We may have mismatched modules.  Mask them off.
+    mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
 fi
 
 mount -t tmpfs tmpfs /tmp/
