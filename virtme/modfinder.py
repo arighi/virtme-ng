@@ -13,7 +13,7 @@ everything.  The idea is to require very few modules.
 
 import re
 import subprocess
-import os.path
+import os, os.path
 import itertools
 
 _INSMOD_RE = re.compile('insmod (.*[^ ]) *$')
@@ -23,7 +23,9 @@ def resolve_dep(modalias, root=None, kver=None, moddir=None):
     args += ['-C', '/var/empty']
     if root is not None:
         args += ['-d', root]
-    if kver is not None:
+    if kver is not None and kver != os.uname().release:
+        # If booting the loaded kernel, skip -S.  This helps certain
+        # buggy modprobe versions that don't support -S.
         args += ['-S', kver]
     if moddir is not None:
         args += ['--moddir', moddir]
