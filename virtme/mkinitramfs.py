@@ -85,7 +85,17 @@ if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
   # QEMU 1.5 and below have a bug in virtfs that prevents mounting
   # anything on top of a virtfs mount.
   log "your host's virtfs is broken -- using a fallback tmpfs"
+  need_fallback_tmpfs=1
+else
+  umount /newroot/proc  # Don't leave garbage behind
+fi
 
+if ! [[ -d /newroot/run ]]; then
+  log "your host does not have /run -- using a fallback tmpfs"
+  need_fallback_tmpfs=1
+fi
+
+if [[ "$need_fallback_tmpfs" != "" ]]; then
   mount --move /newroot /tmproot
   mount -t tmpfs root_workaround /newroot/
   cd tmproot
@@ -99,8 +109,6 @@ if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
   mknod /newroot/dev/null c 1 3
   mount -o remount,ro -t tmpfs root_workaround /newroot
   umount -l /tmproot
-else
-  umount /newroot/proc  # Don't leave garbage behind
 fi
 
 mount -t tmpfs run /newroot/run
