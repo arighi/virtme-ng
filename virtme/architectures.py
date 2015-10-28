@@ -99,24 +99,25 @@ class Arch_arm(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
 
-        self.defconfig_target = 'versatile_defconfig'
+        self.defconfig_target = 'vexpress_defconfig'
 
     @staticmethod
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
 
-        # Emulate a versatilepb.
-        ret.extend(['-M', 'versatilepb'])
+        # Emulate a vexpress-a15.
+        ret.extend(['-M', 'vexpress-a15'])
 
-        # Add a watchdog.  This is useful for testing.  Oddly, this works
-        # fine on ARM even though it's an Intel chipset device.
-        ret.extend(['-watchdog', 'i6300esb'])
+        # TODO: consider adding a PCI bus (and figuring out how)
+
+        # TODO: This won't boot unless -dtb is set, but we need to figure
+        # out how to find the dtb file.
 
         return ret
 
     @staticmethod
     def virtio_dev_type(virtiotype):
-        return 'virtio-%s-pci' % virtiotype
+        return 'virtio-%s-device' % virtiotype
 
     @staticmethod
     def earlyconsole_args():
