@@ -35,9 +35,8 @@ def make_parser():
     g.add_argument('--kimg', action='store',
                    help='Use specified kernel image with no modules.')
 
-#    Disabled until kmod gets fixed.
-#    g.add_argument('--kernel-build-dir', action='store', metavar='KDIR',
-#                   help='Use a compiled kernel source directory')
+    g.add_argument('--kdir', action='store', metavar='KDIR',
+                   help='Use a compiled kernel source directory')
 
     g = parser.add_argument_group(title='Kernel options')
     g.add_argument('-a', '--kopt', action='append', default=[],
@@ -106,27 +105,38 @@ def arg_fail(message):
     _ARGPARSER.print_usage()
     sys.exit(1)
 
-def find_kernel_and_mods(args):
+def find_kernel_and_mods(arch, args):
     if args.installed_kernel is not None:
         kver = args.installed_kernel
         modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=kver)
         moddir = os.path.join('/lib/modules', kver)
         kimg = '/boot/vmlinuz-%s' % kver
-#    Disabled until kmod gets fixed.
-#    elif args.kernel_build_dir is not None:
-#        kimg = os.path.join(args.kernel_build_dir, 'arch/x86/boot/bzImage')
-#        modfiles = modfinder.find_modules_from_install(
-#            virtmods.MODALIASES,
-#            moddir=os.path.join(args.kernel_build_dir, '.tmp_moddir'))
+        dtb = None  # For now
+    elif args.kdir is not None:
+        kimg = os.path.join(args.kdir, arch.kimg_path())
+        modfiles = []
+        moddir = None
+
+        # Once kmod gets fixed (if ever), we can do something like:
+        # modfiles = modfinder.find_modules_from_install(
+        #     virtmods.MODALIASES,
+        #     moddir=os.path.join(args.kernel_build_dir, '.tmp_moddir'))
+
+        dtb_path = arch.dtb_path()
+        if dtb_path is None:
+            dtb = None
+        else:
+            dtb = os.path.join(args.kdir, dtb_path)
     elif args.kimg is not None:
         kimg = args.kimg
         modfiles = []
         moddir = None
+        dtb = None # TODO: fix this
     else:
         arg_fail('You must specify a kernel to use.')
 
-    return kimg,modfiles,moddir
+    return kimg,dtb,modfiles,moddir
 
 def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True):
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
@@ -161,13 +171,13 @@ def main():
 
     config = mkinitramfs.Config()
 
-    kimg,modfiles,moddir = find_kernel_and_mods(args)
+    arch = architectures.get(args.arch)
+    is_native = (args.arch == uname.machine)
+
+    kimg,dtb,modfiles,moddir = find_kernel_and_mods(arch, args)
     config.modfiles = modfiles
     if config.modfiles:
         need_initramfs = True
-
-    arch = architectures.get(args.arch)
-    is_native = (args.arch == uname.machine)
 
     qemuargs = [qemu.qemubin]
     kernelargs = []
@@ -391,6 +401,8 @@ def main():
                                       in (kernelargs + args.kopt))])
         if initrdpath is not None:
             qemuargs.extend(['-initrd', initrdpath])
+        if dtb is not None:
+            qemuargs.extend(['-dtb', dtb])
     else:
         # Use multiboot syntax to load Xen
         qemuargs.extend(['-kernel', args.xen])

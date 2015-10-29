@@ -40,6 +40,13 @@ class Arch(object):
     def config_base():
         return []
 
+    def kimg_path(self):
+        return 'arch/%s/boot/bzImage' % self.linuxname
+
+    @staticmethod
+    def dtb_path():
+        return None
+
 class Arch_unknown(Arch):
     @staticmethod
     def qemuargs(is_native):
@@ -127,6 +134,12 @@ class Arch_arm(Arch):
     def serial_console_args():
         return ['console=ttyAMA0']
 
+    def kimg_path(self):
+        return 'arch/arm/boot/zImage'
+
+    def dtb_path(self):
+        return 'arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb'
+
 class Arch_aarch64(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
@@ -159,7 +172,9 @@ class Arch_aarch64(Arch):
     def serial_console_args():
         return ['console=ttyAMA0']
 
-# Disabled because it doesn't work.
+    def kimg_path(self):
+        return 'arch/arm64/boot/Image'
+
 class Arch_s390x(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
