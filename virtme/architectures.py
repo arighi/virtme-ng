@@ -169,24 +169,32 @@ class Arch_s390x(Arch):
 
     @staticmethod
     def virtio_dev_type(virtiotype):
-        return 'virtio-%s-device' % virtiotype
+        return 'virtio-%s-ccw' % virtiotype
 
     def qemuargs(self, is_native):
-        return [
-            '-device', 'virtio-mmio',
+        ret = Arch.qemuargs(is_native)
 
-            # This is very buggy.
-            '-device', self.virtio_dev_type('serial'),
+        # Ask for the latest version of s390-ccw
+        ret.extend(['-M', 's390-ccw-virtio'])
 
-            # This is annoying but acceptable.
-            '-device', 'virtconsole,chardev=console',
-        ]
+        # To be able to configure a console, we need to get rid of the
+        # default console
+        ret.extend(['-nodefaults'])
+
+        ret.extend(['-device', 'sclpconsole,chardev=console'])
+
+        return ret
+
+    @staticmethod
+    def config_base():
+        return ['CONFIG_MARCH_Z900=y']
 
 ARCHES = {
     'x86_64': Arch_x86,
     'i386': Arch_x86,
     'arm': Arch_arm,
     'aarch64': Arch_aarch64,
+    's390x': Arch_s390x,
 }
 
 def get(arch):
