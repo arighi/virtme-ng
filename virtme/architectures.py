@@ -175,6 +175,25 @@ class Arch_aarch64(Arch):
     def kimg_path(self):
         return 'arch/arm64/boot/Image'
 
+class Arch_ppc64(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.defconfig_target = 'ppc64_defconfig'
+        self.qemuname = 'ppc64'
+        self.linuxname = 'powerpc'
+
+    def qemuargs(self, is_native):
+        ret = Arch.qemuargs(is_native)
+
+        ret.extend(['-M', 'pseries'])
+
+        return ret
+
+    def kimg_path(self):
+        # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
+        return 'vmlinux'
+
 class Arch_s390x(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
@@ -209,6 +228,7 @@ ARCHES = {
     'i386': Arch_x86,
     'arm': Arch_arm,
     'aarch64': Arch_aarch64,
+    'ppc64': Arch_ppc64,
     's390x': Arch_s390x,
 }
 
