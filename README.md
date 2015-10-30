@@ -58,14 +58,12 @@ Your host system will need to satisfy some prerequisites:
 
 Once you have such a kernel, run one of:
 
-* virtme-run --kimg PATH_TO_BZIMAGE
+* virtme-run --kdir PATH_TO_KERNEL_TREE
 * virtme-run --installed-kernel
 * virtme-run --installed-kernel VERSION
+* virtme-run --kimg PATH_TO_KERNEL_IMAGE
 
-On x86, you can usually find a bzImage in `arch/x86/boot/bzImage` once you've
-compiled your kernel.
-
-Note that the --kimg mode does not support modules.
+Note that the --kdir and --kimg modes do not support modules yet.
 
 You can then do things like `cd /home/username` and you will have readonly
 access to all your files.
@@ -85,6 +83,10 @@ Architecture support
 
 By default, virtme will use whatever architecture would be shown by `uname -m`.  You can override this with `--arch`.  Note that you may need to do some poorly documented fiddling for now to get non-native architectures working, and you will almost certainly need to set `--root` to a root that matches the architecture.
 
+In general, the easiest way to configure a working kernel is to run:
+
+    virtme-configkernel --arch=ARCH --defconfig
+
 x86
 ---
 
@@ -93,7 +95,9 @@ x86 (both x86_64 and i386) is fully supported, although some odd KVM configurati
 ARM
 ---
 
-ARM is supported using qemu's `versatilepb` machine.  This is an unfortunate choice: that's a rather outdated machine, and virtme should be using a different system (`vexpress-a15` or `virt`) that is more modern and does not depend on PCI.  There is no built-in KVM support for ARM right now, although it might work by accident -- I don't own a real KVM-capable ARM machine to test it on.
+ARM is supported using qemu's `vexpress-a15` machine.  There is no built-in KVM support for ARM right now, although it might work by accident -- I don't own a real KVM-capable ARM machine to test it on.
+
+If you use any mode other than --kdir, you'll need to manually set QEMU's -dtb option.  I'm not sure why -- I assumed that QEMU would provide its own device tree, but this doesn't seem to be the case.
 
 Aarch64
 -------
