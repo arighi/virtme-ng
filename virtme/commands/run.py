@@ -48,6 +48,8 @@ def make_parser():
     g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--root', action='store', default='/',
                    help='Local path to use as guest root')
+    g.add_argument('--rw', action='store_true',
+                   help='Give the guest read-write access to its root filesystem')
     g.add_argument('--graphics', action='store_true',
                    help='Show graphical output instead of using a console.')
     g.add_argument('--net', action='store_true',
@@ -183,7 +185,7 @@ def main():
     kernelargs = []
 
     # Set up virtfs
-    export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root')
+    export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 
     guest_tools_in_guest, guest_tools_path = \
         guest_tools.find_best_guest_tools(args.root)
@@ -385,8 +387,9 @@ def main():
         # Sigh.
         kernelargs.extend([
             'rootfstype=9p',
-            'rootflags=ro,version=9p2000.L,trans=virtio,access=any',
+            'rootflags=version=9p2000.L,trans=virtio,access=any',
             'raid=noautodetect',
+            'rw' if args.rw else 'ro',
         ])
         initrdpath = None
 
