@@ -253,8 +253,7 @@ def main():
 
         kernelargs.extend(arch.earlyconsole_args())
         kernelargs.extend(arch.serial_console_args())
-        qemuargs.extend(['-vga', 'none'])
-        qemuargs.extend(['-display', 'none'])
+        qemuargs.extend(arch.qemu_nodisplay_args())
 
         # PS/2 probing is slow; give the kernel a hint to speed it up.
         kernelargs.extend(['psmouse.proto=exps'])
@@ -303,8 +302,7 @@ def main():
         need_initramfs = True  # TODO: Fix this
 
         # Turn off default I/O
-        qemuargs.extend(['-vga', 'none'])
-        qemuargs.extend(['-display', 'none'])
+        qemuargs.extend(arch.qemu_nodisplay_args())
 
         # Send kernel logs to stderr
         qemuargs.extend(['-serial', 'none'])

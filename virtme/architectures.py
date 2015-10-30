@@ -37,6 +37,10 @@ class Arch(object):
         return []
 
     @staticmethod
+    def qemu_nodisplay_args():
+        return ['-vga', 'none', '-display', 'none']
+
+    @staticmethod
     def config_base():
         return []
 
@@ -194,6 +198,26 @@ class Arch_ppc64(Arch):
         # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
         return 'vmlinux'
 
+class Arch_sparc64(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.defconfig_target = 'sparc64_defconfig'
+        self.qemuname = 'sparc64'
+        self.linuxname = 'sparc'
+
+    def qemuargs(self, is_native):
+        ret = Arch.qemuargs(is_native)
+
+        return ret
+
+    def kimg_path(self):
+        return 'arch/sparc/boot/image'
+
+    def qemu_nodisplay_args(self):
+        # qemu-system-sparc fails to boot if -display none is set.
+        return ['-nographic', '-vga', 'none']
+
 class Arch_s390x(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
@@ -229,6 +253,7 @@ ARCHES = {
     'arm': Arch_arm,
     'aarch64': Arch_aarch64,
     'ppc64': Arch_ppc64,
+    'sparc64': Arch_sparc64,
     's390x': Arch_s390x,
 }
 
