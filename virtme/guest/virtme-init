@@ -87,9 +87,13 @@ log "basic initialization done"
 
 # Try to get udevd to coldplug everything.
 # We could use virtme-loadmods as a lightweight alternative.
-"$udevd" --daemon --resolve-names=never
-udevadm trigger --action=add  >/dev/null 2>&1
-udevadm settle
+if [[ -n "$udevd" ]]; then
+    "$udevd" --daemon --resolve-names=never
+    udevadm trigger --action=add  >/dev/null 2>&1
+    udevadm settle
+else
+    log "udevd not found"
+fi
 
 # Set up filesystems that live in /dev
 mkdir -p -m 0755 /dev/shm /dev/pts
