@@ -99,8 +99,8 @@ def main():
     elif args.arch == 'i386':
         conf.append('CONFIG_64BIT=n')
 
-    if shutil.which('%s-linux-gnu-gcc' % arch.qemuname):
-        conf.append('CONFIG_CROSS_COMPILE="%s-linux-gnu-"' % arch.qemuname)
+    if shutil.which('%s-linux-gnu-gcc' % arch.gccname):
+        conf.append('CONFIG_CROSS_COMPILE="%s-linux-gnu-"' % arch.gccname)
 
     if args.allnoconfig and args.defconfig:
         arg_fail('allnoconfig and defconfig are incompatible')

@@ -11,6 +11,7 @@ class Arch(object):
     def __init__(self, name):
         self.qemuname = name
         self.linuxname = name
+        self.gccname = name
 
     defconfig_target = 'defconfig'
 
@@ -150,6 +151,7 @@ class Arch_aarch64(Arch):
 
         self.qemuname = 'aarch64'
         self.linuxname = 'arm64'
+        self.gccname = 'aarch64'
 
     @staticmethod
     def qemuargs(is_native):
@@ -186,6 +188,7 @@ class Arch_ppc64(Arch):
         self.defconfig_target = 'ppc64_defconfig'
         self.qemuname = 'ppc64'
         self.linuxname = 'powerpc'
+        self.gccname = 'ppc64'
 
     def qemuargs(self, is_native):
         ret = Arch.qemuargs(is_native)
@@ -205,6 +208,7 @@ class Arch_sparc64(Arch):
         self.defconfig_target = 'sparc64_defconfig'
         self.qemuname = 'sparc64'
         self.linuxname = 'sparc'
+        self.gccname = 'sparc64'
 
     def qemuargs(self, is_native):
         ret = Arch.qemuargs(is_native)
@@ -224,6 +228,7 @@ class Arch_s390x(Arch):
 
         self.qemuname = 's390x'
         self.linuxname = 's390'
+        self.gccname = 's390x'
 
     @staticmethod
     def virtio_dev_type(virtiotype):
