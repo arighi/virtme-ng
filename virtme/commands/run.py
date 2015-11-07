@@ -166,15 +166,15 @@ _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
 def main():
     args = _ARGPARSER.parse_args()
 
-    qemu = qemu_helpers.Qemu(args.arch)
+    arch = architectures.get(args.arch)
+    is_native = (args.arch == uname.machine)
+
+    qemu = qemu_helpers.Qemu(arch.qemuname)
     qemu.probe()
 
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
     config = mkinitramfs.Config()
-
-    arch = architectures.get(args.arch)
-    is_native = (args.arch == uname.machine)
 
     kimg,dtb,modfiles,moddir = find_kernel_and_mods(arch, args)
     config.modfiles = modfiles
