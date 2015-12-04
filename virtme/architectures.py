@@ -58,6 +58,11 @@ class Arch_unknown(Arch):
         return Arch.qemuargs(is_native)
 
 class Arch_x86(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.linuxname = 'x86'
+
     @staticmethod
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
