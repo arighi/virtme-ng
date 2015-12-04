@@ -24,11 +24,16 @@ def make_parser():
                         default=uname.machine,
                         help='Target architecture')
 
-    parser.add_argument('--allnoconfig', action='store_true',
+    g = parser.add_argument_group(title='Mode').add_mutually_exclusive_group()
+
+    g.add_argument('--allnoconfig', action='store_true',
                         help='Overwrite configuration with a virtme-suitable allnoconfig (unlikely to work)')
 
-    parser.add_argument('--defconfig', action='store_true',
+    g.add_argument('--defconfig', action='store_true',
                         help='Overwrite configuration with a virtme-suitable defconfig')
+
+    g.add_argument('--update', action='store_true',
+                        help='Update existing config for virtme')
 
     return parser
 
@@ -97,22 +102,23 @@ def main():
     if shutil.which('%s-linux-gnu-gcc' % arch.gccname):
         conf.append('CONFIG_CROSS_COMPILE="%s-linux-gnu-"' % arch.gccname)
 
-    if args.allnoconfig and args.defconfig:
-        arg_fail('allnoconfig and defconfig are incompatible')
-
     if args.allnoconfig:
         maketarget = 'allnoconfig'
         updatetarget = 'silentoldconfig'
     elif args.defconfig:
         maketarget = arch.defconfig_target
         updatetarget = 'olddefconfig'
+    elif args.update:
+        maketarget = None
+        updatetarget = 'olddefconfig'
     else:
-        arg_fail('One of --allnoconfig and --defconfig must be specified')
+        arg_fail('No mode selected')
 
     # TODO: Get rid of most of the noise and check the result.
 
     # Set up an initial config
-    subprocess.check_call(['make', 'ARCH=%s' % arch.linuxname, maketarget])
+    if maketarget:
+        subprocess.check_call(['make', 'ARCH=%s' % arch.linuxname, maketarget])
 
     with open('.config', 'ab') as conffile:
         conffile.write('\n'.join(conf).encode('utf-8'))
