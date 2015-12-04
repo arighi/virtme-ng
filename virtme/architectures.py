@@ -62,6 +62,7 @@ class Arch_x86(Arch):
         Arch.__init__(self, name)
 
         self.linuxname = 'x86'
+        self.defconfig_target = '%s_defconfig' % name
 
     @staticmethod
     def qemuargs(is_native):

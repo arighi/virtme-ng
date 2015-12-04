@@ -94,11 +94,6 @@ def main():
             ['# Arch-specific options'] +
             arch.config_base())
 
-    if args.arch == 'x86_64':
-        conf.append('CONFIG_64BIT=y')
-    elif args.arch == 'i386':
-        conf.append('CONFIG_64BIT=n')
-
     if shutil.which('%s-linux-gnu-gcc' % arch.gccname):
         conf.append('CONFIG_CROSS_COMPILE="%s-linux-gnu-"' % arch.gccname)
 
