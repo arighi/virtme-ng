@@ -88,9 +88,18 @@ log "basic initialization done"
 # Try to get udevd to coldplug everything.
 # We could use virtme-loadmods as a lightweight alternative.
 if [[ -n "$udevd" ]]; then
+    if [[ -e '/sys/kernel/uevent_helper' ]]; then
+       # This kills boot performance.
+       log "you have CONFIG_UEVENT_HELPER on; turn it off"
+       echo '' >/sys/kernel/uevent_helper
+    fi
+    log "starting udevd"
     "$udevd" --daemon --resolve-names=never
+    log "triggering udev coldplug"
     udevadm trigger --action=add  >/dev/null 2>&1
+    log "waiting for udev to settle"
     udevadm settle
+    log "udev is done"
 else
     log "udevd not found"
 fi
