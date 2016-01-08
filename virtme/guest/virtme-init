@@ -85,6 +85,12 @@ log "basic initialization done"
 
 ######## The remainder of this script is a very simple init (PID 1) ########
 
+# Does the system use systemd-tmpfiles?
+tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
+    log "running systemd-tmpfiles"
+    systemd-tmpfiles --create --boot --exclude-prefix="/dev"
+}
+
 # Try to get udevd to coldplug everything.
 # We could use virtme-loadmods as a lightweight alternative.
 if [[ -n "$udevd" ]]; then
