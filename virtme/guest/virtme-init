@@ -172,6 +172,10 @@ for p in "${!virtme_@}"; do export -n "$p"; done
 
 echo "virtme-init: console is $consdev"
 
+# Set up a basic environment
+install -d -m 0755 /tmp/roothome
+export HOME=/tmp/roothome
+
 # Bring up a functioning shell on the console.  This is a bit magical:
 # We have no controlling terminal because we're attached to a fake
 # console device (probably something like /dev/console), which can't
