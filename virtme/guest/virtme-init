@@ -102,7 +102,8 @@ if [[ -n "$udevd" ]]; then
     log "starting udevd"
     "$udevd" --daemon --resolve-names=never
     log "triggering udev coldplug"
-    udevadm trigger --action=add  >/dev/null 2>&1
+    udevadm trigger --type=subsystems --action=add  >/dev/null 2>&1
+    udevadm trigger --type=devices --action=add  >/dev/null 2>&1
     log "waiting for udev to settle"
     udevadm settle
     log "udev is done"
