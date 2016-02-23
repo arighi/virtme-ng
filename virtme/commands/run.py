@@ -13,6 +13,7 @@ import fcntl
 import sys
 import shlex
 import re
+import itertools
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -97,6 +98,8 @@ def make_parser():
     g = parser.add_argument_group(title='Sharing resources with guest')
     g.add_argument('--rwdir', action='append', default=[],
                    help="Supply a read/write directory to the guest.  Use --rwdir=path or --rwdir=guestpath=hostpath.")
+    g.add_argument('--rodir', action='append', default=[],
+                   help="Supply a read-only directory to the guest.  Use --rodir=path or --rodir=guestpath=hostpath.")
 
     return parser
 
@@ -204,10 +207,11 @@ def main():
 
     # Set up mounts
     mount_index = 0
-    for rwdir in args.rwdir:
-        m = _RWDIR_RE.match(rwdir)
+    for dirtype, dirarg in itertools.chain((('rwdir', i) for i in args.rwdir),
+                                           (('rodir', i) for i in args.rodir)):
+        m = _RWDIR_RE.match(dirarg)
         if not m:
-            arg_fail('invalid --rwdir parameter')
+            arg_fail('invalid --%s parameter %r' % (dirtype, dirarg))
         if m.group(2) is not None:
             guestpath = m.group(1)
             hostpath = m.group(2)
@@ -220,7 +224,7 @@ def main():
         idx = mount_index
         mount_index += 1
         tag = 'virtme.initmount%d' % idx
-        export_virtfs(qemu, arch, qemuargs, hostpath, tag, readonly=False)
+        export_virtfs(qemu, arch, qemuargs, hostpath, tag, readonly=(dirtype != 'rwdir'))
         kernelargs.append('virtme_initmount%d=%s' % (idx, guestpath))
 
     # Turn on KVM if available
