@@ -22,13 +22,11 @@ def find_guest_tools():
     if pkg_resources.resource_isdir(__name__, 'guest'):
         return pkg_resources.resource_filename(__name__, 'guest')
 
-    # Second try: look for a distribution resource.
-    provider = pkg_resources.get_provider(__name__)
-    if provider.egg_info is not None:
-        dist = pkg_resources.Distribution.from_filename(provider.egg_root)
-        req = dist.as_requirement()
-        if pkg_resources.resource_isdir(req, 'share/virtme-guest-0'):
-            return pkg_resources.resource_filename(req, 'share/virtme-guest-0')
+    # Second try: look for an installed copy.  (Sadly, pkg_resources can't
+    # see data_files AFAICT.)
+    for d in ('/usr/local/share/virtme-guest-0', '/usr/share/virtme-guest-0'):
+        if os.path.isdir(d):
+            return d
 
     # No luck.  This is somewhat surprising.
     return None
