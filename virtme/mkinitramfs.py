@@ -75,7 +75,7 @@ source /modules/load_all.sh
 log 'mounting hostfs...'
 
 if ! /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any /dev/root /newroot/; then
-  echo "Failed to switch to real root.  We are stuck."
+  echo "Failed to mount real root.  We are stuck."
   sleep 5
   exit 1
 fi
@@ -91,7 +91,7 @@ else
 fi
 
 if ! [[ -d /newroot/run ]]; then
-  log "your host does not have /run -- using a fallback tmpfs"
+  log "your guest's root does not have /run -- using a fallback tmpfs"
   need_fallback_tmpfs=1
 fi
 
@@ -113,7 +113,6 @@ fi
 
 mount -t tmpfs run /newroot/run
 cp -a /run_virtme /newroot/run/virtme
-export virtme_run_mounted=1
 
 # Find init
 mount -t proc none /proc
@@ -128,10 +127,6 @@ umount /proc
 if [[ -z "$init" ]]; then
   log 'no init= option'
   exit 1
-fi
-
-if /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /newroot/run/virtme/guesttools 2>/dev/null; then
-  log 'using separate guest tools'
 fi
 
 log 'done; switching to real root'

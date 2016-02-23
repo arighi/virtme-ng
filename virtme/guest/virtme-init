@@ -35,7 +35,6 @@ fi
 
 mount -t tmpfs tmpfs /tmp/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
-[[ -n "${virtme_run_mounted}" ]] || mount -t tmpfs run /run
 
 # Fix up /etc a little bit
 touch /tmp/fstab

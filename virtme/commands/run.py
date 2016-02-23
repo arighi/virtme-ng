@@ -187,21 +187,16 @@ def main():
     # Set up virtfs
     export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 
-    guest_tools_in_guest, guest_tools_path = \
-        guest_tools.find_best_guest_tools(args.root)
+    guest_tools_path = guest_tools.find_guest_tools()
     if guest_tools_path is None:
-        raise ValueError("couldn't find usable virtme guest tools")
+        raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
-    if guest_tools_in_guest:
-        virtme_init = os.path.join(guest_tools_path, 'virtme-init')
-    else:
-        virtme_init = '/run/virtme/guesttools/virtme-init'
-        export_virtfs(qemu, arch, qemuargs, guest_tools_path,
-                      'virtme.guesttools')
-        need_initramfs = True
+    export_virtfs(qemu, arch, qemuargs, guest_tools_path,
+                  'virtme.guesttools')
 
-    # TODO: This has escaping issues for now
-    kernelargs.append('init=%s' % os.path.join('/', virtme_init))
+    kernelargs.append('init=/bin/sh')
+
+    initargs = ['-c', 'mount -t tmpfs run /run;mkdir -p /run/virtme/guesttools;/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools;exec /run/virtme/guesttools/virtme-init']
 
     # Map modules
     if moddir is not None:
@@ -392,6 +387,10 @@ def main():
             'rw' if args.rw else 'ro',
         ])
         initrdpath = None
+
+    # Now that we're done setting up kernelargs, append initargs
+    kernelargs.append('--')
+    kernelargs.extend(initargs)
 
     if args.xen is None:
         # Load a normal kernel
