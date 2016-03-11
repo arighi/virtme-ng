@@ -392,7 +392,9 @@ def main():
         ])
         initrdpath = None
 
-    # Now that we're done setting up kernelargs, append initargs
+    # Now that we're done setting up kernelargs, append user-specified args
+    # and then initargs
+    kernelargs.extend(args.kopt)
     kernelargs.append('--')
     kernelargs.extend(initargs)
 
@@ -401,8 +403,7 @@ def main():
         qemuargs.extend(['-kernel', kimg])
         if kernelargs:
             qemuargs.extend(['-append',
-                             ' '.join(quote_karg(a) for a
-                                      in (kernelargs + args.kopt))])
+                             ' '.join(quote_karg(a) for a in kernelargs)])
         if initrdpath is not None:
             qemuargs.extend(['-initrd', initrdpath])
         if dtb is not None:
