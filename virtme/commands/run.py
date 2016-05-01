@@ -197,8 +197,6 @@ def main():
     export_virtfs(qemu, arch, qemuargs, guest_tools_path,
                   'virtme.guesttools')
 
-    kernelargs.append('init=/bin/sh')
-
     initargs = ['-c', 'mount -t tmpfs run /run;mkdir -p /run/virtme/guesttools;/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools;exec /run/virtme/guesttools/virtme-init']
 
     # Map modules
@@ -395,6 +393,12 @@ def main():
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
     kernelargs.extend(args.kopt)
+
+    # Unknown options get turned into arguments to init, which is annoying
+    # because we're explicitly passing '--' to set the arguments directly.
+    # Fortunately, 'init=' will clear any arguments parsed so far, so make
+    # sure that 'init=' appears directly before '--'.
+    kernelargs.append('init=/bin/sh')
     kernelargs.append('--')
     kernelargs.extend(initargs)
 
