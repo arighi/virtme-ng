@@ -127,7 +127,10 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
 	mount --bind "$tmpfile" /etc/resolv.conf
 	rm "$tmpfile"
     fi
-    busybox udhcpc -i eth0 -t 1 -n -q -f -s "$(dirname $0)/virtme-udhcpc-script"
+
+    # udev is liable to rename the interface out from under us.
+    virtme_net=`ls "$(ls -d /sys/bus/virtio/drivers/virtio_net/virtio* |sort -g |head -n1)"/net`
+    busybox udhcpc -i "$virtme_net" -t 1 -n -q -f -s "$(dirname $0)/virtme-udhcpc-script"
 fi
 
 if [[ -x /run/virtme/data/script ]]; then
