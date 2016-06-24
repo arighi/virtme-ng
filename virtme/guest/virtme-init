@@ -90,6 +90,9 @@ tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
     systemd-tmpfiles --create --boot --exclude-prefix="/dev"
 }
 
+# Make dbus work (if tmpfiles wasn't there or didn't create the directory).
+install -d /run/dbus
+
 # Try to get udevd to coldplug everything.
 # We could use virtme-loadmods as a lightweight alternative.
 if [[ -n "$udevd" ]]; then
