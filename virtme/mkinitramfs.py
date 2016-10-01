@@ -157,7 +157,7 @@ def mkinitramfs(out, config):
     if config.modfiles is not None:
         install_modules(cw, config.modfiles)
     for name,contents in config.virtme_data.items():
-        cw.write_file(b'/run_virtme/data/' + name, body=contents, mode=0o755)
+        cw.write_file(b'run_virtme/data/' + name, body=contents, mode=0o755)
     cw.write_file(b'init', body=generate_init(),
                   mode=0o755)
     cw.write_trailer()
