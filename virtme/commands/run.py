@@ -291,7 +291,7 @@ def main():
 
     has_script = False
 
-    def do_script(shellcmd):
+    def do_script(shellcmd, use_exec=False):
         if args.graphics:
             arg_fail('scripts and --graphics are mutually exclusive')
 
@@ -324,8 +324,8 @@ def main():
         # Ask virtme-init to run the script
         config.virtme_data[b'script'] = """#!/bin/sh
 
-        exec {shellcmd}
-        """.format(shellcmd=shellcmd).encode('ascii')
+        {prefix}{shellcmd}
+        """.format(shellcmd=shellcmd, prefix="exec " if use_exec else "").encode('ascii')
 
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if
@@ -348,7 +348,7 @@ def main():
         do_script(args.script_sh)
 
     if args.script_exec is not None:
-        do_script(shlex.quote(args.script_exec))
+        do_script(shlex.quote(args.script_exec), use_exec=True)
 
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])
