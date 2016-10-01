@@ -197,7 +197,10 @@ def main():
     export_virtfs(qemu, arch, qemuargs, guest_tools_path,
                   'virtme.guesttools')
 
-    initargs = ['-c', 'mount -t tmpfs run /run;mkdir -p /run/virtme/guesttools;/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools;exec /run/virtme/guesttools/virtme-init']
+    initcmds = ['mount -t tmpfs run /run',
+                'mkdir -p /run/virtme/guesttools',
+                '/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools',
+                'exec /run/virtme/guesttools/virtme-init']
 
     # Map modules
     if moddir is not None:
@@ -400,7 +403,7 @@ def main():
     # sure that 'init=' appears directly before '--'.
     kernelargs.append('init=/bin/sh')
     kernelargs.append('--')
-    kernelargs.extend(initargs)
+    kernelargs.extend(['-c', ';'.join(initcmds)])
 
     if args.xen is None:
         # Load a normal kernel
