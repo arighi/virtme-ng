@@ -9,6 +9,7 @@ import argparse
 import tempfile
 import shutil
 import os
+import errno
 import fcntl
 import sys
 import shlex
@@ -260,9 +261,14 @@ def main():
         # Fix the terminal defaults (and set iutf8 because that's a better
         # default nowadays).  I don't know of any way to keep this up to date
         # after startup, though.
-        terminal_size = os.get_terminal_size()
-        kernelargs.extend(['virtme_stty_con=rows %d cols %d iutf8' %
-                           (terminal_size.lines, terminal_size.columns)])
+        try:
+                terminal_size = os.get_terminal_size()
+                kernelargs.extend(['virtme_stty_con=rows %d cols %d iutf8' %
+                                   (terminal_size.lines, terminal_size.columns)])
+        except OSError as e:
+                # don't die if running with a non-TTY stdout
+                if e.errno != errno.ENOTTY:
+                        raise
 
         # Propagate the terminal type
         if 'TERM' in os.environ:
