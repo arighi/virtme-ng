@@ -198,7 +198,9 @@ def main():
     export_virtfs(qemu, arch, qemuargs, guest_tools_path,
                   'virtme.guesttools')
 
-    initargs = ['-c', 'mount -t tmpfs run /run;mkdir -p /run/virtme/guesttools;/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools;exec /run/virtme/guesttools/virtme-init']
+    initcmds = ['mkdir -p /run/virtme/guesttools',
+                '/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools',
+                'exec /run/virtme/guesttools/virtme-init']
 
     # Map modules
     if moddir is not None:
@@ -295,7 +297,7 @@ def main():
 
     has_script = False
 
-    def do_script(shellcmd):
+    def do_script(shellcmd, use_exec=False):
         if args.graphics:
             arg_fail('scripts and --graphics are mutually exclusive')
 
@@ -328,8 +330,8 @@ def main():
         # Ask virtme-init to run the script
         config.virtme_data[b'script'] = """#!/bin/sh
 
-        exec {shellcmd}
-        """.format(shellcmd=shellcmd).encode('ascii')
+        {prefix}{shellcmd}
+        """.format(shellcmd=shellcmd, prefix="exec " if use_exec else "").encode('ascii')
 
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if
@@ -352,7 +354,7 @@ def main():
         do_script(args.script_sh)
 
     if args.script_exec is not None:
-        do_script(shlex.quote(args.script_exec))
+        do_script(shlex.quote(args.script_exec), use_exec=True)
 
     if args.net:
         qemuargs.extend(['-net', 'nic,model=virtio'])
@@ -395,6 +397,7 @@ def main():
             'rw' if args.rw else 'ro',
         ])
         initrdpath = None
+        initcmds.insert(0, 'mount -t tmpfs run /run')
 
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
@@ -406,7 +409,7 @@ def main():
     # sure that 'init=' appears directly before '--'.
     kernelargs.append('init=/bin/sh')
     kernelargs.append('--')
-    kernelargs.extend(initargs)
+    kernelargs.extend(['-c', ';'.join(initcmds)])
 
     if args.xen is None:
         # Load a normal kernel

@@ -141,7 +141,7 @@ if [[ -x /run/virtme/data/script ]]; then
     fi
 
     log 'starting script'
-    setsid /run/virtme/data/script <>/dev/virtio-ports/virtme.scriptio 2>&1
+    setsid /run/virtme/data/script <>/dev/virtio-ports/virtme.scriptio 1>&0 2>&0
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.
