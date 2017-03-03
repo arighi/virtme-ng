@@ -96,6 +96,8 @@ def make_parser():
                    help="Initialize everything but don't run the guest")
     g.add_argument('--show-command', action='store_true',
                    help='Show the VM command line')
+    g.add_argument('--show-boot-console', action='store_true',
+                   help='Show the boot console when running scripts')
 
     g = parser.add_argument_group(title='Guest userspace configuration')
     g.add_argument('--pwd', action='store_true',
@@ -312,7 +314,7 @@ def main():
 
     has_script = False
 
-    def do_script(shellcmd, use_exec=False):
+    def do_script(shellcmd, use_exec=False, show_boot_console=False):
         if args.graphics:
             arg_fail('scripts and --graphics are mutually exclusive')
 
@@ -333,6 +335,11 @@ def main():
         # We should be using the new-style -device serialdev,chardev=xyz,
         # but many architecture-specific serial devices don't support that.
         qemuargs.extend(['-serial', 'chardev:console'])
+
+        if show_boot_console:
+            serdev = qemu.quote_optarg(arch.serial_dev_name(0))
+            kernelargs.extend(['console=%s' % serdev,
+                               'earlyprintk=serial,%s,115200' % serdev])
 
         # Set up a virtserialport for script I/O
         qemuargs.extend(['-chardev', 'stdio,id=stdio,signal=on,mux=off'])
@@ -366,10 +373,10 @@ def main():
                     os.close(newfd)
 
     if args.script_sh is not None:
-        do_script(args.script_sh)
+        do_script(args.script_sh, show_boot_console=args.show_boot_console)
 
     if args.script_exec is not None:
-        do_script(shlex.quote(args.script_exec), use_exec=True)
+        do_script(shlex.quote(args.script_exec), use_exec=True, show_boot_console=args.show_boot_console)
 
     if args.net:
         qemuargs.extend(['-device', 'virtio-net-pci,netdev=n0'])
