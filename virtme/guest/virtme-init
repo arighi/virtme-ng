@@ -121,6 +121,16 @@ mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
 
+# Install /proc/self/fd symlinks into /dev if not already present
+declare -r -A fdlinks=(["/dev/fd"]="/proc/self/fd"
+                       ["/dev/stdin"]="/proc/self/fd/0"
+                       ["/dev/stdout"]="/proc/self/fd/1"
+                       ["/dev/stderr"]="/proc/self/fd/2")
+
+for p in "${!fdlinks[@]}"; do
+    [[ -e "$p" ]] || ln -s "${fdlinks[$p]}" "$p"
+done
+
 # Bring up networking
 ip link set dev lo up
 
