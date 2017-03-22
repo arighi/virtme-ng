@@ -120,8 +120,6 @@ Upcoming features
 In the near term, the high-priority features are:
 
 * Support for modular virtfs and 9p for non-installed kernels.
-* Some way to configure writable mounts.
-* A clean way to run a script in the guest for testing.
 
 Contributing
 ============
