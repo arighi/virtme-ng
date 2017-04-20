@@ -113,6 +113,10 @@ else
     log "udevd not found"
 fi
 
+# Set up useful things in /sys, assuming our kernel supports it.
+mount -t configfs configfs /sys/kernel/config &>/dev/null
+mount -t debugfs debugfs /sys/kernel/debug &>/dev/null
+
 # Set up filesystems that live in /dev
 mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
