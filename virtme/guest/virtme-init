@@ -19,7 +19,10 @@ mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 declare -A mount_tags
 for i in /sys/bus/virtio/drivers/9pnet_virtio/virtio*/mount_tag; do
-    mount_tags["`cat "$i"`"]=1
+    # mount_tag is terminated with a NUL byte, which leads to a
+    # "command substitution: ignored null byte in input" warning from
+    # bash; use sed instead of a bare 'cat' here to strip it off.
+    mount_tags["`sed '$s/\x00$//;' "$i"`"]=1
 done
 
 kver="`uname -r`"
@@ -121,6 +124,16 @@ mount -t debugfs debugfs /sys/kernel/debug &>/dev/null
 mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
+
+# Install /proc/self/fd symlinks into /dev if not already present
+declare -r -A fdlinks=(["/dev/fd"]="/proc/self/fd"
+                       ["/dev/stdin"]="/proc/self/fd/0"
+                       ["/dev/stdout"]="/proc/self/fd/1"
+                       ["/dev/stderr"]="/proc/self/fd/2")
+
+for p in "${!fdlinks[@]}"; do
+    [[ -e "$p" ]] || ln -s "${fdlinks[$p]}" "$p"
+done
 
 # Bring up networking
 ip link set dev lo up
