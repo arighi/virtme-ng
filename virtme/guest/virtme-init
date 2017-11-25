@@ -143,6 +143,7 @@ ip link set dev lo up
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     if [[ -f /etc/resolv.conf ]]; then
 	tmpfile="`mktemp --tmpdir=/tmp`"
+	chmod 644 "$tmpfile"
 	mount --bind "$tmpfile" /etc/resolv.conf
 	rm "$tmpfile"
     fi
