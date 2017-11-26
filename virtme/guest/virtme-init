@@ -137,6 +137,11 @@ for p in "${!fdlinks[@]}"; do
     [[ -e "$p" ]] || ln -s "${fdlinks[$p]}" "$p"
 done
 
+if [[ -n "$virtme_hostname" ]]; then
+    log "Setting hostname to $virtme_hostname..."
+    hostname "$virtme_hostname"
+fi
+
 # Bring up networking
 ip link set dev lo up
 
