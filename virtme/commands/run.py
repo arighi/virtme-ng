@@ -60,6 +60,8 @@ def make_parser():
                    help='Allow the host to ask the guest to release memory.')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
                    help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
+    g.add_argument('--name', action='store', default=None,
+                   help='Set guest hostname and qemu -name flag.')
 
     g = parser.add_argument_group(
         title='Scripting',
@@ -187,6 +189,11 @@ def main():
 
     qemuargs = [qemu.qemubin]
     kernelargs = []
+
+    # Put the '-name' flag first so it's easily visible in ps, top, etc.
+    if args.name:
+        qemuargs.extend(['-name', args.name])
+        kernelargs.append('virtme_hostname=%s' % args.name)
 
     # Set up virtfs
     export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
