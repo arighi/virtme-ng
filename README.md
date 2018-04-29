@@ -46,8 +46,11 @@ You may also have better luck if you set:
     CONFIG_MODULE_SIG_FORCE=n
     CONFIG_DEVTMPFS=y
 
-An easy, somewhat-reliable way to generate a working config is to append
-the `prereqs.config` file to your .config and then run `make defconfig`.
+An easy, somewhat-reliable way to generate a working config is via
+the virtme-configkernel. It needs to be run on a kernel source directory,
+like:
+
+    virtme-configkernel --arch=ARCH --defconfig
 
 Your host system will need to satisfy some prerequisites:
 
