@@ -119,7 +119,9 @@ def find_kernel_and_mods(arch, args):
         modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=kver)
         moddir = os.path.join('/lib/modules', kver)
-        kimg = '/boot/vmlinuz-%s' % kver
+        kimg = '/usr/lib/modules/%s/vmlinuz' % kver
+        if not os.path.exists(kimg):
+            kimg = '/boot/vmlinuz-%s' % kver
         dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
