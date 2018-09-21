@@ -2,11 +2,7 @@
 
 import os
 import sys
-
-try:
-    from setuptools import setup
-except ImportError:
-    from distutils.core import setup
+from setuptools import setup
 
 if sys.version_info < (3,3):
     print('virtme requires Python 3.3 or higher')
