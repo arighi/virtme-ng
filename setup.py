@@ -25,7 +25,7 @@ setup(
     license='GPLv2',
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md'), 'r').read(),
-    packages=['virtme', 'virtme.commands'],
+    packages=['virtme', 'virtme.commands', 'virtme.guest'],
     install_requires=[],
     entry_points = {
         'console_scripts': [
@@ -33,13 +33,9 @@ setup(
             'virtme-configkernel = virtme.commands.configkernel:main',
         ]
     },
-    data_files = [
-        ('share/virtme-guest-0',
-         ['virtme/guest/virtme-init',
-          'virtme/guest/virtme-udhcpc-script',
-          'virtme/guest/virtme-loadmods',
-         ]),
-    ],
+    package_data={
+        'virtme.guest': ['*'],
+    },
     classifiers=['Environment :: Console',
                  'Intended Audience :: Developers',
                  'Intended Audience :: System Administrators',
