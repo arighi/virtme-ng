@@ -29,8 +29,12 @@ setup(
             'virtme-configkernel = virtme.commands.configkernel:main',
         ]
     },
-    package_data={
-        'virtme.guest': ['*'],
+    package_data = {
+        'virtme.guest': [
+            'virtme-init',
+            'virtme-udhcpc-script',
+            'virtme-loadmods',
+        ],
     },
     classifiers=['Environment :: Console',
                  'Intended Audience :: Developers',
