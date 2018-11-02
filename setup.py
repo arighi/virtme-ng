@@ -41,5 +41,9 @@ setup(
                  'Intended Audience :: System Administrators',
                  'License :: OSI Approved :: GNU General Public License v2 (GPLv2)',
                  'Operating System :: POSIX :: Linux',
-             ]
+             ],
+
+    # virtme actually does work as a zip, but that forces the guest
+    # tools to get extracted at run time.
+    zip_safe = False,
 )
