@@ -40,6 +40,7 @@ def install_modprobe(cw):
     cw.write_file(name=b'bin/modprobe', body=b'\n'.join([
         b'#!/bin/sh',
         b'echo "virtme: initramfs does not have module $3" >/dev/console',
+        b'exit 1',
     ]), mode=0o755)
 
 _LOGFUNC = """log() {
