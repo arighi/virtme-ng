@@ -306,7 +306,7 @@ def main():
             name,fn = namefile
             if '=' in fn or ',' in fn:
                 arg_fail("--disk filenames cannot contain '=' or ','")
-            if '=' in fn or ',' in name:
+            if '=' in name or ',' in name:
                 arg_fail("--disk device names cannot contain '=' or ','")
             driveid = 'disk%d' % i
             qemuargs.extend(['-drive', 'if=none,id=%s,file=%s' % (driveid, fn),
