@@ -60,6 +60,8 @@ def make_parser():
                    help='Allow the host to ask the guest to release memory.')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
                    help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
+    g.add_argument('--memory', action='store', default=None,
+                   help='Set guest memory and qemu -m flag.')
     g.add_argument('--name', action='store', default=None,
                    help='Set guest hostname and qemu -name flag.')
 
@@ -287,6 +289,9 @@ def main():
 
     if args.balloon:
         qemuargs.extend(['-balloon', 'virtio'])
+
+    if args.memory:
+        qemuargs.extend(['-m', args.memory])
 
     if args.disk:
         qemuargs.extend(['-device', '%s,id=scsi' % arch.virtio_dev_type('scsi')])
