@@ -57,7 +57,7 @@ fi
 mount -t proc -o nosuid,noexec,nodev proc /proc/
 
 # devtmpfs might be automounted; if not, mount it.
-if [[ "`stat --format=%m /dev`" != "/dev" ]]; then
+if ! findmnt --kernel --mountpoint /dev &>/dev/null; then
     # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
     if [[ -c /dev/null ]]; then
 	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
