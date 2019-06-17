@@ -371,8 +371,8 @@ def main():
         do_script(shlex.quote(args.script_exec), use_exec=True)
 
     if args.net:
-        qemuargs.extend(['-net', 'nic,model=virtio'])
-        qemuargs.extend(['-net', 'user'])
+        qemuargs.extend(['-device', 'virtio-net-pci,netdev=n0'])
+        qemuargs.extend(['-netdev', 'user,id=n0'])
         kernelargs.extend(['virtme.dhcp'])
 
     if args.pwd:
