@@ -74,7 +74,7 @@ source /modules/load_all.sh
 
 log 'mounting hostfs...'
 
-if ! /bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any /dev/root /newroot/; then
+if ! /bin/mount -n -t 9p -o {access},version=9p2000.L,trans=virtio,access=any /dev/root /newroot/; then
   echo "Failed to mount real root.  We are stuck."
   sleep 5
   exit 1
@@ -134,19 +134,21 @@ exec /bin/switch_root /newroot "$init" "$@"
 """
 
 
-def generate_init():
+def generate_init(config):
     out = io.StringIO()
     out.write(_INIT.format(
-        logfunc=_LOGFUNC))
+        logfunc=_LOGFUNC,
+        access=config.access))
     return out.getvalue().encode('utf-8')
 
 class Config:
-    __slots__ = ['modfiles', 'virtme_data', 'virtme_init_path', 'busybox']
+    __slots__ = ['modfiles', 'virtme_data', 'virtme_init_path', 'busybox', 'access']
     def __init__(self):
         self.modfiles = []
         self.virtme_data = {}
         self.virtme_init_path = None
         self.busybox = None
+        self.access = 'ro'
 
 def mkinitramfs(out, config):
     cw = cpiowriter.CpioWriter(out)
@@ -158,7 +160,7 @@ def mkinitramfs(out, config):
         install_modules(cw, config.modfiles)
     for name,contents in config.virtme_data.items():
         cw.write_file(b'run_virtme/data/' + name, body=contents, mode=0o755)
-    cw.write_file(b'init', body=generate_init(),
+    cw.write_file(b'init', body=generate_init(config),
                   mode=0o755)
     cw.write_trailer()
 
