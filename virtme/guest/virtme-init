@@ -123,9 +123,10 @@ mount -t configfs configfs /sys/kernel/config &>/dev/null
 mount -t debugfs debugfs /sys/kernel/debug &>/dev/null
 
 # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
-mount -t tmpfs tmpfs /sys/fs/cgroup &>/dev/null
-mkdir /sys/fs/cgroup/unified
-mount -t cgroup2 cgroup2 /sys/fs/cgroup/unified &>/dev/null
+if mount -t tmpfs tmpfs /sys/fs/cgroup &>/dev/null; then
+    mkdir /sys/fs/cgroup/unified
+    mount -t cgroup2 cgroup2 /sys/fs/cgroup/unified
+fi
 
 # Set up filesystems that live in /dev
 mkdir -p -m 0755 /dev/shm /dev/pts
