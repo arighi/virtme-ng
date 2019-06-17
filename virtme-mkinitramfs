@@ -15,6 +15,7 @@ _ARGPARSER = argparse.ArgumentParser(
     description='Generate initramfs image for virtme',
 )
 _ARGPARSER.add_argument('--mod-kversion', action='store', default=None)
+_ARGPARSER.add_argument('--rw', action='store_true', default=False)
 
 def main():
     import sys
@@ -26,6 +27,9 @@ def main():
     if args.mod_kversion is not None:
         config.modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=args.mod_kversion)
+
+    if args.rw:
+        config.access = 'rw'
 
     mkinitramfs.mkinitramfs(sys.stdout.buffer, config)
 
