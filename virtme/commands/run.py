@@ -392,6 +392,9 @@ def main():
                       file=sys.stderr)
                 return 1
 
+        if args.rw:
+            config.access = 'rw'
+
         # Set up the initramfs (warning: hack ahead)
         tmpfd,tmpname = tempfile.mkstemp('irfs')
         os.unlink(tmpname)
