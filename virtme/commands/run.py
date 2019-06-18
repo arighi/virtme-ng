@@ -54,7 +54,8 @@ def make_parser():
                    help='Give the guest read-write access to its root filesystem')
     g.add_argument('--graphics', action='store_true',
                    help='Show graphical output instead of using a console.')
-    g.add_argument('--net', action='store_true',
+    g.add_argument('--net', action='store', const='user', nargs='?',
+                   choices=['user', 'bridge'],
                    help='Enable basic network access.')
     g.add_argument('--balloon', action='store_true',
                    help='Allow the host to ask the guest to release memory.')
@@ -372,7 +373,17 @@ def main():
 
     if args.net:
         qemuargs.extend(['-device', 'virtio-net-pci,netdev=n0'])
-        qemuargs.extend(['-netdev', 'user,id=n0'])
+        if args.net == 'user':
+            qemuargs.extend(['-netdev', 'user,id=n0'])
+        elif args.net == 'bridge':
+            # This is highly experimental.  At least on Fedora 30 on
+            # a wireless network, it appears to successfully start but
+            # not have any network access.  Patches or guidance welcome.
+            # (I assume it's mostly a lost cause on a wireless network
+            # due to a lack of widespread or automatic WDS support.)
+            qemuargs.extend(['-netdev', 'bridge,id=n0,br=virbr0'])
+        else:
+            assert False
         kernelargs.extend(['virtme.dhcp'])
 
     if args.pwd:
