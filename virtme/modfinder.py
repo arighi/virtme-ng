@@ -12,6 +12,7 @@ everything.  The idea is to require very few modules.
 """
 
 import re
+import shutil
 import subprocess
 import os, os.path
 import itertools
@@ -19,7 +20,9 @@ import itertools
 _INSMOD_RE = re.compile('insmod (.*[^ ]) *$')
 
 def resolve_dep(modalias, root=None, kver=None, moddir=None):
-    args = ['modprobe', '--show-depends']
+    # In openSUSE and SLE, modprobe is not in the PATH of ordinary users
+    modprobe = shutil.which('modprobe') or shutil.which('/usr/sbin/modprobe')
+    args = [modprobe, '--show-depends']
     args += ['-C', '/var/empty']
     if root is not None:
         args += ['-d', root]
