@@ -118,6 +118,11 @@ def arg_fail(message):
     _ARGPARSER.print_usage()
     sys.exit(1)
 
+def get_kver_from_kdir(kdir):
+    kver_path = os.path.join(kdir, 'include/config/kernel.release')
+    with open(kver_path) as fd:
+        return fd.read().strip()
+
 def find_kernel_and_mods(arch, args):
     if args.installed_kernel is not None:
         kver = args.installed_kernel
@@ -130,13 +135,16 @@ def find_kernel_and_mods(arch, args):
         dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
-        modfiles = []
-        moddir = None
-
-        # Once kmod gets fixed (if ever), we can do something like:
-        # modfiles = modfinder.find_modules_from_install(
-        #     virtmods.MODALIASES,
-        #     moddir=os.path.join(args.kernel_build_dir, '.tmp_moddir'))
+        tmp_moddir = os.path.join(args.kdir, '.tmp_moddir')
+        if os.path.exists(tmp_moddir):
+            kver = get_kver_from_kdir(args.kdir)
+            moddir = os.path.join(tmp_moddir, 'lib/modules', kver)
+            modfiles = modfinder.find_modules_from_install(
+                virtmods.MODALIASES, kver=kver)
+        else:
+            kver = None
+            moddir = None
+            modfiles = []
 
         dtb_path = arch.dtb_path()
         if dtb_path is None:
