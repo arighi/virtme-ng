@@ -20,8 +20,8 @@ import itertools
 _INSMOD_RE = re.compile('insmod (.*[^ ]) *$')
 
 def resolve_dep(modalias, root=None, kver=None, moddir=None):
-    # In openSUSE and SLE, modprobe is not in the PATH of ordinary users
-    modprobe = shutil.which('modprobe') or shutil.which('/usr/sbin/modprobe')
+    # /usr/sbin might not be in the path, and modprobe is usually in /usr/sbin
+    modprobe = shutil.which('modprobe') or '/usr/sbin/modprobe'
     args = [modprobe, '--show-depends']
     args += ['-C', '/var/empty']
     if root is not None:
