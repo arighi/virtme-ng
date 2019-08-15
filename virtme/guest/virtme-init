@@ -155,10 +155,18 @@ fi
 ip link set dev lo up
 
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
-    if [[ -f /etc/resolv.conf ]]; then
+    real_resolv_conf=/etc/resolv.conf
+    if [[ -L "$real_resolv_conf" ]]; then
+        real_resolv_conf="`readlink /etc/resolv.conf`"
+        if [[ ! -e $real_resolv_conf ]]; then
+            mkdir -p "`dirname $real_resolv_conf`"
+            touch $real_resolv_conf
+        fi
+    fi
+    if [[ -f "$real_resolv_conf" ]]; then
 	tmpfile="`mktemp --tmpdir=/tmp`"
 	chmod 644 "$tmpfile"
-	mount --bind "$tmpfile" /etc/resolv.conf
+	mount --bind "$tmpfile" "$real_resolv_conf"
 	rm "$tmpfile"
     fi
 
