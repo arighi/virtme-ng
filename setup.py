@@ -29,6 +29,9 @@ setup(
             'virtme-configkernel = virtme.commands.configkernel:main',
         ]
     },
+    scripts = [
+        'bin/virtme-prep-kdir-mods',
+        ],
     package_data = {
         'virtme.guest': [
             'virtme-init',

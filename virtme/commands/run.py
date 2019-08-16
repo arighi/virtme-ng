@@ -118,12 +118,9 @@ def arg_fail(message):
     _ARGPARSER.print_usage()
     sys.exit(1)
 
-def get_kver_from_kdir(kdir):
-    kver_path = os.path.join(kdir, 'include/config/kernel.release')
-    with open(kver_path) as fd:
-        return fd.read().strip()
-
 def find_kernel_and_mods(arch, args):
+    use_root_mods = False
+
     if args.installed_kernel is not None:
         kver = args.installed_kernel
         modfiles = modfinder.find_modules_from_install(
@@ -133,14 +130,14 @@ def find_kernel_and_mods(arch, args):
         if not os.path.exists(kimg):
             kimg = '/boot/vmlinuz-%s' % kver
         dtb = None  # For now
+        use_root_mods = True
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
-        tmp_moddir = os.path.join(args.kdir, '.tmp_moddir')
-        if os.path.exists(tmp_moddir):
-            kver = get_kver_from_kdir(args.kdir)
-            moddir = os.path.join(tmp_moddir, 'lib/modules', kver)
+        virtme_mods = os.path.join(args.kdir, '.virtme_mods')
+        if os.path.exists(virtme_mods):
+            moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             modfiles = modfinder.find_modules_from_install(
-                virtmods.MODALIASES, kver=kver)
+                virtmods.MODALIASES, kver='0.0.0')
         else:
             kver = None
             moddir = None
@@ -159,7 +156,7 @@ def find_kernel_and_mods(arch, args):
     else:
         arg_fail('You must specify a kernel to use.')
 
-    return kimg,dtb,modfiles,moddir
+    return kimg,dtb,modfiles,moddir,use_root_mods
 
 def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True):
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
@@ -197,7 +194,7 @@ def main():
 
     config = mkinitramfs.Config()
 
-    kimg,dtb,modfiles,moddir = find_kernel_and_mods(arch, args)
+    kimg,dtb,modfiles,moddir,use_root_mods = find_kernel_and_mods(arch, args)
     config.modfiles = modfiles
     if config.modfiles:
         need_initramfs = True
@@ -224,9 +221,20 @@ def main():
                 '/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools',
                 'exec /run/virtme/guesttools/virtme-init']
 
-    # Map modules
+    # Arrange for modules to end up in the right place
     if moddir is not None:
-        export_virtfs(qemu, arch, qemuargs, moddir, 'virtme.moddir')
+        if use_root_mods:
+            # Tell virtme-init to use the root /lib/modules
+            kernelargs.append("virtme_root_mods=1")
+        else:
+            # We're grabbing modules from somewhere other than /lib/modules.
+            # Rather than mounting it separately, symlink it in the guest.
+            # This allows symlinks within the module directory to resolve
+            # correctly in the guest.
+            kernelargs.append("virtme_link_mods=/%s" % qemu.quote_optarg(os.path.relpath(moddir, args.root)))
+    else:
+        # No modules are available.  virtme-init will hide /lib/modules/KVER
+        pass
 
     # Set up mounts
     mount_index = 0

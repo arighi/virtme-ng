@@ -1,0 +1,32 @@
+#!/bin/sh
+
+# This is still a bit of an experiment.
+
+if ! [ -d .tmp_versions ]; then
+    echo 'virtme-prep-kdir-mods must be run from a kernel build directory' >&2
+    exit 1
+fi
+
+FAKEVER=0.0.0
+MODDIR=".virtme_mods/lib/modules/$FAKEVER"
+
+# Set up .virtme_mods/lib/modules/0.0.0 as a module directory for this kernel,
+# but fill it with symlinks instead of actual modules.
+
+mkdir -p "$MODDIR/kernel"
+ln -srfT . "$MODDIR/build"
+
+# Remove all preexisting symlinks and add symlinks to all modules that belong
+# to the build kenrnel.
+find "$MODDIR/kernel" -type l -print0 |xargs -0 rm -f --
+grep -h '.ko$' .tmp_versions/*.mod |while read -r i; do
+    mkdir -p "$MODDIR/kernel/$(dirname "$i")"
+    ln -sr "$i" "$MODDIR/kernel/$i"
+done
+
+
+# Link in the files that make modules_install would copy
+ln -srf modules.builtin modules.builtin.modinfo modules.order "$MODDIR/"
+
+# Now run depmod to collect dependencies
+depmod -ae -F System.map -b .virtme_mods "$FAKEVER"
