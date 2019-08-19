@@ -20,6 +20,7 @@ ln -srfT . "$MODDIR/build"
 # to the build kenrnel.
 find "$MODDIR/kernel" -type l -print0 |xargs -0 rm -f --
 while read -r i; do
+    [ ! -e $i ] && i=$(echo $i | sed s:^kernel/::)
     mkdir -p "$MODDIR/kernel/$(dirname "$i")"
     ln -sr "$i" "$MODDIR/kernel/$i"
 done < modules.order
