@@ -10,6 +10,11 @@ fi
 FAKEVER=0.0.0
 MODDIR=".virtme_mods/lib/modules/$FAKEVER"
 
+if ! [ -f "modules.order" ]; then
+    echo "modules.order is missing.  Your kernel may be too old or you didn't make modules." >&2
+    exit 1
+fi
+
 # Set up .virtme_mods/lib/modules/0.0.0 as a module directory for this kernel,
 # but fill it with symlinks instead of actual modules.
 
@@ -20,7 +25,7 @@ ln -srfT . "$MODDIR/build"
 # to the build kenrnel.
 find "$MODDIR/kernel" -type l -print0 |xargs -0 rm -f --
 while read -r i; do
-    [ ! -e $i ] && i=$(echo $i | sed s:^kernel/::)
+    [ ! -e "$i" ] && i=$(echo "$i" | sed s:^kernel/::)
     mkdir -p "$MODDIR/kernel/$(dirname "$i")"
     ln -sr "$i" "$MODDIR/kernel/$i"
 done < modules.order
