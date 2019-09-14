@@ -134,11 +134,19 @@ def find_kernel_and_mods(arch, args):
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
-        if os.path.exists(virtme_mods):
+        mod_file = os.path.join(args.kdir, 'modules.order')
+        try:
+            if not os.path.exists(mod_file):
+                raise Exception('%s not found' % mod_file)
+            # Initialize virtme modules directory
+            if not os.path.exists(virtme_mods):
+                os.system('virtme-prep-kdir-mods')
+            if not os.path.exists(virtme_mods):
+                raise Exception('%s not found' % virtme_mods)
             moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             modfiles = modfinder.find_modules_from_install(
                 virtmods.MODALIASES, kver='0.0.0')
-        else:
+        except:
             kver = None
             moddir = None
             modfiles = []
