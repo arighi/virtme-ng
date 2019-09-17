@@ -118,6 +118,9 @@ def arg_fail(message):
     _ARGPARSER.print_usage()
     sys.exit(1)
 
+def is_file_more_recent(a, b):
+    return os.stat(a).st_mtime > os.stat(b).st_mtime
+
 def find_kernel_and_mods(arch, args):
     use_root_mods = False
 
@@ -135,11 +138,13 @@ def find_kernel_and_mods(arch, args):
         kimg = os.path.join(args.kdir, arch.kimg_path())
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
+        virtme_mod_file = os.path.join(virtme_mods, 'lib/modules/0.0.0/modules.dep')
         try:
             if not os.path.exists(mod_file):
                 raise Exception('%s not found' % mod_file)
             # Initialize virtme modules directory
-            if not os.path.exists(virtme_mods):
+            if not os.path.exists(virtme_mods) or \
+               is_file_more_recent(mod_file, virtme_mod_file):
                 os.system('virtme-prep-kdir-mods')
             if not os.path.exists(virtme_mods):
                 raise Exception('%s not found' % virtme_mods)
