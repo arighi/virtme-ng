@@ -121,7 +121,14 @@ def main():
     if maketarget:
         subprocess.check_call(['make', 'ARCH=%s' % arch.linuxname, maketarget])
 
-    with open('.config', 'ab') as conffile:
+    config = '.config'
+
+    # Check if KBUILD_OUTPUT is defined and if it's a directory
+    config_dir = os.environ.get('KBUILD_OUTPUT', '')
+    if config_dir and os.path.isdir(config_dir):
+        config = os.path.join(config_dir, config)
+
+    with open(config, 'ab') as conffile:
         conffile.write('\n'.join(conf).encode('utf-8'))
 
     subprocess.check_call(['make', 'ARCH=%s' % arch.linuxname, updatetarget])
