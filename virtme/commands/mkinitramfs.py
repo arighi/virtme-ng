@@ -10,16 +10,23 @@ from .. import modfinder
 from .. import virtmods
 from .. import mkinitramfs
 
-_ARGPARSER = argparse.ArgumentParser(
-    description='Generate initramfs image for virtme',
-)
-_ARGPARSER.add_argument('--mod-kversion', action='store', default=None)
-_ARGPARSER.add_argument('--rw', action='store_true', default=False)
+def make_parser():
+    parser = argparse.ArgumentParser(
+        description='Generate an initramfs image for virtme',
+    )
+
+    parser.add_argument('--mod-kversion', action='store', default=None,
+                        help='Find kernel modules related to kernel version set')
+
+    parser.add_argument('--rw', action='store_true', default=False,
+                        help='Mount initramfs as rw. Default is ro')
+
+    return parser
 
 def main():
     import sys
 
-    args = _ARGPARSER.parse_args()
+    args = make_parser().parse_args()
 
     config = mkinitramfs.Config()
 
