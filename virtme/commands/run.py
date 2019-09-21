@@ -41,6 +41,9 @@ def make_parser():
                    help='Use a compiled kernel source directory')
 
     g = parser.add_argument_group(title='Kernel options')
+    g.add_argument('--mods', action='store', metavar='none|use|auto', default='use',
+                   help='Setup loadable kernel modules inside a compiled kernel source directory (used in conjunction with --kdir); none: ignore kernel modules, use: asks user to refresh virtme\'s kernel modules directory, auto: automatically refreshes virtme\'s kernel modules directory')
+
     g.add_argument('-a', '--kopt', action='append', default=[],
                    help='Add a kernel option.  You can specify this more than once.')
 
@@ -113,9 +116,10 @@ def make_parser():
 
 _ARGPARSER = make_parser()
 
-def arg_fail(message):
+def arg_fail(message, show_usage=True):
     print(message)
-    _ARGPARSER.print_usage()
+    if show_usage:
+        _ARGPARSER.print_usage()
     sys.exit(1)
 
 def is_file_more_recent(a, b):
@@ -139,28 +143,41 @@ def find_kernel_and_mods(arch, args):
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
         virtme_mod_file = os.path.join(virtme_mods, 'lib/modules/0.0.0/modules.dep')
-        try:
+
+        # Kernel modules support
+        kver = None
+        moddir = None
+        modfiles = []
+        if args.mods == 'none':
+            pass
+        elif args.mods == 'use' or args.mods == 'auto':
+            # Check if modules.order exists, otherwise it's not possible to use
+            # this option
             if not os.path.exists(mod_file):
-                raise Exception('%s not found' % mod_file)
-            # Initialize virtme modules directory
+                arg_fail('%s not found: kernel modules not enabled or kernel not compiled properly' % mod_file, show_usage=False)
+            # Check if virtme's kernel modules directory needs to be updated
             if not os.path.exists(virtme_mods) or \
                is_file_more_recent(mod_file, virtme_mod_file):
-                os.system('virtme-prep-kdir-mods')
-            if not os.path.exists(virtme_mods):
-                raise Exception('%s not found' % virtme_mods)
+                if args.mods == 'use':
+                    # Inform user to manually refresh virtme's kernel modules
+                    # directory
+                    arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
+                else:
+                    # Auto-refresh virtme's kernel modules directory
+                    os.system('virtme-prep-kdir-mods')
             moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             modfiles = modfinder.find_modules_from_install(
-                virtmods.MODALIASES, kver='0.0.0')
-        except:
-            kver = None
-            moddir = None
-            modfiles = []
+                               virtmods.MODALIASES, kver='0.0.0')
+        else:
+            arg_fail("invalid argument '%s', please use --mods=none|use|auto" % args.mods)
 
         dtb_path = arch.dtb_path()
         if dtb_path is None:
             dtb = None
         else:
             dtb = os.path.join(args.kdir, dtb_path)
+    elif args.mods is not None:
+        arg_fail("--mods must be used together with --kdir")
     elif args.kimg is not None:
         kimg = args.kimg
         modfiles = []
