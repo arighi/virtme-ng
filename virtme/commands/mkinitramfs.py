@@ -6,9 +6,9 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import argparse
-import modfinder
-import virtmods
-import mkinitramfs
+from .. import modfinder
+from .. import virtmods
+from .. import mkinitramfs
 
 _ARGPARSER = argparse.ArgumentParser(
     description='Generate initramfs image for virtme',
