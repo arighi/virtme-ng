@@ -27,6 +27,9 @@ def main():
         config.modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=args.mod_kversion)
 
+    # search for busybox in the root filesystem
+    config.busybox = mkinitramfs.find_busybox(root = '/', is_native = True)
+
     if args.rw:
         config.access = 'rw'
 
