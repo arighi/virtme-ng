@@ -21,6 +21,9 @@ def make_parser():
     parser.add_argument('--rw', action='store_true', default=False,
                         help='Mount initramfs as rw. Default is ro')
 
+    parser.add_argument('--outfile', action='store', default=None,
+                        help='Filename of the resulting initramfs file. Default: send initramfs to stdout')
+
     return parser
 
 def main():
@@ -40,7 +43,12 @@ def main():
     if args.rw:
         config.access = 'rw'
 
-    mkinitramfs.mkinitramfs(sys.stdout.buffer, config)
+    if args.outfile is None:
+        buf = sys.stdout.buffer
+    else:
+        buf = open(args.outfile, 'w+b')
+
+    mkinitramfs.mkinitramfs(buf, config)
 
     return 0
 
