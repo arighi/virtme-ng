@@ -137,7 +137,7 @@ def find_kernel_and_mods(arch, args):
         if os.path.exists(virtme_mods):
             moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             modfiles = modfinder.find_modules_from_install(
-                virtmods.MODALIASES, kver='0.0.0')
+                virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
         else:
             kver = None
             moddir = None
