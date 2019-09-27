@@ -14,12 +14,13 @@ class Qemu(object):
     def __init__(self, arch):
         self.arch = arch
 
-        self.qemubin = shutil.which('qemu-system-%s' % arch)
-        if self.qemubin is None and arch == os.uname().machine:
-            self.qemubin = shutil.which('qemu-kvm')
-        if self.qemubin is None:
+        qemubin = shutil.which('qemu-system-%s' % arch)
+        if qemubin is None and arch == os.uname().machine:
+            qemubin = shutil.which('qemu-kvm')
+        if qemubin is None:
             raise ValueError('cannot find qemu for %s' % arch)
 
+        self.qemubin = qemubin
         self.version = None
 
     def probe(self):

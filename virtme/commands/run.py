@@ -5,6 +5,8 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
+from typing import Any, Optional, List, NoReturn
+
 import argparse
 import tempfile
 import shutil
@@ -29,6 +31,8 @@ def make_parser():
     parser = argparse.ArgumentParser(
         description='Virtualize your system (or another) under a kernel image',
     )
+
+    g: Any
 
     g = parser.add_argument_group(title='Selection of kernel and modules').add_mutually_exclusive_group()
     g.add_argument('--installed-kernel', action='store', nargs='?',
@@ -117,7 +121,7 @@ def make_parser():
 
 _ARGPARSER = make_parser()
 
-def arg_fail(message, show_usage=True):
+def arg_fail(message, show_usage=True) -> NoReturn:
     print(message)
     if show_usage:
         _ARGPARSER.print_usage()
@@ -128,6 +132,12 @@ def is_file_more_recent(a, b):
 
 class Kernel:
     __slots__ = ['kimg', 'dtb', 'modfiles', 'moddir', 'use_root_mods']
+
+    kimg: str
+    dtb: Optional[str]
+    modfiles: List[str]
+    moddir: Optional[str]
+    use_root_mods: bool
 
 def find_kernel_and_mods(arch, args):
     kernel = Kernel()
@@ -235,7 +245,7 @@ def main():
     if config.modfiles:
         need_initramfs = True
 
-    qemuargs = [qemu.qemubin]
+    qemuargs: List[str] = [qemu.qemubin]
     kernelargs = []
 
     # Put the '-name' flag first so it's easily visible in ps, top, etc.
@@ -451,6 +461,8 @@ def main():
             print('current working directory is not contained in the root')
             return 1
         kernelargs.append('virtme_chdir=%s' % rel_pwd)
+
+    initrdpath: Optional[str]
 
     if need_initramfs:
         if args.busybox is not None:
