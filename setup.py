@@ -27,6 +27,7 @@ setup(
         'console_scripts': [
             'virtme-run = virtme.commands.run:main',
             'virtme-configkernel = virtme.commands.configkernel:main',
+            'virtme-mkinitramfs = virtme.commands.mkinitramfs:main',
         ]
     },
     scripts = [
