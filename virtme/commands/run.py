@@ -24,7 +24,7 @@ from .. import modfinder
 from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
-from .. import guest_tools
+from .. import resources
 
 uname = os.uname()
 
@@ -185,7 +185,8 @@ def find_kernel_and_mods(arch, args):
                 else:
                     # Auto-refresh virtme's kernel modules directory
                     try:
-                        guest_tools.run_script('virtme-prep-kdir-mods')
+                        resources.run_script('virtme-prep-kdir-mods',
+                                             cwd=args.kdir)
                     except subprocess.CalledProcessError:
                         raise SilentError()
                     kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
@@ -263,7 +264,7 @@ def do_it():
     # Set up virtfs
     export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 
-    guest_tools_path = guest_tools.find_guest_tools()
+    guest_tools_path = resources.find_guest_tools()
     if guest_tools_path is None:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 

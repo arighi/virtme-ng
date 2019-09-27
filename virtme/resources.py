@@ -37,6 +37,6 @@ def find_script(name) -> str:
     # No luck.  This is somewhat surprising.
     raise Exception('could not find script %s' % name)
 
-def run_script(name) -> None:
+def run_script(name, **kwargs) -> None:
     fn = find_script(name)
-    subprocess.check_call(executable=fn, args=[fn])
+    subprocess.check_call(executable=fn, args=[fn], **kwargs)
