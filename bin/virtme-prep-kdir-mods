@@ -2,7 +2,7 @@
 
 # This is still a bit of an experiment.
 
-if ! [ -d .tmp_versions ]; then
+if ! [ -f modules.order ]; then
     echo 'virtme-prep-kdir-mods must be run from a kernel build directory' >&2
     exit 1
 fi
