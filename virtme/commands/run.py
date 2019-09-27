@@ -5,7 +5,7 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-from typing import Any, Optional, List, NoReturn
+from typing import Any, Optional, List, NoReturn, Dict
 
 import argparse
 import tempfile
@@ -50,7 +50,7 @@ def make_parser():
                    help='Use a compiled kernel source directory')
 
     g = parser.add_argument_group(title='Kernel options')
-    g.add_argument('--mods', action='store', metavar='none|use|auto', default='use',
+    g.add_argument('--mods', action='store', choices=['none', 'use', 'auto'], default='use',
                    help='Setup loadable kernel modules inside a compiled kernel source directory (used in conjunction with --kdir); none: ignore kernel modules, use: asks user to refresh virtme\'s kernel modules directory, auto: automatically refreshes virtme\'s kernel modules directory')
 
     g.add_argument('-a', '--kopt', action='append', default=[],
@@ -135,13 +135,24 @@ def is_file_more_recent(a, b):
     return os.stat(a).st_mtime > os.stat(b).st_mtime
 
 class Kernel:
-    __slots__ = ['kimg', 'dtb', 'modfiles', 'moddir', 'use_root_mods']
+    __slots__ = ['kimg', 'dtb', 'modfiles', 'moddir', 'use_root_mods', 'config']
 
     kimg: str
     dtb: Optional[str]
     modfiles: List[str]
     moddir: Optional[str]
     use_root_mods: bool
+    config: Optional[Dict[str, str]]
+
+    def load_config(self, kdir: str) -> None:
+        cfgfile = os.path.join(kdir, '.config')
+        if os.path.isfile(cfgfile):
+            self.config = {}
+            regex = re.compile('^(CONFIG_[A-Z0-9_]+)=([ymn])$')
+            for line in open(cfgfile, 'r'):
+                m = regex.match(line.strip())
+                if m:
+                    self.config[m.group(1)] = m.group(2)
 
 def find_kernel_and_mods(arch, args):
     kernel = Kernel()
@@ -163,14 +174,20 @@ def find_kernel_and_mods(arch, args):
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
         virtme_mod_file = os.path.join(virtme_mods, 'lib/modules/0.0.0/modules.dep')
+        kernel.load_config(args.kdir)
 
         # Kernel modules support
         kver = None
         kernel.moddir = None
         kernel.modfiles = []
-        if args.mods == 'none':
+
+        modmode = args.mods
+        if kernel.config is not None and kernel.config.get('CONFIG_MODULES', 'n') != 'y':
+            modmode = 'none'
+
+        if modmode == 'none':
             pass
-        elif args.mods == 'use' or args.mods == 'auto':
+        elif modmode == 'use' or modmode == 'auto':
             # Check if modules.order exists, otherwise it's not possible to use
             # this option
             if not os.path.exists(mod_file):
@@ -178,7 +195,7 @@ def find_kernel_and_mods(arch, args):
             # Check if virtme's kernel modules directory needs to be updated
             if not os.path.exists(virtme_mods) or \
                is_file_more_recent(mod_file, virtme_mod_file):
-                if args.mods == 'use':
+                if modmode == 'use':
                     # Inform user to manually refresh virtme's kernel modules
                     # directory
                     arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
@@ -189,9 +206,10 @@ def find_kernel_and_mods(arch, args):
                                              cwd=args.kdir)
                     except subprocess.CalledProcessError:
                         raise SilentError()
-                    kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
+            kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             kernel.modfiles = modfinder.find_modules_from_install(
                                virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
+            print(kernel.moddir)
         else:
             arg_fail("invalid argument '%s', please use --mods=none|use|auto" % args.mods)
 
