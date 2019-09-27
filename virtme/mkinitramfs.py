@@ -9,6 +9,7 @@ import shutil
 import io
 import os.path
 import shlex
+import itertools
 from . import cpiowriter
 from . import modfinder
 from . import virtmods
@@ -165,12 +166,12 @@ def mkinitramfs(out, config):
     cw.write_trailer()
 
 def find_busybox(root, is_native):
-    for path in ('usr/local/bin/busybox', 'usr/local/sbin/busybox',
-                 'usr/bin/busybox-static',
-                 'usr/bin/busybox', 'usr/sbin/busybox',
-                 'bin/busybox', 'sbin/busybox'):
-        if os.path.isfile(os.path.join(root, path)):
-            return os.path.join(root, path)
+    for p in itertools.product(['usr/local', 'usr', ''],
+                               ['bin', 'sbin'],
+                               ['', '-static', '.static']):
+        path = os.path.join(root, p[0], p[1], 'busybox' + p[2])
+        if os.path.isfile(path):
+            return path
 
     if is_native:
         # Try the host's busybox, if any
