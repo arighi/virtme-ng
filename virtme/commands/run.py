@@ -126,29 +126,34 @@ def arg_fail(message, show_usage=True):
 def is_file_more_recent(a, b):
     return os.stat(a).st_mtime > os.stat(b).st_mtime
 
+class Kernel:
+    __slots__ = ['kimg', 'dtb', 'modfiles', 'moddir', 'use_root_mods']
+
 def find_kernel_and_mods(arch, args):
-    use_root_mods = False
+    kernel = Kernel()
+
+    kernel.use_root_mods = False
 
     if args.installed_kernel is not None:
         kver = args.installed_kernel
-        modfiles = modfinder.find_modules_from_install(
+        kernel.modfiles = modfinder.find_modules_from_install(
             virtmods.MODALIASES, kver=kver)
-        moddir = os.path.join('/lib/modules', kver)
-        kimg = '/usr/lib/modules/%s/vmlinuz' % kver
-        if not os.path.exists(kimg):
-            kimg = '/boot/vmlinuz-%s' % kver
-        dtb = None  # For now
-        use_root_mods = True
+        kernel.moddir = os.path.join('/lib/modules', kver)
+        kernel.kimg = '/usr/lib/modules/%s/vmlinuz' % kver
+        if not os.path.exists(kernel.kimg):
+            kernel.kimg = '/boot/vmlinuz-%s' % kver
+        kernel.dtb = None  # For now
+        kernel.use_root_mods = True
     elif args.kdir is not None:
-        kimg = os.path.join(args.kdir, arch.kimg_path())
+        kernel.kimg = os.path.join(args.kdir, arch.kimg_path())
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
         virtme_mod_file = os.path.join(virtme_mods, 'lib/modules/0.0.0/modules.dep')
 
         # Kernel modules support
         kver = None
-        moddir = None
-        modfiles = []
+        kernel.moddir = None
+        kernel.modfiles = []
         if args.mods == 'none':
             pass
         elif args.mods == 'use' or args.mods == 'auto':
@@ -166,28 +171,28 @@ def find_kernel_and_mods(arch, args):
                 else:
                     # Auto-refresh virtme's kernel modules directory
                     guest_tools.run_script('virtme-prep-kdir-mods')
-            moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
-            modfiles = modfinder.find_modules_from_install(
+            kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
+            kernel.modfiles = modfinder.find_modules_from_install(
                                virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
         else:
             arg_fail("invalid argument '%s', please use --mods=none|use|auto" % args.mods)
 
         dtb_path = arch.dtb_path()
         if dtb_path is None:
-            dtb = None
+            kernel.dtb = None
         else:
-            dtb = os.path.join(args.kdir, dtb_path)
+            kernel.dtb = os.path.join(args.kdir, dtb_path)
     elif args.mods is not None:
         arg_fail("--mods must be used together with --kdir")
     elif args.kimg is not None:
-        kimg = args.kimg
-        modfiles = []
-        moddir = None
-        dtb = None # TODO: fix this
+        kernel.kimg = args.kimg
+        kernel.modfiles = []
+        kernel.moddir = None
+        kernel.dtb = None # TODO: fix this
     else:
         arg_fail('You must specify a kernel to use.')
 
-    return kimg,dtb,modfiles,moddir,use_root_mods
+    return kernel
 
 def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True):
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
@@ -225,8 +230,8 @@ def main():
 
     config = mkinitramfs.Config()
 
-    kimg,dtb,modfiles,moddir,use_root_mods = find_kernel_and_mods(arch, args)
-    config.modfiles = modfiles
+    kernel = find_kernel_and_mods(arch, args)
+    config.modfiles = kernel.modfiles
     if config.modfiles:
         need_initramfs = True
 
@@ -253,8 +258,8 @@ def main():
                 'exec /run/virtme/guesttools/virtme-init']
 
     # Arrange for modules to end up in the right place
-    if moddir is not None:
-        if use_root_mods:
+    if kernel.moddir is not None:
+        if kernel.use_root_mods:
             # Tell virtme-init to use the root /lib/modules
             kernelargs.append("virtme_root_mods=1")
         else:
@@ -262,7 +267,7 @@ def main():
             # Rather than mounting it separately, symlink it in the guest.
             # This allows symlinks within the module directory to resolve
             # correctly in the guest.
-            kernelargs.append("virtme_link_mods=/%s" % qemu.quote_optarg(os.path.relpath(moddir, args.root)))
+            kernelargs.append("virtme_link_mods=/%s" % qemu.quote_optarg(os.path.relpath(kernel.moddir, args.root)))
     else:
         # No modules are available.  virtme-init will hide /lib/modules/KVER
         pass
@@ -495,19 +500,19 @@ def main():
 
     if args.xen is None:
         # Load a normal kernel
-        qemuargs.extend(['-kernel', kimg])
+        qemuargs.extend(['-kernel', kernel.kimg])
         if kernelargs:
             qemuargs.extend(['-append',
                              ' '.join(quote_karg(a) for a in kernelargs)])
         if initrdpath is not None:
             qemuargs.extend(['-initrd', initrdpath])
-        if dtb is not None:
-            qemuargs.extend(['-dtb', dtb])
+        if kernel.dtb is not None:
+            qemuargs.extend(['-dtb', kernel.dtb])
     else:
         # Use multiboot syntax to load Xen
         qemuargs.extend(['-kernel', args.xen])
         qemuargs.extend(['-initrd', '%s %s%s' % (
-            kimg,
+            kernel.kimg,
             ' '.join(quote_karg(a).replace(',', ',,') for a in kernelargs),
             (',%s' % initrdpath) if initrdpath is not None else '')])
 
