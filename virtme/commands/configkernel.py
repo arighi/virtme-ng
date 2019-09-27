@@ -5,6 +5,8 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
+from typing import Optional
+
 import argparse
 import tempfile
 import os
@@ -102,6 +104,8 @@ def main():
 
     if shutil.which('%s-linux-gnu-gcc' % arch.gccname):
         conf.append('CONFIG_CROSS_COMPILE="%s-linux-gnu-"' % arch.gccname)
+
+    maketarget: Optional[str]
 
     if args.allnoconfig:
         maketarget = 'allnoconfig'

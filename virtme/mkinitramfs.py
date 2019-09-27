@@ -5,6 +5,8 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
+from typing import List, Dict, Optional
+
 import shutil
 import io
 import os.path
@@ -136,7 +138,7 @@ exec /bin/switch_root /newroot "$init" "$@"
 """
 
 
-def generate_init(config):
+def generate_init(config) -> bytes:
     out = io.StringIO()
     out.write(_INIT.format(
         logfunc=_LOGFUNC,
@@ -146,13 +148,13 @@ def generate_init(config):
 class Config:
     __slots__ = ['modfiles', 'virtme_data', 'virtme_init_path', 'busybox', 'access']
     def __init__(self):
-        self.modfiles = []
-        self.virtme_data = {}
-        self.virtme_init_path = None
-        self.busybox = None
+        self.modfiles: List[str] = []
+        self.virtme_data: Dict[bytes, bytes] = {}
+        self.virtme_init_path: Optional[str] = None
+        self.busybox: Optional[str] = None
         self.access = 'ro'
 
-def mkinitramfs(out, config):
+def mkinitramfs(out, config) -> None:
     cw = cpiowriter.CpioWriter(out)
     make_base_layout(cw)
     make_dev_nodes(cw)
@@ -166,7 +168,7 @@ def mkinitramfs(out, config):
                   mode=0o755)
     cw.write_trailer()
 
-def find_busybox(root, is_native):
+def find_busybox(root, is_native) -> Optional[str]:
     for p in itertools.product(['usr/local', 'usr', ''],
                                ['bin', 'sbin'],
                                ['', '-static', '.static']):
