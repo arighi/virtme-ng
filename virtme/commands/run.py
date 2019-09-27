@@ -18,6 +18,7 @@ import shlex
 import re
 import itertools
 import pkg_resources
+import subprocess
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -26,6 +27,9 @@ from .. import architectures
 from .. import guest_tools
 
 uname = os.uname()
+
+class SilentError(Exception):
+    pass
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -180,8 +184,11 @@ def find_kernel_and_mods(arch, args):
                     arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
                 else:
                     # Auto-refresh virtme's kernel modules directory
-                    guest_tools.run_script('virtme-prep-kdir-mods')
-            kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
+                    try:
+                        guest_tools.run_script('virtme-prep-kdir-mods')
+                    except subprocess.CalledProcessError:
+                        raise SilentError()
+                    kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             kernel.modfiles = modfinder.find_modules_from_install(
                                virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
         else:
@@ -227,7 +234,7 @@ _SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.-]+'
 _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
                        (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
 
-def main():
+def do_it():
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)
@@ -540,5 +547,14 @@ def main():
     if not args.dry_run:
         os.execv(qemu.qemubin, qemuargs)
 
+def main():
+    try:
+        do_it()
+    except SilentError:
+        return 1
+
 if __name__ == '__main__':
-    exit(main())
+    try:
+        exit(main())
+    except SilentError:
+        exit(1)
