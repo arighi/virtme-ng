@@ -167,7 +167,7 @@ def find_kernel_and_mods(arch, args):
                     os.system('virtme-prep-kdir-mods')
             moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             modfiles = modfinder.find_modules_from_install(
-                               virtmods.MODALIASES, kver='0.0.0')
+                               virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
         else:
             arg_fail("invalid argument '%s', please use --mods=none|use|auto" % args.mods)
 
