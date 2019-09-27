@@ -22,7 +22,7 @@ def find_guest_tools():
     # No luck.  This is somewhat surprising.
     return None
 
-def find_script(name):
+def find_script(name) -> str:
     # If we're running out of a source checkout, we can find scripts through
     # the 'virtme/scripts' symlink.
     fn = pkg_resources.resource_filename(__name__, 'scripts/%s' % name)
@@ -30,13 +30,13 @@ def find_script(name):
         return fn
 
     # Otherwise assume we're actually installed and in PATH.
-    fn = shutil.which(name)
-    if fn is not None:
-        return fn
+    guess = shutil.which(name)
+    if guess is not None:
+        return guess
 
     # No luck.  This is somewhat surprising.
     raise Exception('could not find script %s' % name)
 
-def run_script(name):
+def run_script(name) -> None:
     fn = find_script(name)
     subprocess.check_call(executable=fn, args=[fn])

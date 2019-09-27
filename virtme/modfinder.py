@@ -11,6 +11,8 @@ sort of hotplug.  Instead it generates a topological order and loads
 everything.  The idea is to require very few modules.
 """
 
+from typing import List
+
 import re
 import shutil
 import subprocess
@@ -49,8 +51,8 @@ def resolve_dep(modalias, root=None, kver=None, moddir=None):
 
     return deps
 
-def merge_mods(lists):
-    found = set()
+def merge_mods(lists) -> List[str]:
+    found: set = set()
     mods = []
     for mod in itertools.chain(*lists):
         if mod not in found:

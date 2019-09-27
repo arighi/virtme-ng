@@ -475,11 +475,12 @@ def do_it():
         if args.busybox is not None:
             config.busybox = args.busybox
         else:
-            config.busybox = mkinitramfs.find_busybox(args.root, is_native)
-            if config.busybox is None:
+            busybox = mkinitramfs.find_busybox(args.root, is_native)
+            if busybox is None:
                 print('virtme-run: initramfs is needed, and no busybox was found',
                       file=sys.stderr)
                 return 1
+            config.busybox = busybox
 
         if args.rw:
             config.access = 'rw'
