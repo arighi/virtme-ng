@@ -15,6 +15,7 @@ import sys
 import shlex
 import re
 import itertools
+import pkg_resources
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -164,7 +165,7 @@ def find_kernel_and_mods(arch, args):
                     arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
                 else:
                     # Auto-refresh virtme's kernel modules directory
-                    os.system('virtme-prep-kdir-mods')
+                    guest_tools.run_script('virtme-prep-kdir-mods')
             moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             modfiles = modfinder.find_modules_from_install(
                                virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
