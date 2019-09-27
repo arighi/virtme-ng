@@ -27,10 +27,12 @@ done
 
 kver="`uname -r`"
 
-if [[ -n "${mount_tags[virtme.moddir]}" ]]; then
-    mount -t tmpfs none /lib/modules
-    mkdir /lib/modules/"$kver"
-    mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.moddir /lib/modules/"$kver"
+if [[ -n "$virtme_root_mods" ]]; then
+    # /lib/modules is already set up
+    true
+elif [[ -n "$virtme_link_mods" ]]; then
+    mount -n -t tmpfs none /lib/modules
+    ln -s "$virtme_link_mods" "/lib/modules/$kver"
 elif [[ -d "/lib/modules/$kver" ]]; then
     # We may have mismatched modules.  Mask them off.
     mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
