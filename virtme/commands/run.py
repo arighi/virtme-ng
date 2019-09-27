@@ -31,7 +31,7 @@ uname = os.uname()
 class SilentError(Exception):
     pass
 
-def make_parser():
+def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description='Virtualize your system (or another) under a kernel image',
     )
@@ -131,7 +131,7 @@ def arg_fail(message, show_usage=True) -> NoReturn:
         _ARGPARSER.print_usage()
     sys.exit(1)
 
-def is_file_more_recent(a, b):
+def is_file_more_recent(a, b) -> bool:
     return os.stat(a).st_mtime > os.stat(b).st_mtime
 
 class Kernel:
@@ -154,7 +154,7 @@ class Kernel:
                 if m:
                     self.config[m.group(1)] = m.group(2)
 
-def find_kernel_and_mods(arch, args):
+def find_kernel_and_mods(arch, args) -> Kernel:
     kernel = Kernel()
 
     kernel.use_root_mods = False
@@ -230,7 +230,7 @@ def find_kernel_and_mods(arch, args):
 
     return kernel
 
-def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True):
+def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True) -> None:
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
     fsid = 'virtfs%d' % len(qemuargs)
@@ -239,7 +239,7 @@ def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', 
                       security_model, ',readonly' if readonly else '')])
     qemuargs.extend(['-device', '%s,fsdev=%s,mount_tag=%s' % (arch.virtio_dev_type('9p'), fsid, qemu.quote_optarg(mount_tag))])
 
-def quote_karg(arg):
+def quote_karg(arg: str) -> str:
     if '"' in arg:
         raise ValueError("cannot quote '\"' in kernel args")
 
@@ -253,7 +253,7 @@ _SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.-]+'
 _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
                        (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
 
-def do_it():
+def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)
@@ -567,9 +567,11 @@ def do_it():
     if not args.dry_run:
         os.execv(qemu.qemubin, qemuargs)
 
-def main():
+    return 0
+
+def main() -> int:
     try:
-        do_it()
+        return do_it()
     except SilentError:
         return 1
 
