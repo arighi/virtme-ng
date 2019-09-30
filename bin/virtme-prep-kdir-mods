@@ -10,6 +10,11 @@ fi
 FAKEVER=0.0.0
 MODDIR=".virtme_mods/lib/modules/$FAKEVER"
 
+# Some distro don't have /sbin or /usr/sbin in user's default path. Make sure
+# to setup the right path to find all the commands needed to setup the modules
+# (depmod, etc.).
+PATH=$PATH:/sbin:/usr/sbin
+
 if ! [ -f "modules.order" ]; then
     echo "modules.order is missing.  Your kernel may be too old or you didn't make modules." >&2
     exit 1
