@@ -37,7 +37,6 @@ setup(
         'virtme.guest': [
             'virtme-init',
             'virtme-udhcpc-script',
-            'virtme-loadmods',
         ],
     },
     classifiers=['Environment :: Console',
