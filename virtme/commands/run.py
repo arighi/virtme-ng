@@ -9,7 +9,6 @@ from typing import Any, Optional, List, NoReturn, Dict
 
 import argparse
 import tempfile
-import shutil
 import os
 import errno
 import fcntl
@@ -17,7 +16,6 @@ import sys
 import shlex
 import re
 import itertools
-import pkg_resources
 import subprocess
 from .. import virtmods
 from .. import modfinder
