@@ -104,7 +104,6 @@ tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
 install -d /run/dbus
 
 # Try to get udevd to coldplug everything.
-# We could use virtme-loadmods as a lightweight alternative.
 if [[ -n "$udevd" ]]; then
     if [[ -e '/sys/kernel/uevent_helper' ]]; then
        # This kills boot performance.
