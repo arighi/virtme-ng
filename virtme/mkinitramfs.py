@@ -13,8 +13,6 @@ import os.path
 import shlex
 import itertools
 from . import cpiowriter
-from . import modfinder
-from . import virtmods
 
 def make_base_layout(cw):
     for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',

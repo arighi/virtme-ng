@@ -8,7 +8,6 @@
 from typing import Optional
 
 import argparse
-import tempfile
 import os
 import shutil
 import subprocess
