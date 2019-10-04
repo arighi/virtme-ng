@@ -159,9 +159,13 @@ def find_kernel_and_mods(arch, args) -> Kernel:
 
     if args.installed_kernel is not None:
         kver = args.installed_kernel
-        kernel.modfiles = modfinder.find_modules_from_install(
-            virtmods.MODALIASES, kver=kver)
-        kernel.moddir = os.path.join('/lib/modules', kver)
+        if args.mods != 'none':
+            kernel.modfiles = modfinder.find_modules_from_install(
+                virtmods.MODALIASES, kver=kver)
+            kernel.moddir = os.path.join('/lib/modules', kver)
+        else:
+            kernel.modfiles = None
+            kernel.moddir = None
         kernel.kimg = '/usr/lib/modules/%s/vmlinuz' % kver
         if not os.path.exists(kernel.kimg):
             kernel.kimg = '/boot/vmlinuz-%s' % kver
