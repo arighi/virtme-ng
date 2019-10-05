@@ -9,6 +9,7 @@ from typing import Optional
 
 import argparse
 import os
+import shlex
 import shutil
 import subprocess
 import multiprocessing
@@ -102,8 +103,10 @@ def main():
             ['# Arch-specific options'] +
             arch.config_base())
 
+    archargs = ['ARCH=%s' % shlex.quote(arch.linuxname)]
+
     if shutil.which('%s-linux-gnu-gcc' % arch.gccname):
-        conf.append('CONFIG_CROSS_COMPILE="%s-linux-gnu-"' % arch.gccname)
+        archargs.append('CROSS_COMPILE=%s' % shlex.quote("%s-linux-gnu-" % arch.gccname))
 
     maketarget: Optional[str]
 
@@ -123,7 +126,7 @@ def main():
 
     # Set up an initial config
     if maketarget:
-        subprocess.check_call(['make', 'ARCH=%s' % arch.linuxname, maketarget])
+        subprocess.check_call(['make'] + archargs + [maketarget])
 
     config = '.config'
 
@@ -135,10 +138,10 @@ def main():
     with open(config, 'ab') as conffile:
         conffile.write('\n'.join(conf).encode('utf-8'))
 
-    subprocess.check_call(['make', 'ARCH=%s' % arch.linuxname, updatetarget])
+    subprocess.check_call(['make'] + archargs + [updatetarget])
 
-    print("Configured.  Build with 'make ARCH=%s -j%d'" %
-          (arch.linuxname, multiprocessing.cpu_count()))
+    print("Configured.  Build with 'make %s -j%d'" %
+          (' '.join(archargs), multiprocessing.cpu_count()))
 
     return 0
 
