@@ -207,6 +207,30 @@ class Arch_ppc64(Arch):
         # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
         return 'vmlinux'
 
+class Arch_riscv64(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
+
+        self.defconfig_target = 'riscv64_defconfig'
+        self.qemuname = 'riscv64'
+        self.linuxname = 'riscv'
+        self.gccname = 'riscv64'
+
+    def qemuargs(self, is_native):
+        ret = Arch.qemuargs(is_native)
+
+        ret.extend(['-machine', 'virt'])
+        ret.extend(['-bios', 'default'])
+
+        return ret
+
+    @staticmethod
+    def serial_console_args():
+        return ['console=ttyS0']
+
+    def kimg_path(self):
+        return 'arch/riscv/boot/Image'
+
 class Arch_sparc64(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
@@ -264,6 +288,7 @@ ARCHES = {
     'arm': Arch_arm,
     'aarch64': Arch_aarch64,
     'ppc64': Arch_ppc64,
+    'riscv64': Arch_riscv64,
     'sparc64': Arch_sparc64,
     's390x': Arch_s390x,
 }

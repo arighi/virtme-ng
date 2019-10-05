@@ -112,6 +112,14 @@ PPC64
 
 PPC64 appears to be reasonably functional.
 
+RISC-V
+------
+
+riscv64 works out of the box, but you'll neet at least QEMU-4.1.0 to be
+able to run `vmlinux`-style kernels.  riscv32 is not supported because
+there are no existing userspace images for it.  Support is provided via
+QEMU's `virt` machine with OpenSBI for firmware.
+
 Others
 ------
 
