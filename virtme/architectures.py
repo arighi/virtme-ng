@@ -211,7 +211,7 @@ class Arch_riscv64(Arch):
     def __init__(self, name):
         Arch.__init__(self, name)
 
-        self.defconfig_target = 'riscv64_defconfig'
+        self.defconfig_target = 'defconfig'
         self.qemuname = 'riscv64'
         self.linuxname = 'riscv'
         self.gccname = 'riscv64'
