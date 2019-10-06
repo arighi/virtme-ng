@@ -9,6 +9,7 @@ import os
 
 class Arch(object):
     def __init__(self, name):
+        self.virtmename = name
         self.qemuname = name
         self.linuxname = name
         self.gccname = name
@@ -114,8 +115,8 @@ class Arch_x86(Arch):
             ]
 
 class Arch_arm(Arch):
-    def __init__(self, name):
-        Arch.__init__(self, name)
+    def __init__(self):
+        Arch.__init__(self, 'arm')
 
         self.defconfig_target = 'vexpress_defconfig'
 
@@ -152,8 +153,8 @@ class Arch_arm(Arch):
         return 'arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb'
 
 class Arch_aarch64(Arch):
-    def __init__(self, name):
-        Arch.__init__(self, name)
+    def __init__(self):
+        Arch.__init__(self, 'aarch64')
 
         self.qemuname = 'aarch64'
         self.linuxname = 'arm64'
@@ -188,8 +189,8 @@ class Arch_aarch64(Arch):
         return 'arch/arm64/boot/Image'
 
 class Arch_ppc64(Arch):
-    def __init__(self, name):
-        Arch.__init__(self, name)
+    def __init__(self):
+        Arch.__init__(self, 'ppc64')
 
         self.defconfig_target = 'ppc64_defconfig'
         self.qemuname = 'ppc64'
@@ -208,8 +209,8 @@ class Arch_ppc64(Arch):
         return 'vmlinux'
 
 class Arch_riscv64(Arch):
-    def __init__(self, name):
-        Arch.__init__(self, name)
+    def __init__(self):
+        Arch.__init__(self, 'riscv64')
 
         self.defconfig_target = 'defconfig'
         self.qemuname = 'riscv64'
@@ -232,8 +233,8 @@ class Arch_riscv64(Arch):
         return 'arch/riscv/boot/Image'
 
 class Arch_sparc64(Arch):
-    def __init__(self, name):
-        Arch.__init__(self, name)
+    def __init__(self):
+        Arch.__init__(self, 'sparc64')
 
         self.defconfig_target = 'sparc64_defconfig'
         self.qemuname = 'sparc64'
@@ -253,8 +254,8 @@ class Arch_sparc64(Arch):
         return ['-nographic', '-vga', 'none']
 
 class Arch_s390x(Arch):
-    def __init__(self, name):
-        Arch.__init__(self, name)
+    def __init__(self):
+        Arch.__init__(self, 's390x')
 
         self.qemuname = 's390x'
         self.linuxname = 's390'
@@ -282,16 +283,19 @@ class Arch_s390x(Arch):
     def config_base():
         return ['CONFIG_MARCH_Z900=y']
 
-ARCHES = {
-    'x86_64': Arch_x86,
-    'i386': Arch_x86,
-    'arm': Arch_arm,
-    'aarch64': Arch_aarch64,
-    'ppc64': Arch_ppc64,
-    'riscv64': Arch_riscv64,
-    'sparc64': Arch_sparc64,
-    's390x': Arch_s390x,
-}
+ARCHES = {arch.virtmename: arch for arch in [
+    Arch_x86('x86_64'),
+    Arch_x86('i386'),
+    Arch_arm(),
+    Arch_aarch64(),
+    Arch_ppc64(),
+    Arch_riscv64(),
+    Arch_sparc64(),
+    Arch_s390x(),
+]}
 
 def get(arch):
-    return ARCHES.get(arch, Arch_unknown)(arch)
+    if arch in ARCHES:
+        return ARCHES[arch]
+    else:
+        return Arch_unknown(arch)
