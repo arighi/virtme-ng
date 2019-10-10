@@ -15,7 +15,7 @@ and PRs via github.  Release tarballs are at [kernel.org in /pub/linux/utils/ker
 
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
-[korg-releases]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
+[korg-releases]: https://mirrors.edge.kernel.org/pub/linux/utils/kernel/virtme/releases/ "virtme releases on kernel.org"
 [github]: https://github.com/amluto/virtme
 
 How to use virtme
