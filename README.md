@@ -66,7 +66,7 @@ Once you have such a kernel, run one of:
 * virtme-run --installed-kernel VERSION
 * virtme-run --kimg PATH_TO_KERNEL_IMAGE
 
-Note that the --kdir and --kimg modes do not support modules yet.
+With --installed-kernel or --kdir, modules associated with the kernel will be available in the VM.  With --kdir in particular, you will either need to follow the directions that virtme-run prints or specify --mods=auto to make this work.  With --kimg, modules are not supported.
 
 You can then do things like `cd /home/username` and you will have readonly
 access to all your files.
