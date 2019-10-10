@@ -10,10 +10,12 @@ Virtme is tiny, easy to use, and makes testing kernel changes quite simple.
 Some day this might be useful as a sort of sandbox.  Right now it's not
 really configurable enough for that.
 
-Virtme is hosted at kernel.org in utils/kernel/virtme/virtme.git ([web][korg-web] | [git][korg-git]).  It's mirrored [on github][github].
+Virtme is hosted at kernel.org in utils/kernel/virtme/virtme.git ([web][korg-web] | [git][korg-git]).  It's mirrored [on github][github].  Please submit bugs
+and PRs via github.  Release tarballs are at [web][korg-releases].
 
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
+[korg-releases]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [github]: https://github.com/amluto/virtme
 
 How to use virtme
