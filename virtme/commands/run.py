@@ -492,7 +492,9 @@ def do_it() -> int:
             return 1
         kernelargs.append('virtme_chdir=%s' % rel_pwd)
 
-    if args.cwd:
+    if args.cwd is not None:
+        if args.pwd:
+            arg_fail('--pwd and --cwd are mutually exclusive')
         rel_cwd = os.path.relpath(args.cwd, args.root)
         if rel_cwd.startswith('..'):
             print('specified working directory is not contained in the root')
