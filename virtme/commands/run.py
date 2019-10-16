@@ -529,8 +529,11 @@ def do_it() -> int:
             initramfsfile = os.fdopen(initramfsfd, 'r+b')
         mkinitramfs.mkinitramfs(initramfsfile, config)
         initramfsfile.flush()
-        fcntl.fcntl(initramfsfd, fcntl.F_SETFD, 0)
-        initrdpath = '/proc/self/fd/%d' % initramfsfd
+        if args.save_initramfs is not None:
+            initrdpath = args.save_initramfs
+        else:
+            fcntl.fcntl(initramfsfd, fcntl.F_SETFD, 0)
+            initrdpath = '/proc/self/fd/%d' % initramfsfd
     else:
         if args.save_initramfs is not None:
             print('--save_initramfs specified but initramfs is not used',
