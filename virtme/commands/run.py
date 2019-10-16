@@ -106,6 +106,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help="Initialize everything but don't run the guest")
     g.add_argument('--show-command', action='store_true',
                    help='Show the VM command line')
+    g.add_argument('--save-initramfs', action='store',
+                   help='Save the generated initramfs to the specified path')
     g.add_argument('--show-boot-console', action='store_true',
                    help='Show the boot console when running scripts')
 
@@ -518,14 +520,23 @@ def do_it() -> int:
             config.access = 'rw'
 
         # Set up the initramfs (warning: hack ahead)
-        tmpfd,tmpname = tempfile.mkstemp('irfs')
-        os.unlink(tmpname)
-        tmpfile = os.fdopen(tmpfd, 'r+b')
-        mkinitramfs.mkinitramfs(tmpfile, config)
-        tmpfile.flush()
-        fcntl.fcntl(tmpfd, fcntl.F_SETFD, 0)
-        initrdpath = '/proc/self/fd/%d' % tmpfile.fileno()
+        if args.save_initramfs is not None:
+            initramfsfile = open(args.save_initramfs, 'xb')
+            initramfsfd = initramfsfile.fileno()
+        else:
+            initramfsfd,tmpname = tempfile.mkstemp('irfs')
+            os.unlink(tmpname)
+            initramfsfile = os.fdopen(initramfsfd, 'r+b')
+        mkinitramfs.mkinitramfs(initramfsfile, config)
+        initramfsfile.flush()
+        fcntl.fcntl(initramfsfd, fcntl.F_SETFD, 0)
+        initrdpath = '/proc/self/fd/%d' % initramfsfd
     else:
+        if args.save_initramfs is not None:
+            print('--save_initramfs specified but initramfs is not used',
+                  file=sys.stderr)
+            return 1
+
         # No initramfs!  Warning: this is slower than using an initramfs
         # because the kernel will wait for device probing to finish.
         # Sigh.
