@@ -224,13 +224,13 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             kernel.dtb = None
         else:
             kernel.dtb = os.path.join(args.kdir, dtb_path)
-    elif args.mods is not None:
-        arg_fail("--mods must be used together with --kdir or --installed-kernel")
     elif args.kimg is not None:
         kernel.kimg = args.kimg
         kernel.modfiles = []
         kernel.moddir = None
         kernel.dtb = None # TODO: fix this
+        if args.mods != 'use':
+            arg_fail("--mods is not currently supported properly with --kimg")
     else:
         arg_fail('You must specify a kernel to use.')
 
