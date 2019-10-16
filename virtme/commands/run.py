@@ -225,7 +225,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         else:
             kernel.dtb = os.path.join(args.kdir, dtb_path)
     elif args.mods is not None:
-        arg_fail("--mods must be used together with --kdir")
+        arg_fail("--mods must be used together with --kdir or --installed-kernel")
     elif args.kimg is not None:
         kernel.kimg = args.kimg
         kernel.modfiles = []
