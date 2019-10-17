@@ -169,7 +169,7 @@ def mkinitramfs(out, config) -> None:
 def find_busybox(root, is_native) -> Optional[str]:
     for p in itertools.product(['usr/local', 'usr', ''],
                                ['bin', 'sbin'],
-                               ['', '-static', '.static']):
+                               ['-static', '.static', '']):
         path = os.path.join(root, p[0], p[1], 'busybox' + p[2])
         if os.path.isfile(path):
             return path
