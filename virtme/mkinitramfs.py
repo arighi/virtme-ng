@@ -167,16 +167,22 @@ def mkinitramfs(out, config) -> None:
     cw.write_trailer()
 
 def find_busybox(root, is_native) -> Optional[str]:
-    for p in itertools.product(['usr/local', 'usr', ''],
-                               ['bin', 'sbin'],
-                               ['-static', '.static', '']):
-        path = os.path.join(root, p[0], p[1], 'busybox' + p[2])
-        if os.path.isfile(path):
-            return path
+    names = ['busybox-static', 'busybox.static', 'busybox']
+    dirs = [os.path.join(*i) for i in itertools.product(
+        ['usr/local', 'usr', ''],
+        ['bin', 'sbin'])]
 
-    if is_native:
-        # Try the host's busybox, if any
-        return shutil.which('busybox')
+    for n in names:
+        if is_native:
+            # Search PATH first
+            path = shutil.which(n)
+            if path is not None:
+                return path
+
+        for d in dirs:
+            path = os.path.join(root, d, n)
+            if os.path.isfile(path):
+                return path
 
     # We give up.
     return None
