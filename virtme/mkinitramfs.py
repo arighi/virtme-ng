@@ -13,6 +13,7 @@ import os.path
 import shlex
 import itertools
 from . import cpiowriter
+from . import util
 
 def make_base_layout(cw):
     for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',
@@ -167,22 +168,5 @@ def mkinitramfs(out, config) -> None:
     cw.write_trailer()
 
 def find_busybox(root, is_native) -> Optional[str]:
-    names = ['busybox-static', 'busybox.static', 'busybox']
-    dirs = [os.path.join(*i) for i in itertools.product(
-        ['usr/local', 'usr', ''],
-        ['bin', 'sbin'])]
-
-    for n in names:
-        if is_native:
-            # Search PATH first
-            path = shutil.which(n)
-            if path is not None:
-                return path
-
-        for d in dirs:
-            path = os.path.join(root, d, n)
-            if os.path.isfile(path):
-                return path
-
-    # We give up.
-    return None
+    return util.find_binary(['busybox-static', 'busybox.static', 'busybox'],
+                            root=root, use_path=is_native)
