@@ -31,3 +31,10 @@ def find_binary(names: Sequence[str], root: str = '/',
 
     # We give up.
     return None
+
+def find_binary_or_raise(names: Sequence[str], root: str = '/',
+                         use_path: bool = True) -> str:
+    ret = find_binary(names, root=root, use_path=use_path)
+    if ret is None:
+        raise RuntimeError('Could not find %r' % names)
+    return ret
