@@ -14,16 +14,16 @@ everything.  The idea is to require very few modules.
 from typing import List
 
 import re
-import shutil
 import subprocess
-import os, os.path
+import os
 import itertools
+from . import util
 
 _INSMOD_RE = re.compile('insmod (.*[^ ]) *$')
 
 def resolve_dep(modalias, root=None, kver=None, moddir=None):
     # /usr/sbin might not be in the path, and modprobe is usually in /usr/sbin
-    modprobe = shutil.which('modprobe') or '/usr/sbin/modprobe'
+    modprobe = util.find_binary_or_raise(['modprobe'])
     args = [modprobe, '--show-depends']
     args += ['-C', '/var/empty']
     if root is not None:
