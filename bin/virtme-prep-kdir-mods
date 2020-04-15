@@ -1,12 +1,6 @@
 #!/bin/sh
 
 # This is still a bit of an experiment.
-
-if ! [ -f modules.order ]; then
-    echo 'virtme-prep-kdir-mods must be run from a kernel build directory' >&2
-    exit 1
-fi
-
 FAKEVER=0.0.0
 MODDIR=".virtme_mods/lib/modules/$FAKEVER"
 
@@ -16,6 +10,7 @@ MODDIR=".virtme_mods/lib/modules/$FAKEVER"
 PATH=$PATH:/sbin:/usr/sbin
 
 if ! [ -f "modules.order" ]; then
+    echo 'virtme-prep-kdir-mods must be run from a kernel build directory' >&2
     echo "modules.order is missing.  Your kernel may be too old or you didn't make modules." >&2
     exit 1
 fi
