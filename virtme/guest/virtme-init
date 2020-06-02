@@ -87,6 +87,16 @@ if ! findmnt --kernel --mountpoint /dev &>/dev/null; then
     fi
 fi
 
+for tag in "${!virtme_rw_overlay@}"; do
+    td=`mktemp -d`
+    dir="${!tag}"
+    mount -t tmpfs none "$td"
+    mkdir "$td/cow" "$td/work"
+    mount -t overlay -o "lowerdir=$dir,upperdir=$td/cow,workdir=$td/work" cow "$dir"
+    umount "$td"
+    rmdir "$td"
+done
+
 for tag in "${!virtme_initmount@}"; do
     if [[ ! -d "${!tag}" ]]; then
         mkdir -p "${!tag}"
