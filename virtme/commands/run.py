@@ -127,6 +127,9 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument('--rodir', action='append', default=[],
                    help="Supply a read-only directory to the guest.  Use --rodir=path or --rodir=guestpath=hostpath.")
 
+    g.add_argument('--overlay-rwdir', action='append', default=[],
+                   help="Supply a directory that is r/w to the guest but read-only in the host.  Use --overlay-rwdir=path.")
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -292,6 +295,9 @@ def do_it() -> int:
 
     config = mkinitramfs.Config()
 
+    if len(args.overlay_rwdir) > 0:
+        virtmods.MODALIASES.append('overlay')
+
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles
     if config.modfiles:
@@ -356,6 +362,9 @@ def do_it() -> int:
         tag = 'virtme.initmount%d' % idx
         export_virtfs(qemu, arch, qemuargs, hostpath, tag, readonly=(dirtype != 'rwdir'))
         kernelargs.append('virtme_initmount%d=%s' % (idx, guestpath))
+
+    for i, d in enumerate(args.overlay_rwdir):
+        kernelargs.append('virtme_rw_overlay%d=%s' % (i, d))
 
     # Turn on KVM if available
     if is_native:

@@ -35,6 +35,8 @@ For script support, you need CONFIG_VIRTIO_CONSOLE.
 
 For disk support, you need CONFIG_SCSI_VIRTIO.
 
+For --overlay-rwdir support, you need CONFIG_OVERLAY_FS.
+
 That kernel needs to be sane.  Your kernel is probably sane, but allmodconfig and allyesconfig generate insane kernels.  Sanity includes:
 
     CONFIG_CMDLINE_OVERRIDE=n
