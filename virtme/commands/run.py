@@ -279,6 +279,7 @@ def do_it() -> int:
 
     qemuargs: List[str] = [qemu.qemubin]
     kernelargs = []
+    xenargs = []
 
     # Put the '-name' flag first so it's easily visible in ps, top, etc.
     if args.name:
@@ -362,8 +363,14 @@ def do_it() -> int:
         qemuargs.extend(['-mon', 'chardev=console'])
 
         kernelargs.extend(arch.earlyconsole_args())
-        kernelargs.extend(arch.serial_console_args())
         qemuargs.extend(arch.qemu_nodisplay_args())
+
+        if not args.xen:
+            kernelargs.extend(arch.serial_console_args())
+        else:
+            # Horrible special case
+            xenargs.extend(['console=com1'])
+            kernelargs.extend(['xencons=hvc', 'console=hvc0'])
 
         # PS/2 probing is slow; give the kernel a hint to speed it up.
         kernelargs.extend(['psmouse.proto=exps'])
@@ -574,9 +581,15 @@ def do_it() -> int:
             qemuargs.extend(['-initrd', initrdpath])
         if kernel.dtb is not None:
             qemuargs.extend(['-dtb', kernel.dtb])
+
+        if xenargs:
+            raise ValueError("Can't pass Xen any arguments if we're not using Xen")
     else:
         # Use multiboot syntax to load Xen
         qemuargs.extend(['-kernel', args.xen])
+        if xenargs:
+            qemuargs.extend(['-append',
+                             ' '.join(quote_karg(a) for a in xenargs)])
         qemuargs.extend(['-initrd', '%s %s%s' % (
             kernel.kimg,
             ' '.join(quote_karg(a).replace(',', ',,') for a in kernelargs),
