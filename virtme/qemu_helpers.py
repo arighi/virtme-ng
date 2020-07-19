@@ -9,9 +9,13 @@ import os
 import re
 import shutil
 import subprocess
+from typing import Optional
 
 class Qemu(object):
-    def __init__(self, arch):
+    qemubin: str
+    version: Optional[str]
+
+    def __init__(self, arch) -> None:
         self.arch = arch
 
         qemubin = shutil.which('qemu-system-%s' % arch)
@@ -23,7 +27,7 @@ class Qemu(object):
         self.qemubin = qemubin
         self.version = None
 
-    def probe(self):
+    def probe(self) -> None:
         if self.version is None:
             self.version = subprocess.check_output([self.qemubin, '--version'])\
                                      .decode('utf-8')
@@ -34,7 +38,7 @@ class Qemu(object):
             self.has_multidevs = (
                 re.search(r'version (?:1\.|2\.|3\.|4\.[01][^\d])', self.version) is None)
 
-    def quote_optarg(self, a):
+    def quote_optarg(self, a: str) -> str:
         """Quote an argument to an option."""
         return a.replace(',', ',,')
 
