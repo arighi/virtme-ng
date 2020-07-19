@@ -6,9 +6,10 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import os
+from typing import List, Optional
 
 class Arch(object):
-    def __init__(self, name):
+    def __init__(self, name) -> None:
         self.virtmename = name
         self.qemuname = name
         self.linuxname = name
@@ -17,40 +18,40 @@ class Arch(object):
     defconfig_target = 'defconfig'
 
     @staticmethod
-    def serial_dev_name(index):
+    def serial_dev_name(index) -> str:
         return 'ttyS%d' % index
 
     @staticmethod
-    def qemuargs(is_native):
+    def qemuargs(is_native) -> List[str]:
         return []
 
     @staticmethod
-    def virtio_dev_type(virtiotype):
+    def virtio_dev_type(virtiotype) -> str:
         # Return a full name for a virtio device.  It would be
         # nice if QEMU abstracted this away, but it doesn't.
         return 'virtio-%s-pci' % virtiotype
 
     @staticmethod
-    def earlyconsole_args():
+    def earlyconsole_args() -> List[str]:
         return []
 
     @staticmethod
-    def serial_console_args():
+    def serial_console_args() -> List[str]:
         return []
 
     @staticmethod
-    def qemu_nodisplay_args():
+    def qemu_nodisplay_args() -> List[str]:
         return ['-vga', 'none', '-display', 'none']
 
     @staticmethod
-    def config_base():
+    def config_base() -> List[str]:
         return []
 
-    def kimg_path(self):
+    def kimg_path(self) -> str:
         return 'arch/%s/boot/bzImage' % self.linuxname
 
     @staticmethod
-    def dtb_path():
+    def dtb_path() -> Optional[str]:
         return None
 
 class Arch_unknown(Arch):
@@ -294,7 +295,7 @@ ARCHES = {arch.virtmename: arch for arch in [
     Arch_s390x(),
 ]}
 
-def get(arch):
+def get(arch: str) -> Arch:
     if arch in ARCHES:
         return ARCHES[arch]
     else:

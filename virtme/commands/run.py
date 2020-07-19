@@ -418,7 +418,7 @@ def do_it() -> int:
 
     has_script = False
 
-    def do_script(shellcmd, use_exec=False, show_boot_console=False):
+    def do_script(shellcmd: str, use_exec=False, show_boot_console=False) -> None:
         if args.graphics:
             arg_fail('scripts and --graphics are mutually exclusive')
 
