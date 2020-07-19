@@ -72,6 +72,7 @@ _GENERIC_CONFIG = [
     'CONFIG_VT=y',
     'CONFIG_UNIX98_PTYS=y',
     'CONFIG_EARLY_PRINTK=y',
+    'CONFIG_INOTIFY_USER=y',
     '',
     '# virtio-scsi support',
     'CONFIG_BLOCK=y',
