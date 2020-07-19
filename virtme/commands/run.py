@@ -236,13 +236,16 @@ def find_kernel_and_mods(arch, args) -> Kernel:
 
     return kernel
 
-def export_virtfs(qemu, arch, qemuargs, path, mount_tag, security_model='none', readonly=True) -> None:
+def export_virtfs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
+                  qemuargs: List[str], path: str,
+                  mount_tag: str, security_model='none', readonly=True) -> None:
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
     fsid = 'virtfs%d' % len(qemuargs)
-    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=%s%s' %
+    qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=%s%s%s' %
                      (fsid, qemu.quote_optarg(path),
-                      security_model, ',readonly' if readonly else '')])
+                      security_model, ',readonly' if readonly else '',
+                      ',multidevs=remap' if qemu.has_multidevs else '')])
     qemuargs.extend(['-device', '%s,fsdev=%s,mount_tag=%s' % (arch.virtio_dev_type('9p'), fsid, qemu.quote_optarg(mount_tag))])
 
 def quote_karg(arg: str) -> str:

@@ -30,6 +30,10 @@ class Qemu(object):
             self.cannot_overmount_virtfs = (
                 re.search(r'version 1\.[012345]', self.version) is not None)
 
+            # QEMU 4.2+ supports -fsdev multidevs=remap
+            self.has_multidevs = (
+                re.search(r'version (?:1\.|2\.|3\.|4\.[01][^\d])', self.version) is None)
+
     def quote_optarg(self, a):
         """Quote an argument to an option."""
         return a.replace(',', ',,')
