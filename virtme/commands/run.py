@@ -5,7 +5,7 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-from typing import Any, Optional, List, NoReturn, Dict
+from typing import Any, Optional, List, NoReturn, Dict, Tuple
 
 import argparse
 import tempfile
@@ -71,6 +71,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Allow the host to ask the guest to release memory.')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
                    help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
+    g.add_argument('--blk-disk', action='append', default=[], metavar='NAME=PATH',
+                   help='Add a read/write virtio-blk disk.  The device nodes will be /dev/disk/by-id/virtio-virtme_disk_blk_NAME.')
     g.add_argument('--memory', action='store', default=None,
                    help='Set guest memory and qemu -m flag.')
     g.add_argument('--name', action='store', default=None,
@@ -257,6 +259,19 @@ def quote_karg(arg: str) -> str:
     else:
         return arg
 
+# Validate name=path arguments from --disk and --blk-disk
+def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
+    namefile = arg.split('=', 1)
+    if len(namefile) != 2:
+        arg_fail('invalid argument to %s' % (func))
+    name, fn = namefile
+    if '=' in fn or ',' in fn:
+        arg_fail("%s filenames cannot contain '=' or ','" % (func))
+    if '=' in name or ',' in name:
+        arg_fail("%s device names cannot contain '=' or ','" % (func))
+
+    return name, fn
+
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.-]+'
 _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
@@ -400,19 +415,19 @@ def do_it() -> int:
     if args.memory:
         qemuargs.extend(['-m', args.memory])
 
+    if args.blk_disk:
+        for i,d in enumerate(args.blk_disk):
+            driveid = 'blk-disk%d' % i
+            name, fn = sanitize_disk_args('--blk-disk', d)
+            qemuargs.extend(['-drive', 'if=none,id=%s,file=%s' % (driveid, fn),
+                             '-device', 'virtio-blk-pci,drive=%s,serial=%s' % (driveid, name)])
+
     if args.disk:
         qemuargs.extend(['-device', '%s,id=scsi' % arch.virtio_dev_type('scsi')])
 
         for i,d in enumerate(args.disk):
-            namefile = d.split('=', 1)
-            if len(namefile) != 2:
-                arg_fail('invalid argument to --disk')
-            name,fn = namefile
-            if '=' in fn or ',' in fn:
-                arg_fail("--disk filenames cannot contain '=' or ','")
-            if '=' in name or ',' in name:
-                arg_fail("--disk device names cannot contain '=' or ','")
             driveid = 'disk%d' % i
+            name, fn = sanitize_disk_args('--disk', d)
             qemuargs.extend(['-drive', 'if=none,id=%s,file=%s' % (driveid, fn),
                              '-device', 'scsi-hd,drive=%s,vendor=virtme,product=disk,serial=%s' % (driveid, name)])
 
