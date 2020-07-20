@@ -71,6 +71,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Allow the host to ask the guest to release memory.')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
                    help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
+    g.add_argument('--blk-disk', action='append', default=[], metavar='NAME=PATH',
+                   help='Add a read/write virtio-blk disk.  The device nodes will be /dev/disk/by-id/virtio-virtme_disk_blk_NAME.')
     g.add_argument('--memory', action='store', default=None,
                    help='Set guest memory and qemu -m flag.')
     g.add_argument('--name', action='store', default=None,
@@ -409,6 +411,13 @@ def do_it() -> int:
 
     if args.memory:
         qemuargs.extend(['-m', args.memory])
+
+    if args.blk_disk:
+        for i,d in enumerate(args.blk_disk):
+            driveid = 'blk-disk%d' % i
+            name, fn = sanitize_disk_args('--blk-disk', d)
+            qemuargs.extend(['-drive', 'if=none,id=%s,file=%s' % (driveid, fn),
+                             '-device', 'virtio-blk-pci,drive=%s,serial=%s' % (driveid, name)])
 
     if args.disk:
         qemuargs.extend(['-device', '%s,id=scsi' % arch.virtio_dev_type('scsi')])
