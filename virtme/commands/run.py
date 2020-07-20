@@ -263,7 +263,7 @@ def quote_karg(arg: str) -> str:
 def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
     namefile = arg.split('=', 1)
     if len(namefile) != 2:
-        arg_fail('invalid argument to %s' % (func))
+        arg_fail('invalid argument to %s' % func)
     name, fn = namefile
     if '=' in fn or ',' in fn:
         arg_fail("%s filenames cannot contain '=' or ','" % (func))
