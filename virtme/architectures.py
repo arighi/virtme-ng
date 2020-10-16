@@ -165,12 +165,17 @@ class Arch_aarch64(Arch):
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
 
-        # Emulate a fully virtual system.
-        ret.extend(['-M', 'virt'])
+        if is_native:
+            ret.extend(['-M', 'virt,gic-version=host'])
+            ret.extend(['-cpu', 'host'])
+        else:
+            # Emulate a fully virtual system.
+            ret.extend(['-M', 'virt'])
 
-        # Despite being called qemu-system-aarch64, QEMU defaults to
-        # emulating a 32-bit CPU.  Override it.
-        ret.extend(['-cpu', 'cortex-a57'])
+            # Despite being called qemu-system-aarch64, QEMU defaults to
+            # emulating a 32-bit CPU.  Override it.
+            ret.extend(['-cpu', 'cortex-a57'])
+
 
         return ret
 
