@@ -113,7 +113,7 @@ def main():
 
     if args.allnoconfig:
         maketarget = 'allnoconfig'
-        updatetarget = 'silentoldconfig'
+        updatetarget = 'syncconfig'
     elif args.defconfig:
         maketarget = arch.defconfig_target
         updatetarget = 'olddefconfig'
