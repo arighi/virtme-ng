@@ -75,6 +75,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Add a read/write virtio-blk disk.  The device nodes will be /dev/disk/by-id/virtio-virtme_disk_blk_NAME.')
     g.add_argument('--memory', action='store', default=None,
                    help='Set guest memory and qemu -m flag.')
+    g.add_argument('--cpus', action='store', default=None,
+                   help='Set guest cpu and qemu -smp flag.')
     g.add_argument('--name', action='store', default=None,
                    help='Set guest hostname and qemu -name flag.')
 
@@ -414,6 +416,9 @@ def do_it() -> int:
 
     if args.memory:
         qemuargs.extend(['-m', args.memory])
+
+    if args.cpus:
+        qemuargs.extend(['-smp', args.cpus])
 
     if args.blk_disk:
         for i,d in enumerate(args.blk_disk):
