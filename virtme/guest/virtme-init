@@ -48,10 +48,10 @@ rm /tmp/fstab
 
 # Populate dummy entries in /etc/shadow to allow switching to any user defined
 # in the system
-touch /tmp/shadow
-chmod 0640 /tmp/shadow
-sed -e 's/^\([^:]\+\).*/\1:x:::::::/' < /etc/passwd > /tmp/shadow
+(umask 0644 && touch /tmp/shadow)
+sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /tmp/shadow
 mount --bind /tmp/shadow /etc/shadow
+rm /tmp/shadow
 
 # Find udevd
 if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
