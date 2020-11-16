@@ -40,6 +40,7 @@ fi
 
 mount -t tmpfs tmpfs /tmp/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
+[[ -w /var/tmp ]] || mount -t tmpfs tmpfs /var/tmp/
 
 # Fix up /etc a little bit
 touch /tmp/fstab
