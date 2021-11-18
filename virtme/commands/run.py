@@ -248,7 +248,7 @@ def export_virtfs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
     fsid = 'virtfs%d' % len(qemuargs)
     qemuargs.extend(['-fsdev', 'local,id=%s,path=%s,security_model=%s%s%s' %
                      (fsid, qemu.quote_optarg(path),
-                      security_model, ',readonly' if readonly else '',
+                      security_model, ',readonly=on' if readonly else '',
                       ',multidevs=remap' if qemu.has_multidevs else '')])
     qemuargs.extend(['-device', '%s,fsdev=%s,mount_tag=%s' % (arch.virtio_dev_type('9p'), fsid, qemu.quote_optarg(mount_tag))])
 
