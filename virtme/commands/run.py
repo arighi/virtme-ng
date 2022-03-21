@@ -387,9 +387,7 @@ def do_it() -> int:
         qemuargs.extend(['-serial', 'none'])
         qemuargs.extend(['-chardev', 'stdio,id=console,signal=off,mux=on'])
 
-        # We should be using the new-style -device serialdev,chardev=xyz,
-        # but many architecture-specific serial devices don't support that.
-        qemuargs.extend(['-serial', 'chardev:console'])
+        qemuargs.extend(arch.qemu_serial_console_args())
 
         qemuargs.extend(['-mon', 'chardev=console'])
 
