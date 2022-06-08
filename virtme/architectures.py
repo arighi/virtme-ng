@@ -200,9 +200,9 @@ class Arch_aarch64(Arch):
     def kimg_path(self):
         return 'arch/arm64/boot/Image'
 
-class Arch_ppc64(Arch):
-    def __init__(self):
-        Arch.__init__(self, 'ppc64')
+class Arch_ppc(Arch):
+    def __init__(self, name):
+        Arch.__init__(self, name)
 
         self.defconfig_target = 'ppc64e_defconfig'
         self.qemuname = 'ppc64le'
@@ -350,7 +350,8 @@ ARCHES = {arch.virtmename: arch for arch in [
     Arch_x86('i386'),
     Arch_arm(),
     Arch_aarch64(),
-    Arch_ppc64(),
+    Arch_ppc('ppc64'),
+    Arch_ppc('ppc64le'),
     Arch_riscv64(),
     Arch_sparc64(),
     Arch_s390x(),
