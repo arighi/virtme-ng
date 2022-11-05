@@ -1,0 +1,11 @@
+This package was debianized by Andrea Righi <andrea.righi@canonical.com> on
+Sat, 05 Nov 2022 10:53:33 +0100.
+
+It was downloaded from https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
+
+Upstream Author: Andy Lutomirski <luto@kernel.org>
+
+Files: *
+Copyright: Andy Lutomirski <luto@kernel.org>
+License: GPL-2
+Homepage: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git

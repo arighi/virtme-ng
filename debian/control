@@ -1,0 +1,16 @@
+Source: virtme
+Section: misc
+Priority: optional
+Maintainer: Andrea Righi <andrea.righi@canonical.com>
+Build-Depends: debhelper (>= 11)
+Build-Depends-Indep: dh-python, python3, python3-six, asciidoc, xmlto
+Homepage:  https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
+Vcs-Git:  https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
+
+Package: virtme
+Architecture: any
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, qemu-kvm
+Description: Virtualize the running distro or a simple rootfs
+ Virtme is a set of simple tools to run a virtualized Linux kernel that
+ uses the host Linux distribution or a simple rootfs instead of a whole
+ disk image.
