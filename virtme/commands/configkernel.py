@@ -88,6 +88,9 @@ _GENERIC_CONFIG = [
     'CONFIG_WATCHDOG=y',
     'CONFIG_WATCHDOG_CORE=y',
     'CONFIG_I6300ESB_WDT=y',
+
+    '# Make sure debuginfo are available',
+    'CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y',
 ]
 
 def main():
