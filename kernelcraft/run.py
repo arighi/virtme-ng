@@ -22,8 +22,8 @@ def make_parser():
     parser.add_argument('--opts', '-o', action='store', metavar='OPTS',
             help='Additional options passed to virtme-run')
 
-    parser.add_argument('--resume', '-u', action='store_true',
-            help='Start the previosly generated kernel')
+    parser.add_argument('--local', '-l', action='store_true',
+            help='Start the previously generated kernel')
 
     return parser
 
@@ -119,10 +119,10 @@ def main():
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(str(Path.home()) + '/.kernelcraft')
-    if not args.resume:
+    if not args.local:
         ks.checkout(args.release, args.commit)
         ks.config()
-        ks.make()
+    ks.make()
     ks.run()
 
 if __name__ == '__main__':
