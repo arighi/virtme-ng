@@ -1,3 +1,9 @@
+virtme (0.0.1-2) kinetic; urgency=medium
+
+  * Add python3-setuptools dependency
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sun, 06 Nov 2022 11:05:47 +0100
+
 virtme (0.0.1-1) kinetic; urgency=low
 
   * Initial build
