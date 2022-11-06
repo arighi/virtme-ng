@@ -92,6 +92,9 @@ _GENERIC_CONFIG = [
     '# Make sure debuginfo are available',
     'CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y',
 
+    '# Enable overlayfs',
+    'CONFIG_OVERLAY_FS=y',
+
     '# Unnecessary configs',
     '# CONFIG_DRM is not set',
     '# CONFIG_SOUND is not set',
@@ -100,6 +103,8 @@ _GENERIC_CONFIG = [
     '# CONFIG_NFS_FS is not set',
     '# CONFIG_IPV6 is not set',
     '# CONFIG_SECURITY_SELINUX is not set',
+    '# CONFIG_WIRELESS is not set',
+    '# CONFIG_WLAN is not set',
 ]
 
 def main():
