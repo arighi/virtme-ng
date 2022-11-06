@@ -1,4 +1,4 @@
-Source: virtme
+Source: kernelcraft
 Section: misc
 Priority: optional
 Maintainer: Andrea Righi <andrea.righi@canonical.com>
@@ -7,10 +7,11 @@ Build-Depends-Indep: dh-python, python3, python3-six, python3-setuptools
 Homepage:  https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
 Vcs-Git:  https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
 
-Package: virtme
+Package: kernelcraft
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, qemu-kvm
-Description: Virtualize the running distro or a simple rootfs
- Virtme is a set of simple tools to run a virtualized Linux kernel that
- uses the host Linux distribution or a simple rootfs instead of a whole
- disk image.
+Depends: ${shlibs:Depends}, ${misc:Depends}, ${python3:Depends}, virtme
+Description: Tool to help kernel development, testing and debugging
+ KernelCraft is a tool that allows to setup a lab to experiment different
+ kernel versions in a safe virtualized environment, re-using the entire
+ filesystem of the running machine as a safe live-copy, without affecting
+ the real filesystem of the host.
