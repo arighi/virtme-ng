@@ -42,6 +42,13 @@ mount -t tmpfs tmpfs /tmp/
 [[ -w /var/log ]] || mount -t tmpfs tmpfs /var/log/
 [[ -w /var/tmp ]] || mount -t tmpfs tmpfs /var/tmp/
 
+# Additional dirs used by systemd
+[[ -w /var/spool/rsyslog ]] || mount -t tmpfs tmpfs /var/spool/rsyslog
+[[ -w /var/lib/portables ]] || mount -t tmpfs tmpfs /var/lib/portables
+[[ -w /var/lib/machines ]] || mount -t tmpfs tmpfs /var/lib/machines
+[[ -w /var/lib/private ]] || mount -t tmpfs tmpfs /var/lib/private
+[[ -w /var/cache/private ]] || mount -t tmpfs tmpfs /var/cache/private
+
 # Fix up /etc a little bit
 touch /tmp/fstab
 mount --bind /tmp/fstab /etc/fstab
