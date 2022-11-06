@@ -1,3 +1,17 @@
+virtme (0.0.1-2ubuntu1) kinetic; urgency=medium
+
+  * Add custom features required by kernelcraft:
+    - virtme-init: use overlayfs to make /home write-able (as a live snapshot)
+    - virtme-init: make additional directories required by systemd write-able
+    - virtme-configkernel: enable Rust support when possible
+    - virtme-configkernel: enable overlayfs
+    - virtme-configkernel: drop configs that are not usually required
+    - virtme-configkernel: make sure debuginfo are available
+    - virtme-init: make /var/tmp write-able
+    - virtme-init: add /usr/local/bin to $PATH
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sun, 06 Nov 2022 16:46:51 +0100
+
 virtme (0.0.1-2) kinetic; urgency=medium
 
   * Add python3-setuptools dependency
