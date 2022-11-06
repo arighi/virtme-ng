@@ -181,6 +181,15 @@ fi
 # Bring up networking
 ip link set dev lo up
 
+if [[ -n "virtme_user" ]]; then
+    real_sudoers=/etc/sudoers
+    tmpfile="`mktemp --tmpdir=/tmp`"
+    echo "${virtme_user} ALL = (ALL) NOPASSWD: ALL" > $tmpfile
+    chmod 440 "$tmpfile"
+    mount --bind "$tmpfile" "$real_sudoers"
+    rm "$tmpfile"
+fi
+
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     real_resolv_conf=/etc/resolv.conf
     if [[ -L "$real_resolv_conf" ]]; then
@@ -263,7 +272,10 @@ while true; do
 	stty ${virtme_stty_con} <"/dev/$consdev"
     fi
 
-    setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
+    if [[ -z "virtme_user" ]]; then
+        virtme_user=root
+    fi
+    setsid bash -c "su - ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
     echo "Shell died.  Will respawn."
     sleep 0.5
 done
