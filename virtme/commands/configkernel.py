@@ -95,6 +95,10 @@ _GENERIC_CONFIG = [
     '# Enable overlayfs',
     'CONFIG_OVERLAY_FS=y',
 
+    '# Enable Rust if possible',
+    'CONFIG_RUST=y',
+    'CONFIG_INIT_STACK_NONE=y',
+
     '# Unnecessary configs',
     '# CONFIG_DRM is not set',
     '# CONFIG_SOUND is not set',
