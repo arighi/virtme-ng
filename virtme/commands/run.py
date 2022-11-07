@@ -115,7 +115,7 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument('--show-boot-console', action='store_true',
                    help='Show the boot console when running scripts')
 
-    g = parser.add_argument_group(title='Guest userspace configuration')
+    g = parser.add_argument_group(title='Guest userspace configuration').add_mutually_exclusive_group()
     g.add_argument('--pwd', action='store_true',
                    help='Propagate current working directory to the guest')
     g.add_argument('--cwd', action='store',
