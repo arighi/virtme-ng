@@ -3,27 +3,32 @@ import os
 import sys
 import socket
 import shutil
-import subprocess
+from subprocess import call, check_call, DEVNULL
 from pathlib import Path
 
+VERSION = '0.0.1'
 KERNEL_DIR = str()
 
 def make_parser():
     parser = argparse.ArgumentParser(
         description='Craft and test a specific kernel',
     )
+    parser.add_argument('--version', '-v', action='version', version=f'%(prog)s {VERSION}')
 
-    parser.add_argument('--release', '-r', action='store', metavar='RELEASE',
+    ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group(required=True)
+
+    ga.add_argument('--release', '-r', action='store',
             help='Use a kernel from a specific Ubuntu release or upstream')
 
-    parser.add_argument('--commit', '-c', action='store', metavar='COMMIT',
-            help='Use a kernel identified by a specific commit id or tag (default is HEAD)')
+    ga.add_argument('--local', '-l', action='store_true',
+            help='Use a local branch/tag/commit of a previously generated kernel')
 
-    parser.add_argument('--opts', '-o', action='store', metavar='OPTS',
+    parser.add_argument('--commit', '-c', action='store',
+            nargs='?', default='HEAD', const='HEAD',
+            help='Use a kernel identified by a specific commit id, tag or branch (default is HEAD)')
+
+    parser.add_argument('--opts', '-o', action='store',
             help='Additional options passed to virtme-run')
-
-    parser.add_argument('--local', '-l', action='store_true',
-            help='Start the previously generated kernel')
 
     return parser
 
@@ -85,45 +90,48 @@ class KernelSource:
         if not os.path.exists(srcdir):
            os.makedirs(srcdir)
            os.chdir(srcdir)
-           subprocess.check_call(['git', 'init'])
+           check_call(['git', 'init'])
         self.cpus = str(os.cpu_count())
         os.chdir(srcdir)
         self.srcdir = srcdir
 
-    def checkout(self, release, commit=None):
-        if not release in UBUNTU_RELEASE:
-            sys.stderr.write(f"ERROR: unknown release {release}\n")
-        if subprocess.call(['git', 'remote', 'get-url', release], stderr=subprocess.DEVNULL):
-            repo_url = UBUNTU_RELEASE[release]['repo']
-            subprocess.check_call(['git', 'remote', 'add', release, repo_url])
-        subprocess.check_call(['git', 'fetch', release])
-        target = commit or (release + '/' + UBUNTU_RELEASE[release]['branch'])
-        subprocess.check_call(['git', 'reset', '--hard', target])
+    def checkout(self, release, commit=None, local=None):
+        if not local:
+            if not release in UBUNTU_RELEASE:
+                sys.stderr.write(f"ERROR: unknown release {release}\n")
+            if call(['git', 'remote', 'get-url', release], stderr=DEVNULL):
+                repo_url = UBUNTU_RELEASE[release]['repo']
+                check_call(['git', 'remote', 'add', release, repo_url])
+            check_call(['git', 'fetch', release])
+            target = commit or (release + '/' + UBUNTU_RELEASE[release]['branch'])
+        else:
+            target = commit
+        check_call(['git', 'reset', '--hard', target])
 
     def config(self):
-        subprocess.check_call(['virtme-configkernel', '--defconfig'])
+        check_call(['virtme-configkernel', '--defconfig'])
 
     def make(self):
-        subprocess.check_call(['make', '-j', self.cpus])
+        check_call(['make', '-j', self.cpus])
 
-    def run(self):
+    def run(self, opts):
         hostname = socket.gethostname()
         username = os.getlogin()
         # Disable kaslr because it may break debugging tools
-        opts = '-a nokaslr'
+        if not opts:
+            opts = '-a nokaslr'
         # Start VM using virtme
-        cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto -a nokaslr --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
-        subprocess.check_call([str(c) for c in cmd.split(' ')])
+        cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        check_call([str(c) for c in cmd.split(' ')])
 
 def main():
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(str(Path.home()) + '/.kernelcraft')
-    if not args.local:
-        ks.checkout(args.release, args.commit)
-        ks.config()
+    ks.checkout(args.release, args.commit, args.local)
+    ks.config()
     ks.make()
-    ks.run()
+    ks.run(args.opts)
 
 if __name__ == '__main__':
     exit(main())
