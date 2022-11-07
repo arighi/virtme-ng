@@ -117,12 +117,10 @@ class KernelSource:
     def run(self, opts):
         hostname = socket.gethostname()
         username = os.getlogin()
-        # Disable kaslr because it may break debugging tools
-        if not opts:
-            opts = '-a nokaslr'
+        opts = opts or ''
         # Start VM using virtme
         cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
-        check_call([str(c) for c in cmd.split(' ')])
+        check_call(list(filter(None, cmd.split(' '))))
 
 def main():
     args = _ARGPARSER.parse_args()
