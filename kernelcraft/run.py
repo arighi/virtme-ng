@@ -95,7 +95,8 @@ class KernelSource:
         username = os.getlogin()
         opts = opts or ''
         # Start VM using virtme
-        cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
+        cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
     def clean(self):
