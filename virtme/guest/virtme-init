@@ -259,6 +259,7 @@ echo "virtme-init: console is $consdev"
 # Set up a basic environment
 install -d -m 0755 /tmp/roothome
 export HOME=/tmp/roothome
+mount --bind /tmp/roothome /root
 
 # Bring up a functioning shell on the console.  This is a bit magical:
 # We have no controlling terminal because we're attached to a fake
