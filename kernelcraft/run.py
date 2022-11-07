@@ -16,13 +16,10 @@ def make_parser():
     )
     parser.add_argument('--version', '-v', action='version', version=f'%(prog)s {VERSION}')
 
-    ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group(required=True)
+    ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
     ga.add_argument('--release', '-r', action='store',
             help='Use a kernel from a specific Ubuntu release or upstream')
-
-    ga.add_argument('--local', '-l', action='store_true',
-            help='Use a local branch/tag/commit of a previously generated kernel')
 
     ga.add_argument('--clean', '-x', action='store_true',
             help='Clean the local kernel repository')
@@ -70,8 +67,8 @@ class KernelSource:
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
 
-    def checkout(self, release, commit=None, local=None):
-        if not local:
+    def checkout(self, release, commit=None):
+        if release:
             if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
                 sys.exit(1)
@@ -113,7 +110,7 @@ def main():
         ks.clean()
     else:
         if not args.skip_build:
-            ks.checkout(args.release, args.commit, args.local)
+            ks.checkout(args.release, args.commit)
             ks.config(args.config)
             ks.make()
         ks.run(args.opts)
