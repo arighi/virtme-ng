@@ -124,6 +124,7 @@ _GENERIC_CONFIG = [
     '# CONFIG_USB is not set',
     '# CONFIG_NFS_FS is not set',
     '# CONFIG_IPV6 is not set',
+    '# CONFIG_AUDIT is not set',
     '# CONFIG_SECURITY is not set',
     '# CONFIG_WIRELESS is not set',
     '# CONFIG_WLAN is not set',
