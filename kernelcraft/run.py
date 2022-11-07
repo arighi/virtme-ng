@@ -2,12 +2,13 @@ import argparse
 import os
 import sys
 import socket
-import shutil
+import pkg_resources
+import json
 from subprocess import call, check_call, DEVNULL
 from pathlib import Path
+from shutil import copyfile
 
 VERSION = '0.0.1'
-KERNEL_DIR = str()
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -24,8 +25,7 @@ def make_parser():
             help='Use a local branch/tag/commit of a previously generated kernel')
 
     parser.add_argument('--commit', '-c', action='store',
-            nargs='?', default='HEAD', const='HEAD',
-            help='Use a kernel identified by a specific commit id, tag or branch (default is HEAD)')
+            help='Use a kernel identified by a specific commit id, tag or branch')
 
     parser.add_argument('--opts', '-o', action='store',
             help='Additional options passed to virtme-run')
@@ -39,54 +39,17 @@ def arg_fail(message):
     _ARGPARSER.print_usage()
     exit(1)
 
-UBUNTU_RELEASE = {
-    # Upstream kernels
-    'mainline': {
-        'repo': 'git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git',
-        'branch': 'master',
-    },
-    'next': {
-        'repo': 'git://git.kernel.org/pub/scm/linux/kernel/git/next/linux-next.git',
-        'branch': 'master',
-    },
-    'stable': {
-        'repo': 'git://git.kernel.org/pub/scm/linux/kernel/git/stable/linux.git',
-        'branch': 'master',
-    },
-
-    # Ubuntu kernels
-    'ubuntu-unstable': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/unstable',
-        'branch': 'master',
-    },
-    'ubuntu-kinetic': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/kinetic',
-        'branch': 'master-next',
-    },
-    'ubuntu-jammy': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/jammy',
-        'branch': 'master-next',
-    },
-    'ubuntu-focal': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/focal',
-        'branch': 'master-next',
-    },
-    'ubuntu-bionic': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/bionic',
-        'branch': 'master-next',
-    },
-    'ubuntu-xenial': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/xenial',
-        'branch': 'master-next',
-    },
-    'ubuntu-trusty': {
-        'repo': 'git://git.launchpad.net/~ubuntu-kernel/ubuntu/+source/linux/+git/trusty',
-        'branch': 'master-next',
-    },
-}
-
 class KernelSource:
     def __init__(self, srcdir):
+        # Initialize known kernels
+        conf = str(Path.home()) + '/.kernelcraft.conf'
+        if not Path(conf).exists():
+            default_conf = pkg_resources.resource_filename('kernelcraft', 'kernelcraft.conf')
+            copyfile(default_conf, conf)
+        with open(conf) as fd:
+            self.kernel_release = json.loads(fd.read())
+
+        # Initialize kernel source repo
         if not os.path.exists(srcdir):
            os.makedirs(srcdir)
            os.chdir(srcdir)
@@ -97,15 +60,16 @@ class KernelSource:
 
     def checkout(self, release, commit=None, local=None):
         if not local:
-            if not release in UBUNTU_RELEASE:
+            if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
+                sys.exit(1)
             if call(['git', 'remote', 'get-url', release], stderr=DEVNULL):
-                repo_url = UBUNTU_RELEASE[release]['repo']
+                repo_url = self.kernel_release[release]['repo']
                 check_call(['git', 'remote', 'add', release, repo_url])
             check_call(['git', 'fetch', release])
-            target = commit or (release + '/' + UBUNTU_RELEASE[release]['branch'])
+            target = commit or (release + '/' + self.kernel_release[release]['branch'])
         else:
-            target = commit
+            target = commit or 'HEAD'
         check_call(['git', 'reset', '--hard', target])
 
     def config(self):
