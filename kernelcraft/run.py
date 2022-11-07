@@ -24,6 +24,9 @@ def make_parser():
     ga.add_argument('--local', '-l', action='store_true',
             help='Use a local branch/tag/commit of a previously generated kernel')
 
+    ga.add_argument('--clean', '-x', action='store_true',
+            help='Clean the local kernel repository')
+
     parser.add_argument('--commit', '-c', action='store',
             help='Use a kernel identified by a specific commit id, tag or branch')
 
@@ -95,14 +98,20 @@ class KernelSource:
         cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
+    def clean(self):
+        check_call(['git', 'clean', '-xdf'])
+
 def main():
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(str(Path.home()) + '/.kernelcraft')
-    ks.checkout(args.release, args.commit, args.local)
-    ks.config(args.config)
-    ks.make()
-    ks.run(args.opts)
+    if args.clean:
+        ks.clean()
+    else:
+        ks.checkout(args.release, args.commit, args.local)
+        ks.config(args.config)
+        ks.make()
+        ks.run(args.opts)
 
 if __name__ == '__main__':
     exit(main())
