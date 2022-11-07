@@ -27,6 +27,9 @@ def make_parser():
     parser.add_argument('--commit', '-c', action='store',
             help='Use a kernel identified by a specific commit id, tag or branch')
 
+    parser.add_argument('--config', '-f', action='store',
+            help='Use a specific kernel .config snippet to override default config settings')
+
     parser.add_argument('--opts', '-o', action='store',
             help='Additional options passed to virtme-run')
 
@@ -58,6 +61,9 @@ class KernelSource:
         os.chdir(srcdir)
         self.srcdir = srcdir
 
+    def _format_cmd(self, cmd):
+        return list(filter(None, cmd.split(' ')))
+
     def checkout(self, release, commit=None, local=None):
         if not local:
             if not release in self.kernel_release:
@@ -72,8 +78,11 @@ class KernelSource:
             target = commit or 'HEAD'
         check_call(['git', 'reset', '--hard', target])
 
-    def config(self):
-        check_call(['virtme-configkernel', '--defconfig'])
+    def config(self, config):
+        cmd = 'virtme-configkernel --defconfig'
+        if config:
+            cmd += f' --custom {config}'
+        check_call(self._format_cmd(cmd))
 
     def make(self):
         check_call(['make', '-j', self.cpus])
@@ -84,14 +93,14 @@ class KernelSource:
         opts = opts or ''
         # Start VM using virtme
         cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
-        check_call(list(filter(None, cmd.split(' '))))
+        check_call(self._format_cmd(cmd))
 
 def main():
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(str(Path.home()) + '/.kernelcraft')
     ks.checkout(args.release, args.commit, args.local)
-    ks.config()
+    ks.config(args.config)
     ks.make()
     ks.run(args.opts)
 
