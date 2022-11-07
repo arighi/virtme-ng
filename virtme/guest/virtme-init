@@ -275,7 +275,11 @@ while true; do
     if [[ -z "virtme_user" ]]; then
         virtme_user=root
     fi
-    setsid bash -c "su - ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
+    if [[ -n "${virtme_user}" ]]; then
+        setsid bash -c "su - ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
+    else
+        setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
+    fi
     echo "Shell died.  Will respawn."
     sleep 0.5
 done
