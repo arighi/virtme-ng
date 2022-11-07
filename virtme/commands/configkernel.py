@@ -26,6 +26,9 @@ def make_parser():
                         default=uname.machine,
                         help='Target architecture')
 
+    parser.add_argument('--custom', action='store', metavar='CUSTOM',
+                        help='Use a custom config snippet file to override specific config options')
+
     g = parser.add_argument_group(title='Mode').add_mutually_exclusive_group()
 
     g.add_argument('--allnoconfig', action='store_true',
@@ -142,9 +145,15 @@ def main():
 
     arch = architectures.get(args.arch)
 
+    custom_conf = []
+    if args.custom:
+        with open(args.custom) as fd:
+            custom_conf = list(fd.readlines())
+
     conf = (_GENERIC_CONFIG +
             ['# Arch-specific options'] +
-            arch.config_base())
+            arch.config_base() +
+            custom_conf)
 
     archargs = ['ARCH=%s' % shlex.quote(arch.linuxname)]
 
