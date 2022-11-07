@@ -127,6 +127,8 @@ _GENERIC_CONFIG = [
     '# CONFIG_SECURITY is not set',
     '# CONFIG_WIRELESS is not set',
     '# CONFIG_WLAN is not set',
+    '# CONFIG_SCHED_MC is not set',
+    '# CONFIG_CPU_FREQ is not set',
 ]
 
 def main():
