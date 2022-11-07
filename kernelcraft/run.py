@@ -27,6 +27,9 @@ def make_parser():
     ga.add_argument('--clean', '-x', action='store_true',
             help='Clean the local kernel repository')
 
+    ga.add_argument('--skip-build', '-s', action='store_true',
+            help='Start the previously compiled kernel without trying to rebuild it')
+
     parser.add_argument('--commit', '-c', action='store',
             help='Use a kernel identified by a specific commit id, tag or branch')
 
@@ -109,9 +112,10 @@ def main():
     if args.clean:
         ks.clean()
     else:
-        ks.checkout(args.release, args.commit, args.local)
-        ks.config(args.config)
-        ks.make()
+        if not args.skip_build:
+            ks.checkout(args.release, args.commit, args.local)
+            ks.config(args.config)
+            ks.make()
         ks.run(args.opts)
 
 if __name__ == '__main__':
