@@ -4,6 +4,7 @@ import sys
 import socket
 import pkg_resources
 import json
+import tempfile
 from subprocess import call, check_call, DEVNULL
 from pathlib import Path
 from shutil import copyfile
@@ -23,6 +24,9 @@ def make_parser():
 
     ga.add_argument('--clean', '-x', action='store_true',
             help='Clean the local kernel repository')
+
+    ga.add_argument('--dump', '-d', action='store_true',
+            help='Generate a memory dump of the running kernel')
 
     ga.add_argument('--skip-build', '-s', action='store_true',
             help='Start the previously compiled kernel without trying to rebuild it')
@@ -99,6 +103,32 @@ class KernelSource:
         cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
+    def dump(self):
+        # Use QMP to generate a memory dump
+        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        s.connect(('localhost', 3636))
+        data = s.recv(1024)
+        if not data:
+            exit(1)
+        print(data)
+        s.send("{ \"execute\": \"qmp_capabilities\" }\r".encode('utf-8'))
+        data = s.recv(1024)
+        if not data:
+            exit(1)
+        print(data)
+        with tempfile.NamedTemporaryFile() as tmp:
+            msg = "{\"execute\":\"dump-guest-memory\",\"arguments\":{\"paging\":false,\"protocol\":\"file:" + tmp.name + "\"}}\r"
+            print(msg)
+            s.send(msg.encode('utf-8'))
+            data = s.recv(1024)
+            if not data:
+                exit(1)
+            print(data)
+            data = s.recv(1024)
+            print(data)
+            # Use crash to inspect the memory dump
+            check_call(['crash', tmp.name, self.srcdir + '/vmlinux'])
+
     def clean(self):
         check_call(['git', 'clean', '-xdf'])
 
@@ -108,6 +138,8 @@ def main():
     ks = KernelSource(str(Path.home()) + '/.kernelcraft')
     if args.clean:
         ks.clean()
+    elif args.dump:
+        ks.dump()
     else:
         if not args.skip_build:
             ks.checkout(args.release, args.commit)
