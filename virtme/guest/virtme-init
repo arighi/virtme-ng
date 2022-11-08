@@ -25,6 +25,20 @@ for i in /sys/bus/virtio/drivers/9pnet_virtio/virtio*/mount_tag; do
     mount_tags["`sed '$s/\x00$//;' "$i"`"]=1
 done
 
+# Setup rw filesystem overlays
+mount -t tmpfs tmpfs /tmp/
+
+for tag in "${!virtme_rw_overlay@}"; do
+    td=`mktemp -d`
+    dir="${!tag}"
+    mount -t tmpfs none "$td"
+    mkdir "$td/cow" "$td/work"
+    mount -t overlay -o "lowerdir=$dir,upperdir=$td/cow,workdir=$td/work" cow "$dir"
+    umount "$td"
+    rmdir "$td"
+done
+
+# Setup kernel modules
 kver="`uname -r`"
 
 if [[ -n "$virtme_root_mods" ]]; then
@@ -38,29 +52,18 @@ elif [[ -d "/lib/modules/$kver" ]]; then
     mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
 fi
 
-mount -t tmpfs tmpfs /tmp/
-
-for tag in "${!virtme_rw_overlay@}"; do
-    td=`mktemp -d`
-    dir="${!tag}"
-    mount -t tmpfs none "$td"
-    mkdir "$td/cow" "$td/work"
-    mount -t overlay -o "lowerdir=$dir,upperdir=$td/cow,workdir=$td/work" cow "$dir"
-    umount "$td"
-    rmdir "$td"
-done
-
+# Setup rw tmpfs directories
 mount -t tmpfs tmpfs /var/log/
 mount -t tmpfs tmpfs /var/tmp/
 
-# Additional dirs used by systemd
+# Additional rw dirs used by systemd
 mount -t tmpfs tmpfs /var/spool/rsyslog
 mount -t tmpfs tmpfs /var/lib/portables
 mount -t tmpfs tmpfs /var/lib/machines
 mount -t tmpfs tmpfs /var/lib/private
 mount -t tmpfs tmpfs /var/cache/private
 
-# Additional dirs required by apt
+# Additional rw dirs required by apt
 mount -t tmpfs tmpfs /var/lib/apt
 mount -t tmpfs tmpfs /var/cache
 
