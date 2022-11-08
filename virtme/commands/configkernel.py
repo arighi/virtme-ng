@@ -121,6 +121,7 @@ _GENERIC_CONFIG = [
     'CONFIG_INIT_STACK_NONE=y',
 
     '# Unnecessary configs',
+    '# CONFIG_LOCALVERSION_AUTO is not set',
     '# CONFIG_DRM is not set',
     '# CONFIG_SOUND is not set',
     '# CONFIG_HID is not set',
