@@ -95,6 +95,9 @@ _GENERIC_CONFIG = [
     '# Make sure debuginfo are available',
     'CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y',
 
+    '# Provide USB support as module',
+    'CONFIG_USB=m'
+
     '# Enable overlayfs',
     'CONFIG_OVERLAY_FS=y',
 
@@ -125,7 +128,6 @@ _GENERIC_CONFIG = [
     '# CONFIG_DRM is not set',
     '# CONFIG_SOUND is not set',
     '# CONFIG_HID is not set',
-    '# CONFIG_USB is not set',
     '# CONFIG_NFS_FS is not set',
     '# CONFIG_IPV6 is not set',
     '# CONFIG_AUDIT is not set',
