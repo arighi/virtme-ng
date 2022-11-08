@@ -65,7 +65,7 @@ def arg_fail(message):
 REMOTE_BUILD_SCRIPT = '''#!/bin/bash
 cd ~/.kernelcraft
 git reset --hard __kernelcraft__
-{} make -j$(nproc --all)
+{} make -j$(nproc --all) LOCALVERSION=-kc
 '''
 
 class KernelSource:
@@ -112,7 +112,7 @@ class KernelSource:
 
     def make(self, build_host, build_host_exec_prefix, build_host_vmlinux):
         if not build_host:
-            check_call(['make', '-j', self.cpus])
+            check_call(['make', '-j', self.cpus, 'LOCALVERSION=-kc'])
             return
         check_call(['ssh', build_host,
                     'mkdir -p ~/.kernelcraft'])
@@ -140,7 +140,7 @@ class KernelSource:
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name])
-        check_call(['make', '-j', self.cpus, 'modules_prepare'])
+        check_call(['make', '-j', self.cpus, 'modules_prepare', 'LOCALVERSION=-kc'])
 
     def run(self, opts):
         hostname = socket.gethostname()
