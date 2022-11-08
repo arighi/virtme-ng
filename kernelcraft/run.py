@@ -2,6 +2,7 @@ import argparse
 import os
 import sys
 import socket
+import shutil
 import pkg_resources
 import json
 import tempfile
@@ -26,7 +27,10 @@ def make_parser():
             help='Clean the local kernel repository')
 
     ga.add_argument('--dump', '-d', action='store_true',
-            help='Generate a memory dump of the running kernel')
+            help='Generate a memory dump of the running kernel and inspect it')
+
+    parser.add_argument('--dump-file', action='store',
+            help='Generate a memory dump of the running kernel to a target file')
 
     ga.add_argument('--skip-build', '-s', action='store_true',
             help='Start the previously compiled kernel without trying to rebuild it')
@@ -136,6 +140,7 @@ class KernelSource:
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name])
+        check_call(['make', '-j', self.cpus, 'modules_prepare'])
 
     def run(self, opts):
         hostname = socket.gethostname()
@@ -146,7 +151,7 @@ class KernelSource:
         cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
-    def dump(self):
+    def dump(self, dump_file):
         # Use QMP to generate a memory dump
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(('localhost', 3636))
@@ -169,8 +174,12 @@ class KernelSource:
             print(data)
             data = s.recv(1024)
             print(data)
-            # Use crash to inspect the memory dump
-            check_call(['crash', tmp.name, self.srcdir + '/vmlinux'])
+            if dump_file:
+                # Save memory dump to target file
+                shutil.move(tmp.name, dump_file)
+            else:
+                # Use crash to inspect the memory dump
+                check_call(['crash', tmp.name, self.srcdir + '/vmlinux'])
 
     def clean(self):
         check_call(['git', 'clean', '-xdf'])
@@ -182,7 +191,7 @@ def main():
     if args.clean:
         ks.clean()
     elif args.dump:
-        ks.dump()
+        ks.dump(args.dump_file)
     else:
         if not args.skip_build:
             ks.checkout(args.release, args.commit)
