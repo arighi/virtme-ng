@@ -40,6 +40,15 @@ def make_parser():
     parser.add_argument('--opts', '-o', action='store',
             help='Additional options passed to virtme-run')
 
+    parser.add_argument('--build-host', '-b', action='store',
+            help='Perform kernel build on a remote server (ssh access required)')
+
+    parser.add_argument('--build-host-exec-prefix', action='store',
+            help='Prepend a command (e.g., chroot) to the make command executed on the remote build host')
+
+    parser.add_argument('--build-host-vmlinux', action='store_true',
+            help='Copy vmlinux back from the build host')
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -48,6 +57,12 @@ def arg_fail(message):
     print(message)
     _ARGPARSER.print_usage()
     exit(1)
+
+REMOTE_BUILD_SCRIPT = '''#!/bin/bash
+cd ~/.kernelcraft
+git reset --hard __kernelcraft__
+{} make -j$(nproc --all)
+'''
 
 class KernelSource:
     def __init__(self, srcdir):
@@ -91,8 +106,36 @@ class KernelSource:
             cmd += f' --custom {config}'
         check_call(self._format_cmd(cmd))
 
-    def make(self):
-        check_call(['make', '-j', self.cpus])
+    def make(self, build_host, build_host_exec_prefix, build_host_vmlinux):
+        if not build_host:
+            check_call(['make', '-j', self.cpus])
+            return
+        check_call(['ssh', build_host,
+                    'mkdir -p ~/.kernelcraft'])
+        check_call(['ssh', build_host,
+                    'git init ~/.kernelcraft'])
+        check_call(['git', 'push', '--force', f"{build_host}:~/.kernelcraft",
+                    'HEAD:__kernelcraft__', ])
+        cmd = f'rsync {self.srcdir}/.config {build_host}:.kernelcraft/.config'
+        check_call(self._format_cmd(cmd))
+        # Create remote build script
+        with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
+            tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or ''))
+            tmp.flush()
+            cmd = f'rsync {tmp.name} {build_host}:.kernelcraft/.kc-build'
+            check_call(self._format_cmd(cmd))
+        # Execute remote build script
+        check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'])
+        # Copy artifacts back to the running host
+        with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
+            if build_host_vmlinux:
+                vmlinux = '--include=vmlinux'
+            else:
+                vmlinux = ''
+            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ {self.srcdir}/'
+            tmp.write(cmd)
+            tmp.flush()
+            check_call(['bash', tmp.name])
 
     def run(self, opts):
         hostname = socket.gethostname()
@@ -144,7 +187,7 @@ def main():
         if not args.skip_build:
             ks.checkout(args.release, args.commit)
             ks.config(args.config)
-            ks.make()
+            ks.make(args.build_host, args.build_host_exec_prefix, args.build_host_vmlinux)
         ks.run(args.opts)
 
 if __name__ == '__main__':
