@@ -67,6 +67,7 @@ Depends:
  fonts-noto-cjk,
  latexmk,
  librsvg2-bin,
+ fakeroot,
 Description: Tool to help kernel development, testing and debugging
  KernelCraft is a tool that allows to setup a lab to experiment different
  kernel versions in a safe virtualized environment, re-using the entire

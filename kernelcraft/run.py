@@ -65,6 +65,7 @@ def arg_fail(message):
 REMOTE_BUILD_SCRIPT = '''#!/bin/bash
 cd ~/.kernelcraft
 git reset --hard __kernelcraft__
+[ -f debian/rules ] && fakeroot debian/rules clean
 {} make -j$(nproc --all) LOCALVERSION=-kc
 '''
 
@@ -140,6 +141,8 @@ class KernelSource:
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name])
+        if os.path.exists(self.srcdir + '/debian/rules'):
+            check_call(['fakeroot', 'debian/rules', 'clean'])
         check_call(['make', '-j', self.cpus, 'modules_prepare', 'LOCALVERSION=-kc'])
 
     def run(self, opts):
