@@ -51,6 +51,13 @@ Examples
    $ kc -r next --build-host arighi@builder \
      --build-host-exec-prefix 'PATH=/var/lib/rust-for-linux/bin:$PATH'
 
+ - Test the tip of the latest mainline kernel, building the kernel on a remote
+   build host called "builder", running make inside a specific build chroot
+   (managed remotely by schroot):
+
+   $ kc -r mainline --build-host builder \
+     --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
+
 Implementation details
 ======================
 
