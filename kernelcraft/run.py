@@ -164,7 +164,7 @@ class KernelSource:
         if not data:
             exit(1)
         print(data)
-        with tempfile.NamedTemporaryFile() as tmp:
+        with tempfile.NamedTemporaryFile(delete=(dump_file is None)) as tmp:
             msg = "{\"execute\":\"dump-guest-memory\",\"arguments\":{\"paging\":false,\"protocol\":\"file:" + tmp.name + "\"}}\r"
             print(msg)
             s.send(msg.encode('utf-8'))
