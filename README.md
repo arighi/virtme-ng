@@ -34,38 +34,45 @@ Examples
 ========
 
  - Build and run v6.1-rc3 from the public mainline git repository:
-
+```
    $ kc -r mainline -c v6.1-rc3
+```
 
  - Build and run a kernel 2 commits before the previously compiled kernel:
-
+```
    $ kc --commit HEAD~2
+```
 
  - Test the previously built kernel:
-
+```
    $ kc -s
+```
 
  - Generate and inspect a memory dump of the currently tested kernel (crash
    tool needs to be installed):
-
+```
    $ kc -d
+```
 
  - Save a memory dump of the running kernel to /tmp/vmcore.img
-
+```
    $ kc -d --dump-file /tmp/vmcore.img
+```
 
  - Test the tip of linux-next, building the kernel on a remote build host
    called "builder", including /var/lib/rust-for-linux/bin to the default PATH:
-
+```
    $ kc -r next --build-host arighi@builder \
      --build-host-exec-prefix 'PATH=/var/lib/rust-for-linux/bin:$PATH'
+```
 
  - Test the tip of the latest mainline kernel, building the kernel on a remote
    build host called "builder", running make inside a specific build chroot
    (managed remotely by schroot):
-
+```
    $ kc -r mainline --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
+```
 
 Implementation details
 ======================
