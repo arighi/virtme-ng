@@ -21,6 +21,15 @@ Kernels produced with KernelCraft are lacking lots of features, in order to
 reduce the build time to the minimum and still provide you a usable kernel
 capable of running your tests and experiments.
 
+Requirements
+============
+
+KernelCraft requires a customized version of virtme, available here
+[web][arighi-virtme].
+
+You may also need to install `crash` to use the memory dump inspection feature
+(see example below).
+
 Examples
 ========
 
@@ -106,3 +115,4 @@ KernelCraft is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
+[arighi-virtme]: https://github.com/arighi/virtme "arighi virtme"
