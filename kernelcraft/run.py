@@ -14,7 +14,7 @@ VERSION = '0.0.1'
 
 def make_parser():
     parser = argparse.ArgumentParser(
-        description='Build and run a specific kernel inside a virtualized snapshot of your live system',
+        description='Build and run specific kernels inside a virtualized snapshot of your live system',
     )
     parser.add_argument('--version', '-v', action='version', version=f'%(prog)s {VERSION}')
 
