@@ -1,3 +1,36 @@
+kernelcraft (0.0.2-1) kinetic; urgency=medium
+
+  * New version 0.0.2:
+    - doc: add a referene to the KernelCraft ppa
+    - doc: properly format command examples
+    - doc: add a requirements section to README.md
+    - deb: clarify tool description
+    - doc: add another remote build example to README.md
+    - cfg: drop xenial and trusty kernels from default config
+    - run.py: update generic command description
+    - run.py: properly initialize build environment for Ubuntu kernels
+    - cfg: add Ubuntu lunar git repository
+    - doc: update README.md
+    - run.py: prevent deleting dump file when a target file is specified
+    - run.py: append -kc to kernel version
+    - run.py: introduce option --dump-file
+    - run.py: add remote build host support
+    - run.py: introduce option --dump
+    - deb: update list of dependencies
+    - run.py: get rid of the --local option
+    - config: add arighi-rust git repository
+    - run.py: introduce option --skip-build
+    - run.py: make system directories rw using fs overlays
+    - run.py: introduce option --clean
+    - run.py: introduce --config FILE
+    - documentation: update README.md
+    - cfg: introduce a config file to define repositories
+    - run.py: do not implicitly boot the kernel with nokaslr
+    - run.py: minor command line arguments refactoring
+    - run.py: rename option --resume to --local
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 09 Nov 2022 08:41:38 +0100
+
 kernelcraft (0.0.1-1) kinetic; urgency=medium
 
   * Initial build
