@@ -1,3 +1,21 @@
+virtme (0.0.1-2ubuntu2) kinetic; urgency=medium
+
+  * Custom features required by kernelcraft:
+    - virtme-configkernel: re-enable USB support by default
+    - virtme-configkernel: disable CONFIG_LOCALVERSION_AUTO
+    - virtme-init: do not break kernel modules setup inside the guest
+    - virtme-init: allow to use rw overlays without breaking systemd and apt
+    - virtme-init: connect /root with /tmp/roothome
+    - virtme-init: allow to use --cwd when --user is not used
+    - virtme-init: fix always true condition
+    - virtme-configkernel: introduce option --custom FILE
+    - virtme-configkernel: disable audit
+    - virtme-configkernel: disable cpufreq support
+    - virtme-configkernel: disable security models completely
+    - virtme-configkernel: make sure BPF is properly supported
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 09 Nov 2022 08:34:46 +0100
+
 virtme (0.0.1-2ubuntu1) kinetic; urgency=medium
 
   * Add custom features required by kernelcraft:
