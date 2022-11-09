@@ -30,6 +30,9 @@ KernelCraft requires a customized version of virtme, available here
 You may also need to install `crash` to use the memory dump inspection feature
 (see example below).
 
+If you are using Ubuntu you can install all the required packages and dependencies from this ppa:
+[web][kernelcraft-ppa].
+
 Examples
 ========
 
@@ -123,3 +126,4 @@ KernelCraft is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
 [arighi-virtme]: https://github.com/arighi/virtme "arighi virtme"
+[kernelcraft-ppa]: https://launchpad.net/~arighi/+archive/ubuntu/kernelcraft "kernelcraft ppa"
