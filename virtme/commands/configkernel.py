@@ -118,10 +118,7 @@ _GENERIC_CONFIG = [
     'CONFIG_UPROBES=y',
     'CONFIG_UPROBE_EVENTS=y',
     'CONFIG_DEBUG_FS=y',
-
-    '# Enable Rust if possible',
-    'CONFIG_RUST=y',
-    'CONFIG_INIT_STACK_NONE=y',
+    'CONFIG_DEBUG_INFO_BTF=y',
 
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
