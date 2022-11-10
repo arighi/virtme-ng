@@ -77,6 +77,13 @@ Examples
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
 ```
 
+ - Run the previously compiled kernel and enable bridge networking (NOTE: you
+   may get permission denied in some Ubuntu releases, I solved by doing a
+   `sudo chmod u+s /usr/lib/qemu/qemu-bridge-helper`:
+```
+   $ kc -s -o '--net bridge'
+```
+
 Implementation details
 ======================
 
