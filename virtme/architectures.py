@@ -204,10 +204,10 @@ class Arch_ppc64(Arch):
     def __init__(self):
         Arch.__init__(self, 'ppc64')
 
-        self.defconfig_target = 'ppc64_defconfig'
-        self.qemuname = 'ppc64'
+        self.defconfig_target = 'ppc64e_defconfig'
+        self.qemuname = 'ppc64le'
         self.linuxname = 'powerpc'
-        self.gccname = 'ppc64'
+        self.gccname = 'powerpc64le'
 
     def qemuargs(self, is_native):
         ret = Arch.qemuargs(is_native)
