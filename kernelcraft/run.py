@@ -24,7 +24,7 @@ def make_parser():
             help='Use a kernel from a specific Ubuntu release or upstream')
 
     ga.add_argument('--clean', '-x', action='store_true',
-            help='Clean the local kernel repository')
+            help='Clean the kernel repository (local or remote if used with --build-host)')
 
     ga.add_argument('--dump', '-d', action='store_true',
             help='Generate a memory dump of the running kernel and inspect it')
@@ -224,15 +224,21 @@ class KernelSource:
                 # Use crash to inspect the memory dump
                 check_call(['crash', tmp.name, self.srcdir + '/vmlinux'])
 
-    def clean(self):
-        check_call(['git', 'clean', '-xdf'])
+    def clean(self, build_host=None):
+        if build_host is None:
+            cmd = "bash -c"
+        else:
+            cmd = f'ssh {build_host} --'
+        cmd = self._format_cmd(cmd)
+        cmd.append('cd ~/.kernelcraft && git clean -xdf')
+        check_call(cmd)
 
 def main():
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(str(Path.home()) + '/.kernelcraft')
     if args.clean:
-        ks.clean()
+        ks.clean(build_host=args.build_host)
     elif args.dump:
         ks.dump(args.dump_file)
     else:
