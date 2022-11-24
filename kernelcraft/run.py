@@ -41,7 +41,7 @@ def make_parser():
     parser.add_argument('--config', '-f', action='store',
             help='Use a specific kernel .config snippet to override default config settings')
 
-    parser.add_argument('--opts', '-o', action='store',
+    parser.add_argument('--opts', '-o', action='append',
             help='Additional options passed to virtme-run')
 
     parser.add_argument('--build-host', '-b', action='store',
@@ -148,7 +148,7 @@ class KernelSource:
     def run(self, opts):
         hostname = socket.gethostname()
         username = os.getlogin()
-        opts = opts or ''
+        opts = ' '.join(opts) or ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
         cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
