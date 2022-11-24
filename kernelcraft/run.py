@@ -53,6 +53,12 @@ def make_parser():
     parser.add_argument('--build-host-vmlinux', action='store_true',
             help='Copy vmlinux back from the build host')
 
+    parser.add_argument('--arch', action='store',
+            help='Generate and test a kernel for a specific architecture (default is host architecture)')
+
+    parser.add_argument('--root', action='store',
+            help='Pass a specific chroot to use inside the virtualized kernel (useful with --arch)')
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -62,11 +68,20 @@ def arg_fail(message):
     _ARGPARSER.print_usage()
     exit(1)
 
+ARCH_MAPPING = {
+    'arm64': {
+        'name': 'aarch64',
+        'cross_compile': 'aarch64-linux-gnu-',
+    },
+}
+
+MAKE_COMMAND = "make LOCALVERSION=-kc"
+
 REMOTE_BUILD_SCRIPT = '''#!/bin/bash
 cd ~/.kernelcraft
 git reset --hard __kernelcraft__
 [ -f debian/rules ] && fakeroot debian/rules clean
-{} make -j$(nproc --all) LOCALVERSION=-kc
+{} {}
 '''
 
 class KernelSource:
@@ -91,8 +106,8 @@ class KernelSource:
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
 
-    def checkout(self, release, commit=None):
-        if release:
+    def checkout(self, release=None, commit=None):
+        if release is not None:
             if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
                 sys.exit(1)
@@ -105,15 +120,26 @@ class KernelSource:
             target = commit or 'HEAD'
         check_call(['git', 'reset', '--hard', target])
 
-    def config(self, config):
+    def config(self, arch=None, config=None):
         cmd = 'virtme-configkernel --defconfig'
-        if config:
+        if arch is not None:
+            if arch not in ARCH_MAPPING:
+                arg_fail(f'unsupported architecture: {arch}')
+            arch = ARCH_MAPPING[arch]['name']
+            cmd += f' --arch {arch}'
+        if config is not None:
             cmd += f' --custom {config}'
         check_call(self._format_cmd(cmd))
 
-    def make(self, build_host, build_host_exec_prefix, build_host_vmlinux):
-        if not build_host:
-            check_call(['make', '-j', self.cpus, 'LOCALVERSION=-kc'])
+    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False):
+        make_command = MAKE_COMMAND
+        if arch is not None:
+            if arch not in ARCH_MAPPING:
+                arg_fail(f'unsupported architecture: {arch}')
+            cross_compile = ARCH_MAPPING[arch]['cross_compile']
+            make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
+        if build_host is None:
+            check_call(self._format_cmd(make_command + ' -j' + self.cpus))
             return
         check_call(['ssh', build_host,
                     'mkdir -p ~/.kernelcraft'])
@@ -125,7 +151,7 @@ class KernelSource:
         check_call(self._format_cmd(cmd))
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
-            tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or ''))
+            tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or '', make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {build_host}:.kernelcraft/.kc-build'
             check_call(self._format_cmd(cmd))
@@ -137,21 +163,35 @@ class KernelSource:
                 vmlinux = '--include=vmlinux'
             else:
                 vmlinux = ''
-            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ {self.srcdir}/'
+            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ {self.srcdir}/'
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name])
         if os.path.exists(self.srcdir + '/debian/rules'):
             check_call(['fakeroot', 'debian/rules', 'clean'])
-        check_call(['make', '-j', self.cpus, 'modules_prepare', 'LOCALVERSION=-kc'])
+        check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'))
 
-    def run(self, opts):
+    def run(self, arch=None, root=None, opts=None):
         hostname = socket.gethostname()
-        username = os.getlogin()
-        opts = ' '.join(opts) or ''
+        if arch is not None:
+            if arch not in ARCH_MAPPING:
+                arg_fail(f'unsupported architecture: {arch}')
+            arch = '--arch ' + ARCH_MAPPING[arch]['name']
+        else:
+            arch = ''
+        if root is not None:
+            root = f'--root {root}'
+            username = ''
+        else:
+            root = ''
+            username = '--user ' + os.getlogin()
+        if opts is not None:
+            opts = ' '.join(opts)
+        else:
+            opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {opts} --user {username} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {username} {root} {opts} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
     def dump(self, dump_file):
@@ -197,10 +237,12 @@ def main():
         ks.dump(args.dump_file)
     else:
         if not args.skip_build:
-            ks.checkout(args.release, args.commit)
-            ks.config(args.config)
-            ks.make(args.build_host, args.build_host_exec_prefix, args.build_host_vmlinux)
-        ks.run(args.opts)
+            ks.checkout(release=args.release, commit=args.commit)
+            ks.config(arch=args.arch, config=args.config)
+            ks.make(arch=args.arch, build_host=args.build_host, \
+                    build_host_exec_prefix=args.build_host_exec_prefix, \
+                    build_host_vmlinux=args.build_host_vmlinux)
+        ks.run(arch=args.arch, root=args.root, opts=args.opts)
 
 if __name__ == '__main__':
     exit(main())
