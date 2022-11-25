@@ -133,6 +133,7 @@ _GENERIC_CONFIG = [
     '# CONFIG_WLAN is not set',
     '# CONFIG_SCHED_MC is not set',
     '# CONFIG_CPU_FREQ is not set',
+    '# CONFIG_INFINIBAND is not set',
 ]
 
 def main():
