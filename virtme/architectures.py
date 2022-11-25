@@ -216,6 +216,54 @@ class Arch_ppc64(Arch):
 
         return ret
 
+    @staticmethod
+    def config_base():
+        return ['CONFIG_PPC64=y',
+                'CONFIG_PPC_BOOK3S_64=y',
+                'CONFIG_GENERIC_CPU=y',
+                'CONFIG_PPC_BOOK3S=y',
+                'CONFIG_PPC_FPU_REGS=y',
+                'CONFIG_PPC_FPU=y',
+                'CONFIG_ALTIVEC=y',
+                'CONFIG_VSX=y',
+                'CONFIG_PPC_64S_HASH_MMU=y',
+                'CONFIG_PPC_RADIX_MMU=y',
+                'CONFIG_PPC_RADIX_MMU_DEFAULT=y',
+                'CONFIG_PPC_KUEP=y',
+                'CONFIG_PPC_KUAP=y',
+                'CONFIG_PPC_HAVE_PMU_SUPPORT=y',
+                'CONFIG_PPC_PERF_CTRS=y',
+                'CONFIG_FORCE_SMP=y',
+                'CONFIG_SMP=y',
+                'CONFIG_PPC_DOORBELL=y',
+                'CONFIG_VDSO32=y',
+                'CONFIG_CPU_LITTLE_ENDIAN=y',
+                'CONFIG_PPC64_ELF_ABI_V2=y',
+                'CONFIG_PPC64_BOOT_WRAPPER=y',
+                'CONFIG_64BIT=y',
+                'CONFIG_PPC_64K_PAGES=y',
+                'CONFIG_PPC_SMLPAR=y',
+                'CONFIG_PPC_SUBPAGE_PROT=y',
+                'CONFIG_PPC_SVM=y',
+                'CONFIG_PPC_TRANSACTIONAL_MEM=y',
+                'CONFIG_PPC_UV=y',
+                'CONFIG_PPC_WATCHDOG=y',
+                'CONFIG_PPC_MEMTRACE=y',
+                'CONFIG_PPC_UV=y',
+                'CONFIG_PPC_WATCHDOG=y',
+                'CONFIG_MEMORY_HOTPLUG=y',
+                'CONFIG_VIRTUALIZATION=y',
+                'CONFIG_KVM_BOOK3S_64=y',
+                'CONFIG_KVM_BOOK3S_64_HV=y',
+                'CONFIG_MEMORY_HOTREMOVE=y',
+                'CONFIG_ZONE_DEVICE=y',
+                'CONFIG_DEVICE_PRIVATE=y',
+                'CONFIG_HARDLOCKUP_DETECTOR=y',
+                'CONFIG_CRYPTO_MD5_PPC=m',
+                'CONFIG_CRYPTO_SHA1_PPC=m',
+                'CONFIG_HVC_CONSOLE=y',
+                ]
+
     def kimg_path(self):
         # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
         return 'vmlinux'
