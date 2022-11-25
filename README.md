@@ -84,6 +84,12 @@ Examples
    $ kc -s -o '--net bridge'
 ```
 
+ - Test latest mainline kernel on arm64 (using a separate chroot in
+   /opt/chroot/arm64 as the main filesystem):
+```
+   $ kc -r mainline --arch arm64 --root /opt/chroot/arm64/
+```
+
 Implementation details
 ======================
 
