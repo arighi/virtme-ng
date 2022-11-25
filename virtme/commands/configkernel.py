@@ -136,6 +136,12 @@ _GENERIC_CONFIG = [
     '# CONFIG_INFINIBAND is not set',
     '# CONFIG_PPP is not set',
     '# CONFIG_PPPOE is not set',
+    '# CONFIG_EXT2_FS is not set',
+    '# CONFIG_REISERFS_FS not set',
+    '# CONFIG_JFS_FS is not set',
+    '# CONFIG_XFS_FS is not set',
+    '# CONFIG_HFS_FS is not set',
+    '# CONFIG_HFSPLUS_FS is not set',
 ]
 
 def main():
