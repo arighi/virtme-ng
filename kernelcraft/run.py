@@ -101,7 +101,7 @@ git reset --hard __kernelcraft__
 '''
 
 class KernelSource:
-    def __init__(self, srcdir):
+    def __init__(self):
         # Initialize known kernels
         conf = str(Path.home()) + '/.kernelcraft.conf'
         if not Path(conf).exists():
@@ -110,14 +110,10 @@ class KernelSource:
         with open(conf) as fd:
             self.kernel_release = json.loads(fd.read())
 
-        # Initialize kernel source repo
-        if not os.path.exists(srcdir):
-           os.makedirs(srcdir)
-           os.chdir(srcdir)
-           check_call(['git', 'init'])
+        if not os.path.isfile('Kbuild') or \
+           not os.path.isdir('.git'):
+            arg_fail(f'error: must be run from a kernel git repository')
         self.cpus = str(os.cpu_count())
-        os.chdir(srcdir)
-        self.srcdir = srcdir
 
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
@@ -174,7 +170,7 @@ class KernelSource:
                     'git init ~/.kernelcraft'])
         check_call(['git', 'push', '--force', f"{build_host}:~/.kernelcraft",
                     'HEAD:__kernelcraft__', ])
-        cmd = f'rsync {self.srcdir}/.config {build_host}:.kernelcraft/.config'
+        cmd = f'rsync .config {build_host}:.kernelcraft/.config'
         check_call(self._format_cmd(cmd))
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
@@ -190,11 +186,11 @@ class KernelSource:
                 vmlinux = '--include=vmlinux'
             else:
                 vmlinux = ''
-            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ {self.srcdir}/'
+            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name])
-        if os.path.exists(self.srcdir + '/debian/rules'):
+        if os.path.exists('./debian/rules'):
             check_call(['fakeroot', 'debian/rules', 'clean'])
         check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'))
 
@@ -218,10 +214,12 @@ class KernelSource:
             opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir {self.srcdir} --mods auto {rw_dirs} {username} {root} {opts} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} {username} {root} {opts} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
     def dump(self, dump_file):
+        if not os.path.isfile('vmlinux'):
+            arg_fail('vmlinux not found, try to recompile the kernel with --build-host-vmlinux (if --build-host was used)')
         # Use QMP to generate a memory dump
         s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         s.connect(('localhost', 3636))
@@ -249,21 +247,21 @@ class KernelSource:
                 shutil.move(tmp.name, dump_file)
             else:
                 # Use crash to inspect the memory dump
-                check_call(['crash', tmp.name, self.srcdir + '/vmlinux'])
+                check_call(['crash', tmp.name, './vmlinux'])
 
     def clean(self, build_host=None):
         if build_host is None:
-            cmd = "bash -c"
+            cmd = self._format_cmd("git clean -xdf")
         else:
             cmd = f'ssh {build_host} --'
-        cmd = self._format_cmd(cmd)
-        cmd.append('cd ~/.kernelcraft && git clean -xdf')
+            cmd = self._format_cmd(cmd)
+            cmd.append('cd ~/.kernelcraft && git clean -xdf')
         check_call(cmd)
 
 def main():
     args = _ARGPARSER.parse_args()
 
-    ks = KernelSource(str(Path.home()) + '/.kernelcraft')
+    ks = KernelSource()
     if args.clean:
         ks.clean(build_host=args.build_host)
     elif args.dump:

@@ -99,9 +99,10 @@ this file.
 
 Repositories are identified by name (specified with the option --release / -r).
 
-All the used git repository files are stored in ~/.kernelcraft. When a release
-(git repository) is specified KernelCraft takes care of cloning the remote
-branch inside the ~/.kernelcraft folder.
+When a release (git repository) is specified KernelCraft takes care of adding
+the remote branch to the local current git repository. When a remote build host
+is used (--build-host) the target branch is force pushed to the remote host
+inside the ~/.kernelcraft folder.
 
 Then a minimal custom .config is generated using (a custom version of)
 virtme-configkernel.
@@ -125,8 +126,8 @@ External kernel modules
 =======================
 
 It is possible to recompile and test out-of-tree kernel modules inside the
-KernelCraft kernel, simply by building them against the kernel source directory
-`~/.kernelcraft`.
+KernelCraft kernel, simply by building them against the local directory of the
+kernel git repository that was used to build and run the kernel.
 
 Credits
 =======
