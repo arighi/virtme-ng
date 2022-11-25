@@ -84,6 +84,11 @@ ARCH_MAPPING = {
         'linux_name': 's390',
         'cross_compile': 's390x-linux-gnu-',
     },
+    'riscv64': {
+        'qemu_name': 'riscv64',
+        'linux_name': 'riscv',
+        'cross_compile': 'riscv64-linux-gnu-',
+    },
 }
 
 MAKE_COMMAND = "make LOCALVERSION=-kc"
@@ -150,6 +155,13 @@ class KernelSource:
             if arch == 'ppc64el':
                 # ppc64 always requires vmlinux to boot
                 build_host_vmlinux = True
+            elif arch == 'riscv64':
+                print('\n!!! WARNING !!!\n')
+                print('Kernel boot parameters are limited on riscv!')
+                print('Make sure to increase COMMAND_LINE_SIZE to at least 1024')
+                print('https://lore.kernel.org/lkml/e90289af-f557-58f2-f4c8-f79feab4f185@ghiti.fr/T/#t')
+                print('\nPress a key to continue (or CTRL+c to stop)')
+                input()
             cross_compile = ARCH_MAPPING[arch]['cross_compile']
             arch = ARCH_MAPPING[arch]['linux_name']
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
