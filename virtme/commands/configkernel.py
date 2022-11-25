@@ -134,6 +134,8 @@ _GENERIC_CONFIG = [
     '# CONFIG_SCHED_MC is not set',
     '# CONFIG_CPU_FREQ is not set',
     '# CONFIG_INFINIBAND is not set',
+    '# CONFIG_PPP is not set',
+    '# CONFIG_PPPOE is not set',
 ]
 
 def main():
