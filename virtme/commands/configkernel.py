@@ -120,6 +120,9 @@ _GENERIC_CONFIG = [
     'CONFIG_DEBUG_FS=y',
     'CONFIG_DEBUG_INFO_BTF=y',
 
+    '# Useful debugging features',
+    'CONFIG_PROVE_LOCKING=y',
+
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
     '# CONFIG_DRM is not set',
