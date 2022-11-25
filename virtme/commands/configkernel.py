@@ -128,6 +128,8 @@ _GENERIC_CONFIG = [
     '# CONFIG_DRM is not set',
     '# CONFIG_SOUND is not set',
     '# CONFIG_HID is not set',
+    '# CONFIG_MLX4_EN is not set',
+    '# CONFIG_MLX5_CORE is not set',
     '# CONFIG_NFS_FS is not set',
     '# CONFIG_IPV6 is not set',
     '# CONFIG_AUDIT is not set',
