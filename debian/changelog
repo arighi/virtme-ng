@@ -1,3 +1,13 @@
+kernelcraft (0.0.3-1) kinetic; urgency=medium
+
+  * New version 0.0.3:
+    - support multiple architectures (arm64, ppc64el, riscv64, s390x)
+    - allow to use KernelCraft directly from any git repository (without
+      creating a duplicate git repo in ~/.kernelcraft)
+    - allow to remotely clean the git repo (using --clean with --build-host)
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 25 Nov 2022 15:25:08 +0100
+
 kernelcraft (0.0.2-1) kinetic; urgency=medium
 
   * New version 0.0.2:

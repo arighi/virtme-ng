@@ -10,7 +10,7 @@ from subprocess import call, check_call, DEVNULL
 from pathlib import Path
 from shutil import copyfile
 
-VERSION = '0.0.2'
+VERSION = '0.0.3'
 
 def make_parser():
     parser = argparse.ArgumentParser(
