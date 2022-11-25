@@ -1,3 +1,11 @@
+virtme (0.0.1-2ubuntu4) kinetic; urgency=medium
+
+  * Tunings/improvements for KernelCraft:
+    - better support for ppc64el and s390x
+    - try to strip the kernel even more (drop some unnecessary config options)
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 25 Nov 2022 15:39:08 +0100
+
 virtme (0.0.1-2ubuntu3) kinetic; urgency=medium
 
   * virtme-configkernel: prioritize having BTF rather than Rust support
