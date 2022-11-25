@@ -145,6 +145,7 @@ _GENERIC_CONFIG = [
     '# CONFIG_REISERFS_FS not set',
     '# CONFIG_JFS_FS is not set',
     '# CONFIG_XFS_FS is not set',
+    '# CONFIG_BTRFS_FS is not set',
     '# CONFIG_HFS_FS is not set',
     '# CONFIG_HFSPLUS_FS is not set',
 ]
