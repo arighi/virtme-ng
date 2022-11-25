@@ -70,8 +70,19 @@ def arg_fail(message):
 
 ARCH_MAPPING = {
     'arm64': {
-        'name': 'aarch64',
+        'qemu_name': 'aarch64',
+        'linux_name': 'arm64',
         'cross_compile': 'aarch64-linux-gnu-',
+    },
+    'ppc64el': {
+        'qemu_name': 'ppc64',
+        'linux_name': 'powerpc',
+        'cross_compile': 'powerpc64le-linux-gnu-',
+    },
+    's390x': {
+        'qemu_name': 's390x',
+        'linux_name': 's390',
+        'cross_compile': 's390x-linux-gnu-',
     },
 }
 
@@ -125,7 +136,7 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
-            arch = ARCH_MAPPING[arch]['name']
+            arch = ARCH_MAPPING[arch]['qemu_name']
             cmd += f' --arch {arch}'
         if config is not None:
             cmd += f' --custom {config}'
@@ -136,7 +147,11 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
+            if arch == 'ppc64el':
+                # ppc64 always requires vmlinux to boot
+                build_host_vmlinux = True
             cross_compile = ARCH_MAPPING[arch]['cross_compile']
+            arch = ARCH_MAPPING[arch]['linux_name']
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
         if build_host is None:
             check_call(self._format_cmd(make_command + ' -j' + self.cpus))
@@ -176,7 +191,7 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
-            arch = '--arch ' + ARCH_MAPPING[arch]['name']
+            arch = '--arch ' + ARCH_MAPPING[arch]['qemu_name']
         else:
             arch = ''
         if root is not None:
