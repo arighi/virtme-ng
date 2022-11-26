@@ -44,6 +44,9 @@ def make_parser():
     parser.add_argument('--config', '-f', action='store',
             help='Use a specific kernel .config snippet to override default config settings')
 
+    parser.add_argument('--memory', '-m', action='store',
+            help='Set guest memory size (qemu -m flag)')
+
     parser.add_argument('--opts', '-o', action='append',
             help='Additional options passed to virtme-run')
 
@@ -199,7 +202,7 @@ class KernelSource:
             check_call(['fakeroot', 'debian/rules', 'clean'])
         check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'))
 
-    def run(self, arch=None, root=None, opts=None):
+    def run(self, arch=None, root=None, memory=None, opts=None):
         hostname = socket.gethostname()
         if arch is not None:
             if arch not in ARCH_MAPPING:
@@ -213,13 +216,15 @@ class KernelSource:
         else:
             root = ''
             username = '--user ' + os.getlogin()
+        if memory is None:
+            memory = 4096
         if opts is not None:
             opts = ' '.join(opts)
         else:
             opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} {username} {root} {opts} --qemu-opts -m 4096 -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} {username} {root} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(self._format_cmd(cmd))
 
     def dump(self, dump_file):
@@ -280,7 +285,8 @@ def main():
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
                     build_host_vmlinux=args.build_host_vmlinux)
-        ks.run(arch=args.arch, root=args.root, opts=args.opts)
+        ks.run(arch=args.arch, root=args.root, \
+               memory=args.memory, opts=args.opts)
 
 if __name__ == '__main__':
     exit(main())
