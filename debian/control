@@ -4,8 +4,8 @@ Priority: optional
 Maintainer: Andrea Righi <andrea.righi@canonical.com>
 Build-Depends: debhelper (>= 11)
 Build-Depends-Indep: dh-python, python3, python3-six, python3-setuptools
-Homepage:  https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
-Vcs-Git:  https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git
+Homepage: https://github.com/arighi/kernelcraft
+Vcs-Git:  https://github.com/arighi/kernelcraft
 
 Package: kernelcraft
 Architecture: any
