@@ -20,6 +20,9 @@ def make_parser():
 
     ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
+    ga.add_argument('--init', '-i', action='store_true',
+            help='Initialize a git repository to be used with KernelCraft')
+
     ga.add_argument('--release', '-r', action='store',
             help='Use a kernel from a specific Ubuntu release or upstream')
 
@@ -101,7 +104,11 @@ git reset --hard __kernelcraft__
 '''
 
 class KernelSource:
-    def __init__(self):
+    def __init__(self, do_init=False):
+        if do_init:
+            check_call(['git', 'init', '-q'])
+        if not os.path.isdir('.git'):
+            arg_fail(f'error: must run from a kernel git repository')
         # Initialize known kernels
         conf = str(Path.home()) + '/.kernelcraft.conf'
         if not Path(conf).exists():
@@ -109,10 +116,6 @@ class KernelSource:
             copyfile(default_conf, conf)
         with open(conf) as fd:
             self.kernel_release = json.loads(fd.read())
-
-        if not os.path.isfile('Kbuild') or \
-           not os.path.isdir('.git'):
-            arg_fail(f'error: must be run from a kernel git repository')
         self.cpus = str(os.cpu_count())
 
     def _format_cmd(self, cmd):
@@ -261,8 +264,10 @@ class KernelSource:
 def main():
     args = _ARGPARSER.parse_args()
 
-    ks = KernelSource()
-    if args.clean:
+    ks = KernelSource(args.init)
+    if args.init:
+        print('KernelCraft git repository initialized')
+    elif args.clean:
         ks.clean(build_host=args.build_host)
     elif args.dump:
         ks.dump(args.dump_file)
