@@ -21,6 +21,42 @@ Kernels produced with KernelCraft are lacking lots of features, in order to
 reduce the build time to the minimum and still provide you a usable kernel
 capable of running your tests and experiments.
 
+Quick start
+===========
+
+```
+ $ uname -r
+ 5.19.0-23-generic
+ $ mkdir linux && cd linux
+ $ kc --init
+ KernelCraft git repository initialized
+ $ kc -r mainline --commit v6.1-rc6
+ ...
+ $ uname -r
+ 6.1.0-rc6-kc
+ ^
+ |___ Now you have a shell inside a virtualized copy of your entire system,
+      that is running the new kernel
+
+ ("ctrl+a, x" to return back to your real system)
+```
+
+Installation
+============
+
+If you're running Ubuntu you can install KernelCraft from
+ppa:arighi/kernelcraft:
+```
+ $ sudo add-apt-repository ppa:arighi/kernelcraft
+ $ sudo apt install --yes kernelcraft
+```
+
+Otherwise, you can install via pip directly (after cloning this git
+repository):
+```
+ $ pip3 install -r requirements.txt .
+```
+
 Requirements
 ============
 
