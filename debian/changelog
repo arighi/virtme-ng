@@ -1,3 +1,11 @@
+kernelcraft (0.1-1) kinetic; urgency=medium
+
+  * New version 0.1:
+    - provide --init command
+    - ship default config in /etc/kernelcraft.conf
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sat, 26 Nov 2022 14:39:58 +0100
+
 kernelcraft (0.0.3-1) kinetic; urgency=medium
 
   * New version 0.0.3:
