@@ -1,3 +1,9 @@
+kernelcraft (0.1-2) kinetic; urgency=medium
+
+  * Update git repository and homepage
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sat, 26 Nov 2022 14:45:40 +0100
+
 kernelcraft (0.1-1) kinetic; urgency=medium
 
   * New version 0.1:
