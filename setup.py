@@ -3,16 +3,15 @@
 import os
 import sys
 from setuptools import setup
+from kernelcraft.run import VERSION
 
 if sys.version_info < (3,3):
     print('kernelcraft requires Python 3.3 or higher')
     sys.exit(1)
 
-_VERSION = '0.1'
-
 setup(
     name='kernelcraft',
-    version=_VERSION,
+    version=VERSION,
     author='Andrea Righi',
     author_email='andrea.righi@canonical.com',
     description='',
@@ -22,7 +21,7 @@ setup(
                                        'README.md'), 'r').read(),
     long_description_content_type="text/markdown",
     packages=['kernelcraft'],
-    install_requires=[],
+    install_requires=['virtme'],
     include_package_data=True,
     entry_points = {
         'console_scripts': [
@@ -30,7 +29,7 @@ setup(
         ]
     },
     data_files = [
-        ('kernelcraft', ['cfg/kernelcraft.conf']),
+        ('/etc', ['cfg/kernelcraft.conf']),
     ],
     classifiers=['Environment :: Console',
                  'Intended Audience :: Developers',
