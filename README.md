@@ -165,6 +165,54 @@ It is possible to recompile and test out-of-tree kernel modules inside the
 KernelCraft kernel, simply by building them against the local directory of the
 kernel git repository that was used to build and run the kernel.
 
+Troubleshooting
+===============
+
+ - If you get permission denied when starting qemu, make sure that your
+   username is assigned to the group `kvm` or `libvirt`:
+```
+  $ groups | grep "kvm\|libvirt"
+```
+
+ - When using `-o "--net bridge"` to create a bridged network in the guest you
+   may get the following error:
+```
+  ...
+  failed to create tun device: Operation not permitted
+```
+
+   This is because `qemu-bridge-helper` requires `CAP_NET_ADMIN` permissions.
+
+   To fix this you need to add `allow all` to `/etc/qemu/bridge.conf` and set
+   the `CAP_NET_ADMIN` capability to `qemu-bridge-helper`, as following:
+```
+  $ sudo filecap /usr/lib/qemu/qemu-bridge-helper net_admin
+```
+
+ - If the guest fails to start because the host doesn't have enough memory
+   available you can specify a different amount of memory using `--memory MB`,
+   (this option is passed directly to qemu via -m, default is 4G).
+
+ - If you're testing a kernel for an architecture different than the host, keep
+   in mind that you need to use also `--root DIR` to use a specific chroot with
+   the binaries compatible with the architecture that you're testing. For example
+   you can create a chroot to test riscv64 running:
+```
+  $ sudo mkdir -p /opt/chroot/riscv64
+  $ sudo debootstrap --foreign --arch riscv64 kinetic /opt/chroot/riscv64
+```
+
+  Then you can test a riscv64 kernel with:
+```
+  $ kc --arch riscv64 --root /opt/chroot/riscv64
+```
+
+ - If the build on a remote build host is failing unexpectedly you may want to
+   try cleaning up the remote git repository, running:
+```
+  $ kc --clean --build-host HOSTNAME
+```
+
 Credits
 =======
 
