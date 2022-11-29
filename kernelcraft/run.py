@@ -9,6 +9,7 @@ import tempfile
 from subprocess import call, check_call, DEVNULL
 from pathlib import Path
 from shutil import copyfile
+from argcomplete import autocomplete
 
 VERSION = '0.1'
 
@@ -269,6 +270,7 @@ class KernelSource:
         check_call(cmd)
 
 def main():
+    autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(args.init)
