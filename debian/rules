@@ -1,4 +1,12 @@
 #!/usr/bin/make -f
 
+kernelcraft-prompt:
+	register-python-argcomplete kc > $@
+
 %:
 	dh $@ --with python3 --buildsystem=pybuild
+
+override_dh_install: kernelcraft-prompt
+	dh_install
+	mkdir -p $(CURDIR)/debian/kernelcraft/etc/bash_completion.d
+	install -m 0644 kernelcraft-prompt $(CURDIR)/debian/kernelcraft/etc/bash_completion.d/kernelcraft-prompt
