@@ -4,3 +4,13 @@ build
 dist
 .mypy_cache
 kernelcraft-prompt
+kernelcraft.egg-info/
+.pybuild/
+debian/kernelcraft/
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/kernelcraft.debhelper.log
+debian/kernelcraft.postinst.debhelper
+debian/kernelcraft.prerm.debhelper
+debian/kernelcraft.substvars
