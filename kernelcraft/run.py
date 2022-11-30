@@ -6,7 +6,7 @@ import shutil
 import pkg_resources
 import json
 import tempfile
-from subprocess import call, check_call, DEVNULL
+from subprocess import call, check_call, check_output, DEVNULL
 from pathlib import Path
 from shutil import copyfile
 from argcomplete import autocomplete
@@ -66,13 +66,17 @@ def make_parser():
     parser.add_argument('--root', action='store',
             help='Pass a specific chroot to use inside the virtualized kernel (useful with --arch)')
 
+    parser.add_argument('--force', action='store_true',
+            help='Force reset git repository to target branch or commit (warning: this may drop uncommitted changes)')
+
     return parser
 
 _ARGPARSER = make_parser()
 
-def arg_fail(message):
+def arg_fail(message, show_usage=True):
     print(message)
-    _ARGPARSER.print_usage()
+    if (show_usage):
+        _ARGPARSER.print_usage()
     exit(1)
 
 ARCH_MAPPING = {
@@ -112,7 +116,7 @@ class KernelSource:
         if do_init:
             check_call(['git', 'init', '-q'])
         if not os.path.isdir('.git'):
-            arg_fail(f'error: must run from a kernel git repository')
+            arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
         conf = str(Path.home()) + '/.kernelcraft.conf'
         if not Path(conf).exists():
@@ -127,7 +131,14 @@ class KernelSource:
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
 
-    def checkout(self, release=None, commit=None):
+    def _is_dirty_repo(self):
+        cmd = 'git --no-optional-locks status -uno --porcelain'
+        if check_output(self._format_cmd(cmd), stderr=DEVNULL):
+            return True
+        else:
+            return False
+
+    def checkout(self, release=None, commit=None, build_host=None, force=False):
         if release is not None:
             if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
@@ -139,7 +150,10 @@ class KernelSource:
             target = commit or (release + '/' + self.kernel_release[release]['branch'])
         else:
             target = commit or 'HEAD'
-        check_call(['git', 'reset', '--hard', target])
+        if build_host is not None or target != 'HEAD':
+            if not force and self._is_dirty_repo():
+                arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
+            check_call(['git', 'reset', '--hard', target])
 
     def config(self, arch=None, config=None):
         cmd = 'virtme-configkernel --defconfig'
@@ -282,7 +296,8 @@ def main():
         ks.dump(args.dump_file)
     else:
         if not args.skip_build:
-            ks.checkout(release=args.release, commit=args.commit)
+            ks.checkout(release=args.release, commit=args.commit, \
+                        build_host=args.build_host, force=args.force)
             ks.config(arch=args.arch, config=args.config)
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
