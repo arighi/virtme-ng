@@ -1,3 +1,10 @@
+kernelcraft (0.4-1) kinetic; urgency=medium
+
+  * New version 0.4:
+    - properly parse extra command line options passed to virtme
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 30 Nov 2022 10:32:09 +0100
+
 kernelcraft (0.3-1) kinetic; urgency=medium
 
   * New version 0.3:
