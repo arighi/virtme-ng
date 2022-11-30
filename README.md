@@ -126,6 +126,20 @@ Examples
    $ kc -r mainline --arch arm64 --root /opt/chroot/arm64/
 ```
 
+ - Build upstream kernel 6.1-rc6, execute `uname -r` inside it and send the
+   output to cowsay on the host:
+```
+   $ kc -c v6.1-rc6 -o '--script-sh "uname -r"' 2>/dev/null | cowsay
+    ______________
+   < 6.1.0-rc6-kc >
+    --------------
+           \   ^__^
+            \  (oo)\_______
+               (__)\       )\/\
+                   ||----w |
+                   ||     ||
+```
+
 Implementation details
 ======================
 
