@@ -114,7 +114,7 @@ git reset --hard __kernelcraft__
 class KernelSource:
     def __init__(self, do_init=False):
         if do_init:
-            check_call(['git', 'init', '-q'])
+            check_call(['git', 'init', '-q'], stdout=sys.stderr)
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
@@ -143,17 +143,17 @@ class KernelSource:
             if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
                 sys.exit(1)
-            if call(['git', 'remote', 'get-url', release], stderr=DEVNULL):
+            if call(['git', 'remote', 'get-url', release], stderr=DEVNULL, stdout=sys.stderr):
                 repo_url = self.kernel_release[release]['repo']
-                check_call(['git', 'remote', 'add', release, repo_url])
-            check_call(['git', 'fetch', release])
+                check_call(['git', 'remote', 'add', release, repo_url], stdout=sys.stderr)
+            check_call(['git', 'fetch', release], stdout=sys.stderr)
             target = commit or (release + '/' + self.kernel_release[release]['branch'])
         else:
             target = commit or 'HEAD'
         if build_host is not None or target != 'HEAD':
             if not force and self._is_dirty_repo():
                 arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
-            check_call(['git', 'reset', '--hard', target])
+            check_call(['git', 'reset', '--hard', target], stdout=sys.stderr)
 
     def config(self, arch=None, config=None):
         cmd = 'virtme-configkernel --defconfig'
@@ -164,7 +164,7 @@ class KernelSource:
             cmd += f' --arch {arch}'
         if config is not None:
             cmd += f' --custom {config}'
-        check_call(self._format_cmd(cmd))
+        check_call(self._format_cmd(cmd), stdout=sys.stderr)
 
     def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False):
         make_command = MAKE_COMMAND
@@ -185,24 +185,24 @@ class KernelSource:
             arch = ARCH_MAPPING[arch]['linux_name']
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
         if build_host is None:
-            check_call(self._format_cmd(make_command + ' -j' + self.cpus))
+            check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr)
             return
         check_call(['ssh', build_host,
-                    'mkdir -p ~/.kernelcraft'])
+                    'mkdir -p ~/.kernelcraft'], stdout=sys.stderr)
         check_call(['ssh', build_host,
-                    'git init ~/.kernelcraft'])
+                    'git init ~/.kernelcraft'], stdout=sys.stderr)
         check_call(['git', 'push', '--force', f"{build_host}:~/.kernelcraft",
-                    'HEAD:__kernelcraft__', ])
+                    'HEAD:__kernelcraft__', ], stdout=sys.stderr)
         cmd = f'rsync .config {build_host}:.kernelcraft/.config'
-        check_call(self._format_cmd(cmd))
+        check_call(self._format_cmd(cmd), stdout=sys.stderr)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or '', make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {build_host}:.kernelcraft/.kc-build'
-            check_call(self._format_cmd(cmd))
+            check_call(self._format_cmd(cmd), stdout=sys.stderr)
         # Execute remote build script
-        check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'])
+        check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'], stdout=sys.stderr)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if build_host_vmlinux:
@@ -212,10 +212,10 @@ class KernelSource:
             cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
             tmp.write(cmd)
             tmp.flush()
-            check_call(['bash', tmp.name])
+            check_call(['bash', tmp.name], stdout=sys.stderr)
         if os.path.exists('./debian/rules'):
-            check_call(['fakeroot', 'debian/rules', 'clean'])
-        check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'))
+            check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr)
+        check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr)
 
     def run(self, arch=None, root=None, memory=None, opts=None):
         hostname = socket.gethostname()
