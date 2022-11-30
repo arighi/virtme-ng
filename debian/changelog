@@ -1,3 +1,9 @@
+virtme (0.0.1-2ubuntu5) kinetic; urgency=medium
+
+  * architecture: x86: fix qemu watchdog warning
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 30 Nov 2022 10:14:06 +0100
+
 virtme (0.0.1-2ubuntu4) kinetic; urgency=medium
 
   * Tunings/improvements for KernelCraft:
