@@ -224,7 +224,6 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
             kernel.modfiles = modfinder.find_modules_from_install(
                                virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
-            print(kernel.moddir)
         else:
             arg_fail("invalid argument '%s', please use --mods=none|use|auto" % args.mods)
 
