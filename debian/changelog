@@ -1,3 +1,10 @@
+kernelcraft (0.3-1) kinetic; urgency=medium
+
+  * New version 0.3:
+    - prevent implicitly dropping uncommitted changes
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 30 Nov 2022 09:10:43 +0100
+
 kernelcraft (0.2-1) kinetic; urgency=medium
 
   * New version 0.2:
