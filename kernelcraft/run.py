@@ -240,7 +240,7 @@ class KernelSource:
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
         cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} {username} {root} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
-        check_call(self._format_cmd(cmd))
+        check_call(cmd, shell=True)
 
     def dump(self, dump_file):
         if not os.path.isfile('vmlinux'):
