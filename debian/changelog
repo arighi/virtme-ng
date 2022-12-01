@@ -1,3 +1,10 @@
+kernelcraft (0.6-1) kinetic; urgency=medium
+
+  * New version 0.6:
+    - introduce --exec option
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 01 Dec 2022 11:34:10 +0100
+
 kernelcraft (0.5-1) kinetic; urgency=medium
 
   * New version 0.5:
