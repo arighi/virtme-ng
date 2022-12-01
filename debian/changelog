@@ -1,3 +1,9 @@
+virtme (0.0.1-2ubuntu6) kinetic; urgency=medium
+
+  * avoid printing kernel.moddir to stdout
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 01 Dec 2022 11:33:07 +0100
+
 virtme (0.0.1-2ubuntu5) kinetic; urgency=medium
 
   * architecture: x86: fix qemu watchdog warning
