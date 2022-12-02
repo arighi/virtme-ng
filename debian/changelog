@@ -1,3 +1,9 @@
+virtme (0.0.1-2ubuntu7) kinetic; urgency=medium
+
+  * virtme-run: properly forward stdin with --script-sh
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 02 Dec 2022 10:06:57 +0100
+
 virtme (0.0.1-2ubuntu6) kinetic; urgency=medium
 
   * avoid printing kernel.moddir to stdout
