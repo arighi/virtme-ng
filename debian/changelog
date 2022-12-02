@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu1) kinetic; urgency=medium
+
+  * No change, fix version (upstream is 0.1.1)
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 02 Dec 2022 13:12:35 +0100
+
 virtme (0.0.1-2ubuntu7) kinetic; urgency=medium
 
   * virtme-run: properly forward stdin with --script-sh
