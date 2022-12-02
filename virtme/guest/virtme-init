@@ -220,14 +220,14 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
 fi
 
 if [[ -x /run/virtme/data/script ]]; then
-    if [[ ! -e "/dev/virtio-ports/virtme.scriptio" ]]; then
-	echo "virtme-init: cannot find script I/O port; make sure virtio-serial is available"
+    if [[ ! -e "/dev/virtio-ports/virtme.stdin" || ! -e "/dev/virtio-ports/virtme.stdout" ]]; then
+	echo "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
 	poweroff -f
 	exit 1
     fi
 
     log 'starting script'
-    setsid /run/virtme/data/script <>/dev/virtio-ports/virtme.scriptio 1>&0 2>&0
+    setsid /run/virtme/data/script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>&1
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.

@@ -474,9 +474,13 @@ def do_it() -> int:
                                'earlyprintk=serial,%s,115200' % serdev])
 
         # Set up a virtserialport for script I/O
-        qemuargs.extend(['-chardev', 'stdio,id=stdio,signal=on,mux=off'])
+        qemuargs.extend(['-chardev', 'stdio,id=stdin,signal=on,mux=off'])
         qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
-        qemuargs.extend(['-device', 'virtserialport,name=virtme.scriptio,chardev=stdio'])
+        qemuargs.extend(['-device', 'virtserialport,name=virtme.stdin,chardev=stdin'])
+
+        qemuargs.extend(['-chardev', 'file,id=stdout,path=/proc/self/fd/1'])
+        qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
+        qemuargs.extend(['-device', 'virtserialport,name=virtme.stdout,chardev=stdout'])
 
         # Scripts shouldn't reboot
         qemuargs.extend(['-no-reboot'])
