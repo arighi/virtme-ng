@@ -117,7 +117,7 @@ git reset --hard __kernelcraft__
 class KernelSource:
     def __init__(self, do_init=False):
         if do_init:
-            check_call(['git', 'init', '-q'], stdout=sys.stderr)
+            check_call(['git', 'init', '-q'], stdout=sys.stderr, stdin=DEVNULL)
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
@@ -136,7 +136,7 @@ class KernelSource:
 
     def _is_dirty_repo(self):
         cmd = 'git --no-optional-locks status -uno --porcelain'
-        if check_output(self._format_cmd(cmd), stderr=DEVNULL):
+        if check_output(self._format_cmd(cmd), stderr=DEVNULL, stdin=DEVNULL):
             return True
         else:
             return False
@@ -146,17 +146,17 @@ class KernelSource:
             if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
                 sys.exit(1)
-            if call(['git', 'remote', 'get-url', release], stderr=DEVNULL, stdout=sys.stderr):
+            if call(['git', 'remote', 'get-url', release], stderr=DEVNULL, stdout=sys.stderr, stdin=DEVNULL):
                 repo_url = self.kernel_release[release]['repo']
-                check_call(['git', 'remote', 'add', release, repo_url], stdout=sys.stderr)
-            check_call(['git', 'fetch', release], stdout=sys.stderr)
+                check_call(['git', 'remote', 'add', release, repo_url], stdout=sys.stderr, stdin=DEVNULL)
+            check_call(['git', 'fetch', release], stdout=sys.stderr, stdin=DEVNULL)
             target = commit or (release + '/' + self.kernel_release[release]['branch'])
         else:
             target = commit or 'HEAD'
         if build_host is not None or target != 'HEAD':
             if not force and self._is_dirty_repo():
                 arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
-            check_call(['git', 'reset', '--hard', target], stdout=sys.stderr)
+            check_call(['git', 'reset', '--hard', target], stdout=sys.stderr, stdin=DEVNULL)
 
     def config(self, arch=None, config=None):
         cmd = 'virtme-configkernel --defconfig'
@@ -167,9 +167,9 @@ class KernelSource:
             cmd += f' --arch {arch}'
         if config is not None:
             cmd += f' --custom {config}'
-        check_call(self._format_cmd(cmd), stdout=sys.stderr)
+        check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
 
-    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False):
+    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, stdin=DEVNULL):
         make_command = MAKE_COMMAND
         if arch is not None:
             if arch not in ARCH_MAPPING:
@@ -188,24 +188,24 @@ class KernelSource:
             arch = ARCH_MAPPING[arch]['linux_name']
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
         if build_host is None:
-            check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr)
+            check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr, stdin=DEVNULL)
             return
         check_call(['ssh', build_host,
-                    'mkdir -p ~/.kernelcraft'], stdout=sys.stderr)
+                    'mkdir -p ~/.kernelcraft'], stdout=sys.stderr, stdin=DEVNULL)
         check_call(['ssh', build_host,
-                    'git init ~/.kernelcraft'], stdout=sys.stderr)
+                    'git init ~/.kernelcraft'], stdout=sys.stderr, stdin=DEVNULL)
         check_call(['git', 'push', '--force', f"{build_host}:~/.kernelcraft",
-                    'HEAD:__kernelcraft__', ], stdout=sys.stderr)
+                    'HEAD:__kernelcraft__', ], stdout=sys.stderr, stdin=DEVNULL)
         cmd = f'rsync .config {build_host}:.kernelcraft/.config'
-        check_call(self._format_cmd(cmd), stdout=sys.stderr)
+        check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or '', make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {build_host}:.kernelcraft/.kc-build'
-            check_call(self._format_cmd(cmd), stdout=sys.stderr)
+            check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
         # Execute remote build script
-        check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'], stdout=sys.stderr)
+        check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'], stdout=sys.stderr, stdin=DEVNULL)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if build_host_vmlinux:
@@ -215,10 +215,10 @@ class KernelSource:
             cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
             tmp.write(cmd)
             tmp.flush()
-            check_call(['bash', tmp.name], stdout=sys.stderr)
+            check_call(['bash', tmp.name], stdout=sys.stderr, stdin=DEVNULL)
         if os.path.exists('./debian/rules'):
-            check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr)
-        check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr)
+            check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
+        check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
     def run(self, arch=None, root=None, memory=None, execute=None, opts=None):
         hostname = socket.gethostname()
