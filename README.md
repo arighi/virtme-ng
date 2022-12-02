@@ -129,10 +129,26 @@ Examples
  - Build upstream kernel 6.1-rc6, execute `uname -r` inside it and send the
    output to cowsay on the host:
 ```
-   $ kc -c v6.1-rc6 -o '--script-sh "uname -r"' 2>/dev/null | cowsay
+   $ kc -c v6.1-rc6 --exec 'uname -r' 2>/dev/null | cowsay
     ______________
    < 6.1.0-rc6-kc >
     --------------
+           \   ^__^
+            \  (oo)\_______
+               (__)\       )\/\
+                   ||----w |
+                   ||     ||
+```
+
+ - Run `uname -r` on the host, build upstream kernel v6.1-rc6, pass uname
+   output to this kernel, run `uname -r` inside it, send the whole output to
+   cowsay back on the host:
+```
+   $ uname -r | kc -c v6.1-rc6 --exec 'cat -; uname -r' 2>/dev/null | cowsay -n
+    ___________________
+   / 5.19.0-23-generic \
+   \ 6.1.0-rc6-kc      /
+    -------------------
            \   ^__^
             \  (oo)\_______
                (__)\       )\/\
