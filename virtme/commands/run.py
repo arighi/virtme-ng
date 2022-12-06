@@ -79,6 +79,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Set guest cpu and qemu -smp flag.')
     g.add_argument('--name', action='store', default=None,
                    help='Set guest hostname and qemu -name flag.')
+    g.add_argument('--user', action='store',
+                   help='Change guest user')
 
     g = parser.add_argument_group(
         title='Scripting',
@@ -120,8 +122,6 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Propagate current working directory to the guest')
     g.add_argument('--cwd', action='store',
                    help='Change guest working directory')
-    g.add_argument('--user', action='store',
-                   help='Change guest user')
 
     g = parser.add_argument_group(title='Sharing resources with guest')
     g.add_argument('--rwdir', action='append', default=[],

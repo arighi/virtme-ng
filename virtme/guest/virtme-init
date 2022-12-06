@@ -280,12 +280,8 @@ while true; do
     if [[ -n "${virtme_stty_con}" ]]; then
 	stty ${virtme_stty_con} <"/dev/$consdev"
     fi
-
-    if [[ -z "virtme_user" ]]; then
-        virtme_user=root
-    fi
     if [[ -n "${virtme_user}" ]]; then
-        setsid bash -c "su - ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
+        setsid bash -c "su ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
     else
         setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
     fi
