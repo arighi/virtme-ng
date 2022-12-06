@@ -1,3 +1,9 @@
+kernelcraft (0.8-2) kinetic; urgency=medium
+
+  * add python3-argcomplete to the dependencies
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 06 Dec 2022 16:34:04 +0100
+
 kernelcraft (0.8-1) kinetic; urgency=medium
 
   * New version 0.8:
