@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu2) kinetic; urgency=medium
+
+  * virtme-run: allow to specify --user with --cwd or --pwd
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 06 Dec 2022 16:03:12 +0100
+
 virtme (0.1.1-1ubuntu1) kinetic; urgency=medium
 
   * No change, fix version (upstream is 0.1.1)
