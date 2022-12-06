@@ -1,3 +1,10 @@
+kernelcraft (0.8-1) kinetic; urgency=medium
+
+  * New version 0.8:
+    - preserve current working directory inside the guest
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 06 Dec 2022 16:04:36 +0100
+
 kernelcraft (0.7-1) kinetic; urgency=medium
 
   * New version 0.7:
