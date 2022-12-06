@@ -56,6 +56,7 @@ Depends:
  bzip2,
  sharutils,
  asciidoc,
+ python3-argcomplete,
  python3-dev,
  python3-sphinx,
  python3-sphinx-rtd-theme,
