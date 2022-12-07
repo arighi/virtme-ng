@@ -88,6 +88,12 @@ ARCH_MAPPING = {
         'linux_name': 'arm64',
         'cross_compile': 'aarch64-linux-gnu-',
     },
+    'armhf': {
+        'qemu_name': 'arm',
+        'linux_name': 'arm',
+        'cross_compile': 'arm-linux-gnueabihf-',
+        'max-cpus': 4,
+    },
     'ppc64el': {
         'qemu_name': 'ppc64',
         'linux_name': 'powerpc',
@@ -212,7 +218,7 @@ class KernelSource:
                 vmlinux = '--include=vmlinux'
             else:
                 vmlinux = ''
-            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
+            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name], stdout=sys.stderr, stdin=DEVNULL)
@@ -225,6 +231,8 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
+            if 'max-cpus' in ARCH_MAPPING[arch]:
+                self.cpus = ARCH_MAPPING[arch]['max-cpus']
             arch = '--arch ' + ARCH_MAPPING[arch]['qemu_name']
         else:
             arch = ''
