@@ -1,3 +1,11 @@
+kernelcraft (0.9-1) kinetic; urgency=medium
+
+  * New version 0.9:
+    - add support for armhf
+    - reuse the same cwd only if --root is not used
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 07 Dec 2022 14:18:17 +0100
+
 kernelcraft (0.8-2) kinetic; urgency=medium
 
   * add python3-argcomplete to the dependencies
