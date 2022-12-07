@@ -39,6 +39,9 @@ def make_parser():
     ga.add_argument('--skip-build', '-s', action='store_true',
             help='Start the previously compiled kernel without trying to rebuild it')
 
+    parser.add_argument('--skip-modules', '-S', action='store_true',
+            help='Run a really fast build by skipping external modules (no external modules support)')
+
     parser.add_argument('--commit', '-c', action='store',
             help='Use a kernel identified by a specific commit id, tag or branch')
 
@@ -87,27 +90,32 @@ ARCH_MAPPING = {
         'qemu_name': 'aarch64',
         'linux_name': 'arm64',
         'cross_compile': 'aarch64-linux-gnu-',
+        'kernel_target': 'Image',
     },
     'armhf': {
         'qemu_name': 'arm',
         'linux_name': 'arm',
         'cross_compile': 'arm-linux-gnueabihf-',
+        'kernel_target': '',
         'max-cpus': 4,
     },
     'ppc64el': {
         'qemu_name': 'ppc64',
         'linux_name': 'powerpc',
         'cross_compile': 'powerpc64le-linux-gnu-',
+        'kernel_target': 'vmlinux',
     },
     's390x': {
         'qemu_name': 's390x',
         'linux_name': 's390',
         'cross_compile': 's390x-linux-gnu-',
+        'kernel_target': 'bzImage',
     },
     'riscv64': {
         'qemu_name': 'riscv64',
         'linux_name': 'riscv',
         'cross_compile': 'riscv64-linux-gnu-',
+        'kernel_target': 'Image',
     },
 }
 
@@ -175,8 +183,7 @@ class KernelSource:
             cmd += f' --custom {config}'
         check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
 
-    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, stdin=DEVNULL):
-        make_command = MAKE_COMMAND
+    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False):
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
@@ -190,9 +197,15 @@ class KernelSource:
                 print('https://lore.kernel.org/lkml/e90289af-f557-58f2-f4c8-f79feab4f185@ghiti.fr/T/#t')
                 print('\nPress a key to continue (or CTRL+c to stop)')
                 input()
+            if skip_modules:
+                make_command = MAKE_COMMAND + ' ' + ARCH_MAPPING[arch]['kernel_target']
+            else:
+                make_command = MAKE_COMMAND
             cross_compile = ARCH_MAPPING[arch]['cross_compile']
             arch = ARCH_MAPPING[arch]['linux_name']
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
+        else:
+            make_command = MAKE_COMMAND
         if build_host is None:
             check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr, stdin=DEVNULL)
             return
@@ -218,15 +231,19 @@ class KernelSource:
                 vmlinux = '--include=vmlinux'
             else:
                 vmlinux = ''
-            cmd = f'rsync -aS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
+            if skip_modules:
+                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include=bzImage --include=zImage --include=Image {vmlinux} --include=*.dtb --exclude="*" {build_host}:.kernelcraft/ ./'
+            else:
+                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name], stdout=sys.stderr, stdin=DEVNULL)
-        if os.path.exists('./debian/rules'):
-            check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
-        check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
+        if not skip_modules:
+            if os.path.exists('./debian/rules'):
+                check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
+            check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
-    def run(self, arch=None, root=None, memory=None, execute=None, opts=None):
+    def run(self, arch=None, root=None, memory=None, execute=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if arch is not None:
             if arch not in ARCH_MAPPING:
@@ -244,6 +261,10 @@ class KernelSource:
             root = ''
             username = '--user ' + os.getlogin()
             pwd = '--pwd'
+        if skip_modules:
+            mods = '--mods none'
+        else:
+            mods = '--mods auto'
         if memory is None:
             memory = 4096
         if execute is not None:
@@ -256,7 +277,7 @@ class KernelSource:
             opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} {pwd} {username} {root} {execute} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)
 
     def dump(self, dump_file):
@@ -318,9 +339,11 @@ def main():
             ks.config(arch=args.arch, config=args.config)
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
-                    build_host_vmlinux=args.build_host_vmlinux)
+                    build_host_vmlinux=args.build_host_vmlinux, \
+                    skip_modules=args.skip_modules)
         ks.run(arch=args.arch, root=args.root, \
-               memory=args.memory, execute=args.exec, opts=args.opts)
+               memory=args.memory, execute=args.exec, \
+               opts=args.opts, skip_modules=args.skip_modules)
 
 if __name__ == '__main__':
     exit(main())
