@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu3) kinetic; urgency=medium
+
+  * virtme-configkernel: disable mouse and input interfaces by default
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 07 Dec 2022 14:20:12 +0100
+
 virtme (0.1.1-1ubuntu2) kinetic; urgency=medium
 
   * virtme-run: allow to specify --user with --cwd or --pwd
