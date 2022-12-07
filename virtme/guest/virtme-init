@@ -53,19 +53,19 @@ elif [[ -d "/lib/modules/$kver" ]]; then
 fi
 
 # Setup rw tmpfs directories
-mount -t tmpfs tmpfs /var/log/
-mount -t tmpfs tmpfs /var/tmp/
+[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
+[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
 
 # Additional rw dirs used by systemd
-mount -t tmpfs tmpfs /var/spool/rsyslog
-mount -t tmpfs tmpfs /var/lib/portables
-mount -t tmpfs tmpfs /var/lib/machines
-mount -t tmpfs tmpfs /var/lib/private
-mount -t tmpfs tmpfs /var/cache/private
+[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
+[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
+[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
+[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
+[ -e /var/cache/private ] && mount -t tmpfs tmpfs /var/cache/private
 
 # Additional rw dirs required by apt
-mount -t tmpfs tmpfs /var/lib/apt
-mount -t tmpfs tmpfs /var/cache
+[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
+[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
 
 # Fix up /etc a little bit
 touch /tmp/fstab
