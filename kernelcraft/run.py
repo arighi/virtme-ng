@@ -128,6 +128,17 @@ git reset --hard __kernelcraft__
 {} {}
 '''
 
+def create_root(destdir, arch):
+    if os.path.exists(destdir):
+        return
+    release = check_output('lsb_release -s -c', shell=True).decode(sys.stdout.encoding).rstrip()
+    url = f'https://cloud-images.ubuntu.com/{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz'
+    prevdir = os.getcwd()
+    os.system(f'sudo mkdir -p {destdir}')
+    os.chdir(destdir)
+    os.system(f'curl -s {url} | sudo tar xvJ')
+    os.chdir(prevdir)
+
 class KernelSource:
     def __init__(self, do_init=False):
         if do_init:
@@ -245,6 +256,15 @@ class KernelSource:
 
     def run(self, arch=None, root=None, memory=None, execute=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
+        if root is not None:
+            create_root(root, arch)
+            root = f'--root {root}'
+            username = ''
+            pwd = ''
+        else:
+            root = ''
+            username = '--user ' + os.getlogin()
+            pwd = '--pwd'
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
@@ -253,14 +273,6 @@ class KernelSource:
             arch = '--arch ' + ARCH_MAPPING[arch]['qemu_name']
         else:
             arch = ''
-        if root is not None:
-            root = f'--root {root}'
-            username = ''
-            pwd = ''
-        else:
-            root = ''
-            username = '--user ' + os.getlogin()
-            pwd = '--pwd'
         if skip_modules:
             mods = '--mods none'
         else:
