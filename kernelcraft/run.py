@@ -231,9 +231,11 @@ class KernelSource:
         if root is not None:
             root = f'--root {root}'
             username = ''
+            pwd = ''
         else:
             root = ''
             username = '--user ' + os.getlogin()
+            pwd = '--pwd'
         if memory is None:
             memory = 4096
         if execute is not None:
@@ -246,7 +248,7 @@ class KernelSource:
             opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} --pwd {username} {root} {execute} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ --mods auto {rw_dirs} {pwd} {username} {root} {execute} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)
 
     def dump(self, dump_file):
