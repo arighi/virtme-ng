@@ -91,12 +91,14 @@ ARCH_MAPPING = {
         'linux_name': 'arm64',
         'cross_compile': 'aarch64-linux-gnu-',
         'kernel_target': 'Image',
+        'kernel_image': 'Image',
     },
     'armhf': {
         'qemu_name': 'arm',
         'linux_name': 'arm',
         'cross_compile': 'arm-linux-gnueabihf-',
         'kernel_target': '',
+        'kernel_image': 'zImage',
         'max-cpus': 4,
     },
     'ppc64el': {
@@ -104,18 +106,21 @@ ARCH_MAPPING = {
         'linux_name': 'powerpc',
         'cross_compile': 'powerpc64le-linux-gnu-',
         'kernel_target': 'vmlinux',
+        'kernel_image': 'vmlinux',
     },
     's390x': {
         'qemu_name': 's390x',
         'linux_name': 's390',
         'cross_compile': 's390x-linux-gnu-',
         'kernel_target': 'bzImage',
+        'kernel_image': 'bzImage',
     },
     'riscv64': {
         'qemu_name': 'riscv64',
         'linux_name': 'riscv',
         'cross_compile': 'riscv64-linux-gnu-',
         'kernel_target': 'Image',
+        'kernel_image': 'Image',
     },
 }
 
@@ -198,25 +203,28 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
-            if arch == 'ppc64el':
-                # ppc64 always requires vmlinux to boot
-                build_host_vmlinux = True
-            elif arch == 'riscv64':
+            if arch == 'riscv64':
                 print('\n!!! WARNING !!!\n')
                 print('Kernel boot parameters are limited on riscv!')
                 print('Make sure to increase COMMAND_LINE_SIZE to at least 1024')
                 print('https://lore.kernel.org/lkml/e90289af-f557-58f2-f4c8-f79feab4f185@ghiti.fr/T/#t')
                 print('\nPress a key to continue (or CTRL+c to stop)')
                 input()
-            if skip_modules:
-                make_command = MAKE_COMMAND + ' ' + ARCH_MAPPING[arch]['kernel_target']
-            else:
-                make_command = MAKE_COMMAND
+            target = ARCH_MAPPING[arch]['kernel_target']
+            kernel_image = ARCH_MAPPING[arch]['kernel_image']
             cross_compile = ARCH_MAPPING[arch]['cross_compile']
-            arch = ARCH_MAPPING[arch]['linux_name']
-            make_command += f' CROSS_COMPILE={cross_compile} ARCH={arch}'
+            cross_arch = ARCH_MAPPING[arch]['linux_name']
+        else:
+            target = 'bzImage'
+            kernel_image = 'bzImage'
+            cross_compile = None
+            cross_arch = None
+        if skip_modules:
+            make_command = MAKE_COMMAND + ' ' + target
         else:
             make_command = MAKE_COMMAND
+        if cross_compile and cross_arch:
+            make_command += f' CROSS_COMPILE={cross_compile} ARCH={cross_arch}'
         if build_host is None:
             check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr, stdin=DEVNULL)
             return
@@ -243,7 +251,7 @@ class KernelSource:
             else:
                 vmlinux = ''
             if skip_modules:
-                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include=bzImage --include=zImage --include=Image {vmlinux} --include=*.dtb --exclude="*" {build_host}:.kernelcraft/ ./'
+                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include={kernel_image} {vmlinux} --include=*.dtb --exclude="*" {build_host}:.kernelcraft/ ./'
             else:
                 cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
             tmp.write(cmd)
