@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu4) kinetic; urgency=medium
+
+  * virtme-init: don't report errors when dirs don't exist in the guest
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 13 Dec 2022 14:40:49 +0100
+
 virtme (0.1.1-1ubuntu3) kinetic; urgency=medium
 
   * virtme-configkernel: disable mouse and input interfaces by default
