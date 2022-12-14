@@ -201,7 +201,7 @@ fi
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     real_resolv_conf=/etc/resolv.conf
     if [[ -L "$real_resolv_conf" ]]; then
-        real_resolv_conf="`readlink /etc/resolv.conf`"
+        real_resolv_conf="/`readlink /etc/resolv.conf`"
         if [[ ! -e $real_resolv_conf ]]; then
             mkdir -p "`dirname $real_resolv_conf`"
             touch $real_resolv_conf
