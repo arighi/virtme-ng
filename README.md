@@ -117,7 +117,13 @@ Examples
    may get permission denied in some Ubuntu releases, I solved by doing a
    `sudo chmod u+s /usr/lib/qemu/qemu-bridge-helper`:
 ```
-   $ kc -s -o '--net bridge'
+   $ kc -s --network bridge
+```
+
+ - Run the previously compiled kernel adding an additional virtio-scsi device:
+```
+   $ qemu-img create -f qcow2 /tmp/disk.img 8G
+   $ kc -s --disk /tmp/disk.img
 ```
 
  - Test latest mainline kernel on arm64 (using a separate chroot in
@@ -204,7 +210,7 @@ Troubleshooting
   $ groups | grep "kvm\|libvirt"
 ```
 
- - When using `-o "--net bridge"` to create a bridged network in the guest you
+ - When using `--network bridge` to create a bridged network in the guest you
    may get the following error:
 ```
   ...
@@ -225,16 +231,12 @@ Troubleshooting
 
  - If you're testing a kernel for an architecture different than the host, keep
    in mind that you need to use also `--root DIR` to use a specific chroot with
-   the binaries compatible with the architecture that you're testing. For example
-   you can create a chroot to test riscv64 running:
-```
-  $ sudo mkdir -p /opt/chroot/riscv64
-  $ sudo debootstrap --foreign --arch riscv64 kinetic /opt/chroot/riscv64
-```
+   the binaries compatible with the architecture that you're testing.
 
-  Then you can test a riscv64 kernel with:
+   If the chroot doesn't exist in your system KernelCraft will automatically
+   create it using the latest daily build Ubuntu cloud image:
 ```
-  $ kc --arch riscv64 --root /opt/chroot/riscv64
+  $ kc --arch riscv64 --root ./tmproot
 ```
 
  - If the build on a remote build host is failing unexpectedly you may want to
