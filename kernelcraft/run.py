@@ -51,11 +51,17 @@ def make_parser():
     parser.add_argument('--memory', '-m', action='store',
             help='Set guest memory size (qemu -m flag)')
 
+    parser.add_argument('--network', '-n', action='store',
+            metavar='user|bridge', help='Enable network access')
+
+    parser.add_argument('--disk', '-D', action='append',
+            metavar='PATH', help='Add a file as virtio-scsi disk (can be used multiple times)')
+
     parser.add_argument('--exec', '-e', action='store',
             help='Execute a command inside the kernel and exit')
 
     parser.add_argument('--opts', '-o', action='append',
-            help='Additional options passed to virtme-run')
+            help='Additional options passed to virtme-run (can be used multiple times)')
 
     parser.add_argument('--build-host', '-b', action='store',
             help='Perform kernel build on a remote server (ssh access required)')
@@ -262,7 +268,7 @@ class KernelSource:
                 check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
             check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
-    def run(self, arch=None, root=None, memory=None, execute=None, opts=None, skip_modules=False):
+    def run(self, arch=None, root=None, memory=None, network=None, disk=None, execute=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
             create_root(root, arch)
@@ -291,13 +297,24 @@ class KernelSource:
             execute = f'--script-sh "{execute}"'
         else:
             execute = ''
+        if network is not None:
+            network = f'--net {network}'
+        else:
+            network = ''
+        if disk is not None:
+            disk_str = ''
+            for d in disk:
+                disk_str += f'--disk {d}={d} '
+            disk = disk_str
+        else:
+            disk = ''
         if opts is not None:
             opts = ' '.join(opts)
         else:
             opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)
 
     def dump(self, dump_file):
@@ -362,8 +379,9 @@ def main():
                     build_host_vmlinux=args.build_host_vmlinux, \
                     skip_modules=args.skip_modules)
         ks.run(arch=args.arch, root=args.root, \
-               memory=args.memory, execute=args.exec, \
-               opts=args.opts, skip_modules=args.skip_modules)
+               memory=args.memory, network=args.network, disk=args.disk,
+               execute=args.exec, opts=args.opts, \
+               skip_modules=args.skip_modules)
 
 if __name__ == '__main__':
     exit(main())
