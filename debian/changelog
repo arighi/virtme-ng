@@ -1,3 +1,10 @@
+kernelcraft (1.1) kinetic; urgency=medium
+
+  * New version 1.1:
+    - introduce --network and --disk arguments
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 14 Dec 2022 09:23:32 +0100
+
 kernelcraft (1.0) kinetic; urgency=medium
 
   * New version 1.0:
