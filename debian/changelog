@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu6) kinetic; urgency=medium
+
+  * virtme-configkernel: split mandatory configs vs optional configs
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sat, 07 Jan 2023 15:47:22 +0100
+
 virtme (0.1.1-1ubuntu5) kinetic; urgency=medium
 
   * virtme-init: fix resolv.conf symlink path
