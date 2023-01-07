@@ -95,11 +95,13 @@ _GENERIC_CONFIG = [
     '# Make sure debuginfo are available',
     'CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y',
 
-    '# Provide USB support as module',
-    'CONFIG_USB=m'
-
     '# Enable overlayfs',
     'CONFIG_OVERLAY_FS=y',
+]
+
+_GENERIC_CONFIG_OPTIONAL = [
+    '# Provide USB support as module',
+    'CONFIG_USB=m'
 
     '# BPF stuff',
     'CONFIG_BPF=y',
@@ -152,6 +154,7 @@ _GENERIC_CONFIG = [
     '# CONFIG_BTRFS_FS is not set',
     '# CONFIG_HFS_FS is not set',
     '# CONFIG_HFSPLUS_FS is not set',
+
 ]
 
 def main():
@@ -169,10 +172,11 @@ def main():
         with open(args.custom) as fd:
             custom_conf = list(fd.readlines())
 
-    conf = (_GENERIC_CONFIG +
+    conf = (_GENERIC_CONFIG_OPTIONAL +
             ['# Arch-specific options'] +
             arch.config_base() +
-            custom_conf)
+            custom_conf +
+            _GENERIC_CONFIG)
 
     archargs = ['ARCH=%s' % shlex.quote(arch.linuxname)]
 
