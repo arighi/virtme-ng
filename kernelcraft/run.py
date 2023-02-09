@@ -201,8 +201,11 @@ class KernelSource:
                 arg_fail(f'unsupported architecture: {arch}')
             arch = ARCH_MAPPING[arch]['qemu_name']
             cmd += f' --arch {arch}'
+        user_config = str(Path.home()) + '/.kc.config'
         if config is not None:
             cmd += f' --custom {config}'
+        elif os.path.exists(user_config):
+            cmd += f' --custom {user_config}'
         check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
 
     def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False):
