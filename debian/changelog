@@ -1,3 +1,10 @@
+kernelcraft (1.2) kinetic; urgency=medium
+
+  * New version 1.2:
+    - introduce ~/.kc.config
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 09 Feb 2023 16:52:04 +0100
+
 kernelcraft (1.1) kinetic; urgency=medium
 
   * New version 1.1:
