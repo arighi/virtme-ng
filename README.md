@@ -1,21 +1,21 @@
 What is KernelCraft?
 ====================
 
-KernelCraft is a tool that allows to setup a lab to experiment different
-kernel versions in a safe virtualized environment, re-using the entire
-filesystem of the running machine as a safe live-copy, without affecting
-the real filesystem of the host.
+KernelCraft is a tool that allows to easily and quickly recompile and test a
+Linux kernel, starting from the source code.
 
-In order to to this a minimal config is produced (with the bare minimum support
-to test the kernel inside kvm), then the selected kernel is automatically built
-and started inside kvm, using the filesystem of the host as a copy-on-write
-snapshot.
+It allows to recompile the kernel in few minutes (rather than hours), then the
+kernel is automatically started in a virtualized environment that is an exact
+copy-on-write copy of your live system, which means that any changes made to
+the virtualized environment do not affect the host system.
+
+In order to do this a minimal config is produced (with the bare minimum support
+to test the kernel inside qemu), then the selected kernel is automatically
+built and started inside qemu, using the filesystem of the host as a
+copy-on-write snapshot.
 
 This means that you can safely destroy the entire filesystem, crash the kernel,
 etc. without affecting the host.
-
-KernelCraft is meant to be a tool that allows you to easily and quickly test
-kernels (e.g., bisecting a regression).
 
 Kernels produced with KernelCraft are lacking lots of features, in order to
 reduce the build time to the minimum and still provide you a usable kernel
@@ -178,6 +178,11 @@ inside the ~/.kernelcraft folder.
 
 Then a minimal custom .config is generated using (a custom version of)
 virtme-configkernel.
+
+It is possible to specify a set of custom configs (.config chunk) in
+~/.kc.config, these user-specific settings will override the default settings
+of virtme-configkernel (except for the mandatory configs that are required to
+boot and test the kernel inside qemu, using virtme).
 
 Then the kernel is compiled either locally or on an external build host (if the
 `--build-host` option is used); once the build is done only the required files
