@@ -126,6 +126,11 @@ Examples
    $ kc -s --disk /tmp/disk.img
 ```
 
+ - Recompile the kernel enabling Rust support (using specific versions of the
+   Rust toolchain binaries):
+
+   $ kc RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
+
  - Test latest mainline kernel on arm64 (using a separate chroot in
    /opt/chroot/arm64 as the main filesystem):
 ```
