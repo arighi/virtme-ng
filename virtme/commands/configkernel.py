@@ -40,7 +40,7 @@ def make_parser():
     g.add_argument('--update', action='store_true',
                         help='Update existing config for virtme')
 
-    parser.add_argument('envs', metavar='envs', type=str, nargs='+',
+    parser.add_argument('envs', metavar='envs', type=str, nargs='*',
                         help='Additional Makefile variables')
 
     return parser
