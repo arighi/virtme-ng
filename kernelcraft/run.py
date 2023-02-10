@@ -81,6 +81,8 @@ def make_parser():
     parser.add_argument('--force', action='store_true',
             help='Force reset git repository to target branch or commit (warning: this may drop uncommitted changes)')
 
+    parser.add_argument('envs', metavar='envs', type=str, nargs='+',
+                        help='Additional Makefile variables')
     return parser
 
 _ARGPARSER = make_parser()
@@ -194,7 +196,7 @@ class KernelSource:
                 arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
             check_call(['git', 'reset', '--hard', target], stdout=sys.stderr, stdin=DEVNULL)
 
-    def config(self, arch=None, config=None):
+    def config(self, arch=None, config=None, envs=()):
         cmd = 'virtme-configkernel --defconfig'
         if arch is not None:
             if arch not in ARCH_MAPPING:
@@ -206,9 +208,12 @@ class KernelSource:
             cmd += f' --custom {config}'
         elif os.path.exists(user_config):
             cmd += f' --custom {user_config}'
+        # Propagate additional Makefile variables
+        for var in envs:
+            cmd += f' {var} '
         check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
 
-    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False):
+    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False, envs=()):
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
@@ -234,6 +239,9 @@ class KernelSource:
             make_command = MAKE_COMMAND
         if cross_compile and cross_arch:
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={cross_arch}'
+        # Propagate additional Makefile variables
+        for var in envs:
+            make_command += f' {var} '
         if build_host is None:
             check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr, stdin=DEVNULL)
             return
@@ -376,11 +384,11 @@ def main():
         if not args.skip_build:
             ks.checkout(release=args.release, commit=args.commit, \
                         build_host=args.build_host, force=args.force)
-            ks.config(arch=args.arch, config=args.config)
+            ks.config(arch=args.arch, config=args.config, envs=args.envs)
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
                     build_host_vmlinux=args.build_host_vmlinux, \
-                    skip_modules=args.skip_modules)
+                    skip_modules=args.skip_modules, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
                memory=args.memory, network=args.network, disk=args.disk,
                execute=args.exec, opts=args.opts, \
