@@ -40,6 +40,9 @@ def make_parser():
     g.add_argument('--update', action='store_true',
                         help='Update existing config for virtme')
 
+    parser.add_argument('envs', metavar='envs', type=str, nargs='+',
+                        help='Additional Makefile variables')
+
     return parser
 
 _ARGPARSER = make_parser()
@@ -212,6 +215,10 @@ def main():
 
     with open(config, 'ab') as conffile:
         conffile.write('\n'.join(conf).encode('utf-8'))
+
+    # Propagate additional Makefile variables
+    for var in args.envs:
+        archargs.append(shlex.quote(var))
 
     subprocess.check_call(['make'] + archargs + [updatetarget])
 
