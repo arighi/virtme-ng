@@ -81,7 +81,7 @@ def make_parser():
     parser.add_argument('--force', action='store_true',
             help='Force reset git repository to target branch or commit (warning: this may drop uncommitted changes)')
 
-    parser.add_argument('envs', metavar='envs', type=str, nargs='+',
+    parser.add_argument('envs', metavar='envs', type=str, nargs='*',
                         help='Additional Makefile variables')
     return parser
 
