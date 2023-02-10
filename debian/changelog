@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu7) kinetic; urgency=medium
+
+  * virtme-configkernel: allow to propagate makefile variable definitions
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 10 Feb 2023 09:08:56 +0100
+
 virtme (0.1.1-1ubuntu6) kinetic; urgency=medium
 
   * virtme-configkernel: split mandatory configs vs optional configs
