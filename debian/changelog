@@ -1,3 +1,10 @@
+kernelcraft (1.4) kinetic; urgency=medium
+
+  * New version 1.4:
+    - fix: set propagated makefile arguments as optional
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 10 Feb 2023 12:14:25 +0100
+
 kernelcraft (1.3) kinetic; urgency=medium
 
   * New version 1.3:
