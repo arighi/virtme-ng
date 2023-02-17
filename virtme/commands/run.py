@@ -100,6 +100,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Use the specified busybox binary.')
 
     g = parser.add_argument_group(title='Virtualizer settings')
+    g.add_argument('--qemu-bin', action='store', default=None,
+                   help="Use specified QEMU binary.")
     g.add_argument('-q', '--qemu-opt', action='append', default=[],
                    help="Add a single QEMU argument.  Use this when --qemu-opts's greedy behavior is problematic.'")
     g.add_argument('--qemu-opts', action='store', nargs=argparse.REMAINDER,
@@ -289,7 +291,7 @@ def do_it() -> int:
     arch = architectures.get(args.arch)
     is_native = (args.arch == uname.machine)
 
-    qemu = qemu_helpers.Qemu(arch.qemuname)
+    qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
     qemu.probe()
 
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs

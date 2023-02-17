@@ -15,14 +15,20 @@ class Qemu(object):
     qemubin: str
     version: Optional[str]
 
-    def __init__(self, arch) -> None:
+    def __init__(self, qemubin, arch) -> None:
         self.arch = arch
 
-        qemubin = shutil.which('qemu-system-%s' % arch)
-        if qemubin is None and arch == os.uname().machine:
-            qemubin = shutil.which('qemu-kvm')
-        if qemubin is None:
-            raise ValueError('cannot find qemu for %s' % arch)
+        if not qemubin:
+            qemubin = shutil.which('qemu-system-%s' % arch)
+            if qemubin is None and arch == os.uname().machine:
+                qemubin = shutil.which('qemu-kvm')
+            if qemubin is None:
+                raise ValueError('cannot find qemu for %s' % arch)
+        else:
+            if not os.path.isfile(qemubin):
+                raise ValueError('specified qemu binary "%s" does not exist' % qemubin)
+            if not os.access(qemubin, os.X_OK):
+                raise ValueError('specified qemu binary "%s" is not executable' % qemubin)
 
         self.qemubin = qemubin
         self.version = None
