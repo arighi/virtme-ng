@@ -1,3 +1,11 @@
+kernelcraft (1.6) lunar; urgency=medium
+
+  * New version 1.6:
+    - introduce option --kconfig
+    - allow to specify multiple .config chunks with --config
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 22 Feb 2023 09:01:13 +0100
+
 kernelcraft (1.5) lunar; urgency=medium
 
   * New version 1.5:
