@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu10) lunar; urgency=medium
+
+  * drop .git from source package
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 22 Feb 2023 09:07:37 +0100
+
 virtme (0.1.1-1ubuntu9) lunar; urgency=medium
 
   * virtme-configkernel: allow to specify --custom multiple times
