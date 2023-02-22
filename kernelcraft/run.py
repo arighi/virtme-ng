@@ -33,11 +33,14 @@ def make_parser():
     ga.add_argument('--dump', '-d', action='store_true',
             help='Generate a memory dump of the running kernel and inspect it')
 
-    parser.add_argument('--dump-file', action='store',
-            help='Generate a memory dump of the running kernel to a target file')
-
     ga.add_argument('--skip-build', '-s', action='store_true',
             help='Start the previously compiled kernel without trying to rebuild it')
+
+    parser.add_argument('--kconfig', '-k', action='store_true',
+            help='Only generate the kernel .config without building/running anything')
+
+    parser.add_argument('--dump-file', action='store',
+            help='Generate a memory dump of the running kernel to a target file')
 
     parser.add_argument('--skip-modules', '-S', action='store_true',
             help='Run a really fast build by skipping external modules (no external modules support)')
@@ -385,6 +388,8 @@ def main():
             ks.checkout(release=args.release, commit=args.commit, \
                         build_host=args.build_host, force=args.force)
             ks.config(arch=args.arch, config=args.config, envs=args.envs)
+            if args.kconfig:
+                return
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
                     build_host_vmlinux=args.build_host_vmlinux, \

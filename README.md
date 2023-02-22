@@ -87,6 +87,11 @@ Examples
    $ kc -s
 ```
 
+ - Only generate .config with the latest mainline kernel:
+```
+   $ kc -r mainline --kconfig
+```
+
  - Generate and inspect a memory dump of the currently tested kernel (crash
    tool needs to be installed):
 ```
