@@ -48,8 +48,8 @@ def make_parser():
     parser.add_argument('--commit', '-c', action='store',
             help='Use a kernel identified by a specific commit id, tag or branch')
 
-    parser.add_argument('--config', '-f', action='store',
-            help='Use a specific kernel .config snippet to override default config settings')
+    parser.add_argument('--config', '-f', action='append',
+            help='Use one (or more) specific kernel .config snippet to override default config settings')
 
     parser.add_argument('--memory', '-m', action='store',
             help='Set guest memory size (qemu -m flag)')
@@ -207,9 +207,10 @@ class KernelSource:
             arch = ARCH_MAPPING[arch]['qemu_name']
             cmd += f' --arch {arch}'
         user_config = str(Path.home()) + '/.kc.config'
-        if config is not None:
-            cmd += f' --custom {config}'
-        elif os.path.exists(user_config):
+        if config:
+            for c in config:
+                cmd += f' --custom {c}'
+        if os.path.exists(user_config):
             cmd += f' --custom {user_config}'
         # Propagate additional Makefile variables
         for var in envs:
