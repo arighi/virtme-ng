@@ -11,7 +11,7 @@ from pathlib import Path
 from shutil import copyfile
 from argcomplete import autocomplete
 
-VERSION = '1.6'
+VERSION = '1.7'
 
 def make_parser():
     parser = argparse.ArgumentParser(
