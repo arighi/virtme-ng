@@ -51,6 +51,9 @@ def make_parser():
     parser.add_argument('--config', '-f', action='append',
             help='Use one (or more) specific kernel .config snippet to override default config settings')
 
+    parser.add_argument('--cpus', '-p', action='store',
+        help='Set guest CPU count (qemu -smp flag)')
+
     parser.add_argument('--memory', '-m', action='store',
             help='Set guest memory size (qemu -m flag)')
 
@@ -283,7 +286,7 @@ class KernelSource:
                 check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
             check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
-    def run(self, arch=None, root=None, memory=None, network=None, disk=None, execute=None, opts=None, skip_modules=False):
+    def run(self, arch=None, root=None, cpus=None, memory=None, network=None, disk=None, execute=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
             create_root(root, arch)
@@ -306,6 +309,8 @@ class KernelSource:
             mods = '--mods none'
         else:
             mods = '--mods auto'
+        if cpus is None:
+            cpus = self.cpus
         if memory is None:
             memory = 4096
         if execute is not None:
@@ -329,7 +334,7 @@ class KernelSource:
             opts = ''
         # Start VM using virtme
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/boot', '/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {opts} --qemu-opts -m {memory} -smp {self.cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {opts} --qemu-opts -m {memory} -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)
 
     def dump(self, dump_file):
@@ -396,7 +401,7 @@ def main():
                     build_host_vmlinux=args.build_host_vmlinux, \
                     skip_modules=args.skip_modules, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
-               memory=args.memory, network=args.network, disk=args.disk,
+               cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
                execute=args.exec, opts=args.opts, \
                skip_modules=args.skip_modules)
 
