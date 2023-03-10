@@ -11,7 +11,7 @@ PATH=$PATH:/sbin:/usr/sbin
 
 COPY_MODULES=${COPY_MODULES:-"false"}
 
-function print_help {
+print_help() {
     script_name=$(basename "$0")
     echo "usage: ${script_name} [-h | --help] [-c | --copy-modules]"
     echo ""
@@ -54,7 +54,7 @@ find "$MODDIR/kernel" -type l -print0 |xargs -0 rm -f --
 sed 's:\.o$:.ko:' modules.order | while read -r i; do
     [ ! -e "$i" ] && i=$(echo "$i" | sed s:^kernel/::)
     mkdir -p "$MODDIR/kernel/$(dirname "$i")"
-    if [[ "$COPY_MODULES" == "true" ]]; then
+    if [ "$COPY_MODULES" = "true" ]; then
         cp "$i" "$MODDIR/kernel/$i"
     else
         ln -sr "$i" "$MODDIR/kernel/$i"
