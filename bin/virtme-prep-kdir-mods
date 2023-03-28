@@ -27,6 +27,10 @@ find "$MODDIR/kernel" -type l -print0 |xargs -0 rm -f --
 while read -r i; do
     [ ! -e "$i" ] && i=$(echo "$i" | sed s:^kernel/::)
     mkdir -p "$MODDIR/kernel/$(dirname "$i")"
+    # Starting with v6.2 modules.order has been changed to list .o files
+    # instead of .ko, make sure to support both, see kernel commit:
+    #   f65a486821cf ("kbuild: change module.order to list *.o instead of *.ko")
+    i=$(echo $i | sed "s/\.o$/.ko/")
     ln -sr "$i" "$MODDIR/kernel/$i"
 done < modules.order
 
