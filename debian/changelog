@@ -1,3 +1,9 @@
+virtme (0.1.1-1ubuntu11) lunar; urgency=medium
+
+  * virtme-prep-kdir-mods: support new modules.order format
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 28 Mar 2023 08:53:26 +0200
+
 virtme (0.1.1-1ubuntu10) lunar; urgency=medium
 
   * drop .git from source package
