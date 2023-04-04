@@ -167,9 +167,7 @@ class KernelSource:
         # Initialize known kernels
         conf = str(Path.home()) + '/.kernelcraft.conf'
         if not Path(conf).exists():
-            default_conf = '/etc/kernelcraft.conf'
-            if not Path(default_conf).exists():
-                default_conf = pkg_resources.resource_filename('kernelcraft', '../etc/kernelcraft.conf')
+            default_conf = pkg_resources.resource_filename('kernelcraft', '../etc/kernelcraft.conf')
             copyfile(default_conf, conf)
         with open(conf) as fd:
             self.kernel_release = json.loads(fd.read())
