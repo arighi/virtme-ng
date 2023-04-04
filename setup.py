@@ -21,7 +21,7 @@ setup(
                                        'README.md'), 'r').read(),
     long_description_content_type="text/markdown",
     packages=['kernelcraft'],
-    install_requires=['virtme'],
+    install_requires=['argcomplete', 'virtme'],
     include_package_data=True,
     entry_points = {
         'console_scripts': [
