@@ -3,7 +3,7 @@
 import os
 import sys
 from setuptools import setup
-from kernelcraft.utils import VERSION, conf_path
+from kernelcraft.utils import VERSION, CONF_PATH
 
 if sys.version_info < (3,3):
     print('kernelcraft requires Python 3.3 or higher')
@@ -29,7 +29,7 @@ setup(
         ]
     },
     data_files = [
-        (str(conf_path), ['cfg/kernelcraft.conf']),
+        (str(CONF_PATH), ['cfg/kernelcraft.conf']),
     ],
     classifiers=['Environment :: Console',
                  'Intended Audience :: Developers',
