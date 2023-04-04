@@ -164,9 +164,6 @@ class KernelSource:
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
         conf_path = self.get_conf_file_path()
-        if not conf_path.exists():
-            sys.stderr.write(f"ERROR: Missing {conf_path}\n")
-            sys.exit(1)
         with open(conf_path) as fd:
             conf_data = json.loads(fd.read())
             if 'repo' in conf_data:
@@ -176,13 +173,19 @@ class KernelSource:
                 self.kernel_release = conf_data
         self.cpus = str(os.cpu_count())
 
-    # First check if there is a config file in the users home, then fallback to
-    # /etc directory for older setup
+    # First check if there is a config file in the user's home config
+    # directory, then check for a single config file in ~/.kernelcraft.conf and
+    # finally check for /etc/kernelcraft.conf. If none of them exist, report an
+    # error and exit.
     def get_conf_file_path(self):
-        if CONF_FILE.exists():
-            return CONF_FILE
-
-        return Path('/etc', 'kernelcraft.conf')
+        configs = (CONF_FILE,
+                   Path(Path.home(), '.kernelcraft.conf'),
+                   Path('/etc', 'kernelcraft.conf'))
+        for conf in configs:
+            if conf.exists():
+                return conf
+        sys.stderr.write("ERROR: missing configuration file\n")
+        sys.exit(1)
 
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
