@@ -3,7 +3,7 @@
 import os
 import sys
 from setuptools import setup
-from kernelcraft.run import VERSION
+from kernelcraft.version import VERSION
 
 if sys.version_info < (3,3):
     print('kernelcraft requires Python 3.3 or higher')
