@@ -11,7 +11,7 @@ from pathlib import Path
 from shutil import copyfile
 from argcomplete import autocomplete
 
-VERSION = '1.8'
+from kernelcraft.version import VERSION
 
 def make_parser():
     parser = argparse.ArgumentParser(
