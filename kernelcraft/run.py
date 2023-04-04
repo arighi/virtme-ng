@@ -170,7 +170,12 @@ class KernelSource:
             default_conf = pkg_resources.resource_filename('kernelcraft', '../etc/kernelcraft.conf')
             copyfile(default_conf, conf)
         with open(conf) as fd:
-            self.kernel_release = json.loads(fd.read())
+            conf_data = json.loads(fd.read())
+            if 'repo' in conf_data:
+                self.kernel_release = conf_data['repo']
+                self.default_opts = conf_data['default_opts']
+            else:
+                self.kernel_release = conf_data
         self.cpus = str(os.cpu_count())
 
     def _format_cmd(self, cmd):
@@ -381,6 +386,10 @@ def main():
     args = _ARGPARSER.parse_args()
 
     ks = KernelSource(args.init)
+    if ks.default_opts:
+        for opt in ks.default_opts:
+            val = ks.default_opts[opt]
+            setattr(args, opt, val)
     if args.init:
         print('KernelCraft git repository initialized')
     elif args.clean:
