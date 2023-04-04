@@ -164,7 +164,7 @@ class KernelSource:
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
         if not conf_file.exists():
-            sys.stderr.write("ERROR: Missing {conf_file}\n")
+            sys.stderr.write(f"ERROR: Missing {conf_file}\n")
             sys.exit(1)
         with open(conf_file) as fd:
             conf_data = json.loads(fd.read())
