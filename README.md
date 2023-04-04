@@ -217,6 +217,26 @@ It is possible to recompile and test out-of-tree kernel modules inside the
 KernelCraft kernel, simply by building them against the local directory of the
 kernel git repository that was used to build and run the kernel.
 
+Default options
+===============
+
+Typically, if you always use kc with an external build server (e.g.,
+`kc --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you don't always
+want to specify these options, so instead, you can simply define them in
+~/.kernelcraft.conf under `default_opts` and then simply run `kc`.
+
+Example (always use an external build server called 'kathleen' and run make
+inside a build chroot called 'chroot:lunar-amd64'). To do so, modify the
+`default_opts` sections in ~/.kernelcraft.conf as following:
+
+    "default_opts" : {
+        "build_host": "kathleen",
+        "build_host_exec_prefix": "schroot -c chroot:lunar-amd64 --"
+    },
+
+Now you can simply run `kc` to build your kernel using the external build host,
+prepending the exec prefix command when running make.
+
 Troubleshooting
 ===============
 
