@@ -3,15 +3,13 @@ import os
 import sys
 import socket
 import shutil
-import pkg_resources
 import json
 import tempfile
 from subprocess import call, check_call, check_output, DEVNULL
 from pathlib import Path
-from shutil import copyfile
 from argcomplete import autocomplete
 
-VERSION = '1.8'
+from kernelcraft.utils import VERSION, conf_file
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -165,11 +163,10 @@ class KernelSource:
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
-        conf = str(Path.home()) + '/.kernelcraft.conf'
-        if not Path(conf).exists():
-            default_conf = pkg_resources.resource_filename('kernelcraft', '../etc/kernelcraft.conf')
-            copyfile(default_conf, conf)
-        with open(conf) as fd:
+        if not conf_file.exists():
+            sys.stderr.write("ERROR: Missing {conf_file}\n")
+            sys.exit(1)
+        with open(conf_file) as fd:
             conf_data = json.loads(fd.read())
             if 'repo' in conf_data:
                 self.kernel_release = conf_data['repo']

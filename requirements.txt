@@ -1,1 +1,2 @@
+argcomplete
 git+https://github.com/arighi/virtme@master#egg=virtme
