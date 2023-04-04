@@ -9,7 +9,7 @@ from subprocess import call, check_call, check_output, DEVNULL
 from pathlib import Path
 from argcomplete import autocomplete
 
-from kernelcraft.utils import VERSION, conf_file
+from kernelcraft.utils import VERSION, CONF_FILE
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -163,10 +163,11 @@ class KernelSource:
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
-        if not conf_file.exists():
-            sys.stderr.write(f"ERROR: Missing {conf_file}\n")
+        conf_path = self.get_conf_file_path()
+        if not conf_path.exists():
+            sys.stderr.write(f"ERROR: Missing {conf_path}\n")
             sys.exit(1)
-        with open(conf_file) as fd:
+        with open(conf_path) as fd:
             conf_data = json.loads(fd.read())
             if 'repo' in conf_data:
                 self.kernel_release = conf_data['repo']
@@ -174,6 +175,14 @@ class KernelSource:
             else:
                 self.kernel_release = conf_data
         self.cpus = str(os.cpu_count())
+
+    # First check if there is a config file in the users home, then fallback to
+    # /etc directory for older setup
+    def get_conf_file_path(self):
+        if CONF_FILE.exists():
+            return CONF_FILE
+
+        return Path('/etc', 'kernelcraft.conf')
 
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
