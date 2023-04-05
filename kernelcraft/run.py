@@ -48,6 +48,8 @@ def make_parser():
 
     parser.add_argument('--config', '-f', action='append',
             help='Use one (or more) specific kernel .config snippet to override default config settings')
+    parser.add_argument('--compiler', action='store',
+            help='Compiler to be used as CC when building the kernel')
 
     parser.add_argument('--cpus', '-p', action='store',
         help='Set guest CPU count (qemu -smp flag)')
@@ -232,7 +234,7 @@ class KernelSource:
             cmd += f' {var} '
         check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
 
-    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False, envs=()):
+    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False, compiler=None, envs=()):
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
@@ -252,10 +254,11 @@ class KernelSource:
             kernel_image = 'bzImage'
             cross_compile = None
             cross_arch = None
+        make_command = MAKE_COMMAND
+        if compiler:
+            make_command += f' CC={compiler}'
         if skip_modules:
-            make_command = MAKE_COMMAND + ' ' + target
-        else:
-            make_command = MAKE_COMMAND
+            make_command += f' {target}'
         if cross_compile and cross_arch:
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={cross_arch}'
         # Propagate additional Makefile variables
@@ -415,7 +418,7 @@ def main():
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
                     build_host_vmlinux=args.build_host_vmlinux, \
-                    skip_modules=args.skip_modules, envs=args.envs)
+                    skip_modules=args.skip_modules, compiler=args.compiler, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
                cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
                execute=args.exec, opts=args.opts, \
