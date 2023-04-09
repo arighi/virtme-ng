@@ -205,7 +205,7 @@ class Arch_ppc(Arch):
         Arch.__init__(self, name)
 
         self.defconfig_target = 'ppc64e_defconfig'
-        self.qemuname = 'ppc64le'
+        self.qemuname = 'ppc64'
         self.linuxname = 'powerpc'
         self.gccname = 'powerpc64le'
 
