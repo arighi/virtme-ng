@@ -285,7 +285,7 @@ class KernelSource:
         check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'], stdout=sys.stderr, stdin=DEVNULL)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
-            if build_host_vmlinux:
+            if build_host_vmlinux or arch == 'ppc64el':
                 vmlinux = '--include=vmlinux'
             else:
                 vmlinux = ''
