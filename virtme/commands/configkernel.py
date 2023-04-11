@@ -103,6 +103,9 @@ _GENERIC_CONFIG = [
 ]
 
 _GENERIC_CONFIG_OPTIONAL = [
+    '# initramfs support',
+    'BLK_DEV_INITRD=y',
+
     '# Provide USB support as module',
     'CONFIG_USB=m'
 
