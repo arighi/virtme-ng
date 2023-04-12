@@ -4,8 +4,8 @@ import os
 import sys
 from setuptools import setup
 
-if sys.version_info < (3,3):
-    print('virtme requires Python 3.3 or higher')
+if sys.version_info < (3,8):
+    print('virtme requires Python 3.8 or higher')
     sys.exit(1)
 
 _VERSION = '0.1.1'
