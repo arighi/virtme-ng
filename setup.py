@@ -8,7 +8,7 @@ if sys.version_info < (3,8):
     print('virtme requires Python 3.8 or higher')
     sys.exit(1)
 
-_VERSION = '0.1.1'
+_VERSION = '0.1.2'
 
 setup(
     name='virtme',
