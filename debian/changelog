@@ -1,3 +1,20 @@
+kernelcraft (1.9) lunar; urgency=medium
+
+  * New version 1.9:
+    - run: automatically enable --build-host-vmlinux on ppc64
+    - run: Add new --compiler argument
+    - config: support single config file and new config folder
+    - setup: Fallback to /etc/kernelcraft.conf file .config doesn't exists
+    - run: fix missing f-string in error message
+    - setup: Install kernelcraft.conf and update the references
+    - setup: Add argcomplete as dependency
+    - setup: Create version.py to avoid missing package problems on install
+    - config: introduce default_opts keyword to the config file
+    - config: drop test git repo 'arighi-rust'
+    - config: drop /etc/kernelcraft.conf and always use config in $HOME
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 13 Apr 2023 16:12:05 +0200
+
 kernelcraft (1.8) lunar; urgency=medium
 
   * New version 1.8:
