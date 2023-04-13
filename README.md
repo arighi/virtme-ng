@@ -21,6 +21,9 @@ Kernels produced with KernelCraft are lacking lots of features, in order to
 reduce the build time to the minimum and still provide you a usable kernel
 capable of running your tests and experiments.
 
+KernelCraft is based on virtme, written by Andy Lutomirski <luto@kernel.org>
+([web][korg-web] | [git][korg-git]).
+
 Quick start
 ===========
 
@@ -60,17 +63,29 @@ repository):
 Requirements
 ============
 
-KernelCraft requires a customized version of virtme, available here
-[web][arighi-virtme].
+ * You need Python 3.8 or higher
 
-You may also need to install `crash` to use the memory dump inspection feature
-(see example below).
+ * QEMU 1.6 or higher is recommended (QEMU 1.4 and 1.5 are partially supported
+   using a rather ugly kludge)
+   * You will have a much better experience if KVM is enabled.  That means that
+     you should be on bare metal with hardware virtualization (VT-x or SVM)
+     enabled or in a VM that supports nested virtualization.  On some Linux
+     distributions, you may need to be a member of the "kvm" group.  Using
+     VirtualBox or most VPS providers will fall back to emulation.
 
-If you are using Ubuntu you can install all the required packages and dependencies from this ppa:
-[web][kernelcraft-ppa].
+ * Depending on the options you use, you may need a statically linked `busybox`
+   binary somewhere in your path.
+
+ * You may need to install `crash` to use the memory dump inspection feature
+   (see example below).
 
 Examples
 ========
+
+ - Build and run a kernel from a local git repository:
+```
+   $ kc
+```
 
  - Build and run v6.1-rc3 from the public mainline git repository:
 ```
@@ -192,16 +207,16 @@ virtme-configkernel.
 
 It is possible to specify a set of custom configs (.config chunk) in
 ~/.kc.config, these user-specific settings will override the default settings
-of virtme-configkernel (except for the mandatory configs that are required to
-boot and test the kernel inside qemu, using virtme).
+of virtme-configkernel (except for the mandatory configs that are required to boot
+and test the kernel inside qemu, using virtme-run).
 
 Then the kernel is compiled either locally or on an external build host (if the
 `--build-host` option is used); once the build is done only the required files
 needed to test the kernel are copied from the remote host if an external build
 host is used.
 
-Then the kernel is executed using virtme. This allows to test the kernel using
-a safe copy-on-write snapshot of the entire host filesystem.
+Then the kernel is executed using the virtme module. This allows to test the
+kernel using a safe copy-on-write snapshot of the entire host filesystem.
 
 All the kernels compiled with KernelCraft have a `-rc` suffix to their kernel
 version, this allows to easily determine if you're inside a KernelCraft kernel
@@ -281,6 +296,11 @@ Troubleshooting
   $ kc --clean --build-host HOSTNAME
 ```
 
+Contributing
+============
+
+Please see DCO-1.1.txt.
+
 Credits
 =======
 
@@ -291,5 +311,5 @@ KernelCraft is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
-[arighi-virtme]: https://github.com/arighi/virtme "arighi virtme"
+[virtme]: https://github.com/amluto/virtme "virtme"
 [kernelcraft-ppa]: https://launchpad.net/~arighi/+archive/ubuntu/kernelcraft "kernelcraft ppa"

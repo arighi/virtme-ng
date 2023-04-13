@@ -13,7 +13,6 @@ Depends:
  ${shlibs:Depends},
  ${misc:Depends},
  ${python3:Depends},
- virtme,
  crash,
  gcc-12,
  autoconf,

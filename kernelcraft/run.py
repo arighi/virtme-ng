@@ -150,6 +150,8 @@ git reset --hard __kernelcraft__
 def create_root(destdir, arch):
     if os.path.exists(destdir):
         return
+    # Use Ubuntu's cloud images to create a rootfs, these images are fairly
+    # small and they provide a nice environment to test kernels.
     release = check_output('lsb_release -s -c', shell=True).decode(sys.stdout.encoding).rstrip()
     url = f'https://cloud-images.ubuntu.com/{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz'
     prevdir = os.getcwd()
@@ -347,7 +349,7 @@ class KernelSource:
             opts = ' '.join(opts)
         else:
             opts = ''
-        # Start VM using virtme
+        # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/boot', '/etc', '/home', '/opt', '/srv', '/usr', '/var'))
         cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {opts} --qemu-opts -m {memory} -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)

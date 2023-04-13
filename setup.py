@@ -5,8 +5,8 @@ import sys
 from setuptools import setup
 from kernelcraft.utils import VERSION, CONF_PATH
 
-if sys.version_info < (3,3):
-    print('kernelcraft requires Python 3.3 or higher')
+if sys.version_info < (3,8):
+    print('KernelCraft requires Python 3.8 or higher')
     sys.exit(1)
 
 setup(
@@ -14,23 +14,35 @@ setup(
     version=VERSION,
     author='Andrea Righi',
     author_email='andrea.righi@canonical.com',
-    description='',
+    description='Build and run a kernel inside a virtualized snapshot of your live system',
     url='https://git.launchpad.net/~arighi/+git/kernelcraft',
     license='GPLv2',
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md'), 'r').read(),
     long_description_content_type="text/markdown",
-    packages=['kernelcraft'],
-    install_requires=['argcomplete', 'virtme'],
-    include_package_data=True,
+    packages=['kernelcraft', 'virtme', 'virtme.commands', 'virtme.guest'],
+    install_requires=['argcomplete'],
     entry_points = {
         'console_scripts': [
             'kc = kernelcraft.run:main',
+            'virtme-run = virtme.commands.run:main',
+            'virtme-configkernel = virtme.commands.configkernel:main',
+            'virtme-mkinitramfs = virtme.commands.mkinitramfs:main',
         ]
     },
     data_files = [
         (str(CONF_PATH), ['cfg/kernelcraft.conf']),
     ],
+    scripts = [
+        'bin/virtme-prep-kdir-mods',
+        ],
+    package_data = {
+        'virtme.guest': [
+            'virtme-init',
+            'virtme-udhcpc-script',
+        ],
+    },
+    include_package_data=True,
     classifiers=['Environment :: Console',
                  'Intended Audience :: Developers',
                  'Intended Audience :: System Administrators',

@@ -10,8 +10,8 @@
 # source distribution.
 
 import sys
-if sys.version_info < (3, 3):
-    sys.stderr.write('ERROR: kernelcraft requires Python 3.3 or higher\n')
+if sys.version_info < (3,8):
+    print('KernelCraft requires Python 3.8 or higher')
     sys.exit(1)
 
 from kernelcraft import run

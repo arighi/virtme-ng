@@ -1,0 +1,68 @@
+#!/bin/sh
+
+# This is still a bit of an experiment.
+FAKEVER=0.0.0
+MODDIR=".virtme_mods/lib/modules/$FAKEVER"
+
+# Some distro don't have /sbin or /usr/sbin in user's default path. Make sure
+# to setup the right path to find all the commands needed to setup the modules
+# (depmod, etc.).
+PATH=$PATH:/sbin:/usr/sbin
+
+COPY_MODULES=${COPY_MODULES:-"false"}
+
+print_help() {
+    script_name=$(basename "$0")
+    echo "usage: ${script_name} [-h | --help] [-c | --copy-modules]"
+    echo ""
+    echo "optional arguments:"
+    echo "  -h, --help          show this help message and exit"
+    echo "  -c, --copy-modules  copy kernel instead of linking"
+}
+
+while ":"; do
+    case "$1" in
+	-h | --help)
+	    print_help
+	    exit 0
+	    ;;
+	-c | --copy-modules)
+	    COPY_MODULES="true"
+	    shift
+	    ;;
+	*)
+	    break
+    esac
+done
+
+if ! [ -f "modules.order" ]; then
+    echo 'kc-prep-kdir-mods must be run from a kernel build directory' >&2
+    echo "modules.order is missing.  Your kernel may be too old or you didn't make modules." >&2
+    exit 1
+fi
+
+# Set up .virtme_mods/lib/modules/0.0.0 as a module directory for this kernel,
+# but fill it with symlinks instead of actual modules.
+
+mkdir -p "$MODDIR/kernel"
+ln -srfT . "$MODDIR/build"
+
+# Remove all preexisting symlinks and add symlinks to all modules that belong
+# to the build kenrnel.
+find "$MODDIR/kernel" -type l -print0 |xargs -0 rm -f --
+# from v6.2, modules.order lists .o files, we need the .ko ones
+sed 's:\.o$:.ko:' modules.order | while read -r i; do
+    [ ! -e "$i" ] && i=$(echo "$i" | sed s:^kernel/::)
+    mkdir -p "$MODDIR/kernel/$(dirname "$i")"
+    if [ "$COPY_MODULES" = "true" ]; then
+        cp "$i" "$MODDIR/kernel/$i"
+    else
+        ln -sr "$i" "$MODDIR/kernel/$i"
+    fi
+done
+
+# Link in the files that make modules_install would copy
+ln -srf modules.builtin modules.builtin.modinfo modules.order "$MODDIR/"
+
+# Now run depmod to collect dependencies
+depmod -ae -F System.map -b .virtme_mods "$FAKEVER"
