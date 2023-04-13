@@ -1,3 +1,16 @@
+virtme (0.1.2-1ubuntu1) lunar; urgency=medium
+
+  * Bump minimum python version to 3.8
+  * virtme-init: allow root to run sudo
+  * virtme-configkernel: enable BLK_DEV_INITRD as optional
+  * virtme-prep-kdir-mods: shellcheck: Remove bashisms
+  * virtme-prep-kdir-mods: Add --copy-modules argument
+  * virtme/architectures.py: Fix ppc64le support
+  * allow user to specify custom qemu binary to run
+  * virtme-init: exclude /root from systemd-tmpfiles
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 13 Apr 2023 07:44:09 +0200
+
 virtme (0.1.1-1ubuntu11) lunar; urgency=medium
 
   * virtme-prep-kdir-mods: support new modules.order format
