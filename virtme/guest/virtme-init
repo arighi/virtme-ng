@@ -130,7 +130,7 @@ log "basic initialization done"
 # Does the system use systemd-tmpfiles?
 tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
     log "running systemd-tmpfiles"
-    systemd-tmpfiles --create --boot --exclude-prefix="/dev"
+    systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
 }
 
 # Make dbus work (if tmpfiles wasn't there or didn't create the directory).
