@@ -66,6 +66,9 @@ def make_parser():
     parser.add_argument('--exec', '-e', action='store',
             help='Execute a command inside the kernel and exit')
 
+    parser.add_argument('--append', '-a', action='append',
+            help='Additional kernel boot options (can be used multiple times)')
+
     parser.add_argument('--opts', '-o', action='append',
             help='Additional options passed to virtme-run (can be used multiple times)')
 
@@ -303,7 +306,7 @@ class KernelSource:
                 check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
             check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
-    def run(self, arch=None, root=None, cpus=None, memory=None, network=None, disk=None, execute=None, opts=None, skip_modules=False):
+    def run(self, arch=None, root=None, cpus=None, memory=None, network=None, disk=None, append=None, execute=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
             create_root(root, arch)
@@ -345,13 +348,18 @@ class KernelSource:
             disk = disk_str
         else:
             disk = ''
+        if append is not None:
+            # Split spaces into additional items in the append list
+            append = ' '.join(['-a ' + item for _l in [item.split() for item in append] for item in _l])
+        else:
+            append = ''
         if opts is not None:
             opts = ' '.join(opts)
         else:
             opts = ''
         # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/boot', '/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {opts} --qemu-opts -m {memory} -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --qemu-opts -m {memory} -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)
 
     def dump(self, dump_file):
@@ -423,7 +431,7 @@ def main():
                     skip_modules=args.skip_modules, compiler=args.compiler, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
                cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
-               execute=args.exec, opts=args.opts, \
+               append=args.append, execute=args.exec, opts=args.opts, \
                skip_modules=args.skip_modules)
 
 if __name__ == '__main__':
