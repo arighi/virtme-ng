@@ -1,3 +1,15 @@
+!!! WARNING !!!
+===============
+
+The original project is currently unmaintained:
+https://github.com/amluto/virtme
+
+For this reason we have created a separate project called KernelCraft that
+includes and supports all the existing virtme features:
+https://github.com/arighi/kernelcraft
+
+From now on all the development activity will continue in KernelCraft.
+
 What is virtme?
 ===============
 
