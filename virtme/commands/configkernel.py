@@ -181,22 +181,22 @@ _GENERIC_CONFIG_OPTIONAL = [
     '# CONFIG_FB_MATROX is not set',
     '# CONFIG_FB_RADEON is not set',
     '# CONFIG_FB_IBM_GXT4500 is not set',
-    '# CONFIG_DRM is not set'
-    '# CONFIG_FB_VESA is not set'
-    '# CONFIG_YENTA is not set'
-    '# CONFIG_NETFILTER is not set'
-    '# CONFIG_RFKILL is not set'
-    '# CONFIG_ETHERNET is not set'
-    '# CONFIG_BLK_DEV_SR is not set'
-    '# CONFIG_TCP_MD5SIG is not set'
-    '# CONFIG_XFRM_USER is not set'
-    '# CONFIG_CRYPTO is not set'
-    '# CONFIG_EXT4_FS is not set'
-    '# CONFIG_VFAT_FS is not set'
-    '# CONFIG_FAT_FS is not set'
-    '# CONFIG_MSDOS_FS is not set'
-    '# CONFIG_AUTOFS4_FS is not set'
-    '# CONFIG_AUTOFS_FS is not set'
+    '# CONFIG_DRM is not set',
+    '# CONFIG_FB_VESA is not set',
+    '# CONFIG_YENTA is not set',
+    '# CONFIG_NETFILTER is not set',
+    '# CONFIG_RFKILL is not set',
+    '# CONFIG_ETHERNET is not set',
+    '# CONFIG_BLK_DEV_SR is not set',
+    '# CONFIG_TCP_MD5SIG is not set',
+    '# CONFIG_XFRM_USER is not set',
+    '# CONFIG_CRYPTO is not set',
+    '# CONFIG_EXT4_FS is not set',
+    '# CONFIG_VFAT_FS is not set',
+    '# CONFIG_FAT_FS is not set',
+    '# CONFIG_MSDOS_FS is not set',
+    '# CONFIG_AUTOFS4_FS is not set',
+    '# CONFIG_AUTOFS_FS is not set',
 ]
 
 def main():
