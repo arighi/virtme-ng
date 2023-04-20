@@ -106,10 +106,7 @@ _GENERIC_CONFIG_OPTIONAL = [
     '# initramfs support',
     'BLK_DEV_INITRD=y',
 
-    '# Provide USB support as module',
-    'CONFIG_USB=m'
-
-    '# BPF stuff',
+    '# BPF stuff & useful debugging features',
     'CONFIG_BPF=y',
     'CONFIG_BPF_SYSCALL=y',
     'CONFIG_BPF_JIT=y',
@@ -126,14 +123,11 @@ _GENERIC_CONFIG_OPTIONAL = [
     'CONFIG_UPROBES=y',
     'CONFIG_UPROBE_EVENTS=y',
     'CONFIG_DEBUG_FS=y',
-    'CONFIG_DEBUG_INFO_BTF=y',
-
-    '# Useful debugging features',
     'CONFIG_PROVE_LOCKING=y',
 
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
-    '# CONFIG_DRM is not set',
+    '# CONFIG_USB is not set'
     '# CONFIG_SOUND is not set',
     '# CONFIG_I2C is not set',
     '# CONFIG_INPUT_MOUSE is not set',
@@ -160,7 +154,22 @@ _GENERIC_CONFIG_OPTIONAL = [
     '# CONFIG_BTRFS_FS is not set',
     '# CONFIG_HFS_FS is not set',
     '# CONFIG_HFSPLUS_FS is not set',
-
+    '# CONFIG_DRM is not set'
+    '# CONFIG_FB_VESA is not set'
+    '# CONFIG_YENTA is not set'
+    '# CONFIG_NETFILTER is not set'
+    '# CONFIG_RFKILL is not set'
+    '# CONFIG_ETHERNET is not set'
+    '# CONFIG_BLK_DEV_SR is not set'
+    '# CONFIG_TCP_MD5SIG is not set'
+    '# CONFIG_XFRM_USER is not set'
+    '# CONFIG_CRYPTO is not set'
+    '# CONFIG_EXT4_FS is not set'
+    '# CONFIG_VFAT_FS is not set'
+    '# CONFIG_FAT_FS is not set'
+    '# CONFIG_MSDOS_FS is not set'
+    '# CONFIG_AUTOFS4_FS is not set'
+    '# CONFIG_AUTOFS_FS is not set'
 ]
 
 def main():
