@@ -196,7 +196,7 @@ def main():
         maketarget = 'allnoconfig'
         updatetarget = 'syncconfig'
     elif args.defconfig:
-        maketarget = arch.defconfig_target
+        maketarget = arch.defconfig_target + ' kvm_guest.config'
         updatetarget = 'olddefconfig'
     elif args.update:
         maketarget = None
@@ -208,7 +208,7 @@ def main():
 
     # Set up an initial config
     if maketarget:
-        subprocess.check_call(['make'] + archargs + [maketarget])
+        subprocess.check_call(['make'] + archargs + maketarget.split(' '))
 
     config = '.config'
 
