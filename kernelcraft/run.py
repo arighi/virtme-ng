@@ -243,13 +243,6 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
-            if arch == 'riscv64':
-                print('\n!!! WARNING !!!\n')
-                print('Kernel boot parameters are limited on riscv!')
-                print('Make sure to increase COMMAND_LINE_SIZE to at least 1024')
-                print('https://lore.kernel.org/lkml/e90289af-f557-58f2-f4c8-f79feab4f185@ghiti.fr/T/#t')
-                print('\nPress a key to continue (or CTRL+c to stop)')
-                input()
             target = ARCH_MAPPING[arch]['kernel_target']
             kernel_image = ARCH_MAPPING[arch]['kernel_image']
             cross_compile = ARCH_MAPPING[arch]['cross_compile']
@@ -320,6 +313,12 @@ class KernelSource:
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
+            if arch == 'riscv64':
+                print('\n!!! WARNING !!!\n')
+                print('Kernel boot parameters may be limited on riscv, if you are using an old kernel.')
+                print('Make sure to increase COMMAND_LINE_SIZE to at least 1024')
+                print('See: https://lore.kernel.org/lkml/e90289af-f557-58f2-f4c8-f79feab4f185@ghiti.fr/T/#t')
+                print('\n')
             if 'max-cpus' in ARCH_MAPPING[arch]:
                 self.cpus = ARCH_MAPPING[arch]['max-cpus']
             arch = '--arch ' + ARCH_MAPPING[arch]['qemu_name']
