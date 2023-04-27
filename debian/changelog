@@ -1,3 +1,15 @@
+kernelcraft (2.0) lunar; urgency=medium
+
+  * New version 2.0:
+    - merge virtme into kernelcraft
+    - virtme: make sure all the kvm guest configs are enabled
+    - configkernel: drop additional configs by default
+    - run: introduce --append option
+    - ppc64: Use pseries defconfig
+    - riscv64: print cmdline size warning without blocking
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Thu, 27 Apr 2023 09:47:33 +0200
+
 kernelcraft (1.9) lunar; urgency=medium
 
   * New version 1.9:
