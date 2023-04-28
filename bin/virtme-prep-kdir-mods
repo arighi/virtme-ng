@@ -36,7 +36,7 @@ while ":"; do
 done
 
 if ! [ -f "modules.order" ]; then
-    echo 'kc-prep-kdir-mods must be run from a kernel build directory' >&2
+    echo 'virtme-prep-kdir-mods must be run from a kernel build directory' >&2
     echo "modules.order is missing.  Your kernel may be too old or you didn't make modules." >&2
     exit 1
 fi

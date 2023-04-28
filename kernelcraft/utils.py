@@ -1,5 +1,5 @@
 from pathlib import Path
 
-VERSION = '2.0'
-CONF_PATH = Path(Path.home(), '.config', 'kernelcraft')
-CONF_FILE = Path(CONF_PATH, 'kernelcraft.conf')
+VERSION = '1.0'
+CONF_PATH = Path(Path.home(), '.config', 'virtme-ng')
+CONF_FILE = Path(CONF_PATH, 'virtme-ng.conf')

@@ -11,7 +11,7 @@
 
 import sys
 if sys.version_info < (3,8):
-    print('KernelCraft requires Python 3.8 or higher')
+    print('virtme requires Python 3.8 or higher')
     sys.exit(1)
 
 from virtme.commands import run

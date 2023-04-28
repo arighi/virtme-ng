@@ -20,7 +20,7 @@ def make_parser():
     ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
     ga.add_argument('--init', '-i', action='store_true',
-            help='Initialize a git repository to be used with KernelCraft')
+            help='Initialize a git repository to be used with virtme-ng')
 
     ga.add_argument('--release', '-r', action='store',
             help='Use a kernel from a specific Ubuntu release or upstream')
@@ -141,11 +141,11 @@ ARCH_MAPPING = {
     },
 }
 
-MAKE_COMMAND = "make LOCALVERSION=-kc"
+MAKE_COMMAND = "make LOCALVERSION=-virtme"
 
 REMOTE_BUILD_SCRIPT = '''#!/bin/bash
-cd ~/.kernelcraft
-git reset --hard __kernelcraft__
+cd ~/.virtme
+git reset --hard __virtme__
 [ -f debian/rules ] && fakeroot debian/rules clean
 {} {}
 '''
@@ -181,13 +181,13 @@ class KernelSource:
         self.cpus = str(os.cpu_count())
 
     # First check if there is a config file in the user's home config
-    # directory, then check for a single config file in ~/.kernelcraft.conf and
-    # finally check for /etc/kernelcraft.conf. If none of them exist, report an
+    # directory, then check for a single config file in ~/.virtme-ng.conf and
+    # finally check for /etc/virtme-ng.conf. If none of them exist, report an
     # error and exit.
     def get_conf_file_path(self):
         configs = (CONF_FILE,
-                   Path(Path.home(), '.kernelcraft.conf'),
-                   Path('/etc', 'kernelcraft.conf'))
+                   Path(Path.home(), '.virtme-ng.conf'),
+                   Path('/etc', 'virtme-ng.conf'))
         for conf in configs:
             if conf.exists():
                 return conf
@@ -228,7 +228,7 @@ class KernelSource:
                 arg_fail(f'unsupported architecture: {arch}')
             arch = ARCH_MAPPING[arch]['qemu_name']
             cmd += f' --arch {arch}'
-        user_config = str(Path.home()) + '/.kc.config'
+        user_config = str(Path.home()) + '/.config/virtme-ng/kernel.config'
         if config:
             for c in config:
                 cmd += f' --custom {c}'
@@ -266,21 +266,21 @@ class KernelSource:
             check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr, stdin=DEVNULL)
             return
         check_call(['ssh', build_host,
-                    'mkdir -p ~/.kernelcraft'], stdout=sys.stderr, stdin=DEVNULL)
+                    'mkdir -p ~/.virtme'], stdout=sys.stderr, stdin=DEVNULL)
         check_call(['ssh', build_host,
-                    'git init ~/.kernelcraft'], stdout=sys.stderr, stdin=DEVNULL)
-        check_call(['git', 'push', '--force', f"{build_host}:~/.kernelcraft",
-                    'HEAD:__kernelcraft__', ], stdout=sys.stderr, stdin=DEVNULL)
-        cmd = f'rsync .config {build_host}:.kernelcraft/.config'
+                    'git init ~/.virtme'], stdout=sys.stderr, stdin=DEVNULL)
+        check_call(['git', 'push', '--force', f"{build_host}:~/.virtme",
+                    'HEAD:__virtme__', ], stdout=sys.stderr, stdin=DEVNULL)
+        cmd = f'rsync .config {build_host}:.virtme/.config'
         check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or '', make_command + ' -j$(nproc --all)'))
             tmp.flush()
-            cmd = f'rsync {tmp.name} {build_host}:.kernelcraft/.kc-build'
+            cmd = f'rsync {tmp.name} {build_host}:.virtme/.kc-build'
             check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
         # Execute remote build script
-        check_call(['ssh', build_host, 'bash', '.kernelcraft/.kc-build'], stdout=sys.stderr, stdin=DEVNULL)
+        check_call(['ssh', build_host, 'bash', '.virtme/.kc-build'], stdout=sys.stderr, stdin=DEVNULL)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if build_host_vmlinux or arch == 'ppc64el':
@@ -288,9 +288,9 @@ class KernelSource:
             else:
                 vmlinux = ''
             if skip_modules:
-                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include={kernel_image} {vmlinux} --include=*.dtb --exclude="*" {build_host}:.kernelcraft/ ./'
+                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include={kernel_image} {vmlinux} --include=*.dtb --exclude="*" {build_host}:.virtme/ ./'
             else:
-                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.kernelcraft/ ./'
+                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.virtme/ ./'
             tmp.write(cmd)
             tmp.flush()
             check_call(['bash', tmp.name], stdout=sys.stderr, stdin=DEVNULL)
@@ -399,7 +399,7 @@ class KernelSource:
         else:
             cmd = f'ssh {build_host} --'
             cmd = self._format_cmd(cmd)
-            cmd.append('cd ~/.kernelcraft && git clean -xdf')
+            cmd.append('cd ~/.virtme && git clean -xdf')
         check_call(cmd)
 
 def main():
@@ -412,7 +412,7 @@ def main():
             val = ks.default_opts[opt]
             setattr(args, opt, val)
     if args.init:
-        print('KernelCraft git repository initialized')
+        print('virtme-ng git repository initialized')
     elif args.clean:
         ks.clean(build_host=args.build_host)
     elif args.dump:

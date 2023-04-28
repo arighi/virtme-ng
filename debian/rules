@@ -1,12 +1,12 @@
 #!/usr/bin/make -f
 
-kernelcraft-prompt:
-	register-python-argcomplete kc > $@
+virtme-ng-prompt:
+	register-python-argcomplete virtme-ng > $@
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
-override_dh_install: kernelcraft-prompt
+override_dh_install: virtme-ng-prompt
 	dh_install
-	mkdir -p $(CURDIR)/debian/kernelcraft/etc/bash_completion.d
-	install -m 0644 kernelcraft-prompt $(CURDIR)/debian/kernelcraft/etc/bash_completion.d/kernelcraft-prompt
+	mkdir -p $(CURDIR)/debian/virtme-ng/etc/bash_completion.d
+	install -m 0644 virtme-ng-prompt $(CURDIR)/debian/virtme-ng/etc/bash_completion.d/virtme-ng-prompt

@@ -1,3 +1,9 @@
+virtme-ng (1.0) lunar; urgency=medium
+
+  * Rename package to virtme-ng
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 28 Apr 2023 10:36:45 +0200
+
 kernelcraft (2.0) lunar; urgency=medium
 
   * New version 2.0:
