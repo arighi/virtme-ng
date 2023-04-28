@@ -4,11 +4,11 @@
 The original project is currently unmaintained:
 https://github.com/amluto/virtme
 
-For this reason we have created a separate project called KernelCraft that
+For this reason we have created a separate project called virtme-ng that
 includes and supports all the existing virtme features:
-https://github.com/arighi/kernelcraft
+https://github.com/arighi/virtme-ng
 
-From now on all the development activity will continue in KernelCraft.
+From now on all the development activity will continue in virtme-ng.
 
 What is virtme?
 ===============
