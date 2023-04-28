@@ -162,8 +162,7 @@ mount -t tracefs tracefs /sys/kernel/tracing &>/dev/null
 
 # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
 if mount -t tmpfs tmpfs /sys/fs/cgroup &>/dev/null; then
-    mkdir /sys/fs/cgroup/unified
-    mount -t cgroup2 cgroup2 /sys/fs/cgroup/unified
+    mount -t cgroup2 cgroup2 /sys/fs/cgroup
 fi
 
 # Set up filesystems that live in /dev
