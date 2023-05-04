@@ -31,7 +31,7 @@ setup(
         ]
     },
     data_files = [
-        (str(CONF_PATH), ['cfg/virtme-ng.conf']),
+        ('/etc', ['cfg/virtme-ng.conf'])
     ],
     scripts = [
         'bin/virtme-prep-kdir-mods',
