@@ -2,15 +2,14 @@ Source: virtme-ng
 Section: misc
 Priority: optional
 Maintainer: Andrea Righi <andrea.righi@canonical.com>
-Build-Depends: debhelper (>= 11)
-Build-Depends-Indep: dh-python, python3, python3-six, python3-setuptools, python3-argcomplete
+Standards-Version: 4.5.1
+Build-Depends: debhelper (>= 11), dh-python, python3, python3-six, python3-setuptools, python3-argcomplete
 Homepage: https://github.com/arighi/virtme-ng
 Vcs-Git:  https://github.com/arighi/virtme-ng
 
 Package: virtme-ng
 Architecture: any
 Depends:
- ${shlibs:Depends},
  ${misc:Depends},
  ${python3:Depends},
  crash,
