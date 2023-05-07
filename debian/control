@@ -13,6 +13,7 @@ Depends:
  ${misc:Depends},
  ${python3:Depends},
  crash,
+ qemu-system-x86,
  gcc-12,
  autoconf,
  automake,
