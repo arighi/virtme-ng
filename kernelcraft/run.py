@@ -284,7 +284,7 @@ class KernelSource:
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if build_host_vmlinux or arch == 'ppc64el':
-                vmlinux = '--include=vmlinux'
+                vmlinux = '--include=./vmlinux'
             else:
                 vmlinux = ''
             if skip_modules:
