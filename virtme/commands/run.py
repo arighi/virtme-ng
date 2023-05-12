@@ -7,6 +7,7 @@
 
 from typing import Any, Optional, List, NoReturn, Dict, Tuple
 
+import atexit
 import argparse
 import tempfile
 import os
@@ -17,6 +18,9 @@ import shlex
 import re
 import itertools
 import subprocess
+import signal
+from shutil import which
+from time import sleep
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -107,6 +111,8 @@ def make_parser() -> argparse.ArgumentParser:
     g = parser.add_argument_group(title='Debugging/testing')
     g.add_argument('--force-initramfs', action='store_true',
                    help='Use an initramfs even if unnecessary')
+    g.add_argument('--force-9p', action='store_true',
+                   help='Use legacy 9p filesystem as rootfs')
     g.add_argument('--dry-run', action='store_true',
                    help="Initialize everything but don't run the guest")
     g.add_argument('--show-command', action='store_true',
@@ -143,6 +149,10 @@ def arg_fail(message, show_usage=True) -> NoReturn:
 
 def is_file_more_recent(a, b) -> bool:
     return os.stat(a).st_mtime > os.stat(b).st_mtime
+
+def has_memory_suffix(string):
+    pattern = r'\d+[MGK]$'
+    return re.match(pattern, string) is not None
 
 class Kernel:
     __slots__ = ['kimg', 'dtb', 'modfiles', 'moddir', 'use_root_mods', 'config']
@@ -296,6 +306,118 @@ def find_kernel_and_mods(arch, args) -> Kernel:
 
     return kernel
 
+# virtio-fs temporary files
+virtiofsd_sock = None
+virtiofsd_pid  = None
+
+def cleanup_virtiofs_temp_files():
+    # Make sure to kill virtiofsd instances that are still potentially running
+    if virtiofsd_pid is not None:
+        try:
+            with open(virtiofsd_pid) as fd:
+                pid = int(fd.read().strip())
+                os.kill(pid, signal.SIGTERM)
+        except (FileNotFoundError, ValueError, OSError):
+            pass
+    # Clean up temp files
+    temp_files = [virtiofsd_sock, virtiofsd_pid]
+    for file_path in temp_files:
+        try:
+            os.remove(file_path)
+        except OSError:
+            pass
+
+def get_virtiofsd_path():
+    # Define the possible virtiofsd paths.
+    #
+    # NOTE: do not use the C implemention of qemu's virtiofsd, because it
+    # doesn't support unprivileged-mode execution and it would be totally
+    # unsafe to export the whole rootfs of the host running as root.
+    #
+    # Instead, always rely on the Rust implementation of virtio-fs:
+    # https://gitlab.com/virtio-fs/virtiofsd
+    #
+    # This project is receiving the most attention for new feature development
+    # and the daemon is able to export the entire root filesystem of the host
+    # as non-privileged user.
+    #
+    # Starting with version 8.0, qemu will not ship the C implementation of
+    # virtiofsd anymore, allowing to use the Rust daemon installed in the the
+    # same path (/usr/lib/qemu/virtiofsd), so also consider this one in the
+    # list of possible paths.
+    #
+    # We can detect if the qemu implementation is installed in /usr/lib/qemu,
+    # simply by running the command with --version as non-root. If it returns
+    # an error it means that we are using the qemu daemon and we just skip it.
+    possible_paths = (
+        which('virtiofsd'),
+        '/usr/libexec/virtiofsd',
+        '/usr/lib/qemu/virtiofsd',
+    )
+    for path in possible_paths:
+        if path and os.path.exists(path) and os.access(path, os.X_OK):
+            try:
+                subprocess.check_call([path, '--version'],
+                                stdout=subprocess.DEVNULL,
+                                stderr=subprocess.DEVNULL)
+                return path
+            except:
+                pass
+    return None
+
+def start_virtiofsd():
+    global virtiofsd_sock
+    global virtiofsd_pid
+
+    virtiofsd_path = get_virtiofsd_path()
+    if virtiofsd_path is None:
+        return False
+
+    # virtiofsd located, try to start the daemon as non-privileged user.
+    _, virtiofsd_sock = tempfile.mkstemp(prefix='virtme')
+    virtiofsd_pid = virtiofsd_sock + '.pid'
+
+    # Make sure to clean up temp files before starting the daemon and at exit.
+    cleanup_virtiofs_temp_files()
+    atexit.register(cleanup_virtiofs_temp_files)
+
+    # Export the whole root fs of the host, do not enable sandbox, otherwise we
+    # would get permission errors.
+    os.system(f"{virtiofsd_path} --syslog --socket-path {virtiofsd_sock} --shared-dir / --sandbox none &")
+    max_attempts = 5
+    check_duration = 0.1
+    for attempt in range(max_attempts):
+        if os.path.exists(virtiofsd_pid):
+            break
+        sys.stderr.write('virtme: waiting for virtiofsd to start\n')
+        sleep(check_duration)
+        check_duration *= 2;
+    else:
+        print('virtme-run: failed to start virtiofsd, fallback to 9p')
+        return False
+    return True
+
+def export_virtiofs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
+                    qemuargs: List[str], path: str,
+                    mount_tag: str, security_model='none', memory=None,
+                    readonly=True) -> None:
+
+    # Try to start virtiofsd deamon
+    ret = start_virtiofsd()
+    if not ret:
+        return False
+
+    # Adjust qemu options to use virtiofsd
+    fsid = 'virtfs%d' % len(qemuargs)
+    if memory is None:
+        memory = '128M'
+    qemuargs.extend(['-chardev', f'socket,id=char{fsid},path={virtiofsd_sock}'])
+    qemuargs.extend(['-device', f'vhost-user-fs-pci,chardev=char{fsid},tag={mount_tag}'])
+    qemuargs.extend(['-object', f'memory-backend-memfd,id=mem,size={memory},share=on'])
+    qemuargs.extend(['-numa', f'node,memdev=mem'])
+
+    return True
+
 def export_virtfs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
                   qemuargs: List[str], path: str,
                   mount_tag: str, security_model='none', readonly=True) -> None:
@@ -365,8 +487,23 @@ def do_it() -> int:
         qemuargs.extend(['-name', args.name])
         kernelargs.append('virtme_hostname=%s' % args.name)
 
-    # Set up virtfs
-    export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
+    if args.memory:
+        # If no memory suffix is specified, assume it's MB.
+        if not has_memory_suffix(args.memory):
+            args.memory += 'M'
+        qemuargs.extend(['-m', args.memory])
+
+    # Try to use virtio-fs first, in case of failure fallback to 9p.
+    #
+    # FIXME: virtiofs is conflicting with virtio-serial and output redirection
+    # from scripts, so automatically disable it for now, until we figure out
+    # the exact nature of this conflict.
+    if args.force_9p or args.script_sh or args.script_exec:
+        use_virtiofs = False
+    else:
+        use_virtiofs = export_virtiofs(qemu, arch, qemuargs, '/', 'ROOTFS', memory=args.memory, readonly=(not args.rw))
+    if not use_virtiofs:
+        export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 
     guest_tools_path = resources.find_guest_tools()
     if guest_tools_path is None:
@@ -473,9 +610,6 @@ def do_it() -> int:
 
     if args.balloon:
         qemuargs.extend(['-balloon', 'virtio'])
-
-    if args.memory:
-        qemuargs.extend(['-m', args.memory])
 
     if args.cpus:
         qemuargs.extend(['-smp', args.cpus])
@@ -640,9 +774,17 @@ def do_it() -> int:
         # No initramfs!  Warning: this is slower than using an initramfs
         # because the kernel will wait for device probing to finish.
         # Sigh.
+        if use_virtiofs:
+            kernelargs.extend([
+                'rootfstype=virtiofs',
+                'root=ROOTFS',
+            ])
+        else:
+            kernelargs.extend([
+                'rootfstype=9p',
+                'rootflags=version=9p2000.L,trans=virtio,access=any',
+            ])
         kernelargs.extend([
-            'rootfstype=9p',
-            'rootflags=version=9p2000.L,trans=virtio,access=any',
             'raid=noautodetect',
             'rw' if args.rw else 'ro',
         ])
@@ -695,8 +837,12 @@ def do_it() -> int:
 
     # Go!
     if not args.dry_run:
-        os.execv(qemu.qemubin, qemuargs)
-
+        pid = os.fork()
+        if pid:
+            pid, status = os.waitpid(pid, 0)
+            return status
+        else:
+            os.execv(qemu.qemubin, qemuargs)
     return 0
 
 def main() -> int:

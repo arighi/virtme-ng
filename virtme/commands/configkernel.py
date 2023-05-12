@@ -99,6 +99,16 @@ _GENERIC_CONFIG = [
 
     '# Enable overlayfs',
     'CONFIG_OVERLAY_FS=y',
+
+    '# virtio-fs support',
+    'CONFIG_DAX=y',
+    'CONFIG_DAX_DRIVER=y',
+    'CONFIG_FS_DAX=y',
+    'CONFIG_MEMORY_HOTPLUG=y',
+    'CONFIG_MEMORY_HOTREMOVE=y',
+    'CONFIG_ZONE_DEVICE=y',
+    'CONFIG_FUSE_FS=y',
+    'CONFIG_VIRTIO_FS=y',
 ]
 
 _GENERIC_CONFIG_OPTIONAL = [
