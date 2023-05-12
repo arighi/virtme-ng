@@ -11,6 +11,12 @@ import os
 import shutil
 import itertools
 
+def check_kernel_repo():
+    if not os.path.isfile('scripts/kconfig/merge_config.sh') and \
+       not os.path.isfile('source/scripts/kconfig/merge_config.sh'):
+        return False
+    return True
+
 def find_binary(names: Sequence[str], root: str = '/',
                 use_path: bool = True) -> Optional[str]:
     dirs = [os.path.join(*i) for i in itertools.product(

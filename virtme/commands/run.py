@@ -23,6 +23,7 @@ from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
 from .. import resources
+from .. import util
 
 uname = os.uname()
 
@@ -286,6 +287,10 @@ _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
                        (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
 
 def do_it() -> int:
+    if not util.check_kernel_repo():
+        print('virtme-run must be run in a kernel source/build directory')
+        return 1
+
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)

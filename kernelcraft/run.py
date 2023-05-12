@@ -11,6 +11,9 @@ from argcomplete import autocomplete
 
 from kernelcraft.utils import VERSION, CONF_FILE
 
+class SilentError(Exception):
+    pass
+
 def make_parser():
     parser = argparse.ArgumentParser(
         description='Build and run specific kernels inside a virtualized snapshot of your live system',
@@ -359,7 +362,10 @@ class KernelSource:
         # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
         cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
-        check_call(cmd, shell=True)
+        try:
+            check_call(cmd, shell=True)
+        except:
+            raise SilentError()
 
     def dump(self, dump_file):
         if not os.path.isfile('vmlinux'):
@@ -402,7 +408,7 @@ class KernelSource:
             cmd.append('cd ~/.virtme && git clean -xdf')
         check_call(cmd)
 
-def main():
+def do_it() -> int:
     autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
 
@@ -433,5 +439,14 @@ def main():
                append=args.append, execute=args.exec, opts=args.opts, \
                skip_modules=args.skip_modules)
 
+def main() -> int:
+    try:
+        return do_it()
+    except SilentError:
+        return 1
+
 if __name__ == '__main__':
-    exit(main())
+    try:
+        exit(main())
+    except SilentError:
+        exit(1)
