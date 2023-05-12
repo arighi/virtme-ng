@@ -31,11 +31,8 @@ mount -t tmpfs tmpfs /tmp/
 for tag in "${!virtme_rw_overlay@}"; do
     td=`mktemp -d`
     dir="${!tag}"
-    mount -t tmpfs none "$td"
     mkdir "$td/cow" "$td/work"
     mount -t overlay -o "lowerdir=$dir,upperdir=$td/cow,workdir=$td/work" cow "$dir"
-    umount "$td"
-    rmdir "$td"
 done
 
 # Setup kernel modules
