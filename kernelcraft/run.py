@@ -331,7 +331,7 @@ class KernelSource:
         if cpus is None:
             cpus = self.cpus
         if memory is None:
-            memory = 4096
+            memory = '4G'
         if execute is not None:
             execute = f'--script-sh "{execute}"'
         else:
@@ -358,7 +358,7 @@ class KernelSource:
             opts = ''
         # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --qemu-opts -m {memory} -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         check_call(cmd, shell=True)
 
     def dump(self, dump_file):
