@@ -72,6 +72,14 @@ touch /tmp/fstab
 mount --bind /tmp/fstab /etc/fstab
 rm /tmp/fstab
 
+# Fix dpkg if we are on a Debian-based distro
+if [ -d /var/lib/dpkg ]; then
+    lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
+    for file in "${lock_files[@]}"; do
+	[ -e $file ] && touch "/tmp/${file##*/}" && mount --bind "/tmp/${file##*/}" "$file"
+    done
+fi
+
 # Populate dummy entries in /etc/shadow to allow switching to any user defined
 # in the system
 (umask 0644 && touch /tmp/shadow)
