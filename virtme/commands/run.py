@@ -40,10 +40,11 @@ def make_parser() -> argparse.ArgumentParser:
     g = parser.add_argument_group(title='Selection of kernel and modules').add_mutually_exclusive_group()
     g.add_argument('--installed-kernel', action='store', nargs='?',
                    const=uname.release, default=None, metavar='VERSION',
-                   help='Use an installed kernel and its associated modules.  If no version is specified, the running kernel will be used.')
+                   help='[Deprecated] use --kimg instead.')
 
-    g.add_argument('--kimg', action='store',
-                   help='Use specified kernel image with no modules.')
+    g.add_argument('--kimg', action='store', nargs='?',
+                   const=uname.release, default=None,
+                   help='Use specified kernel image or  an installed kernel version. If no argument is specified the running kernel will be used.')
 
     g.add_argument('--kdir', action='store', metavar='KDIR',
                    help='Use a compiled kernel source directory')
@@ -168,25 +169,84 @@ class Kernel:
                 if m:
                     self.config[m.group(1)] = m.group(2)
 
+def extract_kernel_version(file_path):
+    result = subprocess.run(['file', file_path], capture_output=True, text=True)
+    match = re.search(r'version (\S+)', result.stdout)
+    if match:
+        kernel_version = match.group(1)
+        return kernel_version
+
+    return None
+
+def get_rootfs_from_kernel_path(path):
+    while path != '/' and not os.path.exists(path + '/lib/modules'):
+        path, _ = os.path.split(path)
+    return os.path.abspath(path)
+
 def find_kernel_and_mods(arch, args) -> Kernel:
     kernel = Kernel()
 
     kernel.use_root_mods = False
-
     if args.installed_kernel is not None:
-        kver = args.installed_kernel
-        if args.mods != 'none':
-            kernel.modfiles = modfinder.find_modules_from_install(
-                virtmods.MODALIASES, kver=kver)
-            kernel.moddir = os.path.join('/lib/modules', kver)
-        else:
+        sys.stderr.write("Warning: --installed-kernel is deprecated. Use --kimg instead.\n")
+        args.kimg = args.installed_kernel
+
+    if args.kimg is not None:
+        # If a locally built kernel image / dir is provided just fallback to
+        # the --kdir case.
+        if os.path.exists(args.kimg):
+            if os.path.isdir(args.kimg):
+                kdir = args.kimg
+            elif args.kimg.endswith(arch.kimg_path()):
+                if args.kimg == arch.kimg_path():
+                    kdir = '.'
+                else:
+                    kdir = args.kimg.split(arch.kimg_path())[0]
+            if os.path.exists(kdir + '/.config'):
+                args.kdir = kdir
+                args.kimg = None
+
+    if args.kimg is not None:
+        # Try to resolve kimg as a kernel version first, then check if a file
+        # is provided.
+        kimg = '/usr/lib/modules/%s/vmlinuz' % args.kimg
+        if not os.path.exists(kimg):
+            kimg = '/boot/vmlinuz-%s' % args.kimg
+            if not os.path.exists(kimg):
+                kimg = args.kimg
+                if not os.path.exists(kimg):
+                    arg_fail("%s does not exist" % args.kimg)
+        if not os.access(kimg, os.R_OK):
+            arg_fail("unable to access %s (check for read permissions)" % kimg, show_usage=False)
+        kernel.kimg = kimg
+        kver = extract_kernel_version(kernel.kimg)
+        if kver is None:
+            arg_fail("%s does not seem to be a valid kernel file / directory" % kernel.kimg, show_usage=False)
+        if args.mods == 'none':
             kernel.modfiles = []
             kernel.moddir = None
-        kernel.kimg = '/usr/lib/modules/%s/vmlinuz' % kver
-        if not os.path.exists(kernel.kimg):
-            kernel.kimg = '/boot/vmlinuz-%s' % kver
+        else:
+            # Try to automatically detect modules' path
+            root_dir = get_rootfs_from_kernel_path(kernel.kimg)
+            if root_dir == '/':
+                kernel.use_root_mods = True
+            elif root_dir.startswith('/tmp'):
+                sys.stderr.write("\nWarning: /tmp is hidden inside the guest, kernel modules won't be supported at runtime unless you move them somewhere else.\n\n")
+            kernel.moddir = f'{root_dir}/lib/modules/{kver}'
+            if not os.path.exists(kernel.moddir):
+                kernel.modfiles = []
+                kernel.moddir = None
+            else:
+                mod_file = os.path.join(kernel.moddir, 'modules.dep')
+                if not os.path.exists(mod_file):
+                    # Try to refresh modules directory. Some packages (e.g., debs)
+                    # don't ship all the required modules information, so we
+                    # need to refresh the modules directory using depmod.
+                    subprocess.call(['depmod', '-a', '-b', root_dir, kver],
+                                    stderr=subprocess.DEVNULL)
+                kernel.modfiles = modfinder.find_modules_from_install(
+                                    virtmods.MODALIASES, root=root_dir, kver=kver)
         kernel.dtb = None  # For now
-        kernel.use_root_mods = True
     elif args.kdir is not None:
         kernel.kimg = os.path.join(args.kdir, arch.kimg_path())
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
@@ -206,27 +266,27 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         if modmode == 'none':
             pass
         elif modmode == 'use' or modmode == 'auto':
-            # Check if modules.order exists, otherwise it's not possible to use
-            # this option
-            if not os.path.exists(mod_file):
-                arg_fail('%s not found: kernel modules not enabled or kernel not compiled properly' % mod_file, show_usage=False)
-            # Check if virtme's kernel modules directory needs to be updated
-            if not os.path.exists(virtme_mods) or \
-               is_file_more_recent(mod_file, virtme_mod_file):
-                if modmode == 'use':
-                    # Inform user to manually refresh virtme's kernel modules
-                    # directory
-                    arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
-                else:
-                    # Auto-refresh virtme's kernel modules directory
-                    try:
-                        resources.run_script('virtme-prep-kdir-mods',
-                                             cwd=args.kdir)
-                    except subprocess.CalledProcessError:
-                        raise SilentError()
-            kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
-            kernel.modfiles = modfinder.find_modules_from_install(
-                               virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
+            # Check if modules.order exists, otherwise fallback to mods=none
+            if os.path.exists(mod_file):
+                # Check if virtme's kernel modules directory needs to be updated
+                if not os.path.exists(virtme_mods) or \
+                   is_file_more_recent(mod_file, virtme_mod_file):
+                    if modmode == 'use':
+                        # Inform user to manually refresh virtme's kernel modules
+                        # directory
+                        arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
+                    else:
+                        # Auto-refresh virtme's kernel modules directory
+                        try:
+                            resources.run_script('virtme-prep-kdir-mods',
+                                                 cwd=args.kdir)
+                        except subprocess.CalledProcessError:
+                            raise SilentError()
+                kernel.moddir = os.path.join(virtme_mods, 'lib/modules', '0.0.0')
+                kernel.modfiles = modfinder.find_modules_from_install(
+                                   virtmods.MODALIASES, root=virtme_mods, kver='0.0.0')
+            else:
+                sys.stderr.write('\n%s not found: kernel modules not enabled or kernel not compiled properly, kernel modules disabled\n\n' % mod_file)
         else:
             arg_fail("invalid argument '%s', please use --mods=none|use|auto" % args.mods)
 
@@ -235,13 +295,6 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             kernel.dtb = None
         else:
             kernel.dtb = os.path.join(args.kdir, dtb_path)
-    elif args.kimg is not None:
-        kernel.kimg = args.kimg
-        kernel.modfiles = []
-        kernel.moddir = None
-        kernel.dtb = None # TODO: fix this
-        if args.mods != 'use':
-            arg_fail("--mods is not currently supported properly with --kimg")
     else:
         arg_fail('You must specify a kernel to use.')
 
