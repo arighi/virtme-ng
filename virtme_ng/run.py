@@ -166,10 +166,12 @@ class KernelSource:
     def __init__(self):
         # Initialize known kernels
         conf_path = self.get_conf_file_path()
-        with open(conf_path) as fd:
-            conf_data = json.loads(fd.read())
-            if 'default_opts' in conf_data:
-                self.default_opts = conf_data['default_opts']
+        self.default_opts = []
+        if conf_path is not None:
+            with open(conf_path) as fd:
+                conf_data = json.loads(fd.read())
+                if 'default_opts' in conf_data:
+                    self.default_opts = conf_data['default_opts']
         self.cpus = str(os.cpu_count())
 
     # First check if there is a config file in the user's home config
@@ -183,8 +185,7 @@ class KernelSource:
         for conf in configs:
             if conf.exists():
                 return conf
-        sys.stderr.write("ERROR: missing configuration file\n")
-        sys.exit(1)
+        return None
 
     def _format_cmd(self, cmd):
         return list(filter(None, cmd.split(' ')))
