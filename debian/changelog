@@ -1,3 +1,16 @@
+virtme-ng (1.3-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.3:
+    - virtme-ng: introduce --run to run kernel images directly
+    - virtme-ng: drop --release option
+    - virtme-ng: remove /boot from the CoW dirs
+    - virtme-run: refactor --kimg and --installed-kernel
+    - virtme-init: do not hide overlayfs dirs
+    - virtme-init: fix dpkg if we are on a Debian-based distro
+    - deb: add qemu-system-x86 as dependency
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 15 May 2023 13:04:00 +0200
+
 virtme-ng (1.2-1) unstable; urgency=medium
 
   * New version virtme-ng 1.2:
