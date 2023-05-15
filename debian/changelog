@@ -1,3 +1,10 @@
+virtme-ng (1.6-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.6:
+    - virtme-ng: allow to run config-less
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 15 May 2023 18:09:47 +0200
+
 virtme-ng (1.5-1) unstable; urgency=medium
 
   * New version virtme-ng 1.5:
