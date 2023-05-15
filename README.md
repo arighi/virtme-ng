@@ -53,7 +53,7 @@ ppa:arighi/virtme-ng:
  $ sudo apt install --yes virtme-ng
 ```
 
-Otherwise, you can install via pip directly (after cloning this git
+Alternatively, you can install via pip directly (after cloning this git
 repository):
 ```
  $ pip3 install -r requirements.txt .
@@ -104,6 +104,26 @@ Examples
  - Only generate .config in the current kernel build directory:
 ```
    $ virtme-ng --kconfig
+```
+
+ - Test the currently running kernel in a safe snapshot of the system:
+```
+   $ virtme-ng -r
+```
+
+ - Test installed kernel 6.2.0-21-generic kernel in a safe snapshot of the
+   system (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
+```
+   $ virtme-ng -r 6.2.0-21-generic
+```
+
+ - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
+```
+   $ mkdir test
+   $ cd test
+   $ apt download linux-image-6.2.0-1003-lowlatency linux-modules-6.2.0-1003-lowlatency
+   $ for d in *.deb; do dpkg -x $d .; done
+   $ virtme-ng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
 ```
 
  - Generate and inspect a memory dump of the currently tested kernel (crash
