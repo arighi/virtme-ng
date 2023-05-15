@@ -14,5 +14,5 @@ if sys.version_info < (3,8):
     print('virtme-ng requires Python 3.8 or higher')
     sys.exit(1)
 
-from kernelcraft import run
+from virtme_ng import run
 exit(run.main())
