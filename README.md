@@ -195,12 +195,8 @@ virtme-ng has a list of git repositories in ~/.config/virtme-ng/virtme-ng.conf,
 stored in a JSON format. It is possible to add custom git repositories by
 changing this file.
 
-Repositories are identified by name (specified with the option --release / -r).
-
-When a release (git repository) is specified virtme-ng takes care of adding
-the remote branch to the local current git repository. When a remote build host
-is used (--build-host) the target branch is force pushed to the remote host
-inside the ~/.virtme-ng folder.
+When a remote build host is used (--build-host) the target branch is force
+pushed to the remote host inside the ~/.virtme folder.
 
 Then a minimal custom .config is generated using (a custom version of)
 virtme-configkernel.

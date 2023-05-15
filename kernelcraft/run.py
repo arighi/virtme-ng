@@ -27,9 +27,6 @@ def make_parser():
             const=uname.release, default=None,
             help='Run specified kernel image or an installed kernel version. If no argument is specified the running kernel will be used.')
 
-    ga.add_argument('--release', '-r', action='store',
-            help='Use a kernel from a specific Ubuntu release or upstream')
-
     ga.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
 
@@ -176,11 +173,8 @@ class KernelSource:
         conf_path = self.get_conf_file_path()
         with open(conf_path) as fd:
             conf_data = json.loads(fd.read())
-            if 'repo' in conf_data:
-                self.kernel_release = conf_data['repo']
+            if 'default_opts' in conf_data:
                 self.default_opts = conf_data['default_opts']
-            else:
-                self.kernel_release = conf_data
         self.cpus = str(os.cpu_count())
 
     # First check if there is a config file in the user's home config
@@ -207,20 +201,10 @@ class KernelSource:
         else:
             return False
 
-    def checkout(self, release=None, commit=None, build_host=None, force=False):
+    def checkout(self, commit=None, build_host=None, force=False):
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
-        if release is not None:
-            if not release in self.kernel_release:
-                sys.stderr.write(f"ERROR: unknown release {release}\n")
-                sys.exit(1)
-            if call(['git', 'remote', 'get-url', release], stderr=DEVNULL, stdout=sys.stderr, stdin=DEVNULL):
-                repo_url = self.kernel_release[release]['repo']
-                check_call(['git', 'remote', 'add', release, repo_url], stdout=sys.stderr, stdin=DEVNULL)
-            check_call(['git', 'fetch', release], stdout=sys.stderr, stdin=DEVNULL)
-            target = commit or (release + '/' + self.kernel_release[release]['branch'])
-        else:
-            target = commit or 'HEAD'
+        target = commit or 'HEAD'
         if build_host is not None or target != 'HEAD':
             if not force and self._is_dirty_repo():
                 arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
@@ -442,8 +426,8 @@ def do_it() -> int:
         if args.kimg is not None:
             args.skip_build = True
         if not args.skip_build:
-            if args.release or args.commit:
-                ks.checkout(release=args.release, commit=args.commit, \
+            if args.commit:
+                ks.checkout(commit=args.commit, \
                             build_host=args.build_host, force=args.force)
             ks.config(arch=args.arch, config=args.config, envs=args.envs)
             if args.kconfig:
