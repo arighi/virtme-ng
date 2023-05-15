@@ -20,12 +20,12 @@ def make_parser():
 
     ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
-    ga.add_argument('--init', '-i', action='store_true',
-            help='Initialize a git repository to be used with virtme-ng')
-
-    ga.add_argument('--kimg', '-K', action='store', nargs='?',
+    ga.add_argument('--run', '-r', action='store', nargs='?',
             const=uname.release, default=None,
             help='Run specified kernel image or an installed kernel version. If no argument is specified the running kernel will be used.')
+
+    ga.add_argument('--init', '-i', action='store_true',
+            help='Initialize a git repository to be used with virtme-ng')
 
     ga.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
@@ -423,7 +423,7 @@ def do_it() -> int:
     elif args.dump:
         ks.dump(args.dump_file)
     else:
-        if args.kimg is not None:
+        if args.run is not None:
             args.skip_build = True
         if not args.skip_build:
             if args.commit:
@@ -438,7 +438,7 @@ def do_it() -> int:
                     skip_modules=args.skip_modules, compiler=args.compiler, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
                cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
-               append=args.append, execute=args.exec, kimg=args.kimg, opts=args.opts, \
+               append=args.append, execute=args.exec, kimg=args.run, opts=args.opts, \
                skip_modules=args.skip_modules)
 
 def main() -> int:
