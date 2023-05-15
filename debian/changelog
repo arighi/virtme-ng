@@ -1,3 +1,11 @@
+virtme-ng (1.5-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.5:
+    - virtme-ng: drop option --init
+    - virtme-run: fix undefined variable 'kdir' error
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 15 May 2023 15:06:05 +0200
+
 virtme-ng (1.4-1) unstable; urgency=medium
 
   * New version virtme-ng 1.4:
