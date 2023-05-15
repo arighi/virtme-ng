@@ -33,7 +33,7 @@ Quick start
  $ mkdir linux && cd linux
  $ virtme-ng --init
  virtme-ng git repository initialized
- $ virtme-ng -r mainline --commit v6.1-rc6
+ $ virtme-ng --commit v6.1-rc6
  ...
  $ uname -r
  6.1.0-rc6-virtme-ng
@@ -87,9 +87,9 @@ Examples
    $ virtme-ng
 ```
 
- - Build and run v6.1-rc3 from the public mainline git repository:
+ - Build and run tag v6.1-rc3 a local kernel git repository:
 ```
-   $ virtme-ng -r mainline -c v6.1-rc3
+   $ virtme-ng -c v6.1-rc3
 ```
 
  - Build and run a kernel 2 commits before the previously compiled kernel:
@@ -102,9 +102,9 @@ Examples
    $ virtme-ng -s
 ```
 
- - Only generate .config with the latest mainline kernel:
+ - Only generate .config in the current kernel build directory:
 ```
-   $ virtme-ng -r mainline --kconfig
+   $ virtme-ng --kconfig
 ```
 
  - Generate and inspect a memory dump of the currently tested kernel (crash
@@ -118,18 +118,11 @@ Examples
    $ virtme-ng -d --dump-file /tmp/vmcore.img
 ```
 
- - Test the tip of linux-next, building the kernel on a remote build host
-   called "builder", including /var/lib/rust-for-linux/bin to the default PATH:
-```
-   $ virtme-ng -r next --build-host arighi@builder \
-     --build-host-exec-prefix 'PATH=/var/lib/rust-for-linux/bin:$PATH'
-```
-
- - Test the tip of the latest mainline kernel, building the kernel on a remote
-   build host called "builder", running make inside a specific build chroot
+ - Test the tip of the latest kernel, building the kernel on a remote build
+   host called "builder", running make inside a specific build chroot
    (managed remotely by schroot):
 ```
-   $ virtme-ng -r mainline --build-host builder \
+   $ virtme-ng --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
 ```
 
@@ -152,10 +145,10 @@ Examples
    $ virtme-ng RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
 ```
 
- - Test latest mainline kernel on arm64 (using a separate chroot in
+ - Build and test the arm64 kernel (using a separate chroot in
    /opt/chroot/arm64 as the main filesystem):
 ```
-   $ virtme-ng -r mainline --arch arm64 --root /opt/chroot/arm64/
+   $ virtme-ng --arch arm64 --root /opt/chroot/arm64/
 ```
 
  - Build upstream kernel 6.1-rc6, execute `uname -r` inside it and send the
