@@ -10,7 +10,7 @@ from pathlib import Path
 from argcomplete import autocomplete
 from virtme.util import SilentError, uname
 
-from kernelcraft.utils import VERSION, CONF_FILE
+from virtme_ng.utils import VERSION, CONF_FILE
 
 def make_parser():
     parser = argparse.ArgumentParser(
