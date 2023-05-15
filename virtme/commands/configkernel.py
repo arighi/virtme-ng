@@ -14,9 +14,7 @@ import shutil
 import subprocess
 import multiprocessing
 from .. import architectures
-from .. import util
-
-uname = os.uname()
+from ..util import SilentError, uname
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -200,12 +198,8 @@ _GENERIC_CONFIG_OPTIONAL = [
     '# CONFIG_AUTOFS_FS is not set',
 ]
 
-def main():
+def do_it():
     args = _ARGPARSER.parse_args()
-
-    if not util.check_kernel_repo():
-        print('virtme-configkernel must be run in a kernel source/build directory')
-        return 1
 
     arch = architectures.get(args.arch)
 
@@ -244,7 +238,10 @@ def main():
 
     # Set up an initial config
     if maketarget:
-        subprocess.check_call(['make'] + archargs + maketarget.split(' '))
+        try:
+            subprocess.check_call(['make'] + archargs + maketarget.split(' '))
+        except:
+            raise SilentError()
 
     config = '.config'
 
@@ -267,5 +264,14 @@ def main():
 
     return 0
 
+def main() -> int:
+    try:
+        return do_it()
+    except SilentError:
+        return 1
+
 if __name__ == '__main__':
-    exit(main())
+    try:
+        exit(main())
+    except SilentError:
+        exit(1)

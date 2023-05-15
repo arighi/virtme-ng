@@ -23,12 +23,7 @@ from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
 from .. import resources
-from .. import util
-
-uname = os.uname()
-
-class SilentError(Exception):
-    pass
+from ..util import SilentError, uname
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(

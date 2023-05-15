@@ -11,6 +11,11 @@ import os
 import shutil
 import itertools
 
+uname = os.uname()
+
+class SilentError(Exception):
+    pass
+
 def check_kernel_repo():
     if not os.path.isfile('scripts/kconfig/merge_config.sh') and \
        not os.path.isfile('source/scripts/kconfig/merge_config.sh'):

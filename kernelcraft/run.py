@@ -8,11 +8,9 @@ import tempfile
 from subprocess import call, check_call, check_output, DEVNULL
 from pathlib import Path
 from argcomplete import autocomplete
+from virtme.util import SilentError, uname
 
 from kernelcraft.utils import VERSION, CONF_FILE
-
-class SilentError(Exception):
-    pass
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -24,6 +22,10 @@ def make_parser():
 
     ga.add_argument('--init', '-i', action='store_true',
             help='Initialize a git repository to be used with virtme-ng')
+
+    ga.add_argument('--kimg', '-K', action='store', nargs='?',
+            const=uname.release, default=None,
+            help='Run specified kernel image or an installed kernel version. If no argument is specified the running kernel will be used.')
 
     ga.add_argument('--release', '-r', action='store',
             help='Use a kernel from a specific Ubuntu release or upstream')
@@ -170,8 +172,6 @@ class KernelSource:
     def __init__(self, do_init=False):
         if do_init:
             check_call(['git', 'init', '-q'], stdout=sys.stderr, stdin=DEVNULL)
-        if not os.path.isdir('.git'):
-            arg_fail('error: must run from a kernel git repository', show_usage=False)
         # Initialize known kernels
         conf_path = self.get_conf_file_path()
         with open(conf_path) as fd:
@@ -208,6 +208,8 @@ class KernelSource:
             return False
 
     def checkout(self, release=None, commit=None, build_host=None, force=False):
+        if not os.path.isdir('.git'):
+            arg_fail('error: must run from a kernel git repository', show_usage=False)
         if release is not None:
             if not release in self.kernel_release:
                 sys.stderr.write(f"ERROR: unknown release {release}\n")
@@ -240,9 +242,16 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in envs:
             cmd += f' {var} '
-        check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
+        try:
+            check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
+        except:
+            raise SilentError()
 
-    def make(self, arch=None, build_host=None, build_host_exec_prefix=None, build_host_vmlinux=False, skip_modules=False, compiler=None, envs=()):
+    def make(self, arch=None, build_host=None,
+             build_host_exec_prefix=None, build_host_vmlinux=False,
+             skip_modules=False, compiler=None, envs=()):
+        if not os.path.isdir('.git') and build_host is not None:
+            arg_fail('error: --build-host can be used only on a kernel git repository', show_usage=False)
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
@@ -302,7 +311,7 @@ class KernelSource:
                 check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
             check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
-    def run(self, arch=None, root=None, cpus=None, memory=None, network=None, disk=None, append=None, execute=None, opts=None, skip_modules=False):
+    def run(self, arch=None, root=None, cpus=None, memory=None, network=None, disk=None, append=None, execute=None, kimg=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
             create_root(root, arch)
@@ -359,9 +368,13 @@ class KernelSource:
             opts = ' '.join(opts)
         else:
             opts = ''
+        if kimg is not None:
+            kdir = '--kimg ' + kimg
+        else:
+            kdir = '--kdir ./'
         # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} --kdir ./ {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} {kdir} {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         try:
             check_call(cmd, shell=True)
         except:
@@ -400,6 +413,8 @@ class KernelSource:
                 check_call(['crash', tmp.name, './vmlinux'])
 
     def clean(self, build_host=None):
+        if not os.path.isdir('.git'):
+            arg_fail('error: must run from a kernel git repository', show_usage=False)
         if build_host is None:
             cmd = self._format_cmd("git clean -xdf")
         else:
@@ -424,9 +439,12 @@ def do_it() -> int:
     elif args.dump:
         ks.dump(args.dump_file)
     else:
+        if args.kimg is not None:
+            args.skip_build = True
         if not args.skip_build:
-            ks.checkout(release=args.release, commit=args.commit, \
-                        build_host=args.build_host, force=args.force)
+            if args.release or args.commit:
+                ks.checkout(release=args.release, commit=args.commit, \
+                            build_host=args.build_host, force=args.force)
             ks.config(arch=args.arch, config=args.config, envs=args.envs)
             if args.kconfig:
                 return
@@ -436,7 +454,7 @@ def do_it() -> int:
                     skip_modules=args.skip_modules, compiler=args.compiler, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
                cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
-               append=args.append, execute=args.exec, opts=args.opts, \
+               append=args.append, execute=args.exec, kimg=args.kimg, opts=args.opts, \
                skip_modules=args.skip_modules)
 
 def main() -> int:
