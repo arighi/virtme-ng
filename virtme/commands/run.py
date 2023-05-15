@@ -189,6 +189,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     if args.kimg is not None:
         # If a locally built kernel image / dir is provided just fallback to
         # the --kdir case.
+        kdir = None
         if os.path.exists(args.kimg):
             if os.path.isdir(args.kimg):
                 kdir = args.kimg
@@ -197,7 +198,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                     kdir = '.'
                 else:
                     kdir = args.kimg.split(arch.kimg_path())[0]
-            if os.path.exists(kdir + '/.config'):
+            if kdir is not None and os.path.exists(kdir + '/.config'):
                 args.kdir = kdir
                 args.kimg = None
 
