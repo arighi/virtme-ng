@@ -24,9 +24,6 @@ def make_parser():
             const=uname.release, default=None,
             help='Run specified kernel image or an installed kernel version. If no argument is specified the running kernel will be used.')
 
-    ga.add_argument('--init', '-i', action='store_true',
-            help='Initialize a git repository to be used with virtme-ng')
-
     ga.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
 
@@ -166,9 +163,7 @@ def create_root(destdir, arch):
     os.chdir(prevdir)
 
 class KernelSource:
-    def __init__(self, do_init=False):
-        if do_init:
-            check_call(['git', 'init', '-q'], stdout=sys.stderr, stdin=DEVNULL)
+    def __init__(self):
         # Initialize known kernels
         conf_path = self.get_conf_file_path()
         with open(conf_path) as fd:
@@ -411,14 +406,12 @@ def do_it() -> int:
     autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
 
-    ks = KernelSource(args.init)
+    ks = KernelSource()
     if ks.default_opts:
         for opt in ks.default_opts:
             val = ks.default_opts[opt]
             setattr(args, opt, val)
-    if args.init:
-        print('virtme-ng git repository initialized')
-    elif args.clean:
+    if args.clean:
         ks.clean(build_host=args.build_host)
     elif args.dump:
         ks.dump(args.dump_file)

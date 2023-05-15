@@ -30,9 +30,8 @@ Quick start
 ```
  $ uname -r
  5.19.0-23-generic
- $ mkdir linux && cd linux
- $ virtme-ng --init
- virtme-ng git repository initialized
+ $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+ $ cd linux
  $ virtme-ng --commit v6.1-rc6
  ...
  $ uname -r
