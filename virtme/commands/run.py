@@ -509,11 +509,8 @@ def do_it() -> int:
     if guest_tools_path is None:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
-    export_virtfs(qemu, arch, qemuargs, guest_tools_path,
-                  'virtme.guesttools')
-
     initcmds = ['mkdir -p /run/virtme/guesttools',
-                '/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools',
+                f'/bin/mount --bind {guest_tools_path} /run/virtme/guesttools',
                 'exec /run/virtme/guesttools/virtme-init']
 
     # Arrange for modules to end up in the right place

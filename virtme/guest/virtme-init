@@ -17,14 +17,6 @@ log() {
 
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-declare -A mount_tags
-for i in /sys/bus/virtio/drivers/9pnet_virtio/virtio*/mount_tag; do
-    # mount_tag is terminated with a NUL byte, which leads to a
-    # "command substitution: ignored null byte in input" warning from
-    # bash; use sed instead of a bare 'cat' here to strip it off.
-    mount_tags["`sed '$s/\x00$//;' "$i"`"]=1
-done
-
 # Setup rw filesystem overlays
 mount -t tmpfs tmpfs /tmp/
 
