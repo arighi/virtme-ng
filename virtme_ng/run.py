@@ -31,7 +31,7 @@ def make_parser():
             help='Generate a memory dump of the running kernel and inspect it')
 
     ga.add_argument('--skip-build', '-s', action='store_true',
-            help='Start the previously compiled kernel without trying to rebuild it')
+            help='[Deprecated] use `--run .` instead')
 
     parser.add_argument('--kconfig', '-k', action='store_true',
             help='Only generate the kernel .config without building/running anything')
@@ -427,9 +427,10 @@ def do_it() -> int:
     elif args.dump:
         ks.dump(args.dump_file)
     else:
-        if args.run is not None:
-            args.skip_build = True
-        if not args.skip_build:
+        if args.skip_build:
+            sys.stderr.write("Warning: --skip-build is deprecated. Use `--run .` instead.\n")
+            args.run = '.'
+        if args.run is None:
             if args.commit:
                 ks.checkout(commit=args.commit, \
                             build_host=args.build_host, force=args.force)
