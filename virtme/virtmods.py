@@ -8,6 +8,7 @@
 MODALIASES = [
     # These are most likely portable across all architectures.
     'fs-9p',
+    'fs-virtiofs',
     'virtio:d00000009v00001AF4',  # 9pnet_virtio
     'virtio:d00000003v00001AF4',  # virtio_console
 
