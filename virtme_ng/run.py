@@ -68,6 +68,9 @@ def make_parser():
     parser.add_argument('--append', '-a', action='append',
             help='Additional kernel boot options (can be used multiple times)')
 
+    parser.add_argument('--force-9p', action='store_true',
+            help='Use legacy 9p filesystem as rootfs')
+
     parser.add_argument('--opts', '-o', action='append',
             help='Additional options passed to virtme-run (can be used multiple times)')
 
@@ -291,7 +294,10 @@ class KernelSource:
                 check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
             check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
 
-    def run(self, arch=None, root=None, cpus=None, memory=None, network=None, disk=None, append=None, execute=None, kimg=None, opts=None, skip_modules=False):
+    def run(self, arch=None, root=None, \
+                  cpus=None, memory=None, network=None, disk=None, \
+                  append=None, execute=None, kimg=None, force_9p=None, \
+                  opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
             create_root(root, arch)
@@ -339,6 +345,10 @@ class KernelSource:
             disk = disk_str
         else:
             disk = ''
+        if force_9p:
+            force_9p = '--force-9p'
+        else:
+            force_9p = ''
         if append is not None:
             # Split spaces into additional items in the append list
             append = ' '.join(['-a ' + item for _l in [item.split() for item in append] for item in _l])
@@ -354,7 +364,7 @@ class KernelSource:
             kdir = '--kdir ./'
         # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} {kdir} {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} {kdir} {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {force_9p} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         try:
             check_call(cmd, shell=True)
         except:
@@ -432,8 +442,8 @@ def do_it() -> int:
                     skip_modules=args.skip_modules, compiler=args.compiler, envs=args.envs)
         ks.run(arch=args.arch, root=args.root, \
                cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
-               append=args.append, execute=args.exec, kimg=args.run, opts=args.opts, \
-               skip_modules=args.skip_modules)
+               append=args.append, execute=args.exec, kimg=args.run, \
+               force_9p=args.force_9p, opts=args.opts, skip_modules=args.skip_modules)
 
 def main() -> int:
     try:
