@@ -165,6 +165,15 @@ def create_root(destdir, arch):
     os.system(f'curl -s {url} | sudo tar xvJ')
     os.chdir(prevdir)
 
+# Reliably get current username
+def get_username():
+    try:
+        username = os.getlogin()
+    except OSError:
+        # If os.getlogin() fails, try alternative methods
+        username = os.getenv('USER') or os.getenv('LOGNAME')
+    return username
+
 class KernelSource:
     def __init__(self):
         # Initialize known kernels
@@ -306,7 +315,7 @@ class KernelSource:
             pwd = ''
         else:
             root = ''
-            username = '--user ' + os.getlogin()
+            username = '--user ' + get_username()
             pwd = '--pwd'
         if arch is not None:
             if arch not in ARCH_MAPPING:
