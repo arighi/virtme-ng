@@ -30,8 +30,11 @@ def make_parser():
     ga.add_argument('--dump', '-d', action='store_true',
             help='Generate a memory dump of the running kernel and inspect it')
 
-    ga.add_argument('--skip-build', '-s', action='store_true',
+    ga.add_argument('--skip-build', action='store_true',
             help='[Deprecated] use `--run .` instead')
+
+    ga.add_argument('--skip-config', '-s', action='store_true',
+            help='Do not re-generate kernel .config')
 
     parser.add_argument('--kconfig', '-k', action='store_true',
             help='Only generate the kernel .config without building/running anything')
@@ -47,6 +50,7 @@ def make_parser():
 
     parser.add_argument('--config', '-f', action='append',
             help='Use one (or more) specific kernel .config snippet to override default config settings')
+
     parser.add_argument('--compiler', action='store',
             help='Compiler to be used as CC when building the kernel')
 
@@ -443,9 +447,10 @@ def do_it() -> int:
             if args.commit:
                 ks.checkout(commit=args.commit, \
                             build_host=args.build_host, force=args.force)
-            ks.config(arch=args.arch, config=args.config, envs=args.envs)
-            if args.kconfig:
-                return
+            if not args.skip_config:
+                ks.config(arch=args.arch, config=args.config, envs=args.envs)
+                if args.kconfig:
+                    return
             ks.make(arch=args.arch, build_host=args.build_host, \
                     build_host_exec_prefix=args.build_host_exec_prefix, \
                     build_host_vmlinux=args.build_host_vmlinux, \
