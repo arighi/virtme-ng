@@ -33,7 +33,7 @@ def make_parser():
     ga.add_argument('--skip-build', action='store_true',
             help='[Deprecated] use `--run .` instead')
 
-    ga.add_argument('--skip-config', '-s', action='store_true',
+    parser.add_argument('--skip-config', '-s', action='store_true',
             help='Do not re-generate kernel .config')
 
     parser.add_argument('--kconfig', '-k', action='store_true',
