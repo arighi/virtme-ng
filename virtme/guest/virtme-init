@@ -24,7 +24,8 @@ for tag in "${!virtme_rw_overlay@}"; do
     td=`mktemp -d`
     dir="${!tag}"
     mkdir "$td/cow" "$td/work"
-    mount -t overlay -o "xino=off,lowerdir=$dir,upperdir=$td/cow,workdir=$td/work" cow "$dir"
+    mnt_opts="xino=off,lowerdir=$dir,upperdir=$td/cow,workdir=$td/work"
+    mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}"
 done
 
 # Setup kernel modules
