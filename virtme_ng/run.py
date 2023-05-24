@@ -257,6 +257,8 @@ class KernelSource:
              skip_modules=False, compiler=None, envs=()):
         if not os.path.isdir('.git') and build_host is not None:
             arg_fail('error: --build-host can be used only on a kernel git repository', show_usage=False)
+        if build_host is not None and self._is_dirty_repo():
+            arg_fail("error: you have uncommitted changes in your git repository, commit or drop them before building on a remote host", show_usage=False)
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
