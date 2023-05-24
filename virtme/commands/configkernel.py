@@ -236,7 +236,7 @@ def do_it():
         maketarget = 'allnoconfig'
         updatetarget = 'syncconfig'
     elif args.defconfig:
-        maketarget = arch.defconfig_target + ' kvm_guest.config'
+        maketarget = arch.defconfig_target
         updatetarget = 'olddefconfig'
     elif args.update:
         maketarget = None
@@ -244,15 +244,11 @@ def do_it():
     else:
         arg_fail('No mode selected')
 
-    # TODO: Get rid of most of the noise and check the result.
+    # Propagate additional Makefile variables
+    for var in args.envs:
+        archargs.append(shlex.quote(var))
 
-    # Set up an initial config
-    if maketarget:
-        try:
-            subprocess.check_call(['make'] + archargs + maketarget.split(' '))
-        except:
-            raise SilentError()
-
+    # Determine if an initial config is present
     config = '.config'
 
     # Check if KBUILD_OUTPUT is defined and if it's a directory
@@ -260,14 +256,24 @@ def do_it():
     if config_dir and os.path.isdir(config_dir):
         config = os.path.join(config_dir, config)
 
-    with open(config, 'ab') as conffile:
-        conffile.write('\n'.join(conf).encode('utf-8'))
+    if not os.path.exists(config):
+        # Set up an initial config
+        if maketarget is None:
+            maketarget = arch.defconfig_target
+        try:
+            subprocess.check_call(['make'] + archargs + [maketarget])
+        except:
+            raise SilentError()
 
-    # Propagate additional Makefile variables
-    for var in args.envs:
-        archargs.append(shlex.quote(var))
+        # Append virtme configs
+        with open(config, 'ab') as conffile:
+            conffile.write('\n'.join(conf).encode('utf-8'))
 
-    subprocess.check_call(['make'] + archargs + [updatetarget])
+    # Run the update target
+    try:
+        subprocess.check_call(['make'] + archargs + [updatetarget])
+    except:
+        raise SilentError()
 
     print("Configured.  Build with 'make %s -j%d'" %
           (' '.join(archargs), multiprocessing.cpu_count()))
