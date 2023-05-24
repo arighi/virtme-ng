@@ -316,7 +316,7 @@ class KernelSource:
                   force_initramfs=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
-            create_root(root, arch)
+            create_root(root, arch or 'amd64')
             root = f'--root {root}'
             username = ''
             pwd = ''
