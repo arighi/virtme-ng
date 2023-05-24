@@ -365,7 +365,7 @@ def get_virtiofsd_path():
                 pass
     return None
 
-def start_virtiofsd():
+def start_virtiofsd(path):
     global virtiofsd_sock
     global virtiofsd_pid
 
@@ -383,7 +383,7 @@ def start_virtiofsd():
 
     # Export the whole root fs of the host, do not enable sandbox, otherwise we
     # would get permission errors.
-    os.system(f"{virtiofsd_path} --syslog --socket-path {virtiofsd_sock} --shared-dir / --sandbox none &")
+    os.system(f"{virtiofsd_path} --syslog --socket-path {virtiofsd_sock} --shared-dir {path} --sandbox none &")
     max_attempts = 5
     check_duration = 0.1
     for attempt in range(max_attempts):
@@ -403,7 +403,7 @@ def export_virtiofs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
                     readonly=True) -> None:
 
     # Try to start virtiofsd deamon
-    ret = start_virtiofsd()
+    ret = start_virtiofsd(path)
     if not ret:
         return False
 
@@ -501,7 +501,7 @@ def do_it() -> int:
     if args.force_9p or args.script_sh or args.script_exec:
         use_virtiofs = False
     else:
-        use_virtiofs = export_virtiofs(qemu, arch, qemuargs, '/', 'ROOTFS', memory=args.memory, readonly=(not args.rw))
+        use_virtiofs = export_virtiofs(qemu, arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, readonly=(not args.rw))
     if not use_virtiofs:
         export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 
@@ -509,7 +509,7 @@ def do_it() -> int:
     if guest_tools_path is None:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
-    if args.root:
+    if args.root != '/':
         export_virtfs(qemu, arch, qemuargs, guest_tools_path, 'virtme.guesttools')
         guest_tools_cmd = '/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any virtme.guesttools /run/virtme/guesttools'
     else:
