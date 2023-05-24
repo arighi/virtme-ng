@@ -136,6 +136,7 @@ _GENERIC_CONFIG_OPTIONAL = [
 
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
+    '# CONFIG_TEST_KMOD is not set',
     '# CONFIG_USB is not set',
     '# CONFIG_CAN is not set',
     '# CONFIG_BLUETOOTH is not set',
