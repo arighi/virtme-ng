@@ -136,7 +136,7 @@ _GENERIC_CONFIG_OPTIONAL = [
 
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
-    '# CONFIG_USB is not set'
+    '# CONFIG_USB is not set',
     '# CONFIG_SOUND is not set',
     '# CONFIG_I2C is not set',
     '# CONFIG_INPUT_MOUSE is not set',
