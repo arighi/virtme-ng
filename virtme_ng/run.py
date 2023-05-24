@@ -226,7 +226,7 @@ class KernelSource:
             check_call(['git', 'reset', '--hard', target], stdout=sys.stderr, stdin=DEVNULL)
 
     def config(self, arch=None, config=None, envs=()):
-        cmd = 'virtme-configkernel --defconfig'
+        cmd = 'virtme-configkernel --update'
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
