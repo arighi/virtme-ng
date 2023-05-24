@@ -402,6 +402,9 @@ def export_virtiofs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
                     mount_tag: str, security_model='none', memory=None,
                     readonly=True) -> None:
 
+    if not arch.virtiofs_support():
+        return False
+
     # Try to start virtiofsd deamon
     ret = start_virtiofsd(path)
     if not ret:

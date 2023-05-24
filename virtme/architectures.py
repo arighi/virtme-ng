@@ -18,6 +18,10 @@ class Arch(object):
     defconfig_target = 'defconfig'
 
     @staticmethod
+    def virtiofs_support() -> bool:
+        return False
+
+    @staticmethod
     def serial_dev_name(index) -> str:
         return 'ttyS%d' % index
 
@@ -71,6 +75,10 @@ class Arch_x86(Arch):
 
         self.linuxname = 'x86'
         self.defconfig_target = '%s_defconfig' % name
+
+    @staticmethod
+    def virtiofs_support() -> bool:
+        return True
 
     @staticmethod
     def qemuargs(is_native):
@@ -237,6 +245,10 @@ class Arch_riscv64(Arch):
         self.qemuname = 'riscv64'
         self.linuxname = 'riscv'
         self.gccname = 'riscv64'
+
+    @staticmethod
+    def virtiofs_support() -> bool:
+        return True
 
     def qemuargs(self, is_native):
         ret = Arch.qemuargs(is_native)
