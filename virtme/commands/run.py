@@ -65,6 +65,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Give the guest read-write access to its root filesystem')
     g.add_argument('--graphics', action='store_true',
                    help='Show graphical output instead of using a console.')
+    g.add_argument('--quiet', action='store_true',
+                   help='Reduce console output verbosity.')
     g.add_argument('--net', action='store', const='user', nargs='?',
                    choices=['user', 'bridge'],
                    help='Enable basic network access.')
@@ -365,7 +367,7 @@ def get_virtiofsd_path():
                 pass
     return None
 
-def start_virtiofsd(path):
+def start_virtiofsd(path, verbose=True):
     global virtiofsd_sock
     global virtiofsd_pid
 
@@ -389,7 +391,8 @@ def start_virtiofsd(path):
     for attempt in range(max_attempts):
         if os.path.exists(virtiofsd_pid):
             break
-        sys.stderr.write('virtme: waiting for virtiofsd to start\n')
+        if verbose:
+            sys.stderr.write('virtme: waiting for virtiofsd to start\n')
         sleep(check_duration)
         check_duration *= 2;
     else:
@@ -400,13 +403,13 @@ def start_virtiofsd(path):
 def export_virtiofs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
                     qemuargs: List[str], path: str,
                     mount_tag: str, security_model='none', memory=None,
-                    readonly=True) -> None:
+                    readonly=True, verbose=False) -> None:
 
     if not arch.virtiofs_support():
         return False
 
     # Try to start virtiofsd deamon
-    ret = start_virtiofsd(path)
+    ret = start_virtiofsd(path, verbose)
     if not ret:
         return False
 
@@ -504,7 +507,7 @@ def do_it() -> int:
     if args.force_9p or args.script_sh or args.script_exec:
         use_virtiofs = False
     else:
-        use_virtiofs = export_virtiofs(qemu, arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, readonly=(not args.rw))
+        use_virtiofs = export_virtiofs(qemu, arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, readonly=(not args.rw), verbose=not args.quiet)
     if not use_virtiofs:
         export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 
@@ -585,7 +588,8 @@ def do_it() -> int:
 
         qemuargs.extend(['-mon', 'chardev=console'])
 
-        kernelargs.extend(arch.earlyconsole_args())
+        if not args.quiet:
+            kernelargs.extend(arch.earlyconsole_args())
         qemuargs.extend(arch.qemu_nodisplay_args())
 
         if not args.xen:
@@ -796,6 +800,10 @@ def do_it() -> int:
         ])
         initrdpath = None
         initcmds.insert(0, 'mount -t tmpfs run /run')
+
+    if args.quiet:
+        kernelargs.append('quiet')
+        kernelargs.append('loglevel=1')
 
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs

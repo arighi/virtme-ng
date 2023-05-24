@@ -142,7 +142,12 @@ if [[ -n "$udevd" ]]; then
        echo '' >/sys/kernel/uevent_helper
     fi
     log "starting udevd"
-    "$udevd" --daemon --resolve-names=never
+    cmd="$udevd --daemon --resolve-names=never"
+    if grep -q "quiet" /proc/cmdline; then
+        $cmd >/dev/null 2>&1
+    else
+        $cmd
+    fi
     log "triggering udev coldplug"
     udevadm trigger --type=subsystems --action=add  >/dev/null 2>&1
     udevadm trigger --type=devices --action=add  >/dev/null 2>&1
@@ -260,7 +265,7 @@ fi
 # Parameters that start with virtme_ shouldn't pollute the environment
 for p in "${!virtme_@}"; do export -n "$p"; done
 
-echo "virtme-init: console is $consdev"
+echo "virtme-ng started: console is $consdev"
 
 # Set up a basic environment
 install -d -m 0755 /tmp/roothome

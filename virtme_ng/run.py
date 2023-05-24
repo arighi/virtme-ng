@@ -81,6 +81,9 @@ def make_parser():
     parser.add_argument('--graphics', '-g', action='store_true',
             help='Show graphical output instead of using a console')
 
+    parser.add_argument('--quiet', '-q', action='store_true',
+            help='Reduce console output verbosity.')
+
     parser.add_argument('--opts', '-o', action='append',
             help='Additional options passed to virtme-run (can be used multiple times)')
 
@@ -317,7 +320,7 @@ class KernelSource:
                   cpus=None, memory=None, network=None, disk=None, \
                   append=None, execute=None, kimg=None, force_9p=None, \
                   force_initramfs=None, graphics=None, \
-                  opts=None, skip_modules=False):
+                  quiet=None, opts=None, skip_modules=False):
         hostname = socket.gethostname()
         if root is not None:
             create_root(root, arch or 'amd64')
@@ -377,6 +380,10 @@ class KernelSource:
             graphics = '--graphics'
         else:
             graphics = ''
+        if quiet:
+            quiet = '--quiet'
+        else:
+            quiet = ''
         if append is not None:
             # Split spaces into additional items in the append list
             append = ' '.join(['-a ' + item for _l in [item.split() for item in append] for item in _l])
@@ -392,7 +399,7 @@ class KernelSource:
             kdir = '--kdir ./'
         # Start VM using virtme-run
         rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} {kdir} {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {force_9p} {force_initramfs} {graphics} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
+        cmd = f'virtme-run {arch} --name {hostname} {kdir} {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {force_9p} {force_initramfs} {graphics} {quiet} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
         try:
             check_call(cmd, shell=True)
         except:
@@ -474,7 +481,8 @@ def do_it() -> int:
                cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
                append=args.append, execute=args.exec, kimg=args.run, \
                force_9p=args.force_9p, force_initramfs=args.force_initramfs, \
-               graphics=args.graphics, opts=args.opts, skip_modules=args.skip_modules)
+               graphics=args.graphics, quiet=args.quiet, \
+               opts=args.opts, skip_modules=args.skip_modules)
 
 def main() -> int:
     try:
