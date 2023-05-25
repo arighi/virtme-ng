@@ -1,3 +1,8 @@
+# -*- mode: python -*-
+# Copyright 2023 Andrea Righi
+
+"""virtme-ng: main command-line frontend."""
+
 import argparse
 import os
 import sys
@@ -8,7 +13,7 @@ import tempfile
 import time
 import threading
 import datetime
-from subprocess import call, check_call, check_output, DEVNULL
+from subprocess import check_call, check_output, DEVNULL
 from pathlib import Path
 from argcomplete import autocomplete
 from virtme.util import SilentError, uname
@@ -16,11 +21,13 @@ from virtme.util import SilentError, uname
 from virtme_ng.utils import VERSION, CONF_FILE
 
 def log_msg(message):
+    """Log a message with a timestamp."""
     timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     sys.stderr.write(f"[{timestamp}] {message}")
     sys.stderr.flush()
 
 def spinner_decorator(show_spinner=False, message=""):
+    """Function decorator to show a spinner while the function is running."""
     def decorator(func):
         def wrapper(*args, **kwargs):
             stop_event = threading.Event()
@@ -51,24 +58,27 @@ def spinner_decorator(show_spinner=False, message=""):
     return decorator
 
 def make_parser():
+    """Main virtme-ng command line parser."""
+
     parser = argparse.ArgumentParser(
-        description='Build and run specific kernels inside a virtualized snapshot of your live system',
+        description='Build and run kernels inside a virtualized snapshot of your live system',
     )
     parser.add_argument('--version', '-v', action='version', version=f'%(prog)s {VERSION}')
 
-    ga = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
+    g_action = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
-    ga.add_argument('--run', '-r', action='store', nargs='?',
+    g_action.add_argument('--run', '-r', action='store', nargs='?',
             const=uname.release, default=None,
-            help='Run specified kernel image or an installed kernel version. If no argument is specified the running kernel will be used.')
+            help='Run specified kernel image or an installed kernel version. '
+                 'If no argument is specified the running kernel will be used.')
 
-    ga.add_argument('--clean', '-x', action='store_true',
+    g_action.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
 
-    ga.add_argument('--dump', '-d', action='store_true',
+    g_action.add_argument('--dump', '-d', action='store_true',
             help='Generate a memory dump of the running kernel and inspect it')
 
-    ga.add_argument('--skip-build', action='store_true',
+    g_action.add_argument('--skip-build', action='store_true',
             help='[Deprecated] use `--run .` instead')
 
     parser.add_argument('--skip-config', '-s', action='store_true',
@@ -81,13 +91,15 @@ def make_parser():
             help='Generate a memory dump of the running kernel to a target file')
 
     parser.add_argument('--skip-modules', '-S', action='store_true',
-            help='Run a really fast build by skipping external modules (no external modules support)')
+            help='Run a really fast build by skipping external modules '
+                 '(no external modules support)')
 
     parser.add_argument('--commit', '-c', action='store',
             help='Use a kernel identified by a specific commit id, tag or branch')
 
     parser.add_argument('--config', '-f', action='append',
-            help='Use one (or more) specific kernel .config snippet to override default config settings')
+            help='Use one (or more) specific kernel .config snippet '
+                 'to override default config settings')
 
     parser.add_argument('--compiler', action='store',
             help='Compiler to be used as CC when building the kernel')
@@ -129,19 +141,22 @@ def make_parser():
             help='Perform kernel build on a remote server (ssh access required)')
 
     parser.add_argument('--build-host-exec-prefix', action='store',
-            help='Prepend a command (e.g., chroot) to the make command executed on the remote build host')
+            help='Prepend a command (e.g., chroot) '
+                 'to the make command executed on the remote build host')
 
     parser.add_argument('--build-host-vmlinux', action='store_true',
             help='Copy vmlinux back from the build host')
 
     parser.add_argument('--arch', action='store',
-            help='Generate and test a kernel for a specific architecture (default is host architecture)')
+            help='Generate and test a kernel for a specific architecture '
+                 '(default is host architecture)')
 
     parser.add_argument('--root', action='store',
             help='Pass a specific chroot to use inside the virtualized kernel (useful with --arch)')
 
     parser.add_argument('--force', action='store_true',
-            help='Force reset git repository to target branch or commit (warning: this may drop uncommitted changes)')
+            help='Force reset git repository to target branch or commit '
+                 '(warning: this may drop uncommitted changes)')
 
     parser.add_argument('envs', metavar='envs', type=str, nargs='*',
                         help='Additional Makefile variables')
@@ -150,10 +165,11 @@ def make_parser():
 _ARGPARSER = make_parser()
 
 def arg_fail(message, show_usage=True):
-    print(message)
-    if (show_usage):
+    """Print an error message and exit, optionally showing usage help."""
+    sys.stderr.write(message + "\n")
+    if show_usage:
         _ARGPARSER.print_usage()
-    exit(1)
+    sys.exit(1)
 
 ARCH_MAPPING = {
     'arm64': {
@@ -204,20 +220,22 @@ git reset --hard __virtme__
 '''
 
 def create_root(destdir, arch):
+    """Initialize a rootfs directory, populating files/directory if it doesn't exist."""
     if os.path.exists(destdir):
         return
     # Use Ubuntu's cloud images to create a rootfs, these images are fairly
     # small and they provide a nice environment to test kernels.
     release = check_output('lsb_release -s -c', shell=True).decode(sys.stdout.encoding).rstrip()
-    url = f'https://cloud-images.ubuntu.com/{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz'
+    url = 'https://cloud-images.ubuntu.com/' + \
+          f'{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz'
     prevdir = os.getcwd()
     os.system(f'sudo mkdir -p {destdir}')
     os.chdir(destdir)
     os.system(f'curl -s {url} | sudo tar xvJ')
     os.chdir(prevdir)
 
-# Reliably get current username
 def get_username():
+    """Reliably get current username."""
     try:
         username = os.getlogin()
     except OSError:
@@ -226,22 +244,25 @@ def get_username():
     return username
 
 class KernelSource:
+    """Main class that implement actions to perform on a kernel source directory."""
     def __init__(self):
-        # Initialize known kernels
+        self.virtme_param = {}
         conf_path = self.get_conf_file_path()
         self.default_opts = []
         if conf_path is not None:
-            with open(conf_path) as fd:
-                conf_data = json.loads(fd.read())
+            with open(conf_path, 'r', encoding='utf-8') as conf_fd:
+                conf_data = json.loads(conf_fd.read())
                 if 'default_opts' in conf_data:
                     self.default_opts = conf_data['default_opts']
         self.cpus = str(os.cpu_count())
 
-    # First check if there is a config file in the user's home config
-    # directory, then check for a single config file in ~/.virtme-ng.conf and
-    # finally check for /etc/virtme-ng.conf. If none of them exist, report an
-    # error and exit.
     def get_conf_file_path(self):
+        """Return virtme-ng main configuration file path."""
+
+        # First check if there is a config file in the user's home config
+        # directory, then check for a single config file in ~/.virtme-ng.conf and
+        # finally check for /etc/virtme-ng.conf. If none of them exist, report an
+        # error and exit.
         configs = (CONF_FILE,
                    Path(Path.home(), '.virtme-ng.conf'),
                    Path('/etc', 'virtme-ng.conf'))
@@ -257,19 +278,23 @@ class KernelSource:
         cmd = 'git --no-optional-locks status -uno --porcelain'
         if check_output(self._format_cmd(cmd), stderr=DEVNULL, stdin=DEVNULL):
             return True
-        else:
-            return False
+        return False
 
-    def checkout(self, commit=None, build_host=None, force=False, quiet=False):
+    def checkout(self, args):
+        """Perform a git checkout operation on a local kernel git repository."""
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
-        target = commit or 'HEAD'
-        if build_host is not None or target != 'HEAD':
-            if not force and self._is_dirty_repo():
-                arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
-            check_call(['git', 'reset', '--hard', target], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
+        target = args.commit or 'HEAD'
+        if args.build_host is not None or target != 'HEAD':
+            if not args.force and self._is_dirty_repo():
+                arg_fail("error: you have uncommitted changes in your git repository, " + \
+                         "use --force to drop them", show_usage=False)
+            check_call(['git', 'reset', '--hard', target], \
+                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
 
-    def config(self, arch=None, config=None, quiet=False, envs=()):
+    def config(self, args):
+        """Perform a make config operation on a kernel source directory."""
+        arch = args.arch
         cmd = 'virtme-configkernel --update'
         if arch is not None:
             if arch not in ARCH_MAPPING:
@@ -277,195 +302,299 @@ class KernelSource:
             arch = ARCH_MAPPING[arch]['qemu_name']
             cmd += f' --arch {arch}'
         user_config = str(Path.home()) + '/.config/virtme-ng/kernel.config'
-        if config:
-            for c in config:
-                cmd += f' --custom {c}'
+        if args.config:
+            for conf in args.config:
+                cmd += f' --custom {conf}'
         if os.path.exists(user_config):
             cmd += f' --custom {user_config}'
         # Propagate additional Makefile variables
-        for var in envs:
+        for var in args.envs:
             cmd += f' {var} '
-        check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
+        check_call(self._format_cmd(cmd), \
+                   stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
 
-    def make(self, arch=None, build_host=None,
-             build_host_exec_prefix=None, build_host_vmlinux=False,
-             skip_modules=False, compiler=None, quiet=False, envs=()):
-        if not os.path.isdir('.git') and build_host is not None:
-            arg_fail('error: --build-host can be used only on a kernel git repository', show_usage=False)
-        if build_host is not None and self._is_dirty_repo():
-            arg_fail("error: you have uncommitted changes in your git repository, commit or drop them before building on a remote host", show_usage=False)
+    def _make_remote(self, args, make_command):
+        check_call(['ssh', args.build_host,
+                    'mkdir -p ~/.virtme'], \
+                    stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        check_call(['ssh', args.build_host,
+                    'git init ~/.virtme'], \
+                    stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        check_call(['git', 'push', '--force', '--porcelain', f"{args.build_host}:~/.virtme",
+                    'HEAD:__virtme__', ], \
+                    stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        cmd = f'rsync .config {args.build_host}:.virtme/.config'
+        check_call(self._format_cmd(cmd), \
+                   stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        # Create remote build script
+        with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
+            tmp.write(REMOTE_BUILD_SCRIPT.format(args.build_host_exec_prefix or '', \
+                                                 make_command + ' -j$(nproc --all)'))
+            tmp.flush()
+            cmd = f'rsync {tmp.name} {args.build_host}:.virtme/.kc-build'
+            check_call(self._format_cmd(cmd), \
+                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        # Execute remote build script
+        check_call(['ssh', args.build_host, 'bash', '.virtme/.kc-build'], \
+                   stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        # Copy artifacts back to the running host
+        with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
+            if args.build_host_vmlinux or args.arch == 'ppc64el':
+                vmlinux = '--include=vmlinux'
+            else:
+                vmlinux = ''
+            if args.skip_modules:
+                cmd = 'rsync -azS --progress --exclude=.config --exclude=.git/ ' + \
+                      '--include=*/ --include=bzImage --include=zImage --include=Image ' + \
+                      f'{vmlinux} --include=*.dtb --exclude="*" {args.build_host}:.virtme/ ./'
+            else:
+                cmd = 'rsync -azS --progress --exclude=.config --exclude=.git/ ' + \
+                      '--include=*/ --include="*.ko" --include=".dwo" ' + \
+                      f'--include=bzImage --include=zImage --include=Image {vmlinux} ' + \
+                      '--include=.config --include=modules.* ' + \
+                      '--include=System.map --include=Module.symvers --include=module.lds ' + \
+                      '--include=*.dtb --include="**/generated/**" --exclude="*" ' + \
+                      f'{args.build_host}:.virtme/ ./'
+            tmp.write(cmd)
+            tmp.flush()
+            check_call(['bash', tmp.name], \
+                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        if not args.skip_modules:
+            if os.path.exists('./debian/rules'):
+                check_call(['fakeroot', 'debian/rules', 'clean'], \
+                           stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+            check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), \
+                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+
+    def make(self, args):
+        """Perform a make operation on a kernel source directory."""
+        if not os.path.isdir('.git') and args.build_host is not None:
+            arg_fail('error: --build-host can be used only on a kernel git repository',
+                     show_usage=False)
+        if args.build_host is not None and self._is_dirty_repo():
+            arg_fail("error: you have uncommitted changes in your git repository, " + \
+                     "commit or drop them before building on a remote host", show_usage=False)
+        arch = args.arch
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f'unsupported architecture: {arch}')
             target = ARCH_MAPPING[arch]['kernel_target']
-            kernel_image = ARCH_MAPPING[arch]['kernel_image']
             cross_compile = ARCH_MAPPING[arch]['cross_compile']
             cross_arch = ARCH_MAPPING[arch]['linux_name']
         else:
             target = 'bzImage'
-            kernel_image = 'bzImage'
             cross_compile = None
             cross_arch = None
         make_command = MAKE_COMMAND
-        if compiler:
-            make_command += f' CC={compiler}'
-        if skip_modules:
+        if args.compiler:
+            make_command += f' CC={args.compiler}'
+        if args.skip_modules:
             make_command += f' {target}'
         if cross_compile and cross_arch:
             make_command += f' CROSS_COMPILE={cross_compile} ARCH={cross_arch}'
         # Propagate additional Makefile variables
-        for var in envs:
+        for var in args.envs:
             make_command += f' {var} '
-        if build_host is None:
-            check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-            return
-        check_call(['ssh', build_host,
-                    'mkdir -p ~/.virtme'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        check_call(['ssh', build_host,
-                    'git init ~/.virtme'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        check_call(['git', 'push', '--force', '--porcelain', f"{build_host}:~/.virtme",
-                    'HEAD:__virtme__', ], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        cmd = f'rsync .config {build_host}:.virtme/.config'
-        check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        # Create remote build script
-        with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
-            tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or '', make_command + ' -j$(nproc --all)'))
-            tmp.flush()
-            cmd = f'rsync {tmp.name} {build_host}:.virtme/.kc-build'
-            check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        # Execute remote build script
-        check_call(['ssh', build_host, 'bash', '.virtme/.kc-build'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        # Copy artifacts back to the running host
-        with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
-            if build_host_vmlinux or arch == 'ppc64el':
-                vmlinux = '--include=vmlinux'
-            else:
-                vmlinux = ''
-            if skip_modules:
-                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include={kernel_image} {vmlinux} --include=*.dtb --exclude="*" {build_host}:.virtme/ ./'
-            else:
-                cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.virtme/ ./'
-            tmp.write(cmd)
-            tmp.flush()
-            check_call(['bash', tmp.name], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        if not skip_modules:
-            if os.path.exists('./debian/rules'):
-                check_call(['fakeroot', 'debian/rules', 'clean'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-            check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
+        if args.build_host is None:
+            # Build the kernel locally
+            check_call(self._format_cmd(make_command + ' -j' + self.cpus),
+                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        else:
+            # Build the kernel on a remote build host
+            self._make_remote(args, make_command)
 
-    def run(self, arch=None, root=None, \
-                  cpus=None, memory=None, network=None, disk=None, \
-                  append=None, execute=None, kimg=None, force_9p=None, \
-                  force_initramfs=None, graphics=None, \
-                  quiet=None, opts=None, skip_modules=False):
-        hostname = socket.gethostname()
-        if root is not None:
-            create_root(root, arch or 'amd64')
-            root = f'--root {root}'
-            username = ''
-            pwd = ''
+    def _get_virtme_arch(self, args):
+        if args.arch is not None:
+            if args.arch not in ARCH_MAPPING:
+                arg_fail(f'unsupported architecture: {args.arch}')
+            if 'max-cpus' in ARCH_MAPPING[args.arch]:
+                self.cpus = ARCH_MAPPING[args.arch]['max-cpus']
+            self.virtme_param['arch'] = '--arch ' + \
+                    ARCH_MAPPING[args.arch]['qemu_name']
         else:
-            root = ''
-            username = '--user ' + get_username()
-            pwd = '--pwd'
-        if arch is not None:
-            if arch not in ARCH_MAPPING:
-                arg_fail(f'unsupported architecture: {arch}')
-            if arch == 'riscv64':
-                print('\n!!! WARNING !!!\n')
-                print('Kernel boot parameters may be limited on riscv, if you are using an old kernel.')
-                print('Make sure to increase COMMAND_LINE_SIZE to at least 1024')
-                print('See: https://lore.kernel.org/lkml/e90289af-f557-58f2-f4c8-f79feab4f185@ghiti.fr/T/#t')
-                print('\n')
-            if 'max-cpus' in ARCH_MAPPING[arch]:
-                self.cpus = ARCH_MAPPING[arch]['max-cpus']
-            arch = '--arch ' + ARCH_MAPPING[arch]['qemu_name']
+            self.virtme_param['arch'] = ''
+
+    def _get_virtme_host(self):
+        self.virtme_param['hostname'] = '--name ' + socket.gethostname()
+
+    def _get_virtme_root(self, args):
+        if args.root is not None:
+            create_root(args.root, args.arch or 'amd64')
+            self.virtme_param['root'] = f'--root {args.root}'
+            self.virtme_param['username'] = ''
+            self.virtme_param['pwd'] = ''
         else:
-            arch = ''
-        if skip_modules:
-            mods = '--mods none'
+            self.virtme_param['root'] = ''
+            self.virtme_param['username'] = '--user ' + get_username()
+            self.virtme_param['pwd'] = '--pwd'
+
+    def _get_virtme_run(self, args):
+        if args.run is not None:
+            self.virtme_param['kdir'] = '--kimg ' + args.run
         else:
-            mods = '--mods auto'
-        if cpus is None:
-            cpus = self.cpus
-        if memory is None:
-            memory = '4G'
-        if execute is not None:
-            execute = f'--script-sh "{execute}"'
+            self.virtme_param['kdir'] = '--kdir ./'
+
+    def _get_virtme_mods(self, args):
+        if args.skip_modules:
+            self.virtme_param['mods'] = '--mods none'
         else:
-            execute = ''
-        if network is not None:
-            network = f'--net {network}'
+            self.virtme_param['mods'] = '--mods auto'
+
+    def _get_virtme_exec(self, args):
+        if args.exec is not None:
+            self.virtme_param['exec'] = f'--script-sh "{args.exec}"'
         else:
-            network = ''
-        if disk is not None:
+            self.virtme_param['exec'] = ''
+
+    def _get_virtme_network(self, args):
+        if args.network is not None:
+            self.virtme_param['network'] = f'--net {args.network}'
+        else:
+            self.virtme_param['network'] = ''
+
+    def _get_virtme_disk(self, args):
+        if args.disk is not None:
             disk_str = ''
-            for d in disk:
-                disk_str += f'--disk {d}={d} '
-            disk = disk_str
+            for dsk in args.disk:
+                disk_str += f'--disk {dsk}={dsk} '
+            self.virtme_param['disk'] = disk_str
         else:
-            disk = ''
-        if force_9p:
-            force_9p = '--force-9p'
+            self.virtme_param['disk'] = ''
+
+    def _get_virtme_9p(self, args):
+        if args.force_9p:
+            self.virtme_param['force_9p'] = '--force-9p'
         else:
-            force_9p = ''
-        if force_initramfs:
-            force_initramfs = '--force-initramfs'
+            self.virtme_param['force_9p'] = ''
+
+    def _get_virtme_initramfs(self, args):
+        if args.force_initramfs:
+            self.virtme_param['force_initramfs'] = '--force-initramfs'
         else:
-            force_initramfs = ''
-        if graphics:
-            graphics = '--graphics'
+            self.virtme_param['force_initramfs'] = ''
+
+    def _get_virtme_graphics(self, args):
+        if args.graphics:
+            self.virtme_param['graphics'] = '--graphics'
         else:
-            graphics = ''
-        if quiet:
-            quiet = '--quiet'
+            self.virtme_param['graphics'] = ''
+
+    def _get_virtme_quiet(self, args):
+        if args.quiet:
+            self.virtme_param['quiet'] = '--quiet'
         else:
-            quiet = ''
-        if append is not None:
-            # Split spaces into additional items in the append list
-            append = ' '.join(['-a ' + item for _l in [item.split() for item in append] for item in _l])
+            self.virtme_param['quiet'] = ''
+
+    def _get_virtme_rwdirs(self):
+        self.virtme_param['rw_dirs'] = ' '.join(f'--overlay-rwdir {d}' \
+                for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
+
+    def _get_virtme_append(self, args):
+        if args.append is not None:
+            append = []
+            for item in args.append:
+                split_items = item.split()
+                for split_item in split_items:
+                    append.append('-a ' + split_item)
+            self.virtme_param['append'] = ' '.join(append)
         else:
-            append = ''
-        if opts is not None:
-            opts = ' '.join(opts)
+            self.virtme_param['append'] = ''
+
+    def _get_virtme_memory(self, args):
+        if args.memory is None:
+            self.virtme_param['memory'] = '--memory 4G'
         else:
-            opts = ''
-        if kimg is not None:
-            kdir = '--kimg ' + kimg
+            self.virtme_param['memory'] = '--memory ' + args.memory
+
+    def _get_virtme_opts(self, args):
+        if args.opts is not None:
+            self.virtme_param['opts'] = ' '.join(args.opts)
         else:
-            kdir = '--kdir ./'
+            self.virtme_param['opts'] = ''
+
+    def _get_virtme_cpus(self, args):
+        if args.cpus is None:
+            cpus = self.cpus
+        else:
+            cpus = args.cpus
+        self.virtme_param['cpus'] = f'--qemu-opts -smp {cpus}'
+
+    def run(self, args):
+        """Execute a kernel inside virtme-ng."""
+        self._get_virtme_arch(args)
+        self._get_virtme_host()
+        self._get_virtme_root(args)
+        self._get_virtme_run(args)
+        self._get_virtme_mods(args)
+        self._get_virtme_exec(args)
+        self._get_virtme_network(args)
+        self._get_virtme_disk(args)
+        self._get_virtme_9p(args)
+        self._get_virtme_initramfs(args)
+        self._get_virtme_graphics(args)
+        self._get_virtme_quiet(args)
+        self._get_virtme_rwdirs()
+        self._get_virtme_append(args)
+        self._get_virtme_memory(args)
+        self._get_virtme_opts(args)
+        self._get_virtme_cpus(args)
+
         # Start VM using virtme-run
-        rw_dirs = ' '.join(f'--overlay-rwdir {d}' for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-        cmd = f'virtme-run {arch} --name {hostname} {kdir} {mods} {rw_dirs} {pwd} {username} {root} {execute} {network} {disk} {append} {force_9p} {force_initramfs} {graphics} {quiet} {opts} --memory {memory} --qemu-opts -smp {cpus} -s -qmp tcp:localhost:3636,server,nowait'
-        try:
-            check_call(cmd, shell=True)
-        except:
-            raise SilentError()
+        cmd = ('virtme-run ' +
+            f'{self.virtme_param["arch"]} ' +
+            f'{self.virtme_param["hostname"]} ' +
+            f'{self.virtme_param["root"]} ' +
+            f'{self.virtme_param["pwd"]} ' +
+            f'{self.virtme_param["username"]} ' +
+            f'{self.virtme_param["kdir"]} ' +
+            f'{self.virtme_param["mods"]} ' +
+            f'{self.virtme_param["exec"]} ' +
+            f'{self.virtme_param["network"]} ' +
+            f'{self.virtme_param["disk"]} ' +
+            f'{self.virtme_param["force_9p"]} ' +
+            f'{self.virtme_param["force_initramfs"]} ' +
+            f'{self.virtme_param["graphics"]} ' +
+            f'{self.virtme_param["quiet"]} ' +
+            f'{self.virtme_param["rw_dirs"]} ' +
+            f'{self.virtme_param["append"]} ' +
+            f'{self.virtme_param["memory"]} ' +
+            f'{self.virtme_param["opts"]} ' +
+            f'{self.virtme_param["cpus"]} ' +
+            '-s -qmp tcp:localhost:3636,server,nowait'
+        )
+        check_call(cmd, shell=True)
 
     def dump(self, dump_file):
+        """Generate or analyze a crash memory dump."""
         if not os.path.isfile('vmlinux'):
-            arg_fail('vmlinux not found, try to recompile the kernel with --build-host-vmlinux (if --build-host was used)')
+            arg_fail('vmlinux not found, try to recompile the kernel with ' +
+                     '--build-host-vmlinux (if --build-host was used)')
         # Use QMP to generate a memory dump
-        s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        s.connect(('localhost', 3636))
-        data = s.recv(1024)
+        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        sock.connect(('localhost', 3636))
+        data = sock.recv(1024)
         if not data:
-            exit(1)
+            sys.exit(1)
         print(data)
-        s.send("{ \"execute\": \"qmp_capabilities\" }\r".encode('utf-8'))
-        data = s.recv(1024)
+        sock.send("{ \"execute\": \"qmp_capabilities\" }\r".encode('utf-8'))
+        data = sock.recv(1024)
         if not data:
-            exit(1)
+            sys.exit(1)
         print(data)
-        with tempfile.NamedTemporaryFile(delete=(dump_file is None)) as tmp:
-            msg = "{\"execute\":\"dump-guest-memory\",\"arguments\":{\"paging\":false,\"protocol\":\"file:" + tmp.name + "\"}}\r"
+        with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
+            msg = (
+                "{\"execute\":\"dump-guest-memory\","
+                "\"arguments\":{\"paging\":false,"
+                "\"protocol\":\"file:" + tmp.name + "\"}}"
+                "\r"
+            )
             print(msg)
-            s.send(msg.encode('utf-8'))
-            data = s.recv(1024)
+            sock.send(msg.encode('utf-8'))
+            data = sock.recv(1024)
             if not data:
-                exit(1)
+                sys.exit(1)
             print(data)
-            data = s.recv(1024)
+            data = sock.recv(1024)
             print(data)
             if dump_file:
                 # Save memory dump to target file
@@ -475,6 +604,7 @@ class KernelSource:
                 check_call(['crash', tmp.name, './vmlinux'])
 
     def clean(self, build_host=None):
+        """Clean a local or remote git repository."""
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         if build_host is None:
@@ -486,62 +616,55 @@ class KernelSource:
         check_call(cmd)
 
 @spinner_decorator(message="configuring kernel")
-def config(ks, args, show_spinner=False):
-    ks.config(arch=args.arch, config=args.config, \
-              quiet=args.quiet, envs=args.envs)
+def config(kern_source, args, show_spinner=False): # pylint: disable=unused-argument
+    """Confiugure the kernel."""
+    kern_source.config(args)
     return True
 
 @spinner_decorator(message="building kernel")
-def make(ks, args, show_spinner=False):
-    ks.make(arch=args.arch, build_host=args.build_host, \
-            build_host_exec_prefix=args.build_host_exec_prefix, \
-            build_host_vmlinux=args.build_host_vmlinux, \
-            skip_modules=args.skip_modules, compiler=args.compiler, \
-            quiet=args.quiet, envs=args.envs)
+def make(kern_source, args, show_spinner=False): # pylint: disable=unused-argument
+    """Build the kernel."""
+    kern_source.make(args)
     return True
 
-def run(ks, args):
-    ks.run(arch=args.arch, root=args.root, \
-           cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
-           append=args.append, execute=args.exec, kimg=args.run, \
-           force_9p=args.force_9p, force_initramfs=args.force_initramfs, \
-           graphics=args.graphics, quiet=args.quiet, \
-           opts=args.opts, skip_modules=args.skip_modules)
+def run(kern_source, args):
+    """Run the kernel."""
+    kern_source.run(args)
     return True
 
 def do_it() -> int:
+    """Main body."""
     autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
 
-    ks = KernelSource()
-    if ks.default_opts:
-        for opt in ks.default_opts:
-            val = ks.default_opts[opt]
+    kern_source = KernelSource()
+    if kern_source.default_opts:
+        for opt in kern_source.default_opts:
+            val = kern_source.default_opts[opt]
             setattr(args, opt, val)
     try:
         if args.clean:
-            ks.clean(build_host=args.build_host)
+            kern_source.clean(build_host=args.build_host)
         elif args.dump:
-            ks.dump(args.dump_file)
+            kern_source.dump(args.dump_file)
         else:
             if args.skip_build:
                 sys.stderr.write("Warning: --skip-build is deprecated. Use `--run .` instead.\n")
                 args.run = '.'
             if args.run is None:
                 if args.commit:
-                    ks.checkout(commit=args.commit, \
-                                build_host=args.build_host, \
-                                force=args.force, quiet=args.quiet)
+                    kern_source.checkout(args)
                 if not args.skip_config:
-                    config(ks, args, show_spinner=not args.quiet)
+                    config(kern_source, args, show_spinner=not args.quiet)
                     if args.kconfig:
                         return
-                make(ks, args, show_spinner=not args.quiet)
-            run(ks, args)
-    except:
-        raise SilentError()
+                make(kern_source, args, show_spinner=not args.quiet)
+            run(kern_source, args)
+    except Exception as exc:
+        raise SilentError() from exc
 
 def main() -> int:
+    """Main."""
     try:
         return do_it()
     except (KeyboardInterrupt, SilentError):
@@ -549,6 +672,6 @@ def main() -> int:
 
 if __name__ == '__main__':
     try:
-        exit(main())
+        sys.exit(main())
     except SilentError:
-        exit(1)
+        sys.exit(1)
