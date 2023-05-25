@@ -664,13 +664,19 @@ def do_it() -> int:
         # Turn off default I/O
         qemuargs.extend(arch.qemu_nodisplay_args())
 
+        # Configure kernel console output
         if show_boot_console:
-            # Send boot console output to stderr
-            qemuargs.extend(arch.qemu_serial_console_args())
-            qemuargs.extend(['-chardev', 'file,id=console,path=/proc/self/fd/2'])
+            output = '/proc/self/fd/2'
+            console_args = ()
+        else:
+            output = '/dev/null'
+            console_args = ['quiet', 'loglevel=1']
+        qemuargs.extend(arch.qemu_serial_console_args())
+        qemuargs.extend(['-chardev', f'file,id=console,path={output}'])
 
-            kernelargs.extend(arch.serial_console_args())
-            kernelargs.extend(arch.earlyconsole_args())
+        kernelargs.extend(arch.serial_console_args())
+        kernelargs.extend(arch.earlyconsole_args())
+        kernelargs.extend(console_args)
 
         # Set up a virtserialport for script I/O
         qemuargs.extend(['-chardev', 'stdio,id=stdin,signal=on,mux=off'])
