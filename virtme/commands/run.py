@@ -656,18 +656,13 @@ def do_it() -> int:
         # Turn off default I/O
         qemuargs.extend(arch.qemu_nodisplay_args())
 
-        # Send kernel logs to stderr
-        qemuargs.extend(['-serial', 'none'])
-        qemuargs.extend(['-chardev', 'file,id=console,path=/proc/self/fd/2'])
-
-        # We should be using the new-style -device serialdev,chardev=xyz,
-        # but many architecture-specific serial devices don't support that.
-        qemuargs.extend(['-serial', 'chardev:console'])
-
         if show_boot_console:
-            serdev = qemu.quote_optarg(arch.serial_dev_name(0))
-            kernelargs.extend(['console=%s' % serdev,
-                               'earlyprintk=serial,%s,115200' % serdev])
+            # Send boot console output to stderr
+            qemuargs.extend(arch.qemu_serial_console_args())
+            qemuargs.extend(['-chardev', 'file,id=console,path=/proc/self/fd/2'])
+
+            kernelargs.extend(arch.serial_console_args())
+            kernelargs.extend(arch.earlyconsole_args())
 
         # Set up a virtserialport for script I/O
         qemuargs.extend(['-chardev', 'stdio,id=stdin,signal=on,mux=off'])

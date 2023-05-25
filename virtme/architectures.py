@@ -22,10 +22,6 @@ class Arch(object):
         return False
 
     @staticmethod
-    def serial_dev_name(index) -> str:
-        return 'ttyS%d' % index
-
-    @staticmethod
     def qemuargs(is_native) -> List[str]:
         return []
 
