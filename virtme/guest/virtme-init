@@ -272,7 +272,7 @@ echo "   \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |"
 echo "    \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |"
 echo "     \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |"
 echo "                                                |___/ "
-echo "   kernel version: $(uname -r)"
+echo "   kernel version: $(uname -mr)"
 echo ""
 echo "Type \"CTRL+a x\" to exit"
 
