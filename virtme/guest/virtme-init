@@ -25,7 +25,7 @@ for tag in "${!virtme_rw_overlay@}"; do
     dir="${!tag}"
     mkdir "$td/cow" "$td/work"
     mnt_opts="xino=off,lowerdir=$dir,upperdir=$td/cow,workdir=$td/work"
-    mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}"
+    mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
 done
 
 # Setup kernel modules
@@ -43,30 +43,31 @@ elif [[ -d "/lib/modules/$kver" ]]; then
 fi
 
 # Setup rw tmpfs directories
-[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
-[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
+[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/ &
+[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/ &
 
 # Additional rw dirs used by systemd
-[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
-[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
-[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
-[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
+[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog &
+[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables &
+[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines &
+[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private &
+{
+[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
 [ -e /var/cache/private ] && mount -t tmpfs tmpfs /var/cache/private
+} &
 
 # Additional rw dirs required by apt
-[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
-[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
+[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt &
 
 # Fix up /etc a little bit
 touch /tmp/fstab
 mount --bind /tmp/fstab /etc/fstab
-rm /tmp/fstab
 
 # Fix dpkg if we are on a Debian-based distro
 if [ -d /var/lib/dpkg ]; then
     lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
     for file in "${lock_files[@]}"; do
-	[ -e $file ] && touch "/tmp/${file##*/}" && mount --bind "/tmp/${file##*/}" "$file"
+	[ -e $file ] && touch "/tmp/${file##*/}" && mount --bind "/tmp/${file##*/}" "$file" &
     done
 fi
 
@@ -74,8 +75,7 @@ fi
 # in the system
 (umask 0644 && touch /tmp/shadow)
 sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /tmp/shadow
-mount --bind /tmp/shadow /etc/shadow
-rm /tmp/shadow
+mount --bind /tmp/shadow /etc/shadow &
 
 # Find udevd
 if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
@@ -129,7 +129,7 @@ log "basic initialization done"
 tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
     log "running systemd-tmpfiles"
     systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
-}
+} &
 
 # Make dbus work (if tmpfiles wasn't there or didn't create the directory).
 install -d /run/dbus
@@ -198,7 +198,6 @@ if [[ -n "virtme_user" ]]; then
     echo "${virtme_user} ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
     chmod 440 "$tmpfile"
     mount --bind "$tmpfile" "$real_sudoers"
-    rm "$tmpfile"
 fi
 
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
@@ -214,7 +213,6 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
 	tmpfile="`mktemp --tmpdir=/tmp`"
 	chmod 644 "$tmpfile"
 	mount --bind "$tmpfile" "$real_resolv_conf"
-	rm "$tmpfile"
     fi
 
     # udev is liable to rename the interface out from under us.
