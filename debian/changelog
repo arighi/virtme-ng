@@ -1,3 +1,10 @@
+virtme-ng (1.8-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.8:
+    - fix: do not use 'microvm' virtual architecture with --graphics
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 26 May 2023 18:13:02 +0200
+
 virtme-ng (1.7-1) unstable; urgency=medium
 
   * New version virtme-ng 1.7:
