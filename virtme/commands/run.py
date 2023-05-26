@@ -417,8 +417,9 @@ def export_virtiofs(qemu: qemu_helpers.Qemu, arch: architectures.Arch,
     fsid = 'virtfs%d' % len(qemuargs)
     if memory is None:
         memory = '128M'
+    vhost_dev_type = arch.vhost_dev_type()
     qemuargs.extend(['-chardev', f'socket,id=char{fsid},path={virtiofsd_sock}'])
-    qemuargs.extend(['-device', f'vhost-user-fs-pci,chardev=char{fsid},tag={mount_tag}'])
+    qemuargs.extend(['-device', f'{vhost_dev_type},chardev=char{fsid},tag={mount_tag}'])
     qemuargs.extend(['-object', f'memory-backend-memfd,id=mem,size={memory},share=on'])
     qemuargs.extend(['-numa', f'node,memdev=mem'])
 
@@ -499,15 +500,22 @@ def do_it() -> int:
             args.memory += 'M'
         qemuargs.extend(['-m', args.memory])
 
-    # Try to use virtio-fs first, in case of failure fallback to 9p.
-    #
-    # FIXME: virtiofs is conflicting with virtio-serial and output redirection
-    # from scripts, so automatically disable it for now, until we figure out
-    # the exact nature of this conflict.
-    if args.force_9p or args.script_sh or args.script_exec:
+    # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
+    # is forced.
+    if args.force_9p:
         use_virtiofs = False
     else:
-        use_virtiofs = export_virtiofs(qemu, arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, readonly=(not args.rw), verbose=not args.quiet)
+        # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
+        # used for now.
+        if args.arch == 'x86_64':
+            virt_arch = architectures.get('microvm')
+        else:
+            virt_arch = arch
+        verbose = not (args.quiet or args.script_sh or args.script_exec)
+        use_virtiofs = export_virtiofs(qemu, virt_arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, \
+                                       readonly=(not args.rw), verbose=verbose)
+        if use_virtiofs:
+            arch = virt_arch
     if not use_virtiofs:
         export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))
 

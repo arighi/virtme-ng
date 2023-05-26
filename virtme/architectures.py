@@ -32,6 +32,10 @@ class Arch(object):
         return 'virtio-%s-pci' % virtiotype
 
     @staticmethod
+    def vhost_dev_type() -> str:
+        return 'vhost-user-fs-pci'
+
+    @staticmethod
     def earlyconsole_args() -> List[str]:
         return []
 
@@ -124,6 +128,30 @@ class Arch_x86(Arch):
                 'CONFIG_KVM_INTEL=y',
                 'CONFIG_KVM_AMD=y',
             ]
+
+class Arch_microvm(Arch_x86):
+
+    @staticmethod
+    def virtio_dev_type(virtiotype):
+        return 'virtio-%s-device' % virtiotype
+
+    @staticmethod
+    def vhost_dev_type() -> str:
+        return 'vhost-user-fs-device'
+
+    @staticmethod
+    def qemuargs(is_native):
+        ret = Arch.qemuargs(is_native)
+
+        # Use microvm architecture for faster boot
+        ret.extend(['-M', 'microvm'])
+
+        if is_native and os.access('/dev/kvm', os.R_OK):
+            # If we're likely to use KVM, request a full-featured CPU.
+            # (NB: if KVM fails, this will cause problems.  We should probe.)
+            ret.extend(['-cpu', 'host'])  # We can't migrate regardless.
+
+        return ret
 
 class Arch_arm(Arch):
     def __init__(self):
@@ -315,6 +343,7 @@ class Arch_s390x(Arch):
         return ['-device', 'sclpconsole,chardev=console']
 
 ARCHES = {arch.virtmename: arch for arch in [
+    Arch_microvm('microvm'),
     Arch_x86('x86_64'),
     Arch_x86('i386'),
     Arch_arm(),
