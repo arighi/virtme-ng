@@ -513,7 +513,7 @@ def do_it() -> int:
     else:
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
-        if args.arch == 'x86_64':
+        if not args.graphics and args.arch == 'x86_64':
             virt_arch = architectures.get('microvm')
         else:
             virt_arch = arch
