@@ -1,3 +1,19 @@
+virtme-ng (1.7-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.7:
+    - introduced virtio-fs support
+    - add support to QEMU 'microvm' virtual architecture
+    - use virtio-blk by default for external block devices (--disk option)
+    - allow to run nested virtme-ng instances
+    - add new options to virtme-ng to support legacy virtme-run commands
+    - fixed serial console redirection across all the supported architectures
+    - strip kernel a little more by dropping bluetooth and can bus support
+    - introduced option --quiet to reduce verbosity during build/config/run
+    - show a welcome banner in the virtme-ng shell
+    - code cleanups (pylint fixes)
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 26 May 2023 17:10:28 +0200
+
 virtme-ng (1.6-1) unstable; urgency=medium
 
   * New version virtme-ng 1.6:

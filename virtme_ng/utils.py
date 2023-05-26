@@ -1,5 +1,5 @@
 from pathlib import Path
 
-VERSION = '1.6'
+VERSION = '1.7'
 CONF_PATH = Path(Path.home(), '.config', 'virtme-ng')
 CONF_FILE = Path(CONF_PATH, 'virtme-ng.conf')
