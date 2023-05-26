@@ -7,6 +7,7 @@ import json
 import tempfile
 import time
 import threading
+import datetime
 from subprocess import call, check_call, check_output, DEVNULL
 from pathlib import Path
 from argcomplete import autocomplete
@@ -14,47 +15,40 @@ from virtme.util import SilentError, uname
 
 from virtme_ng.utils import VERSION, CONF_FILE
 
-import time
-import threading
-import sys
+def log_msg(message):
+    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    sys.stderr.write(f"[{timestamp}] {message}")
+    sys.stderr.flush()
 
-def spinner_decorator(show_spinner, message=""):
+def spinner_decorator(show_spinner=False, message=""):
     def decorator(func):
         def wrapper(*args, **kwargs):
-            if show_spinner in args or show_spinner in kwargs.values():
-                spinner = SpinnerThread(message)
-                spinner.start()
-
+            stop_event = threading.Event()
+            if show_spinner in kwargs.values():
+                log_msg(message + "\n")
+                spinner_thread = threading.Thread(target=spinner, args=(stop_event,))
+                spinner_thread.start()
+            result = None
             try:
                 result = func(*args, **kwargs)
-                return result
             finally:
-                if show_spinner in args or show_spinner in kwargs.values():
-                    spinner.stop()
-                    spinner.join()
+                if show_spinner in kwargs.values():
+                    stop_event.set()
+                    spinner_thread.join()
+                    if result is not None:
+                        log_msg('ok\n')
+            return result
+
+        def spinner(stop_event):
+            while not stop_event.is_set():
+                for char in '|/-\\':
+                    sys.stderr.write(f'{char}\b')
+                    sys.stderr.flush()
+                    time.sleep(0.1)
 
         return wrapper
 
     return decorator
-
-class SpinnerThread(threading.Thread):
-    def __init__(self, message):
-        super().__init__()
-        self._stop_event = threading.Event()
-        self.message = message
-
-    def run(self):
-        symbols = ['-', '\\', '|', '/']
-        i = 0
-        while not self._stop_event.is_set():
-            sys.stderr.write('\r{} {}'.format(self.message, symbols[i]))
-            sys.stderr.flush()
-            time.sleep(0.1)
-            i = (i + 1) % len(symbols)
-
-    def stop(self):
-        self._stop_event.set()
-        sys.stderr.write('\bdone\n')
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -291,10 +285,7 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in envs:
             cmd += f' {var} '
-        try:
-            check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
-        except:
-            raise SilentError()
+        check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
 
     def make(self, arch=None, build_host=None,
              build_host_exec_prefix=None, build_host_vmlinux=False,
@@ -494,18 +485,20 @@ class KernelSource:
             cmd.append('cd ~/.virtme && git clean -xdf')
         check_call(cmd)
 
-@spinner_decorator(show_spinner=False, message=">> configuring kernel:")
+@spinner_decorator(message="configuring kernel")
 def config(ks, args, show_spinner=False):
     ks.config(arch=args.arch, config=args.config, \
               quiet=args.quiet, envs=args.envs)
+    return True
 
-@spinner_decorator(show_spinner=False, message=">>    building kernel:")
+@spinner_decorator(message="building kernel")
 def make(ks, args, show_spinner=False):
     ks.make(arch=args.arch, build_host=args.build_host, \
             build_host_exec_prefix=args.build_host_exec_prefix, \
             build_host_vmlinux=args.build_host_vmlinux, \
             skip_modules=args.skip_modules, compiler=args.compiler, \
             quiet=args.quiet, envs=args.envs)
+    return True
 
 def run(ks, args):
     ks.run(arch=args.arch, root=args.root, \
@@ -514,6 +507,7 @@ def run(ks, args):
            force_9p=args.force_9p, force_initramfs=args.force_initramfs, \
            graphics=args.graphics, quiet=args.quiet, \
            opts=args.opts, skip_modules=args.skip_modules)
+    return True
 
 def do_it() -> int:
     autocomplete(_ARGPARSER)
@@ -524,30 +518,33 @@ def do_it() -> int:
         for opt in ks.default_opts:
             val = ks.default_opts[opt]
             setattr(args, opt, val)
-    if args.clean:
-        ks.clean(build_host=args.build_host)
-    elif args.dump:
-        ks.dump(args.dump_file)
-    else:
-        if args.skip_build:
-            sys.stderr.write("Warning: --skip-build is deprecated. Use `--run .` instead.\n")
-            args.run = '.'
-        if args.run is None:
-            if args.commit:
-                ks.checkout(commit=args.commit, \
-                            build_host=args.build_host, \
-                            force=args.force, quiet=args.quiet)
-            if not args.skip_config:
-                config(ks, args, show_spinner=not args.quiet)
-                if args.kconfig:
-                    return
-            make(ks, args, show_spinner=not args.quiet)
-        run(ks, args)
+    try:
+        if args.clean:
+            ks.clean(build_host=args.build_host)
+        elif args.dump:
+            ks.dump(args.dump_file)
+        else:
+            if args.skip_build:
+                sys.stderr.write("Warning: --skip-build is deprecated. Use `--run .` instead.\n")
+                args.run = '.'
+            if args.run is None:
+                if args.commit:
+                    ks.checkout(commit=args.commit, \
+                                build_host=args.build_host, \
+                                force=args.force, quiet=args.quiet)
+                if not args.skip_config:
+                    config(ks, args, show_spinner=not args.quiet)
+                    if args.kconfig:
+                        return
+                make(ks, args, show_spinner=not args.quiet)
+            run(ks, args)
+    except:
+        raise SilentError()
 
 def main() -> int:
     try:
         return do_it()
-    except SilentError:
+    except (KeyboardInterrupt, SilentError):
         return 1
 
 if __name__ == '__main__':
