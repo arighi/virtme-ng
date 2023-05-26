@@ -72,14 +72,14 @@ def make_parser():
             help='Run specified kernel image or an installed kernel version. '
                  'If no argument is specified the running kernel will be used.')
 
+    g_action.add_argument('--build', '-b', action='store_true',
+            help='Build the kernel in the current directory (or remotely if used with --build-host)')
+
     g_action.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
 
     g_action.add_argument('--dump', '-d', action='store_true',
             help='Generate a memory dump of the running kernel and inspect it')
-
-    g_action.add_argument('--skip-build', action='store_true',
-            help='[Deprecated] use `--run .` instead')
 
     parser.add_argument('--skip-config', '-s', action='store_true',
             help='Do not re-generate kernel .config')
@@ -137,7 +137,7 @@ def make_parser():
     parser.add_argument('--opts', '-o', action='append',
             help='Additional options passed to virtme-run (can be used multiple times)')
 
-    parser.add_argument('--build-host', '-b', action='store',
+    parser.add_argument('--build-host', action='store',
             help='Perform kernel build on a remote server (ssh access required)')
 
     parser.add_argument('--build-host-exec-prefix', action='store',
@@ -648,10 +648,7 @@ def do_it() -> int:
         elif args.dump:
             kern_source.dump(args.dump_file)
         else:
-            if args.skip_build:
-                sys.stderr.write("Warning: --skip-build is deprecated. Use `--run .` instead.\n")
-                args.run = '.'
-            if args.run is None:
+            if args.build:
                 if args.commit:
                     kern_source.checkout(args)
                 if not args.skip_config:

@@ -176,19 +176,23 @@ class Kernel:
                 if m:
                     self.config[m.group(1)] = m.group(2)
 
-def extract_kernel_version(file_path):
-    result = subprocess.run(['file', file_path], capture_output=True, text=True)
-    match = re.search(r'version (\S+)', result.stdout)
-    if match:
-        kernel_version = match.group(1)
-        return kernel_version
-
-    return None
-
 def get_rootfs_from_kernel_path(path):
     while path != '/' and not os.path.exists(path + '/lib/modules'):
         path, _ = os.path.split(path)
     return os.path.abspath(path)
+
+def get_kernel_version(path):
+    if not os.path.exists(path):
+        arg_fail("kernel file %s does not exist, try --build to build the kernel" % path,
+                 show_usage=False)
+    if not os.access(path, os.R_OK):
+        arg_fail("unable to access %s (check for read permissions)" % path, show_usage=False)
+    result = subprocess.run(['file', path], capture_output=True, text=True)
+    match = re.search(r'version (\S+)', result.stdout)
+    if match:
+        kernel_version = match.group(1)
+        return kernel_version
+    return None
 
 def find_kernel_and_mods(arch, args) -> Kernel:
     kernel = Kernel()
@@ -224,12 +228,10 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 kimg = args.kimg
                 if not os.path.exists(kimg):
                     arg_fail("%s does not exist" % args.kimg)
-        if not os.access(kimg, os.R_OK):
-            arg_fail("unable to access %s (check for read permissions)" % kimg, show_usage=False)
-        kernel.kimg = kimg
-        kver = extract_kernel_version(kernel.kimg)
+        kver = get_kernel_version(kimg)
         if kver is None:
-            arg_fail("%s does not seem to be a valid kernel file / directory" % kernel.kimg, show_usage=False)
+            arg_fail("%s does not seem to be a valid kernel file / directory" % kimg, show_usage=False)
+        kernel.kimg = kimg
         if args.mods == 'none':
             kernel.modfiles = []
             kernel.moddir = None
@@ -256,7 +258,11 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                                     virtmods.MODALIASES, root=root_dir, kver=kver)
         kernel.dtb = None  # For now
     elif args.kdir is not None:
-        kernel.kimg = os.path.join(args.kdir, arch.kimg_path())
+        kimg = os.path.join(args.kdir, arch.kimg_path())
+        kver = get_kernel_version(kimg)
+        if kver is None:
+            arg_fail("%s does not seem to be a valid kernel file / directory" % kimg, show_usage=False)
+        kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
         virtme_mod_file = os.path.join(virtme_mods, 'lib/modules/0.0.0/modules.dep')
