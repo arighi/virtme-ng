@@ -5,12 +5,56 @@ import socket
 import shutil
 import json
 import tempfile
+import time
+import threading
 from subprocess import call, check_call, check_output, DEVNULL
 from pathlib import Path
 from argcomplete import autocomplete
 from virtme.util import SilentError, uname
 
 from virtme_ng.utils import VERSION, CONF_FILE
+
+import time
+import threading
+import sys
+
+def spinner_decorator(show_spinner, message=""):
+    def decorator(func):
+        def wrapper(*args, **kwargs):
+            if show_spinner in args or show_spinner in kwargs.values():
+                spinner = SpinnerThread(message)
+                spinner.start()
+
+            try:
+                result = func(*args, **kwargs)
+                return result
+            finally:
+                if show_spinner in args or show_spinner in kwargs.values():
+                    spinner.stop()
+                    spinner.join()
+
+        return wrapper
+
+    return decorator
+
+class SpinnerThread(threading.Thread):
+    def __init__(self, message):
+        super().__init__()
+        self._stop_event = threading.Event()
+        self.message = message
+
+    def run(self):
+        symbols = ['-', '\\', '|', '/']
+        i = 0
+        while not self._stop_event.is_set():
+            sys.stderr.write('\r{} {}'.format(self.message, symbols[i]))
+            sys.stderr.flush()
+            time.sleep(0.1)
+            i = (i + 1) % len(symbols)
+
+    def stop(self):
+        self._stop_event.set()
+        sys.stderr.write('\bdone\n')
 
 def make_parser():
     parser = argparse.ArgumentParser(
@@ -222,16 +266,16 @@ class KernelSource:
         else:
             return False
 
-    def checkout(self, commit=None, build_host=None, force=False):
+    def checkout(self, commit=None, build_host=None, force=False, quiet=False):
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
         target = commit or 'HEAD'
         if build_host is not None or target != 'HEAD':
             if not force and self._is_dirty_repo():
                 arg_fail("error: you have uncommitted changes in your git repository, use --force to drop them", show_usage=False)
-            check_call(['git', 'reset', '--hard', target], stdout=sys.stderr, stdin=DEVNULL)
+            check_call(['git', 'reset', '--hard', target], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
 
-    def config(self, arch=None, config=None, envs=()):
+    def config(self, arch=None, config=None, quiet=False, envs=()):
         cmd = 'virtme-configkernel --update'
         if arch is not None:
             if arch not in ARCH_MAPPING:
@@ -248,13 +292,13 @@ class KernelSource:
         for var in envs:
             cmd += f' {var} '
         try:
-            check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
+            check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         except:
             raise SilentError()
 
     def make(self, arch=None, build_host=None,
              build_host_exec_prefix=None, build_host_vmlinux=False,
-             skip_modules=False, compiler=None, envs=()):
+             skip_modules=False, compiler=None, quiet=False, envs=()):
         if not os.path.isdir('.git') and build_host is not None:
             arg_fail('error: --build-host can be used only on a kernel git repository', show_usage=False)
         if build_host is not None and self._is_dirty_repo():
@@ -282,24 +326,24 @@ class KernelSource:
         for var in envs:
             make_command += f' {var} '
         if build_host is None:
-            check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=sys.stderr, stdin=DEVNULL)
+            check_call(self._format_cmd(make_command + ' -j' + self.cpus), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
             return
         check_call(['ssh', build_host,
-                    'mkdir -p ~/.virtme'], stdout=sys.stderr, stdin=DEVNULL)
+                    'mkdir -p ~/.virtme'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         check_call(['ssh', build_host,
-                    'git init ~/.virtme'], stdout=sys.stderr, stdin=DEVNULL)
-        check_call(['git', 'push', '--force', f"{build_host}:~/.virtme",
-                    'HEAD:__virtme__', ], stdout=sys.stderr, stdin=DEVNULL)
+                    'git init ~/.virtme'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
+        check_call(['git', 'push', '--force', '--porcelain', f"{build_host}:~/.virtme",
+                    'HEAD:__virtme__', ], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         cmd = f'rsync .config {build_host}:.virtme/.config'
-        check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
+        check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(build_host_exec_prefix or '', make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {build_host}:.virtme/.kc-build'
-            check_call(self._format_cmd(cmd), stdout=sys.stderr, stdin=DEVNULL)
+            check_call(self._format_cmd(cmd), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         # Execute remote build script
-        check_call(['ssh', build_host, 'bash', '.virtme/.kc-build'], stdout=sys.stderr, stdin=DEVNULL)
+        check_call(['ssh', build_host, 'bash', '.virtme/.kc-build'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if build_host_vmlinux or arch == 'ppc64el':
@@ -312,11 +356,11 @@ class KernelSource:
                 cmd = f'rsync -azS --progress --exclude=.config --exclude=.git/ --include=*/ --include="*.ko" --include=".dwo" --include=bzImage --include=zImage --include=Image {vmlinux} --include=.config --include=modules.* --include=System.map --include=Module.symvers --include=module.lds --include=*.dtb --include="**/generated/**" --exclude="*" {build_host}:.virtme/ ./'
             tmp.write(cmd)
             tmp.flush()
-            check_call(['bash', tmp.name], stdout=sys.stderr, stdin=DEVNULL)
+            check_call(['bash', tmp.name], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
         if not skip_modules:
             if os.path.exists('./debian/rules'):
-                check_call(['fakeroot', 'debian/rules', 'clean'], stdout=sys.stderr, stdin=DEVNULL)
-            check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=sys.stderr, stdin=DEVNULL)
+                check_call(['fakeroot', 'debian/rules', 'clean'], stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
+            check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), stdout=DEVNULL if quiet else sys.stderr, stdin=DEVNULL)
 
     def run(self, arch=None, root=None, \
                   cpus=None, memory=None, network=None, disk=None, \
@@ -450,6 +494,27 @@ class KernelSource:
             cmd.append('cd ~/.virtme && git clean -xdf')
         check_call(cmd)
 
+@spinner_decorator(show_spinner=False, message=">> configuring kernel:")
+def config(ks, args, show_spinner=False):
+    ks.config(arch=args.arch, config=args.config, \
+              quiet=args.quiet, envs=args.envs)
+
+@spinner_decorator(show_spinner=False, message=">>    building kernel:")
+def make(ks, args, show_spinner=False):
+    ks.make(arch=args.arch, build_host=args.build_host, \
+            build_host_exec_prefix=args.build_host_exec_prefix, \
+            build_host_vmlinux=args.build_host_vmlinux, \
+            skip_modules=args.skip_modules, compiler=args.compiler, \
+            quiet=args.quiet, envs=args.envs)
+
+def run(ks, args):
+    ks.run(arch=args.arch, root=args.root, \
+           cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
+           append=args.append, execute=args.exec, kimg=args.run, \
+           force_9p=args.force_9p, force_initramfs=args.force_initramfs, \
+           graphics=args.graphics, quiet=args.quiet, \
+           opts=args.opts, skip_modules=args.skip_modules)
+
 def do_it() -> int:
     autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
@@ -470,21 +535,14 @@ def do_it() -> int:
         if args.run is None:
             if args.commit:
                 ks.checkout(commit=args.commit, \
-                            build_host=args.build_host, force=args.force)
+                            build_host=args.build_host, \
+                            force=args.force, quiet=args.quiet)
             if not args.skip_config:
-                ks.config(arch=args.arch, config=args.config, envs=args.envs)
+                config(ks, args, show_spinner=not args.quiet)
                 if args.kconfig:
                     return
-            ks.make(arch=args.arch, build_host=args.build_host, \
-                    build_host_exec_prefix=args.build_host_exec_prefix, \
-                    build_host_vmlinux=args.build_host_vmlinux, \
-                    skip_modules=args.skip_modules, compiler=args.compiler, envs=args.envs)
-        ks.run(arch=args.arch, root=args.root, \
-               cpus=args.cpus, memory=args.memory, network=args.network, disk=args.disk,
-               append=args.append, execute=args.exec, kimg=args.run, \
-               force_9p=args.force_9p, force_initramfs=args.force_initramfs, \
-               graphics=args.graphics, quiet=args.quiet, \
-               opts=args.opts, skip_modules=args.skip_modules)
+            make(ks, args, show_spinner=not args.quiet)
+        run(ks, args)
 
 def main() -> int:
     try:
