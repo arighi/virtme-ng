@@ -643,7 +643,7 @@ def do_it() -> int:
             driveid = 'blk-disk%d' % i
             name, fn = sanitize_disk_args('--blk-disk', d)
             qemuargs.extend(['-drive', 'if=none,id=%s,file=%s' % (driveid, fn),
-                             '-device', 'virtio-blk-pci,drive=%s,serial=%s' % (driveid, name)])
+                             '-device', '%s,drive=%s,serial=%s' % (arch.virtio_dev_type('blk'), driveid, name)])
 
     if args.disk:
         qemuargs.extend(['-device', '%s,id=scsi' % arch.virtio_dev_type('scsi')])
@@ -726,15 +726,10 @@ def do_it() -> int:
         do_script(shlex.quote(args.script_exec), use_exec=True, show_boot_console=args.show_boot_console)
 
     if args.net:
-        qemuargs.extend(['-device', 'virtio-net-pci,netdev=n0'])
+        qemuargs.extend(['-device', '%s,netdev=n0' % arch.virtio_dev_type('net')])
         if args.net == 'user':
             qemuargs.extend(['-netdev', 'user,id=n0'])
         elif args.net == 'bridge':
-            # This is highly experimental.  At least on Fedora 30 on
-            # a wireless network, it appears to successfully start but
-            # not have any network access.  Patches or guidance welcome.
-            # (I assume it's mostly a lost cause on a wireless network
-            # due to a lack of widespread or automatic WDS support.)
             qemuargs.extend(['-netdev', 'bridge,id=n0,br=virbr0'])
         else:
             assert False
