@@ -203,14 +203,10 @@ Examples
 Implementation details
 ======================
 
-virtme-ng has a list of git repositories in ~/.config/virtme-ng/virtme-ng.conf,
-stored in a JSON format. It is possible to add custom git repositories by
-changing this file.
+virtme-ng allows to automatically configure, build and run kernels using the
+main command-line interface called virtme-ng.
 
-When a remote build host is used (--build-host) the target branch is force
-pushed to the remote host inside the ~/.virtme folder.
-
-Then a minimal custom .config is generated using (a custom version of)
+Initially a minimal custom .config is generated using (a custom version of)
 virtme-configkernel.
 
 It is possible to specify a set of custom configs (.config chunk) in
@@ -223,12 +219,15 @@ Then the kernel is compiled either locally or on an external build host (if the
 needed to test the kernel are copied from the remote host if an external build
 host is used.
 
+When a remote build host is used (--build-host) the target branch is force
+pushed to the remote host inside the ~/.virtme folder.
+
 Then the kernel is executed using the virtme module. This allows to test the
 kernel using a safe copy-on-write snapshot of the entire host filesystem.
 
-All the kernels compiled with virtme-ng have a `-rc` suffix to their kernel
-version, this allows to easily determine if you're inside a virtme-ng kernel
-or if you're using the real host kernel (simply by checking `uname -r`).
+All the kernels compiled with virtme-ng have a `-virtme` suffix to their kernel
+version, this allows to easily determine if you're inside a virtme-ng kernel or
+if you're using the real host kernel (simply by checking `uname -r`).
 
 It is also possible to generate and inspect a memory dump of the tested kernel
 running `virtme-ng -d` from the host, while the test kernel is running.
@@ -244,13 +243,13 @@ Default options
 ===============
 
 Typically, if you always use virtme-ng with an external build server (e.g.,
-`virtme-ng --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you don't always
-want to specify these options, so instead, you can simply define them in
+`virtme-ng --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you don't
+always want to specify these options, so instead, you can simply define them in
 ~/.virtme-ng.conf under `default_opts` and then simply run `virtme-ng`.
 
 Example (always use an external build server called 'kathleen' and run make
 inside a build chroot called 'chroot:lunar-amd64'). To do so, modify the
-`default_opts` sections in ~/.virtme-ng.conf as following:
+`default_opts` sections in ~/.config/virtme-ng/virtme-ng.conf as following:
 
     "default_opts" : {
         "build_host": "kathleen",
