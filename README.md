@@ -1,3 +1,5 @@
+![Alt text](/img/screenshot.png?raw=true "virtme-ng screenshot")
+
 What is virtme-ng?
 ====================
 
