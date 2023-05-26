@@ -456,7 +456,7 @@ class KernelSource:
         if args.disk is not None:
             disk_str = ''
             for dsk in args.disk:
-                disk_str += f'--disk {dsk}={dsk} '
+                disk_str += f'--blk-disk {dsk}={dsk} '
             self.virtme_param['disk'] = disk_str
         else:
             self.virtme_param['disk'] = ''
