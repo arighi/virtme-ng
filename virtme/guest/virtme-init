@@ -52,10 +52,7 @@ fi
 [ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables &
 [ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines &
 [ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private &
-{
-[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
-[ -e /var/cache/private ] && mount -t tmpfs tmpfs /var/cache/private
-} &
+[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache &
 
 # Additional rw dirs required by apt
 [ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt &
