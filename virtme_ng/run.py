@@ -502,7 +502,7 @@ class KernelSource:
 
     def _get_virtme_memory(self, args):
         if args.memory is None:
-            self.virtme_param['memory'] = '--memory 4G'
+            self.virtme_param['memory'] = '--memory 1G'
         else:
             self.virtme_param['memory'] = '--memory ' + args.memory
 
