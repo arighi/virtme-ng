@@ -79,10 +79,14 @@ def make_parser():
             help='Clean the kernel repository (local or remote if used with --build-host)')
 
     g_action.add_argument('--dump', '-d', action='store_true',
-            help='Generate a memory dump of the running kernel and inspect it')
+            help='Generate a memory dump of the running kernel and inspect it '
+                 '(instance needs to be started with --debug)')
 
     parser.add_argument('--skip-config', '-s', action='store_true',
             help='Do not re-generate kernel .config')
+
+    parser.add_argument('--debug', action='store_true',
+            help='Start the instance with debugging enabled (allow to generate crash dumps)')
 
     parser.add_argument('--kconfig', '-k', action='store_true',
             help='Only generate the kernel .config without building/running anything')
@@ -519,6 +523,12 @@ class KernelSource:
             cpus = args.cpus
         self.virtme_param['cpus'] = f'--qemu-opts -smp {cpus}'
 
+    def _get_virtme_debug(self, args):
+        if args.debug:
+            self.virtme_param['debug'] = '-s -qmp tcp:localhost:3636,server,nowait'
+        else:
+            self.virtme_param['debug'] = ''
+
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
         self._get_virtme_arch(args)
@@ -538,6 +548,7 @@ class KernelSource:
         self._get_virtme_memory(args)
         self._get_virtme_opts(args)
         self._get_virtme_cpus(args)
+        self._get_virtme_debug(args)
 
         # Start VM using virtme-run
         cmd = ('virtme-run ' +
@@ -560,7 +571,7 @@ class KernelSource:
             f'{self.virtme_param["memory"]} ' +
             f'{self.virtme_param["opts"]} ' +
             f'{self.virtme_param["cpus"]} ' +
-            '-s -qmp tcp:localhost:3636,server,nowait'
+            f'{self.virtme_param["debug"]} '
         )
         check_call(cmd, shell=True)
 
