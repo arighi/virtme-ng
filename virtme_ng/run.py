@@ -73,7 +73,8 @@ def make_parser():
                  'If no argument is specified the running kernel will be used.')
 
     g_action.add_argument('--build', '-b', action='store_true',
-            help='Build the kernel in the current directory (or remotely if used with --build-host)')
+            help='Build the kernel in the current directory '
+                 '(or remotely if used with --build-host)')
 
     g_action.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
