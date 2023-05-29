@@ -188,10 +188,11 @@ def get_kernel_version(path):
     if not os.access(path, os.R_OK):
         arg_fail("unable to access %s (check for read permissions)" % path, show_usage=False)
     result = subprocess.run(['file', path], capture_output=True, text=True)
-    match = re.search(r'[vV]ersion (\S+)', result.stdout)
-    if match:
-        kernel_version = match.group(1)
-        return kernel_version
+    for item in result.stdout.split(', '):
+        match = re.search(r'^[vV]ersion (\S+)', item)
+        if match:
+            kernel_version = match.group(1)
+            return kernel_version
     return None
 
 def find_kernel_and_mods(arch, args) -> Kernel:
