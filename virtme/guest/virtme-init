@@ -219,14 +219,34 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
 fi
 
 if [[ -x /run/virtme/data/script ]]; then
-    if [[ ! -e "/dev/virtio-ports/virtme.stdin" || ! -e "/dev/virtio-ports/virtme.stdout" ]]; then
-	echo "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
-	poweroff -f
-	exit 1
+    if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
+          ! -e "/dev/virtio-ports/virtme.stdout" ||
+          ! -e "/dev/virtio-ports/virtme.stderr" ||
+          ! -e "/dev/virtio-ports/virtme.dev_stdout" ||
+          ! -e "/dev/virtio-ports/virtme.dev_stderr" ]]; then
+        echo "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
+        poweroff -f
+        exit 1
     fi
 
+    # Fix /dev/stdout and /dev/stderr.
+    #
+    # When using a virtio serial port, the EBUSY error can occur if multiple
+    # writers are attempting to access the port simultaneously. The virtio
+    # serial port is designed to support a single writer at a time, which means
+    # that only one process or application can write to the port at any given
+    # moment.
+    #
+    # For this reason create a separate virtio serial port to handle writes
+    # directly to /dev/stdout and /dev/stderr that will be all redirected to
+    # stdout on the host.
+    rm -f /dev/stdout /dev/stderr
+    ln -s /dev/virtio-ports/virtme.dev_stdout /dev/stdout
+    ln -s /dev/virtio-ports/virtme.dev_stderr /dev/stderr
+
+    # Start the script
     log 'starting script'
-    setsid /run/virtme/data/script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>&1
+    setsid /run/virtme/data/script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.

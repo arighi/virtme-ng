@@ -685,6 +685,14 @@ def do_it() -> int:
         kernelargs.extend(console_args)
 
         # Set up a virtserialport for script I/O
+        #
+        # NOTE: we need two additional I/O ports for /dev/stdout and
+        # /dev/stderr in the guest.
+        #
+        # This is needed because virtio serial ports are designed to support a
+        # single writer at a time, so any attempt to write directly to
+        # /dev/stdout or /dev/stderr in the guest will result in an -EBUSY
+        # error.
         qemuargs.extend(['-chardev', 'stdio,id=stdin,signal=on,mux=off'])
         qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
         qemuargs.extend(['-device', 'virtserialport,name=virtme.stdin,chardev=stdin'])
@@ -692,6 +700,18 @@ def do_it() -> int:
         qemuargs.extend(['-chardev', 'file,id=stdout,path=/proc/self/fd/1'])
         qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
         qemuargs.extend(['-device', 'virtserialport,name=virtme.stdout,chardev=stdout'])
+
+        qemuargs.extend(['-chardev', 'file,id=stderr,path=/proc/self/fd/2'])
+        qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
+        qemuargs.extend(['-device', 'virtserialport,name=virtme.stderr,chardev=stderr'])
+
+        qemuargs.extend(['-chardev', 'file,id=dev_stdout,path=/proc/self/fd/1'])
+        qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
+        qemuargs.extend(['-device', 'virtserialport,name=virtme.dev_stdout,chardev=dev_stdout'])
+
+        qemuargs.extend(['-chardev', 'file,id=dev_stderr,path=/proc/self/fd/2'])
+        qemuargs.extend(['-device', arch.virtio_dev_type('serial')])
+        qemuargs.extend(['-device', 'virtserialport,name=virtme.dev_stderr,chardev=dev_stderr'])
 
         # Scripts shouldn't reboot
         qemuargs.extend(['-no-reboot'])
