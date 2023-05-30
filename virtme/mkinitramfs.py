@@ -38,13 +38,6 @@ def install_busybox(cw, config):
 
     cw.mkdir(b'bin/real_progs', mode=0o755)
 
-def install_modprobe(cw):
-    cw.write_file(name=b'bin/modprobe', body=b'\n'.join([
-        b'#!/bin/sh',
-        b'echo "virtme: initramfs does not have module $3" >/dev/console',
-        b'exit 1',
-    ]), mode=0o755)
-
 _LOGFUNC = """log() {
     if [[ -e /dev/kmsg ]]; then
 	echo "<6>virtme initramfs: $*" >/dev/kmsg
@@ -53,6 +46,14 @@ _LOGFUNC = """log() {
     fi
 }
 """
+
+def install_modprobe(cw):
+    cw.write_file(name=b'bin/modprobe', body=b'\n'.join([
+        b'#!/bin/sh',
+        _LOGFUNC.encode('utf-8'),
+        b'log "initramfs does not have module $3"',
+        b'exit 1',
+    ]), mode=0o755)
 
 def install_modules(cw, modfiles):
     cw.mkdir(b'modules', 0o755)
