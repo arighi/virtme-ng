@@ -133,8 +133,9 @@ def make_parser():
     parser.add_argument('--force-initramfs', action='store_true',
             help='Use an initramfs even if unnecessary')
 
-    parser.add_argument('--graphics', '-g', action='store_true',
-            help='Show graphical output instead of using a console')
+    parser.add_argument('--graphics', '-g', action='store',
+            nargs='?', const='', metavar="BINARY",
+            help='Show graphical output instead of using a console. An argument can be optionally specified to start a graphical application.')
 
     parser.add_argument('--quiet', '-q', action='store_true',
             help='Reduce console output verbosity.')
@@ -479,8 +480,8 @@ class KernelSource:
             self.virtme_param['force_initramfs'] = ''
 
     def _get_virtme_graphics(self, args):
-        if args.graphics:
-            self.virtme_param['graphics'] = '--graphics'
+        if args.graphics is not None:
+            self.virtme_param['graphics'] = f'--graphics "{args.graphics}"'
         else:
             self.virtme_param['graphics'] = ''
 

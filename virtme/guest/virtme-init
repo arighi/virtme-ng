@@ -292,6 +292,21 @@ if [[ -n "${virtme_stty_con}" ]]; then
     # Program the console sensibly
     stty ${virtme_stty_con} <"/dev/$consdev"
 fi
+if [[ -n "${virtme_graphics}" ]]; then
+    # Create a .xinitrc to start the requested graphical application.
+    xinit_rc=/tmp/.xinitrc
+    echo "exec ${virtme_graphics}" > ${xinit_rc}
+    if [[ -n "${virtme_user}" ]]; then
+        chown ${virtme_user}:${virtme_user} ${xinit_rc}
+	# Try to fix permissions on the virtual consoles (udev could mess up
+	# permissions).
+	chmod a+rw /dev/tty*
+        setsid bash -c "su ${virtme_user} -c 'xinit ${xinit_rc}'" 0<>"/dev/$consdev" 1>&0 2>&0
+    else
+        setsid bash -c "xinit ${xinit_rc}" 0<>"/dev/$consdev" 1>&0 2>&0
+    fi
+    # Drop to console if the graphical app failed.
+fi
 if [[ -n "${virtme_user}" ]]; then
     setsid bash -c "su ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
 else

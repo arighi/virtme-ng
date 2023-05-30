@@ -63,8 +63,9 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Local path to use as guest root')
     g.add_argument('--rw', action='store_true',
                    help='Give the guest read-write access to its root filesystem')
-    g.add_argument('--graphics', action='store_true',
-                   help='Show graphical output instead of using a console.')
+    g.add_argument('--graphics', action='store', nargs='?',
+                   metavar='BINARY', const='',
+                   help='Show graphical output instead of using a console. An argument can be optionally specified to start a graphical application.')
     g.add_argument('--quiet', action='store_true',
                    help='Reduce console output verbosity.')
     g.add_argument('--net', action='store', const='user', nargs='?',
@@ -523,7 +524,7 @@ def do_it() -> int:
     else:
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
-        if not args.graphics and args.arch == 'x86_64':
+        if args.graphics is None and args.arch == 'x86_64':
             virt_arch = architectures.get('microvm')
         else:
             virt_arch = arch
@@ -603,7 +604,7 @@ def do_it() -> int:
     qemuargs.extend(['-parallel', 'none'])
     qemuargs.extend(['-net', 'none'])
 
-    if not args.graphics and not args.script_sh and not args.script_exec:
+    if args.graphics is None and not args.script_sh and not args.script_exec:
         # It would be nice to use virtconsole, but it's terminally broken
         # in current kernels.  Nonetheless, I'm configuring the console
         # manually to make it easier to tweak in the future.
@@ -670,7 +671,7 @@ def do_it() -> int:
     has_script = False
 
     def do_script(shellcmd: str, use_exec=False, show_boot_console=False) -> None:
-        if args.graphics:
+        if args.graphics is not None:
             arg_fail('scripts and --graphics are mutually exclusive')
 
         nonlocal has_script
@@ -757,6 +758,14 @@ def do_it() -> int:
 
     if args.script_exec is not None:
         do_script(shlex.quote(args.script_exec), use_exec=True, show_boot_console=args.show_boot_console)
+
+    if args.graphics is not None:
+        video_args = arch.qemu_display_args()
+        if video_args:
+            qemuargs.extend(video_args)
+        if args.graphics != '':
+            kernelargs.append('virtme_graphics=%s' % args.graphics)
+            kernelargs.append('nomodeset')
 
     if args.net:
         qemuargs.extend(['-device', '%s,netdev=n0' % arch.virtio_dev_type('net')])
