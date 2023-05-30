@@ -144,7 +144,7 @@ def make_parser() -> argparse.ArgumentParser:
 _ARGPARSER = make_parser()
 
 def arg_fail(message, show_usage=True) -> NoReturn:
-    print(message)
+    sys.stderr.write(message + "\n")
     if show_usage:
         _ARGPARSER.print_usage()
     sys.exit(1)
