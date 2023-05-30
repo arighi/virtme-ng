@@ -680,7 +680,7 @@ def do_it() -> int:
             console_args = ()
         else:
             output = '/dev/null'
-            console_args = ['quiet', 'loglevel=1']
+            console_args = ['quiet', 'loglevel=0']
         qemuargs.extend(arch.qemu_serial_console_args())
         qemuargs.extend(['-chardev', f'file,id=console,path={output}'])
 
@@ -837,7 +837,7 @@ def do_it() -> int:
 
     if args.quiet:
         kernelargs.append('quiet')
-        kernelargs.append('loglevel=1')
+        kernelargs.append('loglevel=0')
 
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
