@@ -142,8 +142,6 @@ _GENERIC_CONFIG_OPTIONAL = [
     '# CONFIG_BLUETOOTH is not set',
     '# CONFIG_SOUND is not set',
     '# CONFIG_I2C is not set',
-    '# CONFIG_INPUT_MOUSE is not set',
-    '# CONFIG_MOUSE_PS2 is not set',
     '# CONFIG_USB_HID is not set',
     '# CONFIG_HID is not set',
     '# CONFIG_TIGON3 is not set',
