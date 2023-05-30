@@ -238,7 +238,7 @@ if [[ -x /run/virtme/data/script ]]; then
     # Hmm.  We should expose the return value somehow.
     sync
     poweroff -f
-    exit 1
+    exit 0
 fi
 
 # Figure out what the main console is
@@ -276,7 +276,6 @@ echo "     \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |"
 echo "                                                |___/ "
 echo "   kernel version: $(uname -mr)"
 echo ""
-echo "Type \"CTRL+a x\" to exit"
 
 # Set up a basic environment
 install -d -m 0755 /tmp/roothome
@@ -289,16 +288,17 @@ mount --bind /tmp/roothome /root
 # be a controlling terminal.  We are also not a member of a session.
 # Init apparently can't setsid (whether that's a limitation of the
 # setsid binary or the system call, I don't know).
-while true; do
+if [[ -n "${virtme_stty_con}" ]]; then
     # Program the console sensibly
-    if [[ -n "${virtme_stty_con}" ]]; then
-	stty ${virtme_stty_con} <"/dev/$consdev"
-    fi
-    if [[ -n "${virtme_user}" ]]; then
-        setsid bash -c "su ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
-    else
-        setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
-    fi
-    echo "Shell died.  Will respawn."
-    sleep 0.5
-done
+    stty ${virtme_stty_con} <"/dev/$consdev"
+fi
+if [[ -n "${virtme_user}" ]]; then
+    setsid bash -c "su ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
+else
+    setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
+fi
+
+# Exit when the main shell session terminates
+sync
+poweroff -f
+exit 0
