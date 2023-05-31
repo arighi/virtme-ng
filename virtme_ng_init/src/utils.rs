@@ -9,7 +9,7 @@ use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use std::ffi::CString;
 use std::fs::{File, OpenOptions};
-use std::io::Write;
+use std::io::{self, Write};
 use std::os::unix::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
@@ -38,7 +38,16 @@ pub fn do_mkdir(path: &str) {
     nix::unistd::mkdir(path, Mode::from_bits_truncate(dmask as u32)).ok();
 }
 
-pub fn do_touch(path: &str, mode: u32) {
+pub fn do_unlink(path: &str) {
+    match std::fs::remove_file(path) {
+        Ok(_) => (),
+        Err(err) => {
+            log(&format!("failed to unlink file {}: {}", path, err));
+        }
+    }
+}
+
+fn do_touch(path: &str, mode: u32) {
     fn _do_touch(path: &str, mode: u32) -> std::io::Result<()> {
         let file = File::create(path)?;
         let permissions = std::fs::Permissions::from_mode(mode);
@@ -51,13 +60,14 @@ pub fn do_touch(path: &str, mode: u32) {
     }
 }
 
-pub fn do_unlink(path: &str) {
-    match std::fs::remove_file(path) {
-        Ok(_) => (),
-        Err(err) => {
-            log(&format!("failed to unlink file {}: {}", path, err));
-        }
+pub fn create_file(fname: &str, mode: u32, content: &str) -> io::Result<()> {
+    do_touch(fname, mode);
+    if !content.is_empty() {
+        let mut file = File::create(fname)?;
+        file.write_all(content.as_bytes())?;
     }
+
+    Ok(())
 }
 
 pub fn do_symlink(src: &str, dst: &str) {

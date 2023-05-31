@@ -255,13 +255,13 @@ fn run_systemd_tmpfiles() {
 }
 
 fn generate_fstab() -> io::Result<()> {
-    utils::do_touch("/tmp/fstab", 0o0664);
+    utils::create_file("/tmp/fstab", 0o0664, "").ok();
     utils::do_mount("/tmp/fstab", "/etc/fstab", "", libc::MS_BIND, "");
     Ok(())
 }
 
 fn generate_shadow() -> io::Result<()> {
-    utils::do_touch("/tmp/shadow", 0o0644);
+    utils::create_file("/tmp/shadow", 0o0644, "").ok();
 
     let input_file = File::open("/etc/passwd")?;
     let output_file = File::create("/tmp/shadow")?;
@@ -286,7 +286,7 @@ fn generate_shadow() -> io::Result<()> {
 fn generate_sudoers() -> io::Result<()> {
     if let Ok(user) = env::var("virtme_user") {
         let fname = "/tmp/sudoers";
-        utils::do_touch(fname, 0o0440);
+        utils::create_file(fname, 0o0440, "").ok();
         let mut file = File::create(fname)?;
         let content = format!(
             "root ALL = (ALL) NOPASSWD: ALL\n{} ALL = (ALL) NOPASSWD: ALL\n",
@@ -424,7 +424,7 @@ fn fix_dpkg_locks() {
             continue;
         }
         let src_file = format!("/tmp/{}", fname);
-        utils::do_touch(&src_file, 0o0640);
+        utils::create_file(&src_file, 0o0640, "").ok();
         utils::do_mount(&src_file, path, "", libc::MS_BIND, "");
     }
 }
@@ -560,10 +560,7 @@ fn setup_network() -> Option<thread::JoinHandle<()>> {
     None
 }
 
-fn run_script() {
-    if !utils::is_file_executable("/run/virtme/data/script") {
-        return;
-    }
+fn run_user_script() {
     if !std::path::Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stderr").exists()
@@ -630,7 +627,6 @@ fn run_script() {
                 .expect("Failed to execute script");
         }
     }
-    poweroff();
 }
 
 fn setup_root_home() {
@@ -675,39 +671,81 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
-fn run_shell() {
-    if let Some(consdev) = get_active_console() {
-        configure_terminal(consdev.as_str());
-
-        let flags = libc::O_RDWR | libc::O_NONBLOCK;
-        let mode = Mode::empty();
-        let tty_fd = open(consdev.as_str(), OFlag::from_bits_truncate(flags), mode)
-            .expect("Failed to open console.");
-
-        let mut args: Vec<&str> = vec!["-l"];
-        let user_cmd: String;
-
-        if let Ok(user) = env::var("virtme_user") {
-            user_cmd = format!("su {}", user);
-            args.push("-c");
-            args.push(&user_cmd);
-        }
-
-        clear_virtme_envs();
-        unsafe {
-            Command::new("bash")
-                .args(args)
-                .pre_exec(move || {
-                    detach_from_terminal(tty_fd);
-                    Ok(())
-                })
-                .output()
-                .expect("Failed to start shell session");
-        }
-    } else {
-        utils::log("Failed to determine console");
-        Command::new("bash").arg("-l").exec();
+fn run_shell(tty_fd: libc::c_int, args: Vec<String>) {
+    unsafe {
+        Command::new("bash")
+            .args(args.into_iter())
+            .pre_exec(move || {
+                detach_from_terminal(tty_fd);
+                Ok(())
+            })
+            .output()
+            .expect("Failed to start shell session");
     }
+}
+
+fn run_user_gui(tty_fd: libc::c_int, app: &str) {
+    // Generate a bare minimum xinitrc
+    let xinitrc = "/tmp/.xinitrc";
+    if let Err(err) = utils::create_file(xinitrc, 0o0644, &format!("exec {}", app)) {
+        utils::log(&format!("failed to generate {}: {}", xinitrc, err));
+        return;
+    }
+    // Run graphical app using xinit directly
+    let mut args: Vec<String> = vec!["-l".to_owned(), "-c".to_owned()];
+    if let Ok(user) = env::var("virtme_user") {
+        args.push(format!("su - {} -c 'xinit /tmp/.xinitrc'", user));
+    } else {
+        args.push("xinit /tmp/.xinitrc".to_owned());
+    }
+    run_shell(tty_fd, args);
+}
+
+fn run_user_shell(tty_fd: libc::c_int) {
+    let mut args: Vec<String> = vec!["-l".to_owned()];
+    if let Ok(user) = env::var("virtme_user") {
+        args.push("-c".to_owned());
+        args.push(format!("su - {}", user));
+    }
+    run_shell(tty_fd, args);
+}
+
+fn run_user_session() {
+    let consdev = match get_active_console() {
+        Some(console) => console,
+        None => {
+            utils::log("failed to determine console");
+            Command::new("bash").arg("-l").exec();
+            return;
+        }
+    };
+    configure_terminal(consdev.as_str());
+
+    let flags = libc::O_RDWR | libc::O_NONBLOCK;
+    let mode = Mode::empty();
+    let tty_fd = open(consdev.as_str(), OFlag::from_bits_truncate(flags), mode)
+        .expect("failed to open console");
+
+    if let Ok(app) = env::var("virtme_graphics") {
+        run_user_gui(tty_fd, &app);
+    }
+    run_user_shell(tty_fd);
+}
+
+fn setup_user_session() {
+    utils::log("initialization done");
+    print_logo();
+    setup_root_home();
+}
+
+fn run_misc_services() -> Option<thread::JoinHandle<()>> {
+    let handle = thread::spawn(move || {
+        symlink_fds();
+        mount_virtme_initmounts();
+        fix_packaging_files();
+        override_system_files();
+    });
+    Some(handle)
 }
 
 fn print_logo() {
@@ -720,23 +758,6 @@ fn print_logo() {
                                                 |___/"#;
     println!("{}", logo.trim_start_matches("\n"));
     println!("   kernel version: {}\n", get_kernel_version(true));
-}
-
-fn start_session() {
-    utils::log("initialization done");
-    print_logo();
-    setup_root_home();
-    run_shell();
-}
-
-fn run_misc_services() -> Option<thread::JoinHandle<()>> {
-    let handle = thread::spawn(move || {
-        symlink_fds();
-        mount_virtme_initmounts();
-        fix_packaging_files();
-        override_system_files();
-    });
-    Some(handle)
 }
 
 fn main() {
@@ -765,8 +786,12 @@ fn main() {
 
     // Start user session (batch or interactive).
     set_cwd();
-    run_script();
-    start_session();
+    if utils::is_file_executable("/run/virtme/data/script") {
+        run_user_script();
+    } else {
+        setup_user_session();
+        run_user_session();
+    }
 
     // Shutdown the system.
     poweroff();
