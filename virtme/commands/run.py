@@ -270,6 +270,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         kernel.dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
+        # Run get_kernel_version to check at least if the kernel image exist.
+        get_kernel_version(kimg)
         kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
