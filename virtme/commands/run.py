@@ -893,8 +893,12 @@ def do_it() -> int:
     if not args.dry_run:
         pid = os.fork()
         if pid:
-            pid, status = os.waitpid(pid, 0)
-            return status
+            try:
+                pid, status = os.waitpid(pid, 0)
+                return status
+            except KeyboardInterrupt:
+                sys.stderr.write("Interrupted.")
+                sys.exit(1)
         else:
             os.execv(qemu.qemubin, qemuargs)
     return 0
