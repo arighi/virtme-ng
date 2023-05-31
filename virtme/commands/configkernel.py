@@ -134,6 +134,11 @@ _GENERIC_CONFIG_OPTIONAL = [
     'CONFIG_DEBUG_FS=y',
     'CONFIG_PROVE_LOCKING=y',
 
+    '# Graphics support',
+    'CONFIG_DRM=y',
+    'CONFIG_DRM_VIRTIO_GPU=y',
+    'CONFIG_DRM_VIRTIO_GPU_KMS=y',
+
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
     '# CONFIG_TEST_KMOD is not set',
@@ -191,7 +196,6 @@ _GENERIC_CONFIG_OPTIONAL = [
     '# CONFIG_FB_MATROX is not set',
     '# CONFIG_FB_RADEON is not set',
     '# CONFIG_FB_IBM_GXT4500 is not set',
-    '# CONFIG_DRM is not set',
     '# CONFIG_FB_VESA is not set',
     '# CONFIG_YENTA is not set',
     '# CONFIG_NETFILTER is not set',

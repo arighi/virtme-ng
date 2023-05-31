@@ -48,6 +48,10 @@ class Arch(object):
         return ['-vga', 'none', '-display', 'none']
 
     @staticmethod
+    def qemu_display_args() -> List[str]:
+        return ['-device', 'virtio-gpu-pci']
+
+    @staticmethod
     def qemu_serial_console_args() -> List[str]:
         # We should be using the new-style -device serialdev,chardev=xyz,
         # but many architecture-specific serial devices don't support that.
@@ -172,6 +176,10 @@ class Arch_arm(Arch):
         # out how to find the dtb file.
 
         return ret
+
+    @staticmethod
+    def qemu_display_args() -> List[str]:
+        return ['-device', 'virtio-gpu-device']
 
     @staticmethod
     def virtio_dev_type(virtiotype):
@@ -333,6 +341,10 @@ class Arch_s390x(Arch):
         ret.extend(['-nodefaults'])
 
         return ret
+
+    @staticmethod
+    def qemu_display_args() -> List[str]:
+        return ['-device', 'virtio-gpu-ccw,devno=fe.0.0101']
 
     @staticmethod
     def config_base():
