@@ -237,7 +237,11 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                     arg_fail("%s does not exist" % args.kimg)
         kver = get_kernel_version(kimg)
         if kver is None:
-            arg_fail("%s does not seem to be a valid kernel file / directory" % kimg, show_usage=False)
+            # Unable to detect kernel version, try to boot without
+            # automatically detecting modules.
+            args.mods = 'none'
+            sys.stderr.write("warning: failed to retrieve kernel version from: %s " +
+                             "(modules may not work)\n" % kimg)
         kernel.kimg = kimg
         if args.mods == 'none':
             kernel.modfiles = []
@@ -266,9 +270,6 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         kernel.dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
-        kver = get_kernel_version(kimg)
-        if kver is None:
-            arg_fail("%s does not seem to be a valid kernel file / directory" % kimg, show_usage=False)
         kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, '.virtme_mods')
         mod_file = os.path.join(args.kdir, 'modules.order')
