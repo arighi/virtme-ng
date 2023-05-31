@@ -193,6 +193,12 @@ def get_kernel_version(path):
         if match:
             kernel_version = match.group(1)
             return kernel_version
+    # 'file' failed to get kernel version, try with 'strings'.
+    result = subprocess.run(['strings', path], capture_output=True, text=True)
+    match = re.search(r"Linux version (\S+)", result.stdout)
+    if match:
+        kernel_version = match.group(1)
+        return kernel_version
     return None
 
 def find_kernel_and_mods(arch, args) -> Kernel:
