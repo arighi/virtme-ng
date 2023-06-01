@@ -144,6 +144,13 @@ class Arch_microvm(Arch_x86):
         return 'vhost-user-fs-device'
 
     @staticmethod
+    def qemu_display_args() -> List[str]:
+        return ['-device', 'virtio-keyboard-device',
+                '-device', 'virtio-tablet-device',
+                '-device', 'virtio-gpu-device',
+                '-global', 'virtio-mmio.force-legacy=false']
+
+    @staticmethod
     def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
 

@@ -297,10 +297,10 @@ if [[ -n "${virtme_graphics}" ]]; then
     xinit_rc=/tmp/.xinitrc
     echo "exec ${virtme_graphics}" > ${xinit_rc}
     if [[ -n "${virtme_user}" ]]; then
-        chown ${virtme_user}:${virtme_user} ${xinit_rc}
-	# Try to fix permissions on the virtual consoles (udev could mess up
-	# permissions).
-	chmod a+rw /dev/tty*
+	chown ${virtme_user}:${virtme_user} ${xinit_rc}
+	# Try to fix permissions on the virtual consoles, we are starting X
+	# directly here so we may need extra permissions on the tty devices.
+	chown ${virtme_user} /dev/char/*
         setsid bash -c "su ${virtme_user} -c 'xinit ${xinit_rc}'" 0<>"/dev/$consdev" 1>&0 2>&0
     else
         setsid bash -c "xinit ${xinit_rc}" 0<>"/dev/$consdev" 1>&0 2>&0

@@ -138,6 +138,8 @@ _GENERIC_CONFIG_OPTIONAL = [
     'CONFIG_DRM=y',
     'CONFIG_DRM_VIRTIO_GPU=y',
     'CONFIG_DRM_VIRTIO_GPU_KMS=y',
+    'CONFIG_DRM_BOCHS=y',
+    'CONFIG_VIRTIO_IOMMU=y',
 
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',

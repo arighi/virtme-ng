@@ -524,7 +524,7 @@ def do_it() -> int:
     else:
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
-        if args.graphics is None and args.arch == 'x86_64':
+        if args.arch == 'x86_64':
             virt_arch = architectures.get('microvm')
         else:
             virt_arch = arch
@@ -765,7 +765,6 @@ def do_it() -> int:
             qemuargs.extend(video_args)
         if args.graphics != '':
             kernelargs.append('virtme_graphics=%s' % args.graphics)
-            kernelargs.append('nomodeset')
 
     if args.net:
         qemuargs.extend(['-device', '%s,netdev=n0' % arch.virtio_dev_type('net')])
