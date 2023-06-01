@@ -241,8 +241,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             # Unable to detect kernel version, try to boot without
             # automatically detecting modules.
             args.mods = 'none'
-            sys.stderr.write("warning: failed to retrieve kernel version from: %s " +
-                             "(modules may not work)\n" % kimg)
+            sys.stderr.write("warning: failed to retrieve kernel version from: " + kimg +
+                             " (modules may not work)\n")
         kernel.kimg = kimg
         if args.mods == 'none':
             kernel.modfiles = []
