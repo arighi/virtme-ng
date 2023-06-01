@@ -164,10 +164,14 @@ def make_parser():
             metavar='user|bridge', help='Enable network access')
 
     parser.add_argument('--disk', '-D', action='append',
-            metavar='PATH', help='Add a file as virtio-scsi disk (can be used multiple times)')
+            metavar='PATH',
+            help='Add a file as virtio-scsi disk (can be used multiple times)')
 
     parser.add_argument('--exec', '-e', action='store',
             help='Execute a command inside the kernel and exit')
+
+    parser.add_argument('--show-boot-console', action='store_true',
+            help='Show the boot console when running a single command with --exec')
 
     parser.add_argument('--append', '-a', action='append',
             help='Additional kernel boot options (can be used multiple times)')
@@ -534,6 +538,12 @@ class KernelSource:
         else:
             self.virtme_param['exec'] = ''
 
+    def _get_virtme_show_boot_console(self, args):
+        if args.show_boot_console:
+            self.virtme_param['show_boot_console'] = '--show-boot-console'
+        else:
+            self.virtme_param['show_boot_console'] = ''
+
     def _get_virtme_network(self, args):
         if args.network is not None:
             self.virtme_param['network'] = f'--net {args.network}'
@@ -641,6 +651,7 @@ class KernelSource:
         self._get_virtme_run(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
+        self._get_virtme_show_boot_console(args)
         self._get_virtme_network(args)
         self._get_virtme_disk(args)
         self._get_virtme_9p(args)
@@ -670,6 +681,7 @@ class KernelSource:
             f'{self.virtme_param["kdir"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
+            f'{self.virtme_param["show_boot_console"]} ' +
             f'{self.virtme_param["network"]} ' +
             f'{self.virtme_param["disk"]} ' +
             f'{self.virtme_param["force_9p"]} ' +
