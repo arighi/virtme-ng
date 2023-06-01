@@ -55,9 +55,6 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument('-a', '--kopt', action='append', default=[],
                    help='Add a kernel option.  You can specify this more than once.')
 
-    g.add_argument('--xen', action='store',
-                   help='Boot Xen using the specified uncompressed hypervisor.')
-
     g = parser.add_argument_group(title='Common guest options')
     g.add_argument('--root', action='store', default='/',
                    help='Local path to use as guest root')
@@ -504,7 +501,6 @@ def do_it() -> int:
 
     qemuargs: List[str] = [qemu.qemubin]
     kernelargs = []
-    xenargs = []
 
     # Put the '-name' flag first so it's easily visible in ps, top, etc.
     if args.name:
@@ -620,12 +616,7 @@ def do_it() -> int:
             kernelargs.extend(arch.earlyconsole_args())
         qemuargs.extend(arch.qemu_nodisplay_args())
 
-        if not args.xen:
-            kernelargs.extend(arch.serial_console_args())
-        else:
-            # Horrible special case
-            xenargs.extend(['console=com1'])
-            kernelargs.extend(['xencons=hvc', 'console=hvc0'])
+        kernelargs.extend(arch.serial_console_args())
 
         # PS/2 probing is slow; give the kernel a hint to speed it up.
         kernelargs.extend(['psmouse.proto=exps'])
@@ -647,7 +638,7 @@ def do_it() -> int:
             kernelargs.extend(['TERM=%s' % os.environ['TERM']])
 
     if args.balloon:
-        qemuargs.extend(['-balloon', 'virtio'])
+        qemuargs.extend(['-device', '%s,id=balloon0' % arch.virtio_dev_type('balloon')])
 
     if args.cpus:
         qemuargs.extend(['-smp', args.cpus])
@@ -868,29 +859,15 @@ def do_it() -> int:
     kernelargs.append('--')
     kernelargs.extend(['-c', ';'.join(initcmds)])
 
-    if args.xen is None:
-        # Load a normal kernel
-        qemuargs.extend(['-kernel', kernel.kimg])
-        if kernelargs:
-            qemuargs.extend(['-append',
-                             ' '.join(quote_karg(a) for a in kernelargs)])
-        if initrdpath is not None:
-            qemuargs.extend(['-initrd', initrdpath])
-        if kernel.dtb is not None:
-            qemuargs.extend(['-dtb', kernel.dtb])
-
-        if xenargs:
-            raise ValueError("Can't pass Xen any arguments if we're not using Xen")
-    else:
-        # Use multiboot syntax to load Xen
-        qemuargs.extend(['-kernel', args.xen])
-        if xenargs:
-            qemuargs.extend(['-append',
-                             ' '.join(quote_karg(a) for a in xenargs)])
-        qemuargs.extend(['-initrd', '%s %s%s' % (
-            kernel.kimg,
-            ' '.join(quote_karg(a).replace(',', ',,') for a in kernelargs),
-            (',%s' % initrdpath) if initrdpath is not None else '')])
+    # Load a normal kernel
+    qemuargs.extend(['-kernel', kernel.kimg])
+    if kernelargs:
+        qemuargs.extend(['-append',
+                         ' '.join(quote_karg(a) for a in kernelargs)])
+    if initrdpath is not None:
+        qemuargs.extend(['-initrd', initrdpath])
+    if kernel.dtb is not None:
+        qemuargs.extend(['-dtb', kernel.dtb])
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
@@ -921,7 +898,4 @@ def main() -> int:
         return 1
 
 if __name__ == '__main__':
-    try:
-        exit(main())
-    except SilentError:
-        exit(1)
+    main()

@@ -109,39 +109,86 @@ def make_parser():
     parser.add_argument('--compiler', action='store',
             help='Compiler to be used as CC when building the kernel')
 
+    parser.add_argument('--busybox', metavar='PATH_TO_BUSYBOX', action='store',
+            help='Use the specified busybox binary')
+
+    parser.add_argument('--qemu', action='store',
+            help='Use the specified QEMU binary')
+
+    parser.add_argument('--name', action='store',
+            help='Set guest hostname and qemu -name flag')
+
+    parser.add_argument('--user', action='store',
+            help='Change user inside the guest (default is same user as the host)')
+
+    parser.add_argument('--root', action='store',
+            help='Pass a specific chroot to use inside the virtualized kernel ' +
+                 '(useful with --arch)')
+
+    parser.add_argument('--rw', action='store_true',
+            help='Give the guest read-write access to its root filesystem. '
+                 'WARNING: this can be dangerous for the host filesystem!')
+
+    parser.add_argument('--force-9p', action='store_true',
+            help='Use legacy 9p filesystem as rootfs')
+
+    parser.add_argument('--cwd', action='store',
+            help='Change guest working directory ' +
+                 '(default is current working directory when possible)')
+
+    parser.add_argument('--pwd', action='store_true',
+            help='[deprecated] --pwd is set implicitly by default')
+
+    parser.add_argument('--rodir', action='append', default=[],
+            help='Supply a read-only directory to the guest.' +
+                 'Use --rodir=path or --rodir=guestpath=hostpath')
+
+    parser.add_argument('--rwdir', action='append', default=[],
+            help='Supply a read/write directory to the guest.' +
+                 'Use --rwdir=path or --rwdir=guestpath=hostpath')
+
+    parser.add_argument('--overlay-rwdir', action='append', default=[],
+            help='Supply a directory that is r/w to the guest but read-only in the host.' +
+                 'Use --overlay-rwdir=path.')
+
     parser.add_argument('--cpus', '-p', action='store',
         help='Set guest CPU count (qemu -smp flag)')
 
     parser.add_argument('--memory', '-m', action='store',
             help='Set guest memory size (qemu -m flag)')
 
+    parser.add_argument('--balloon', action='store_true',
+            help='Allow the host to ask the guest to release memory')
+
     parser.add_argument('--network', '-n', action='store',
             metavar='user|bridge', help='Enable network access')
 
     parser.add_argument('--disk', '-D', action='append',
-            metavar='PATH', help='Add a file as virtio-scsi disk (can be used multiple times)')
+            metavar='PATH',
+            help='Add a file as virtio-scsi disk (can be used multiple times)')
 
     parser.add_argument('--exec', '-e', action='store',
             help='Execute a command inside the kernel and exit')
 
+    parser.add_argument('--show-boot-console', action='store_true',
+            help='Show the boot console when running a single command with --exec')
+
     parser.add_argument('--append', '-a', action='append',
             help='Additional kernel boot options (can be used multiple times)')
-
-    parser.add_argument('--force-9p', action='store_true',
-            help='Use legacy 9p filesystem as rootfs')
 
     parser.add_argument('--force-initramfs', action='store_true',
             help='Use an initramfs even if unnecessary')
 
     parser.add_argument('--graphics', '-g', action='store',
             nargs='?', const='', metavar="BINARY",
-            help='Show graphical output instead of using a console. An argument can be optionally specified to start a graphical application.')
+            help='Show graphical output instead of using a console. ' +
+                 'An argument can be optionally specified to start a graphical application.')
 
     parser.add_argument('--quiet', '-q', action='store_true',
             help='Reduce console output verbosity.')
 
-    parser.add_argument('--opts', '-o', action='append',
-            help='Additional options passed to virtme-run (can be used multiple times)')
+    parser.add_argument('--qemu-opts', '-o', action='append',
+            help='Additional arguments for QEMU (can be used multiple times)')
 
     parser.add_argument('--build-host', action='store',
             help='Perform kernel build on a remote server (ssh access required)')
@@ -156,9 +203,6 @@ def make_parser():
     parser.add_argument('--arch', action='store',
             help='Generate and test a kernel for a specific architecture '
                  '(default is host architecture)')
-
-    parser.add_argument('--root', action='store',
-            help='Pass a specific chroot to use inside the virtualized kernel (useful with --arch)')
 
     parser.add_argument('--force', action='store_true',
             help='Force reset git repository to target branch or commit '
@@ -409,6 +453,12 @@ class KernelSource:
             # Build the kernel on a remote build host
             self._make_remote(args, make_command)
 
+    def _get_virtme_name(self, args):
+        if args.name is not None:
+            self.virtme_param['name'] = '--name ' + args.name
+        else:
+            self.virtme_param['name'] = '--name ' + socket.gethostname()
+
     def _get_virtme_arch(self, args):
         if args.arch is not None:
             if args.arch not in ARCH_MAPPING:
@@ -420,19 +470,55 @@ class KernelSource:
         else:
             self.virtme_param['arch'] = ''
 
-    def _get_virtme_host(self):
-        self.virtme_param['hostname'] = '--name ' + socket.gethostname()
+    def _get_virtme_user(self, args):
+        if args.user is not None:
+            self.virtme_param['user'] = '--user ' + args.user
+        elif args.root is None:
+            self.virtme_param['user'] = '--user ' + get_username()
+        else:
+            self.virtme_param['user'] = ''
 
     def _get_virtme_root(self, args):
         if args.root is not None:
             create_root(args.root, args.arch or 'amd64')
             self.virtme_param['root'] = f'--root {args.root}'
-            self.virtme_param['username'] = ''
-            self.virtme_param['pwd'] = ''
         else:
             self.virtme_param['root'] = ''
-            self.virtme_param['username'] = '--user ' + get_username()
-            self.virtme_param['pwd'] = '--pwd'
+
+    def _get_virtme_rw(self, args):
+        if args.rw:
+            self.virtme_param['rw'] = '--rw'
+        else:
+            self.virtme_param['rw'] = ''
+
+    def _get_virtme_cwd(self, args):
+        if args.cwd is not None:
+            if args.pwd:
+                arg_fail('--pwd and --cwd are mutually exclusive')
+            self.virtme_param['cwd'] = '--cwd ' + args.cwd
+        elif args.root is None:
+            self.virtme_param['cwd'] = '--pwd'
+        else:
+            self.virtme_param['cwd'] = ''
+
+    def _get_virtme_rodir(self, args):
+        self.virtme_param['rodir'] = ''
+        for item in args.rodir:
+            self.virtme_param['rodir'] += '--rodir ' + item
+
+    def _get_virtme_rwdir(self, args):
+        self.virtme_param['rwdir'] = ''
+        for item in args.rwdir:
+            self.virtme_param['rwdir'] += '--rwdir ' + item
+
+    def _get_virtme_overlay_rwdir(self, args):
+        # Set default overlays if rootfs is mounted in read-only mode.
+        if not args.rw:
+            self.virtme_param['overlay_rwdir'] = ' '.join(f'--overlay-rwdir {d}' \
+                    for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
+        # Add user-specified overlays.
+        for item in args.overlay_rwdir:
+            self.virtme_param['overlay_rwdir'] += '--overlay-rwdir ' + item
 
     def _get_virtme_run(self, args):
         if args.run is not None:
@@ -451,6 +537,12 @@ class KernelSource:
             self.virtme_param['exec'] = f'--script-sh "{args.exec}"'
         else:
             self.virtme_param['exec'] = ''
+
+    def _get_virtme_show_boot_console(self, args):
+        if args.show_boot_console:
+            self.virtme_param['show_boot_console'] = '--show-boot-console'
+        else:
+            self.virtme_param['show_boot_console'] = ''
 
     def _get_virtme_network(self, args):
         if args.network is not None:
@@ -491,10 +583,6 @@ class KernelSource:
         else:
             self.virtme_param['quiet'] = ''
 
-    def _get_virtme_rwdirs(self):
-        self.virtme_param['rw_dirs'] = ' '.join(f'--overlay-rwdir {d}' \
-                for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-
     def _get_virtme_append(self, args):
         if args.append is not None:
             append = []
@@ -512,68 +600,100 @@ class KernelSource:
         else:
             self.virtme_param['memory'] = '--memory ' + args.memory
 
-    def _get_virtme_opts(self, args):
-        if args.opts is not None:
-            self.virtme_param['opts'] = ' '.join(args.opts)
+    def _get_virtme_balloon(self, args):
+        if args.balloon:
+            self.virtme_param['balloon'] = '--balloon'
         else:
-            self.virtme_param['opts'] = ''
+            self.virtme_param['balloon'] = ''
+
+    def _get_virtme_busybox(self, args):
+        if args.busybox is not None:
+            self.virtme_param['busybox'] = '--busybox ' + args.busybox
+        else:
+            self.virtme_param['busybox'] = ''
+
+    def _get_virtme_qemu(self, args):
+        if args.qemu is not None:
+            self.virtme_param['qemu'] = '--qemu-bin ' + args.qemu
+        else:
+            self.virtme_param['qemu'] = ''
 
     def _get_virtme_cpus(self, args):
         if args.cpus is None:
             cpus = self.cpus
         else:
             cpus = args.cpus
-        self.virtme_param['cpus'] = f'--qemu-opts -smp {cpus}'
+        self.virtme_param['cpus'] = f'--cpus {cpus}'
 
-    def _get_virtme_debug(self, args):
+    def _get_virtme_qemu_opts(self, args):
+        qemu_args = ''
+        if args.qemu_opts is not None:
+            qemu_args += ' '.join(args.qemu_opts)
         if args.debug:
-            self.virtme_param['debug'] = '-s -qmp tcp:localhost:3636,server,nowait'
+            qemu_args += '-s -qmp tcp:localhost:3636,server,nowait'
+        if qemu_args != '':
+            self.virtme_param['qemu_opts'] = "--qemu-opts " + qemu_args
         else:
-            self.virtme_param['debug'] = ''
+            self.virtme_param['qemu_opts'] = ''
 
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
+        self._get_virtme_name(args)
+        self._get_virtme_user(args)
         self._get_virtme_arch(args)
-        self._get_virtme_host()
         self._get_virtme_root(args)
+        self._get_virtme_rw(args)
+        self._get_virtme_rodir(args)
+        self._get_virtme_rwdir(args)
+        self._get_virtme_overlay_rwdir(args)
+        self._get_virtme_cwd(args)
         self._get_virtme_run(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
+        self._get_virtme_show_boot_console(args)
         self._get_virtme_network(args)
         self._get_virtme_disk(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
         self._get_virtme_quiet(args)
-        self._get_virtme_rwdirs()
         self._get_virtme_append(args)
-        self._get_virtme_memory(args)
-        self._get_virtme_opts(args)
         self._get_virtme_cpus(args)
-        self._get_virtme_debug(args)
+        self._get_virtme_memory(args)
+        self._get_virtme_balloon(args)
+        self._get_virtme_busybox(args)
+        self._get_virtme_qemu(args)
+        self._get_virtme_qemu_opts(args)
+        self._get_virtme_qemu_opts(args)
 
         # Start VM using virtme-run
         cmd = ('virtme-run ' +
+            f'{self.virtme_param["name"]} ' +
+            f'{self.virtme_param["user"]} ' +
             f'{self.virtme_param["arch"]} ' +
-            f'{self.virtme_param["hostname"]} ' +
             f'{self.virtme_param["root"]} ' +
-            f'{self.virtme_param["pwd"]} ' +
-            f'{self.virtme_param["username"]} ' +
+            f'{self.virtme_param["rw"]} ' +
+            f'{self.virtme_param["rodir"]} ' +
+            f'{self.virtme_param["rwdir"]} ' +
+            f'{self.virtme_param["overlay_rwdir"]} ' +
+            f'{self.virtme_param["cwd"]} ' +
             f'{self.virtme_param["kdir"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
+            f'{self.virtme_param["show_boot_console"]} ' +
             f'{self.virtme_param["network"]} ' +
             f'{self.virtme_param["disk"]} ' +
             f'{self.virtme_param["force_9p"]} ' +
             f'{self.virtme_param["force_initramfs"]} ' +
             f'{self.virtme_param["graphics"]} ' +
             f'{self.virtme_param["quiet"]} ' +
-            f'{self.virtme_param["rw_dirs"]} ' +
             f'{self.virtme_param["append"]} ' +
-            f'{self.virtme_param["memory"]} ' +
-            f'{self.virtme_param["opts"]} ' +
             f'{self.virtme_param["cpus"]} ' +
-            f'{self.virtme_param["debug"]} '
+            f'{self.virtme_param["memory"]} ' +
+            f'{self.virtme_param["balloon"]} ' +
+            f'{self.virtme_param["busybox"]} ' +
+            f'{self.virtme_param["qemu"]} ' +
+            f'{self.virtme_param["qemu_opts"]} '
         )
         check_call(cmd, shell=True)
 
@@ -681,7 +801,4 @@ def main() -> int:
         return 1
 
 if __name__ == '__main__':
-    try:
-        sys.exit(main())
-    except SilentError:
-        sys.exit(1)
+    main()
