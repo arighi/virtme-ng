@@ -694,6 +694,11 @@ fn run_user_gui(tty_fd: libc::c_int, app: &str) {
     // Run graphical app using xinit directly
     let mut args: Vec<String> = vec!["-l".to_owned(), "-c".to_owned()];
     if let Ok(user) = env::var("virtme_user") {
+        // Try to fix permissions on the virtual consoles, we are starting X
+        // directly here so we may need extra permissions on the tty devices.
+        utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
+
+        // Start xinit directly.
         args.push(format!("su - {} -c 'xinit /tmp/.xinitrc'", user));
     } else {
         args.push("xinit /tmp/.xinitrc".to_owned());
