@@ -142,7 +142,8 @@ def make_parser():
 
     parser.add_argument('--graphics', '-g', action='store',
             nargs='?', const='', metavar="BINARY",
-            help='Show graphical output instead of using a console. An argument can be optionally specified to start a graphical application.')
+            help='Show graphical output instead of using a console. ' +
+                 'An argument can be optionally specified to start a graphical application.')
 
     parser.add_argument('--quiet', '-q', action='store_true',
             help='Reduce console output verbosity.')
