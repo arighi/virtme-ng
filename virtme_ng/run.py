@@ -109,6 +109,10 @@ def make_parser():
     parser.add_argument('--compiler', action='store',
             help='Compiler to be used as CC when building the kernel')
 
+    parser.add_argument('--rw', action='store_true',
+            help='Give the guest read-write access to its root filesystem. '
+                 'WARNING: this can be dangerous for the host filesystem!')
+
     parser.add_argument('--cpus', '-p', action='store',
         help='Set guest CPU count (qemu -smp flag)')
 
@@ -434,6 +438,12 @@ class KernelSource:
             self.virtme_param['username'] = '--user ' + get_username()
             self.virtme_param['pwd'] = '--pwd'
 
+    def _get_virtme_rw(self, args):
+        if args.rw:
+            self.virtme_param['rw'] = '--rw'
+        else:
+            self.virtme_param['rw'] = ''
+
     def _get_virtme_run(self, args):
         if args.run is not None:
             self.virtme_param['kdir'] = '--kimg ' + args.run
@@ -491,9 +501,13 @@ class KernelSource:
         else:
             self.virtme_param['quiet'] = ''
 
-    def _get_virtme_rwdirs(self):
-        self.virtme_param['rw_dirs'] = ' '.join(f'--overlay-rwdir {d}' \
-                for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
+    def _get_virtme_rwdirs(self, args):
+        # Setup overlays only if rootfs is mount in read-only mode.
+        if args.rw:
+            self.virtme_param['rw_dirs'] = ''
+        else:
+            self.virtme_param['rw_dirs'] = ' '.join(f'--overlay-rwdir {d}' \
+                    for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
 
     def _get_virtme_append(self, args):
         if args.append is not None:
@@ -536,6 +550,7 @@ class KernelSource:
         self._get_virtme_arch(args)
         self._get_virtme_host()
         self._get_virtme_root(args)
+        self._get_virtme_rw(args)
         self._get_virtme_run(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
@@ -545,7 +560,7 @@ class KernelSource:
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
         self._get_virtme_quiet(args)
-        self._get_virtme_rwdirs()
+        self._get_virtme_rwdirs(args)
         self._get_virtme_append(args)
         self._get_virtme_memory(args)
         self._get_virtme_opts(args)
@@ -557,6 +572,7 @@ class KernelSource:
             f'{self.virtme_param["arch"]} ' +
             f'{self.virtme_param["hostname"]} ' +
             f'{self.virtme_param["root"]} ' +
+            f'{self.virtme_param["rw"]} ' +
             f'{self.virtme_param["pwd"]} ' +
             f'{self.virtme_param["username"]} ' +
             f'{self.virtme_param["kdir"]} ' +
