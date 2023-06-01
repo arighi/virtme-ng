@@ -162,9 +162,7 @@ mount -t debugfs debugfs /sys/kernel/debug &>/dev/null
 mount -t tracefs tracefs /sys/kernel/tracing &>/dev/null
 
 # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
-if mount -t tmpfs tmpfs /sys/fs/cgroup &>/dev/null; then
-    mount -t cgroup2 cgroup2 /sys/fs/cgroup
-fi
+mount -t cgroup2 cgroup2 /sys/fs/cgroup
 
 # Set up filesystems that live in /dev
 mkdir -p -m 0755 /dev/shm /dev/pts
