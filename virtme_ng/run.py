@@ -112,6 +112,9 @@ def make_parser():
     parser.add_argument('--busybox', metavar='PATH_TO_BUSYBOX', action='store',
             help='Use the specified busybox binary')
 
+    parser.add_argument('--qemu', action='store',
+            help='Use the specified QEMU binary')
+
     parser.add_argument('--name', action='store',
             help='Set guest hostname and qemu -name flag')
 
@@ -599,6 +602,12 @@ class KernelSource:
         else:
             self.virtme_param['busybox'] = ''
 
+    def _get_virtme_qemu(self, args):
+        if args.qemu is not None:
+            self.virtme_param['qemu'] = '--qemu-bin ' + args.qemu
+        else:
+            self.virtme_param['qemu'] = ''
+
     def _get_virtme_opts(self, args):
         if args.opts is not None:
             self.virtme_param['opts'] = ' '.join(args.opts)
@@ -642,6 +651,7 @@ class KernelSource:
         self._get_virtme_memory(args)
         self._get_virtme_balloon(args)
         self._get_virtme_busybox(args)
+        self._get_virtme_qemu(args)
         self._get_virtme_opts(args)
         self._get_virtme_cpus(args)
         self._get_virtme_debug(args)
@@ -670,6 +680,7 @@ class KernelSource:
             f'{self.virtme_param["memory"]} ' +
             f'{self.virtme_param["balloon"]} ' +
             f'{self.virtme_param["busybox"]} ' +
+            f'{self.virtme_param["qemu"]} ' +
             f'{self.virtme_param["opts"]} ' +
             f'{self.virtme_param["cpus"]} ' +
             f'{self.virtme_param["debug"]} '
