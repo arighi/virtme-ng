@@ -112,6 +112,9 @@ def make_parser():
     parser.add_argument('--name', action='store',
             help='Set guest hostname and qemu -name flag')
 
+    parser.add_argument('--user', action='store',
+            help='Change user inside the guest (default is same user as the host)')
+
     parser.add_argument('--rw', action='store_true',
             help='Give the guest read-write access to its root filesystem. '
                  'WARNING: this can be dangerous for the host filesystem!')
@@ -437,15 +440,21 @@ class KernelSource:
         else:
             self.virtme_param['arch'] = ''
 
+    def _get_virtme_user(self, args):
+        if args.user is not None:
+            self.virtme_param['user'] = '--user ' + args.user
+        elif args.root is None:
+            self.virtme_param['user'] = '--user ' + get_username()
+        else:
+            self.virtme_param['user'] = ''
+
     def _get_virtme_root(self, args):
         if args.root is not None:
             create_root(args.root, args.arch or 'amd64')
             self.virtme_param['root'] = f'--root {args.root}'
-            self.virtme_param['username'] = ''
             self.virtme_param['pwd'] = ''
         else:
             self.virtme_param['root'] = ''
-            self.virtme_param['username'] = '--user ' + get_username()
             self.virtme_param['pwd'] = '--pwd'
 
     def _get_virtme_rw(self, args):
@@ -564,6 +573,7 @@ class KernelSource:
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
         self._get_virtme_name(args)
+        self._get_virtme_user(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
         self._get_virtme_rw(args)
@@ -589,9 +599,9 @@ class KernelSource:
             f'{self.virtme_param["name"]} ' +
             f'{self.virtme_param["arch"]} ' +
             f'{self.virtme_param["root"]} ' +
+            f'{self.virtme_param["user"]} ' +
             f'{self.virtme_param["rw"]} ' +
             f'{self.virtme_param["pwd"]} ' +
-            f'{self.virtme_param["username"]} ' +
             f'{self.virtme_param["kdir"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
