@@ -187,8 +187,8 @@ def make_parser():
     parser.add_argument('--quiet', '-q', action='store_true',
             help='Reduce console output verbosity.')
 
-    parser.add_argument('--opts', '-o', action='append',
-            help='Additional options passed to virtme-run (can be used multiple times)')
+    parser.add_argument('--qemu-opts', '-o', action='append',
+            help='Additional arguments for QEMU (can be used multiple times)')
 
     parser.add_argument('--build-host', action='store',
             help='Perform kernel build on a remote server (ssh access required)')
@@ -618,24 +618,23 @@ class KernelSource:
         else:
             self.virtme_param['qemu'] = ''
 
-    def _get_virtme_opts(self, args):
-        if args.opts is not None:
-            self.virtme_param['opts'] = ' '.join(args.opts)
-        else:
-            self.virtme_param['opts'] = ''
-
     def _get_virtme_cpus(self, args):
         if args.cpus is None:
             cpus = self.cpus
         else:
             cpus = args.cpus
-        self.virtme_param['cpus'] = f'--qemu-opts -smp {cpus}'
+        self.virtme_param['cpus'] = f'--cpus {cpus}'
 
-    def _get_virtme_debug(self, args):
+    def _get_virtme_qemu_opts(self, args):
+        qemu_args = ''
+        if args.qemu_opts is not None:
+            qemu_args += ' '.join(args.qemu_opts)
         if args.debug:
-            self.virtme_param['debug'] = '-s -qmp tcp:localhost:3636,server,nowait'
+            qemu_args += '-s -qmp tcp:localhost:3636,server,nowait'
+        if qemu_args != '':
+            self.virtme_param['qemu_opts'] = "--qemu-opts " + qemu_args
         else:
-            self.virtme_param['debug'] = ''
+            self.virtme_param['qemu_opts'] = ''
 
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
@@ -659,13 +658,13 @@ class KernelSource:
         self._get_virtme_graphics(args)
         self._get_virtme_quiet(args)
         self._get_virtme_append(args)
+        self._get_virtme_cpus(args)
         self._get_virtme_memory(args)
         self._get_virtme_balloon(args)
         self._get_virtme_busybox(args)
         self._get_virtme_qemu(args)
-        self._get_virtme_opts(args)
-        self._get_virtme_cpus(args)
-        self._get_virtme_debug(args)
+        self._get_virtme_qemu_opts(args)
+        self._get_virtme_qemu_opts(args)
 
         # Start VM using virtme-run
         cmd = ('virtme-run ' +
@@ -689,13 +688,12 @@ class KernelSource:
             f'{self.virtme_param["graphics"]} ' +
             f'{self.virtme_param["quiet"]} ' +
             f'{self.virtme_param["append"]} ' +
+            f'{self.virtme_param["cpus"]} ' +
             f'{self.virtme_param["memory"]} ' +
             f'{self.virtme_param["balloon"]} ' +
             f'{self.virtme_param["busybox"]} ' +
             f'{self.virtme_param["qemu"]} ' +
-            f'{self.virtme_param["opts"]} ' +
-            f'{self.virtme_param["cpus"]} ' +
-            f'{self.virtme_param["debug"]} '
+            f'{self.virtme_param["qemu_opts"]} '
         )
         check_call(cmd, shell=True)
 
@@ -803,7 +801,4 @@ def main() -> int:
         return 1
 
 if __name__ == '__main__':
-    try:
-        sys.exit(main())
-    except SilentError:
-        sys.exit(1)
+    main()

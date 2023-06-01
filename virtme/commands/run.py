@@ -898,7 +898,4 @@ def main() -> int:
         return 1
 
 if __name__ == '__main__':
-    try:
-        exit(main())
-    except SilentError:
-        exit(1)
+    main()
