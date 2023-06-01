@@ -115,9 +115,20 @@ def make_parser():
     parser.add_argument('--user', action='store',
             help='Change user inside the guest (default is same user as the host)')
 
+    parser.add_argument('--root', action='store',
+            help='Pass a specific chroot to use inside the virtualized kernel ' +
+                 '(useful with --arch)')
+
     parser.add_argument('--rw', action='store_true',
             help='Give the guest read-write access to its root filesystem. '
                  'WARNING: this can be dangerous for the host filesystem!')
+
+    parser.add_argument('--force-9p', action='store_true',
+            help='Use legacy 9p filesystem as rootfs')
+
+    parser.add_argument('--cwd', action='store',
+            help='Change guest working directory ' +
+                 '(default is current working directory when possible)')
 
     parser.add_argument('--cpus', '-p', action='store',
         help='Set guest CPU count (qemu -smp flag)')
@@ -139,9 +150,6 @@ def make_parser():
 
     parser.add_argument('--append', '-a', action='append',
             help='Additional kernel boot options (can be used multiple times)')
-
-    parser.add_argument('--force-9p', action='store_true',
-            help='Use legacy 9p filesystem as rootfs')
 
     parser.add_argument('--force-initramfs', action='store_true',
             help='Use an initramfs even if unnecessary')
@@ -170,9 +178,6 @@ def make_parser():
     parser.add_argument('--arch', action='store',
             help='Generate and test a kernel for a specific architecture '
                  '(default is host architecture)')
-
-    parser.add_argument('--root', action='store',
-            help='Pass a specific chroot to use inside the virtualized kernel (useful with --arch)')
 
     parser.add_argument('--force', action='store_true',
             help='Force reset git repository to target branch or commit '
@@ -452,16 +457,22 @@ class KernelSource:
         if args.root is not None:
             create_root(args.root, args.arch or 'amd64')
             self.virtme_param['root'] = f'--root {args.root}'
-            self.virtme_param['pwd'] = ''
         else:
             self.virtme_param['root'] = ''
-            self.virtme_param['pwd'] = '--pwd'
 
     def _get_virtme_rw(self, args):
         if args.rw:
             self.virtme_param['rw'] = '--rw'
         else:
             self.virtme_param['rw'] = ''
+
+    def _get_virtme_cwd(self, args):
+        if args.cwd is not None:
+            self.virtme_param['cwd'] = '--cwd ' + args.cwd
+        elif args.root is None:
+            self.virtme_param['cwd'] = '--pwd'
+        else:
+            self.virtme_param['cwd'] = ''
 
     def _get_virtme_run(self, args):
         if args.run is not None:
@@ -577,6 +588,7 @@ class KernelSource:
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
         self._get_virtme_rw(args)
+        self._get_virtme_cwd(args)
         self._get_virtme_run(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
@@ -601,7 +613,7 @@ class KernelSource:
             f'{self.virtme_param["root"]} ' +
             f'{self.virtme_param["user"]} ' +
             f'{self.virtme_param["rw"]} ' +
-            f'{self.virtme_param["pwd"]} ' +
+            f'{self.virtme_param["cwd"]} ' +
             f'{self.virtme_param["kdir"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
