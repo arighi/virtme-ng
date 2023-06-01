@@ -109,6 +109,9 @@ def make_parser():
     parser.add_argument('--compiler', action='store',
             help='Compiler to be used as CC when building the kernel')
 
+    parser.add_argument('--name', action='store',
+            help='Set guest hostname and qemu -name flag')
+
     parser.add_argument('--rw', action='store_true',
             help='Give the guest read-write access to its root filesystem. '
                  'WARNING: this can be dangerous for the host filesystem!')
@@ -417,6 +420,12 @@ class KernelSource:
             # Build the kernel on a remote build host
             self._make_remote(args, make_command)
 
+    def _get_virtme_name(self, args):
+        if args.name is not None:
+            self.virtme_param['name'] = '--name ' + args.name
+        else:
+            self.virtme_param['name'] = '--name ' + socket.gethostname()
+
     def _get_virtme_arch(self, args):
         if args.arch is not None:
             if args.arch not in ARCH_MAPPING:
@@ -427,9 +436,6 @@ class KernelSource:
                     ARCH_MAPPING[args.arch]['qemu_name']
         else:
             self.virtme_param['arch'] = ''
-
-    def _get_virtme_host(self):
-        self.virtme_param['hostname'] = '--name ' + socket.gethostname()
 
     def _get_virtme_root(self, args):
         if args.root is not None:
@@ -557,8 +563,8 @@ class KernelSource:
 
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
+        self._get_virtme_name(args)
         self._get_virtme_arch(args)
-        self._get_virtme_host()
         self._get_virtme_root(args)
         self._get_virtme_rw(args)
         self._get_virtme_run(args)
@@ -580,8 +586,8 @@ class KernelSource:
 
         # Start VM using virtme-run
         cmd = ('virtme-run ' +
+            f'{self.virtme_param["name"]} ' +
             f'{self.virtme_param["arch"]} ' +
-            f'{self.virtme_param["hostname"]} ' +
             f'{self.virtme_param["root"]} ' +
             f'{self.virtme_param["rw"]} ' +
             f'{self.virtme_param["pwd"]} ' +
