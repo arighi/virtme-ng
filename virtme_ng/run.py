@@ -130,6 +130,9 @@ def make_parser():
             help='Change guest working directory ' +
                  '(default is current working directory when possible)')
 
+    parser.add_argument('--pwd', action='store_true',
+            help='[deprecated] --pwd is set implicitly by default')
+
     parser.add_argument('--cpus', '-p', action='store',
         help='Set guest CPU count (qemu -smp flag)')
 
@@ -468,6 +471,8 @@ class KernelSource:
 
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
+            if args.pwd:
+                arg_fail('--pwd and --cwd are mutually exclusive')
             self.virtme_param['cwd'] = '--cwd ' + args.cwd
         elif args.root is None:
             self.virtme_param['cwd'] = '--pwd'
