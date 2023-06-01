@@ -133,6 +133,18 @@ def make_parser():
     parser.add_argument('--pwd', action='store_true',
             help='[deprecated] --pwd is set implicitly by default')
 
+    parser.add_argument('--rodir', action='append', default=[],
+            help='Supply a read-only directory to the guest.' +
+                 'Use --rodir=path or --rodir=guestpath=hostpath')
+
+    parser.add_argument('--rwdir', action='append', default=[],
+            help='Supply a read/write directory to the guest.' +
+                 'Use --rwdir=path or --rwdir=guestpath=hostpath')
+
+    parser.add_argument('--overlay-rwdir', action='append', default=[],
+            help='Supply a directory that is r/w to the guest but read-only in the host.' +
+                 'Use --overlay-rwdir=path.')
+
     parser.add_argument('--cpus', '-p', action='store',
         help='Set guest CPU count (qemu -smp flag)')
 
@@ -479,6 +491,25 @@ class KernelSource:
         else:
             self.virtme_param['cwd'] = ''
 
+    def _get_virtme_rodir(self, args):
+        self.virtme_param['rodir'] = ''
+        for item in args.rodir:
+            self.virtme_param['rodir'] += '--rodir ' + item
+
+    def _get_virtme_rwdir(self, args):
+        self.virtme_param['rwdir'] = ''
+        for item in args.rwdir:
+            self.virtme_param['rwdir'] += '--rwdir ' + item
+
+    def _get_virtme_overlay_rwdir(self, args):
+        # Set default overlays if rootfs is mounted in read-only mode.
+        if not args.rw:
+            self.virtme_param['overlay_rwdir'] = ' '.join(f'--overlay-rwdir {d}' \
+                    for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
+        # Add user-specified overlays.
+        for item in args.overlay_rwdir:
+            self.virtme_param['overlay_rwdir'] += '--overlay-rwdir ' + item
+
     def _get_virtme_run(self, args):
         if args.run is not None:
             self.virtme_param['kdir'] = '--kimg ' + args.run
@@ -536,14 +567,6 @@ class KernelSource:
         else:
             self.virtme_param['quiet'] = ''
 
-    def _get_virtme_rwdirs(self, args):
-        # Setup overlays only if rootfs is mount in read-only mode.
-        if args.rw:
-            self.virtme_param['rw_dirs'] = ''
-        else:
-            self.virtme_param['rw_dirs'] = ' '.join(f'--overlay-rwdir {d}' \
-                    for d in ('/etc', '/home', '/opt', '/srv', '/usr', '/var'))
-
     def _get_virtme_append(self, args):
         if args.append is not None:
             append = []
@@ -593,6 +616,9 @@ class KernelSource:
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
         self._get_virtme_rw(args)
+        self._get_virtme_rodir(args)
+        self._get_virtme_rwdir(args)
+        self._get_virtme_overlay_rwdir(args)
         self._get_virtme_cwd(args)
         self._get_virtme_run(args)
         self._get_virtme_mods(args)
@@ -603,7 +629,6 @@ class KernelSource:
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
         self._get_virtme_quiet(args)
-        self._get_virtme_rwdirs(args)
         self._get_virtme_append(args)
         self._get_virtme_memory(args)
         self._get_virtme_balloon(args)
@@ -614,10 +639,13 @@ class KernelSource:
         # Start VM using virtme-run
         cmd = ('virtme-run ' +
             f'{self.virtme_param["name"]} ' +
+            f'{self.virtme_param["user"]} ' +
             f'{self.virtme_param["arch"]} ' +
             f'{self.virtme_param["root"]} ' +
-            f'{self.virtme_param["user"]} ' +
             f'{self.virtme_param["rw"]} ' +
+            f'{self.virtme_param["rodir"]} ' +
+            f'{self.virtme_param["rwdir"]} ' +
+            f'{self.virtme_param["overlay_rwdir"]} ' +
             f'{self.virtme_param["cwd"]} ' +
             f'{self.virtme_param["kdir"]} ' +
             f'{self.virtme_param["mods"]} ' +
@@ -628,7 +656,6 @@ class KernelSource:
             f'{self.virtme_param["force_initramfs"]} ' +
             f'{self.virtme_param["graphics"]} ' +
             f'{self.virtme_param["quiet"]} ' +
-            f'{self.virtme_param["rw_dirs"]} ' +
             f'{self.virtme_param["append"]} ' +
             f'{self.virtme_param["memory"]} ' +
             f'{self.virtme_param["balloon"]} ' +
