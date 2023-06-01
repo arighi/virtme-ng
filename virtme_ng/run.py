@@ -119,6 +119,9 @@ def make_parser():
     parser.add_argument('--memory', '-m', action='store',
             help='Set guest memory size (qemu -m flag)')
 
+    parser.add_argument('--balloon', action='store_true',
+            help='Allow the host to ask the guest to release memory')
+
     parser.add_argument('--network', '-n', action='store',
             metavar='user|bridge', help='Enable network access')
 
@@ -526,6 +529,12 @@ class KernelSource:
         else:
             self.virtme_param['memory'] = '--memory ' + args.memory
 
+    def _get_virtme_balloon(self, args):
+        if args.balloon:
+            self.virtme_param['balloon'] = '--balloon'
+        else:
+            self.virtme_param['balloon'] = ''
+
     def _get_virtme_opts(self, args):
         if args.opts is not None:
             self.virtme_param['opts'] = ' '.join(args.opts)
@@ -563,6 +572,7 @@ class KernelSource:
         self._get_virtme_rwdirs(args)
         self._get_virtme_append(args)
         self._get_virtme_memory(args)
+        self._get_virtme_balloon(args)
         self._get_virtme_opts(args)
         self._get_virtme_cpus(args)
         self._get_virtme_debug(args)
@@ -587,6 +597,7 @@ class KernelSource:
             f'{self.virtme_param["rw_dirs"]} ' +
             f'{self.virtme_param["append"]} ' +
             f'{self.virtme_param["memory"]} ' +
+            f'{self.virtme_param["balloon"]} ' +
             f'{self.virtme_param["opts"]} ' +
             f'{self.virtme_param["cpus"]} ' +
             f'{self.virtme_param["debug"]} '

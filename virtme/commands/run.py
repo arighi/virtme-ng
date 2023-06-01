@@ -647,7 +647,7 @@ def do_it() -> int:
             kernelargs.extend(['TERM=%s' % os.environ['TERM']])
 
     if args.balloon:
-        qemuargs.extend(['-balloon', 'virtio'])
+        qemuargs.extend(['-device', '%s,id=balloon0' % arch.virtio_dev_type('balloon')])
 
     if args.cpus:
         qemuargs.extend(['-smp', args.cpus])
