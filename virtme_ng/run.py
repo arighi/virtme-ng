@@ -10,52 +10,58 @@ import socket
 import shutil
 import json
 import tempfile
-import time
-import threading
-import datetime
-from subprocess import check_call, check_output, DEVNULL
+from subprocess import check_call, check_output, Popen, DEVNULL, PIPE, CalledProcessError
+from select import select
 from pathlib import Path
 from argcomplete import autocomplete
+
 from virtme.util import SilentError, uname
-
 from virtme_ng.utils import VERSION, CONF_FILE
+from virtme_ng.spinner import Spinner
 
-def log_msg(message):
-    """Log a message with a timestamp."""
-    timestamp = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    sys.stderr.write(f"[{timestamp}] {message}")
-    sys.stderr.flush()
-
-def spinner_decorator(show_spinner=False, message=""):
-    """Function decorator to show a spinner while the function is running."""
+def spinner_decorator(message):
     def decorator(func):
         def wrapper(*args, **kwargs):
-            stop_event = threading.Event()
-            if show_spinner in kwargs.values():
-                log_msg(message + "\n")
-                spinner_thread = threading.Thread(target=spinner, args=(stop_event,))
-                spinner_thread.start()
-            result = None
-            try:
+            with Spinner(message=message):
                 result = func(*args, **kwargs)
-            finally:
-                if show_spinner in kwargs.values():
-                    stop_event.set()
-                    spinner_thread.join()
-                    if result is not None:
-                        log_msg('ok\n')
-            return result
-
-        def spinner(stop_event):
-            while not stop_event.is_set():
-                for char in '|/-\\':
-                    sys.stderr.write(f'{char}\b')
-                    sys.stderr.flush()
-                    time.sleep(0.1)
-
+                return result
         return wrapper
-
     return decorator
+
+def check_call_cmd(command, quiet=False):
+    process = Popen(
+        command,
+        stdout=PIPE,
+        stderr=PIPE,
+        stdin=DEVNULL,
+    )
+    process.stdout.flush()
+    process.stderr.flush()
+
+    stdout_fd = process.stdout.fileno()
+    stderr_fd = process.stderr.fileno()
+
+    # Use select to poll for new data in the file descriptors
+    while process.poll() is None:
+        ready_to_read, _, _ = select([stdout_fd, stderr_fd], [], [], 1)
+        for file in ready_to_read:
+            if file == stdout_fd:
+                line = process.stdout.readline().decode()
+                if line and not quiet:
+                    sys.stdout.write(line)
+                    sys.stdout.flush()
+            if file == stderr_fd:
+                line = process.stderr.readline().decode()
+                if line:
+                    sys.stderr.write(line)
+                    sys.stderr.flush()
+
+    # Wait for the process to complete and get the return code
+    return_code = process.wait()
+
+    # Trigger a CalledProcessError exception if command failed
+    if return_code:
+        raise CalledProcessError(return_code, command)
 
 def make_parser():
     """Main virtme-ng command line parser."""
@@ -339,8 +345,7 @@ class KernelSource:
             if not args.force and self._is_dirty_repo():
                 arg_fail("error: you have uncommitted changes in your git repository, " + \
                          "use --force to drop them", show_usage=False)
-            check_call(['git', 'reset', '--hard', target], \
-                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+            check_call_cmd(['git', 'reset', '--hard', target], quiet=args.quiet)
 
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
@@ -360,33 +365,24 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in args.envs:
             cmd += f' {var} '
-        check_call(self._format_cmd(cmd), \
-                   stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet)
 
     def _make_remote(self, args, make_command):
-        check_call(['ssh', args.build_host,
-                    'mkdir -p ~/.virtme'], \
-                    stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
-        check_call(['ssh', args.build_host,
-                    'git init ~/.virtme'], \
-                    stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
-        check_call(['git', 'push', '--force', '--porcelain', f"{args.build_host}:~/.virtme",
-                    'HEAD:__virtme__', ], \
-                    stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        check_call_cmd(['ssh', args.build_host, 'mkdir -p ~/.virtme'], quiet=args.quiet)
+        check_call_cmd(['ssh', args.build_host, 'git init ~/.virtme'], quiet=args.quiet)
+        check_call_cmd(['git', 'push', '--force', '--porcelain', f"{args.build_host}:~/.virtme",
+                    'HEAD:__virtme__', ], quiet=args.quiet)
         cmd = f'rsync .config {args.build_host}:.virtme/.config'
-        check_call(self._format_cmd(cmd), \
-                   stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(args.build_host_exec_prefix or '', \
                                                  make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {args.build_host}:.virtme/.kc-build'
-            check_call(self._format_cmd(cmd), \
-                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+            check_call_cmd(self._format_cmd(cmd), quiet=args.quiet)
         # Execute remote build script
-        check_call(['ssh', args.build_host, 'bash', '.virtme/.kc-build'], \
-                   stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+        check_call_cmd(['ssh', args.build_host, 'bash', '.virtme/.kc-build'], quiet=args.quiet)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if args.build_host_vmlinux or args.arch == 'ppc64el':
@@ -407,14 +403,13 @@ class KernelSource:
                       f'{args.build_host}:.virtme/ ./'
             tmp.write(cmd)
             tmp.flush()
-            check_call(['bash', tmp.name], \
-                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+            check_call_cmd(['bash', tmp.name], quiet=args.quiet)
         if not args.skip_modules:
             if os.path.exists('./debian/rules'):
-                check_call(['fakeroot', 'debian/rules', 'clean'], \
-                           stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
-            check_call(self._format_cmd(make_command + f' -j {self.cpus}' + ' modules_prepare'), \
-                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+                check_call_cmd(['fakeroot', 'debian/rules', 'clean'], quiet=args.quiet)
+            check_call_cmd(self._format_cmd(make_command +
+                           f' -j {self.cpus}' + ' modules_prepare'),
+                           quiet=args.quiet)
 
     def make(self, args):
         """Perform a make operation on a kernel source directory."""
@@ -447,8 +442,7 @@ class KernelSource:
             make_command += f' {var} '
         if args.build_host is None:
             # Build the kernel locally
-            check_call(self._format_cmd(make_command + ' -j' + self.cpus),
-                       stdout=DEVNULL if args.quiet else sys.stderr, stdin=DEVNULL)
+            check_call_cmd(self._format_cmd(make_command + ' -j' + self.cpus), quiet=args.quiet)
         else:
             # Build the kernel on a remote build host
             self._make_remote(args, make_command)
@@ -697,7 +691,7 @@ class KernelSource:
         )
         check_call(cmd, shell=True)
 
-    def dump(self, dump_file):
+    def dump(self, args):
         """Generate or analyze a crash memory dump."""
         if not os.path.isfile('vmlinux'):
             arg_fail('vmlinux not found, try to recompile the kernel with ' +
@@ -714,6 +708,7 @@ class KernelSource:
         if not data:
             sys.exit(1)
         print(data)
+        dump_file = args.dump_file
         with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
             msg = (
                 "{\"execute\":\"dump-guest-memory\","
@@ -736,33 +731,50 @@ class KernelSource:
                 # Use crash to inspect the memory dump
                 check_call(['crash', tmp.name, './vmlinux'])
 
-    def clean(self, build_host=None):
+    def clean(self, args):
         """Clean a local or remote git repository."""
         if not os.path.isdir('.git'):
             arg_fail('error: must run from a kernel git repository', show_usage=False)
-        if build_host is None:
+        if args.build_host is None:
             cmd = self._format_cmd("git clean -xdf")
         else:
-            cmd = f'ssh {build_host} --'
+            cmd = f'ssh {args.build_host} --'
             cmd = self._format_cmd(cmd)
             cmd.append('cd ~/.virtme && git clean -xdf')
         check_call(cmd)
 
-@spinner_decorator(message="configuring kernel")
-def config(kern_source, args, show_spinner=False): # pylint: disable=unused-argument
-    """Confiugure the kernel."""
+@spinner_decorator(message="📦 checking out kernel")
+def checkout(kern_source, args):
+    """Checkout kernel."""
+    kern_source.checkout(args)
+    return True
+
+@spinner_decorator(message="🔧 configuring kernel")
+def config(kern_source, args):
+    """Configure the kernel."""
     kern_source.config(args)
     return True
 
-@spinner_decorator(message="building kernel")
-def make(kern_source, args, show_spinner=False): # pylint: disable=unused-argument
+@spinner_decorator(message="⚙️c building kernel")
+def make(kern_source, args):
     """Build the kernel."""
     kern_source.make(args)
+    return True
+
+@spinner_decorator(message="🧹 cleaning kernel")
+def clean(kern_source, args):
+    """Clean the kernel repo."""
+    kern_source.clean(args)
     return True
 
 def run(kern_source, args):
     """Run the kernel."""
     kern_source.run(args)
+    return True
+
+def dump(kern_source, args):
+    """Dump the kernel (if the kernel was running with --debug)."""
+    kern_source.dump(args)
     return True
 
 def do_it() -> int:
@@ -777,18 +789,18 @@ def do_it() -> int:
             setattr(args, opt, val)
     try:
         if args.clean:
-            kern_source.clean(build_host=args.build_host)
+            clean(kern_source, args)
         elif args.dump:
-            kern_source.dump(args.dump_file)
+            dump(kern_source, args)
         else:
             if args.build:
                 if args.commit:
-                    kern_source.checkout(args)
+                    checkout(kern_source, args)
                 if not args.skip_config:
-                    config(kern_source, args, show_spinner=not args.quiet)
+                    config(kern_source, args)
                     if args.kconfig:
                         return
-                make(kern_source, args, show_spinner=not args.quiet)
+                make(kern_source, args)
             run(kern_source, args)
     except Exception as exc:
         raise SilentError() from exc
