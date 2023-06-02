@@ -63,7 +63,7 @@ def make_parser():
     parser = argparse.ArgumentParser(
         description='Build and run kernels inside a virtualized snapshot of your live system',
     )
-    parser.add_argument('--version', '-v', action='version', version=f'%(prog)s {VERSION}')
+    parser.add_argument('--version', '-v', action='version', version=f'virtme-ng {VERSION}')
 
     g_action = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
