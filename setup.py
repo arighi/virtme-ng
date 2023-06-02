@@ -24,6 +24,7 @@ setup(
     install_requires=['argcomplete'],
     entry_points = {
         'console_scripts': [
+            'vng = virtme_ng.run:main',
             'virtme-ng = virtme_ng.run:main',
             'virtme-run = virtme.commands.run:main',
             'virtme-configkernel = virtme.commands.configkernel:main',
