@@ -1,3 +1,19 @@
+virtme-ng (1.9-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.9:
+    - allow to run multiple virtme-ng instances in parallel
+    - allow to run graphical applications inside virtme-ng with "-g BINARY"
+    - proper stdin/stdout/stderr redirection between host and guests
+    - provide a full compatibility layer with the legacy virtme-run
+    - improve detection of kernel version
+    - behavior change: kill guest when the main interactive session exists
+    - set guest memory size to 1GB by default (instead of 4G)
+    - speed up virtme-init
+    - drop Xen support
+    - introduce shortcut command 'vng' to call 'virtme-ng'
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Fri, 02 Jun 2023 15:42:08 +0200
+
 virtme-ng (1.8-1) unstable; urgency=medium
 
   * New version virtme-ng 1.8:
