@@ -535,9 +535,15 @@ def do_it() -> int:
     if guest_tools_path is None:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
+    # Use the faster virtme-ng-init if we are running on a native architecture.
+    if is_native and os.path.exists(guest_tools_path + '/bin/virtme-ng-init'):
+        virtme_init_cmd = 'bin/virtme-ng-init'
+    else:
+        virtme_init_cmd = 'virtme-init'
+
     if args.root == '/':
         initcmds = [
-            f'exec {guest_tools_path}/virtme-init'
+            f'exec {guest_tools_path}/{virtme_init_cmd}'
         ]
     else:
         export_virtfs(qemu, arch, qemuargs, guest_tools_path, 'virtme.guesttools')
@@ -545,7 +551,7 @@ def do_it() -> int:
             'mkdir -p /run/virtme/guesttools',
             '/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any ' +
                     'virtme.guesttools /run/virtme/guesttools',
-            'exec /run/virtme/guesttools/virtme-init',
+            f'exec /run/virtme/guesttools/{virtme_init_cmd}',
         ]
 
     # Arrange for modules to end up in the right place
