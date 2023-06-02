@@ -141,7 +141,7 @@ def make_parser() -> argparse.ArgumentParser:
 
 _ARGPARSER = make_parser()
 
-def arg_fail(message, show_usage=True) -> NoReturn:
+def arg_fail(message, show_usage=False) -> NoReturn:
     sys.stderr.write(message + "\n")
     if show_usage:
         _ARGPARSER.print_usage()
@@ -181,10 +181,9 @@ def get_rootfs_from_kernel_path(path):
 
 def get_kernel_version(path):
     if not os.path.exists(path):
-        arg_fail("kernel file %s does not exist, try --build to build the kernel" % path,
-                 show_usage=False)
+        arg_fail("kernel file %s does not exist, try --build to build the kernel" % path)
     if not os.access(path, os.R_OK):
-        arg_fail("unable to access %s (check for read permissions)" % path, show_usage=False)
+        arg_fail("unable to access %s (check for read permissions)" % path)
     result = subprocess.run(['file', path], capture_output=True, text=True)
     for item in result.stdout.split(', '):
         match = re.search(r'^[vV]ersion (\S+)', item)
@@ -296,7 +295,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                     if modmode == 'use':
                         # Inform user to manually refresh virtme's kernel modules
                         # directory
-                        arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto", show_usage=False)
+                        arg_fail("please run virtme-prep-kdir-mods to update virtme's kernel modules directory or use --mods=auto")
                     else:
                         # Auto-refresh virtme's kernel modules directory
                         try:
