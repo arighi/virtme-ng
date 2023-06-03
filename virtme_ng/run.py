@@ -699,12 +699,14 @@ class KernelSource:
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
-        sys.stderr.write(data.decode('utf-8') + "\n")
+        if not args.quiet:
+            sys.stdout.write(data.decode('utf-8'))
         sock.send("{ \"execute\": \"qmp_capabilities\" }\r".encode('utf-8'))
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
-        sys.stderr.write(data.decode('utf-8') + "\n")
+        if not args.quiet:
+            sys.stdout.write(data.decode('utf-8'))
         dump_file = args.dump
         with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
             msg = (
@@ -713,14 +715,17 @@ class KernelSource:
                 "\"protocol\":\"file:" + tmp.name + "\"}}"
                 "\r"
             )
-            sys.stderr.write(msg + "\n")
+            if not args.quiet:
+                sys.stdout.write(msg + "\n")
             sock.send(msg.encode('utf-8'))
             data = sock.recv(1024)
             if not data:
                 sys.exit(1)
-            sys.stderr.write(data.decode('utf-8') + "\n")
+            if not args.quiet:
+                sys.stdout.write(data.decode('utf-8'))
             data = sock.recv(1024)
-            sys.stderr.write(data.decode('utf-8') + "\n")
+            if not args.quiet:
+                sys.stdout.write(data.decode('utf-8'))
             # Save memory dump to target file
             shutil.move(tmp.name, dump_file)
 
@@ -765,6 +770,7 @@ def run(kern_source, args):
     kern_source.run(args)
     return True
 
+@spinner_decorator(message="🐞 generating memory dump")
 def dump(kern_source, args):
     """Dump the kernel (if the kernel was running with --debug)."""
     kern_source.dump(args)
