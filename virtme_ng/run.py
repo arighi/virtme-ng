@@ -85,8 +85,8 @@ def make_parser():
     g_action.add_argument('--clean', '-x', action='store_true',
             help='Clean the kernel repository (local or remote if used with --build-host)')
 
-    g_action.add_argument('--dump', '-d', action='store_true',
-            help='Generate a memory dump of the running kernel and inspect it '
+    g_action.add_argument('--dump', '-d', action='store',
+            help='Generate a memory dump of the running kernel '
                  '(instance needs to be started with --debug)')
 
     parser.add_argument('--skip-config', '-s', action='store_true',
@@ -97,9 +97,6 @@ def make_parser():
 
     parser.add_argument('--kconfig', '-k', action='store_true',
             help='Only generate the kernel .config without building/running anything')
-
-    parser.add_argument('--dump-file', action='store',
-            help='Generate a memory dump of the running kernel to a target file')
 
     parser.add_argument('--skip-modules', '-S', action='store_true',
             help='Run a really fast build by skipping external modules '
@@ -702,13 +699,13 @@ class KernelSource:
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
-        print(data)
+        sys.stderr.write(data.decode('utf-8') + "\n")
         sock.send("{ \"execute\": \"qmp_capabilities\" }\r".encode('utf-8'))
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
-        print(data)
-        dump_file = args.dump_file
+        sys.stderr.write(data.decode('utf-8') + "\n")
+        dump_file = args.dump
         with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
             msg = (
                 "{\"execute\":\"dump-guest-memory\","
@@ -716,20 +713,16 @@ class KernelSource:
                 "\"protocol\":\"file:" + tmp.name + "\"}}"
                 "\r"
             )
-            print(msg)
+            sys.stderr.write(msg + "\n")
             sock.send(msg.encode('utf-8'))
             data = sock.recv(1024)
             if not data:
                 sys.exit(1)
-            print(data)
+            sys.stderr.write(data.decode('utf-8') + "\n")
             data = sock.recv(1024)
-            print(data)
-            if dump_file:
-                # Save memory dump to target file
-                shutil.move(tmp.name, dump_file)
-            else:
-                # Use crash to inspect the memory dump
-                check_call(['crash', tmp.name, './vmlinux'])
+            sys.stderr.write(data.decode('utf-8') + "\n")
+            # Save memory dump to target file
+            shutil.move(tmp.name, dump_file)
 
     def clean(self, args):
         """Clean a local or remote git repository."""
@@ -790,7 +783,7 @@ def do_it() -> int:
     try:
         if args.clean:
             clean(kern_source, args)
-        elif args.dump:
+        elif args.dump is not None:
             dump(kern_source, args)
         else:
             if args.build:

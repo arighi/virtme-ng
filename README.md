@@ -128,15 +128,11 @@ Examples
    $ virtme-ng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
 ```
 
- - Generate and inspect a memory dump of the currently tested kernel (crash
-   tool needs to be installed):
+ - Save a memory dump of the running kernel to /tmp/vmcore.img and inspect it
+   using the crash tool (this tool needs to be installed separately):
 ```
-   $ virtme-ng -d
-```
-
- - Save a memory dump of the running kernel to /tmp/vmcore.img
-```
-   $ virtme-ng -d --dump-file /tmp/vmcore.img
+   $ virtme-ng -d /tmp/vmcore.img
+   $ crash vmlinux /tmp/vmcore.img
 ```
 
  - Test the tip of the latest kernel, building the kernel on a remote build
