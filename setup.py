@@ -2,8 +2,29 @@
 
 import os
 import sys
+import subprocess
 from setuptools import setup
+from setuptools.command.build_py import build_py
+from setuptools.command.egg_info import egg_info
 from virtme_ng.utils import VERSION, CONF_PATH
+
+class BuildPy(build_py):
+    def run(self):
+        subprocess.check_call(
+            ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
+            cwd="virtme_ng_init",
+        )
+        subprocess.check_call(
+            ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
+            cwd="virtme_ng_init",
+        )
+        build_py.run(self)
+
+class EggInfo(egg_info):
+    def run(self):
+        if not os.path.exists("virtme/guest/bin/virtme-ng-init"):
+            self.run_command("build")
+        egg_info.run(self)
 
 if sys.version_info < (3,8):
     print('virtme-ng requires Python 3.8 or higher')
@@ -20,7 +41,7 @@ setup(
     long_description=open(os.path.join(os.path.dirname(__file__),
                                        'README.md'), 'r').read(),
     long_description_content_type="text/markdown",
-    packages=['virtme_ng', 'virtme', 'virtme.commands', 'virtme.guest'],
+    packages=['virtme_ng', 'virtme', 'virtme.commands', 'virtme.guest', 'virtme.guest.bin'],
     install_requires=['argcomplete'],
     entry_points = {
         'console_scripts': [
@@ -31,6 +52,10 @@ setup(
             'virtme-mkinitramfs = virtme.commands.mkinitramfs:main',
         ]
     },
+    cmdclass={
+        'build_py': BuildPy,
+        'egg_info': EggInfo,
+    },
     data_files = [
         ('/etc', ['cfg/virtme-ng.conf'])
     ],
@@ -39,6 +64,7 @@ setup(
         ],
     package_data = {
         'virtme.guest': [
+            'bin/virtme-ng-init',
             'virtme-init',
             'virtme-udhcpc-script',
         ],

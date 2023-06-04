@@ -3,7 +3,7 @@ Section: misc
 Priority: optional
 Maintainer: Andrea Righi <andrea.righi@canonical.com>
 Standards-Version: 4.5.1
-Build-Depends: debhelper (>= 11), dh-python, python3, python3-six, python3-setuptools, python3-argcomplete
+Build-Depends: debhelper (>= 11), dh-python, python3, python3-six, python3-setuptools, python3-argcomplete, cargo, rustc
 Homepage: https://github.com/arighi/virtme-ng
 Vcs-Git:  https://github.com/arighi/virtme-ng
 
