@@ -34,15 +34,22 @@ Quick start
  5.19.0-23-generic
  $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
  $ cd linux
- $ virtme-ng --commit v6.1-rc6
- ...
+ $ vng --build --quiet --commit v6.2-rc4
+           _      _
+    __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
+    \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |
+     \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |
+      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
+                                                 |___/
+    kernel version: 6.2.0-rc4-virtme x86_64
+
  $ uname -r
- 6.1.0-rc6-virtme-ng
+ 6.2.0-rc4-virtme
  ^
  |___ Now you have a shell inside a virtualized copy of your entire system,
-      that is running the new kernel
+      that is running the new kernel! \o/
 
- ("ctrl+a, x" to return back to your real system)
+ Then simply type "exit" to return back to the real system.
 ```
 
 Installation
@@ -77,46 +84,33 @@ Requirements
  * Depending on the options you use, you may need a statically linked `busybox`
    binary somewhere in your path.
 
- * You may need to install `crash` to use the memory dump inspection feature
-   (see example below).
-
 Examples
 ========
 
- - Build and run a kernel from a local git repository:
+ - Build and run tag v6.1-rc3 from a local kernel git repository:
 ```
-   $ virtme-ng
-```
-
- - Build and run tag v6.1-rc3 a local kernel git repository:
-```
-   $ virtme-ng -c v6.1-rc3
+   $ vng -b -c v6.1-rc3
 ```
 
  - Build and run a kernel 2 commits before the previously compiled kernel:
 ```
-   $ virtme-ng --commit HEAD~2
+   $ vng -b -c HEAD~2
 ```
 
- - Test the previously built kernel:
+ - Run a kernel previously compiled from a local git repository:
 ```
-   $ virtme-ng -s
-```
-
- - Only generate .config in the current kernel build directory:
-```
-   $ virtme-ng --kconfig
+   $ vng -r ./arch/x86/boot/bzImage
 ```
 
  - Test the currently running kernel in a safe snapshot of the system:
 ```
-   $ virtme-ng -r
+   $ vng -r
 ```
 
  - Test installed kernel 6.2.0-21-generic kernel in a safe snapshot of the
    system (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
 ```
-   $ virtme-ng -r 6.2.0-21-generic
+   $ vng -r 6.2.0-21-generic
 ```
 
  - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
@@ -125,53 +119,49 @@ Examples
    $ cd test
    $ apt download linux-image-6.2.0-1003-lowlatency linux-modules-6.2.0-1003-lowlatency
    $ for d in *.deb; do dpkg -x $d .; done
-   $ virtme-ng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
+   $ vng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
 ```
 
- - Save a memory dump of the running kernel to /tmp/vmcore.img and inspect it
-   using the crash tool (this tool needs to be installed separately):
+ - Only generate .config in the current kernel build directory:
 ```
-   $ virtme-ng -d /tmp/vmcore.img
-   $ crash vmlinux /tmp/vmcore.img
+   $ vng --kconfig
 ```
 
  - Test the tip of the latest kernel, building the kernel on a remote build
    host called "builder", running make inside a specific build chroot
    (managed remotely by schroot):
 ```
-   $ virtme-ng --build-host builder \
+   $ vng --build --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
 ```
 
- - Run the previously compiled kernel and enable bridge networking (NOTE: you
-   may get permission denied in some Ubuntu releases, I solved by doing a
-   `sudo chmod u+s /usr/lib/qemu/qemu-bridge-helper`:
+ - Run the previously compiled kernel and enable networking:
 ```
-   $ virtme-ng -s --network bridge
+   $ vng -r . --network user
 ```
 
  - Run the previously compiled kernel adding an additional virtio-scsi device:
 ```
    $ qemu-img create -f qcow2 /tmp/disk.img 8G
-   $ virtme-ng -s --disk /tmp/disk.img
+   $ vng --disk /tmp/disk.img
 ```
 
- - Recompile the kernel enabling Rust support (using specific versions of the
-   Rust toolchain binaries):
+ - Recompile the kernel passing some env variables to enable Rust support
+   (using specific versions of the Rust toolchain binaries):
 ```
-   $ virtme-ng RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
+   $ vng --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
 ```
 
  - Build and test the arm64 kernel (using a separate chroot in
    /opt/chroot/arm64 as the main filesystem):
 ```
-   $ virtme-ng --arch arm64 --root /opt/chroot/arm64/
+   $ vng --build --arch arm64 --root /opt/chroot/arm64/
 ```
 
- - Build upstream kernel 6.1-rc6, execute `uname -r` inside it and send the
-   output to cowsay on the host:
+ - Execute `uname -r` inside a kernel recompiled in the current directory and
+   send the output to cowsay on the host:
 ```
-   $ virtme-ng -c v6.1-rc6 --exec 'uname -r' 2>/dev/null | cowsay
+   $ vng --exec 'uname -r' | cowsay
     __________________
    < 6.1.0-rc6-virtme >
     ------------------
@@ -182,43 +172,69 @@ Examples
                    ||     ||
 ```
 
- - Run `uname -r` on the host, build upstream kernel v6.1-rc6, pass uname
-   output to this kernel, run `uname -r` inside it, send the whole output to
-   cowsay back on the host:
+ - Run a bunch of parallel virtme-ng instances in a pipeline, with different
+   kernels installed in the system, passing each other their stdout/stdin and
+   return all the generated output back to the host (also measure the total
+   elapsed time):
 ```
-   $ uname -r | virtme-ng -c v6.1-rc6 --exec 'cat -; uname -r' 2>/dev/null | cowsay -n
+   $ time true | \
+   > vng -r 5.19.0-38-generic -e "cat && uname -r" | \
+   > vng -r 6.2.0-19-generic  -e "cat && uname -r" | \
+   > vng -r 6.2.0-20-generic  -e "cat && uname -r" | \
+   > vng -r 6.3.0-2-generic   -e "cat && uname -r" | \
+   > cowsay -n
     ___________________
-   / 5.19.0-23-generic \
-   \ 6.1.0-rc6-virtme  /
+   / 5.19.0-38-generic \
+   | 6.2.0-19-generic  |
+   | 6.2.0-20-generic  |
+   \ 6.3.0-2-generic   /
     -------------------
            \   ^__^
             \  (oo)\_______
                (__)\       )\/\
                    ||----w |
                    ||     ||
+
+   real    0m2.737s
+   user    0m8.425s
+   sys     0m8.806s
+```
+
+ - Run `glxgears` inside a kernel recompiled in the current directory:
+```
+   $ vng -g glxgears
+
+   (virtme-ng is started in graphical mode)
+```
+
+ - Execute an `awesome` window manager session with kernel
+   6.2.0-1003-lowlatency (installed in the system):
+```
+   $ vng -r 6.2.0-1003-lowlatency -g awesome
+
+   (virtme-ng is started in graphical mode)
 ```
 
 Implementation details
 ======================
 
 virtme-ng allows to automatically configure, build and run kernels using the
-main command-line interface called virtme-ng.
+main command-line interface called `vng`.
 
-Initially a minimal custom .config is generated using (a custom version of)
-virtme-configkernel.
+A minimal custom `.config` is automatically generated if not already present.
 
 It is possible to specify a set of custom configs (.config chunk) in
-~/.config/virtme-ng/kernel.config, these user-specific settings will override
-the default settings of virtme-configkernel (except for the mandatory configs
-that are required to boot and test the kernel inside qemu, using virtme-run).
+`~/.config/virtme-ng/kernel.config`, these user-specific settings will override
+the default settings (except for the mandatory configs that are required to
+boot and test the kernel inside qemu, using `virtme-run`).
 
 Then the kernel is compiled either locally or on an external build host (if the
 `--build-host` option is used); once the build is done only the required files
 needed to test the kernel are copied from the remote host if an external build
 host is used.
 
-When a remote build host is used (--build-host) the target branch is force
-pushed to the remote host inside the ~/.virtme folder.
+When a remote build host is used (`--build-host`) the target branch is force
+pushed to the remote host inside the `~/.virtme folder`.
 
 Then the kernel is executed using the virtme module. This allows to test the
 kernel using a safe copy-on-write snapshot of the entire host filesystem.
@@ -226,9 +242,6 @@ kernel using a safe copy-on-write snapshot of the entire host filesystem.
 All the kernels compiled with virtme-ng have a `-virtme` suffix to their kernel
 version, this allows to easily determine if you're inside a virtme-ng kernel or
 if you're using the real host kernel (simply by checking `uname -r`).
-
-It is also possible to generate and inspect a memory dump of the tested kernel
-running `virtme-ng -d` from the host, while the test kernel is running.
 
 External kernel modules
 =======================
@@ -241,21 +254,24 @@ Default options
 ===============
 
 Typically, if you always use virtme-ng with an external build server (e.g.,
-`virtme-ng --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you don't
-always want to specify these options, so instead, you can simply define them in
-~/.virtme-ng.conf under `default_opts` and then simply run `virtme-ng`.
+`vng --build --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you
+don't always want to specify these options, so instead, you can simply define
+them in `~/.config/virtme-ng/virtme-ng.conf` under `default_opts` and then
+simply run `vng --build`.
 
 Example (always use an external build server called 'kathleen' and run make
-inside a build chroot called 'chroot:lunar-amd64'). To do so, modify the
-`default_opts` sections in ~/.config/virtme-ng/virtme-ng.conf as following:
-
+inside a build chroot called `chroot:lunar-amd64`). To do so, modify the
+`default_opts` sections in `~/.config/virtme-ng/virtme-ng.conf` as following:
+```
     "default_opts" : {
         "build_host": "kathleen",
         "build_host_exec_prefix": "schroot -c chroot:lunar-amd64 --"
     },
+```
 
-Now you can simply run `virtme-ng` to build your kernel using the external build host,
-prepending the exec prefix command when running make.
+Now you can simply run `vng --build` to build your kernel from the current
+working directory using the external build host, prepending the exec prefix
+command when running make.
 
 Troubleshooting
 ===============
@@ -283,7 +299,7 @@ Troubleshooting
 
  - If the guest fails to start because the host doesn't have enough memory
    available you can specify a different amount of memory using `--memory MB`,
-   (this option is passed directly to qemu via -m, default is 4G).
+   (this option is passed directly to qemu via `-m`, default is 1G).
 
  - If you're testing a kernel for an architecture different than the host, keep
    in mind that you need to use also `--root DIR` to use a specific chroot with
@@ -292,13 +308,13 @@ Troubleshooting
    If the chroot doesn't exist in your system virtme-ng will automatically
    create it using the latest daily build Ubuntu cloud image:
 ```
-  $ virtme-ng --arch riscv64 --root ./tmproot
+  $ vng --build --arch riscv64 --root ./tmproot
 ```
 
  - If the build on a remote build host is failing unexpectedly you may want to
    try cleaning up the remote git repository, running:
 ```
-  $ virtme-ng --clean --build-host HOSTNAME
+  $ vng --clean --build-host HOSTNAME
 ```
 
 Contributing
