@@ -28,7 +28,10 @@ def spinner_decorator(message):
         return wrapper
     return decorator
 
-def check_call_cmd(command, quiet=False):
+def check_call_cmd(command, quiet=False, dry_run=False):
+    if dry_run:
+        print(" ".join(command))
+        return
     process = Popen(
         command,
         stdout=PIPE,
@@ -88,6 +91,9 @@ def make_parser():
     g_action.add_argument('--dump', '-d', action='store',
             help='Generate a memory dump of the running kernel '
                  '(instance needs to be started with --debug)')
+
+    parser.add_argument('--dry-run', action='store_true',
+            help='Only show the commands without actually running them.')
 
     parser.add_argument('--skip-config', '-s', action='store_true',
             help='Do not re-generate kernel .config')
@@ -342,7 +348,8 @@ class KernelSource:
             if not args.force and self._is_dirty_repo():
                 arg_fail("error: you have uncommitted changes in your git repository, " + \
                          "use --force to drop them", show_usage=False)
-            check_call_cmd(['git', 'reset', '--hard', target], quiet=args.quiet)
+            check_call_cmd(['git', 'reset', '--hard', target],
+                            quiet=args.quiet, dry_run=args.dry_run)
 
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
@@ -362,24 +369,28 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in args.envs:
             cmd += f' {var} '
-        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet)
+        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet, dry_run=args.dry_run)
 
     def _make_remote(self, args, make_command):
-        check_call_cmd(['ssh', args.build_host, 'mkdir -p ~/.virtme'], quiet=args.quiet)
-        check_call_cmd(['ssh', args.build_host, 'git init ~/.virtme'], quiet=args.quiet)
-        check_call_cmd(['git', 'push', '--force', '--porcelain', f"{args.build_host}:~/.virtme",
-                    'HEAD:__virtme__', ], quiet=args.quiet)
+        check_call_cmd(['ssh', args.build_host, 'mkdir -p ~/.virtme'],
+                       quiet=args.quiet, dry_run=args.dry_run)
+        check_call_cmd(['ssh', args.build_host, 'git init ~/.virtme'],
+                       quiet=args.quiet, dry_run=args.dry_run)
+        check_call_cmd(['git', 'push', '--force', '--porcelain',
+                        f"{args.build_host}:~/.virtme",
+                        'HEAD:__virtme__', ], quiet=args.quiet, dry_run=args.dry_run)
         cmd = f'rsync .config {args.build_host}:.virtme/.config'
-        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet)
+        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet, dry_run=args.dry_run)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(args.build_host_exec_prefix or '', \
                                                  make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {args.build_host}:.virtme/.kc-build'
-            check_call_cmd(self._format_cmd(cmd), quiet=args.quiet)
+            check_call_cmd(self._format_cmd(cmd), quiet=args.quiet, dry_run=args.dry_run)
         # Execute remote build script
-        check_call_cmd(['ssh', args.build_host, 'bash', '.virtme/.kc-build'], quiet=args.quiet)
+        check_call_cmd(['ssh', args.build_host, 'bash', '.virtme/.kc-build'],
+                       quiet=args.quiet, dry_run=args.dry_run)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if args.build_host_vmlinux or args.arch == 'ppc64el':
@@ -400,13 +411,13 @@ class KernelSource:
                       f'{args.build_host}:.virtme/ ./'
             tmp.write(cmd)
             tmp.flush()
-            check_call_cmd(['bash', tmp.name], quiet=args.quiet)
+            check_call_cmd(['bash', tmp.name], quiet=args.quiet, dry_run=args.dry_run)
         if not args.skip_modules:
             if os.path.exists('./debian/rules'):
                 check_call_cmd(['fakeroot', 'debian/rules', 'clean'], quiet=args.quiet)
             check_call_cmd(self._format_cmd(make_command +
                            f' -j {self.cpus}' + ' modules_prepare'),
-                           quiet=args.quiet)
+                           quiet=args.quiet, dry_run=args.dry_run)
 
     def make(self, args):
         """Perform a make operation on a kernel source directory."""
@@ -439,7 +450,8 @@ class KernelSource:
             make_command += f' {var} '
         if args.build_host is None:
             # Build the kernel locally
-            check_call_cmd(self._format_cmd(make_command + ' -j' + self.cpus), quiet=args.quiet)
+            check_call_cmd(self._format_cmd(make_command + ' -j' + self.cpus),
+                           quiet=args.quiet, dry_run=args.dry_run)
         else:
             # Build the kernel on a remote build host
             self._make_remote(args, make_command)
@@ -522,6 +534,12 @@ class KernelSource:
             self.virtme_param['mods'] = '--mods none'
         else:
             self.virtme_param['mods'] = '--mods auto'
+
+    def _get_virtme_dry_run(self, args):
+        if args.dry_run:
+            self.virtme_param['dry_run'] = '--show-command --dry-run'
+        else:
+            self.virtme_param['dry_run'] = ''
 
     def _get_virtme_exec(self, args):
         if args.exec is not None:
@@ -639,6 +657,7 @@ class KernelSource:
         self._get_virtme_overlay_rwdir(args)
         self._get_virtme_cwd(args)
         self._get_virtme_run(args)
+        self._get_virtme_dry_run(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
         self._get_virtme_show_boot_console(args)
@@ -669,6 +688,7 @@ class KernelSource:
             f'{self.virtme_param["overlay_rwdir"]} ' +
             f'{self.virtme_param["cwd"]} ' +
             f'{self.virtme_param["kdir"]} ' +
+            f'{self.virtme_param["dry_run"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
             f'{self.virtme_param["show_boot_console"]} ' +
@@ -739,7 +759,7 @@ class KernelSource:
             cmd = f'ssh {args.build_host} --'
             cmd = self._format_cmd(cmd)
             cmd.append('cd ~/.virtme && git clean -xdf')
-        check_call(cmd)
+        check_call_cmd(cmd, quiet=args.quiet, dry_run=args.dry_run)
 
 @spinner_decorator(message="📦 checking out kernel")
 def checkout(kern_source, args):
