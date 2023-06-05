@@ -54,8 +54,11 @@ fi
 [ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private &
 [ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache &
 
-# Additional rw dirs required by apt
+# Additional rw dirs required by apt (if present)
 [ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt &
+
+# Additional rw dirs required by snapd (if present)
+[ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie &
 
 # Fix up /etc a little bit
 touch /tmp/fstab
@@ -160,6 +163,7 @@ fi
 mount -t configfs configfs /sys/kernel/config &>/dev/null
 mount -t debugfs debugfs /sys/kernel/debug &>/dev/null
 mount -t tracefs tracefs /sys/kernel/tracing &>/dev/null
+mount -t securityfs securityfs /sys/kernel/security &>/dev/null
 
 # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
 mount -t cgroup2 cgroup2 /sys/fs/cgroup
@@ -200,6 +204,23 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     # udev is liable to rename the interface out from under us.
     virtme_net=`ls "$(ls -d /sys/bus/virtio/drivers/virtio_net/virtio* |sort -g |head -n1)"/net`
     busybox udhcpc -i "$virtme_net" -n -q -f -s "$(dirname $0)/virtme-udhcpc-script"
+fi
+
+# If snapd is present in the system try to start it, to properly support snaps.
+snapd_bin="/usr/lib/snapd/snapd";
+if [ -e "$snapd_bin" ]; then
+    snapd_state="/var/lib/snapd/state.json"
+    if [ -e "$snapd_state" ]; then
+	permissions=$((0$(stat -c "%a" "$snapd_state") & 0x4))
+        if [ $permissions -ne 0 ]; then
+            $(dirname $0)/virtme-snapd-script
+            $snapd_bin >/dev/null 2>&1 </dev/null &
+            snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
+            if [ -e $snapd_apparmor_bin ]; then
+                $snapd_apparmor_bin start
+            fi
+        fi
+    fi
 fi
 
 if [[ -x /run/virtme/data/script ]]; then

@@ -496,6 +496,16 @@ def do_it() -> int:
     # Check if we need to run in quiet or verbose mode.
     verbose = not (args.quiet or args.script_sh or args.script_exec)
 
+    # In verbose mode, check and warn if snapd requires permission adjustments.
+    if verbose:
+        snapd_state = '/var/lib/snapd/state.json'
+        if os.path.exists(snapd_state):
+            file_status = os.stat(snapd_state)
+            if file_status.st_mode & 0o004 == 0:
+                sys.stderr.write(f"\nWARNING: {snapd_state} is not readable, snap support is disabled.\n")
+                sys.stderr.write(f"Run `sudo chmod +r {snapd_state}` on the **host** to enable snaps.\n")
+                sys.stderr.write(f"This may have security implications on the host!\n\n")
+
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
     config = mkinitramfs.Config()

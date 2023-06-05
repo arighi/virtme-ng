@@ -67,6 +67,7 @@ setup(
             'bin/virtme-ng-init',
             'virtme-init',
             'virtme-udhcpc-script',
+            'virtme-snapd-script',
         ],
     },
     include_package_data=True,
