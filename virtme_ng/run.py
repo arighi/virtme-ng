@@ -98,6 +98,9 @@ def make_parser():
     parser.add_argument('--skip-config', '-s', action='store_true',
             help='Do not re-generate kernel .config')
 
+    parser.add_argument('--no-virtme-ng-init', action='store_true',
+            help='Fallback to the bash virtme-init (useful for debugging/development)')
+
     parser.add_argument('--debug', action='store_true',
             help='Start the instance with debugging enabled (allow to generate crash dumps)')
 
@@ -541,6 +544,12 @@ class KernelSource:
         else:
             self.virtme_param['dry_run'] = ''
 
+    def _get_virtme_no_virtme_ng_init(self, args):
+        if args.no_virtme_ng_init:
+            self.virtme_param['no_virtme_ng_init'] = '--no-virtme-ng-init'
+        else:
+            self.virtme_param['no_virtme_ng_init'] = ''
+
     def _get_virtme_exec(self, args):
         if args.exec is not None:
             self.virtme_param['exec'] = f'--script-sh "{args.exec}"'
@@ -658,6 +667,7 @@ class KernelSource:
         self._get_virtme_cwd(args)
         self._get_virtme_run(args)
         self._get_virtme_dry_run(args)
+        self._get_virtme_no_virtme_ng_init(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
         self._get_virtme_show_boot_console(args)
@@ -689,6 +699,7 @@ class KernelSource:
             f'{self.virtme_param["cwd"]} ' +
             f'{self.virtme_param["kdir"]} ' +
             f'{self.virtme_param["dry_run"]} ' +
+            f'{self.virtme_param["no_virtme_ng_init"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
             f'{self.virtme_param["show_boot_console"]} ' +

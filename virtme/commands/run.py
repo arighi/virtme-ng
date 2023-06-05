@@ -121,6 +121,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Save the generated initramfs to the specified path')
     g.add_argument('--show-boot-console', action='store_true',
                    help='Show the boot console when running scripts')
+    g.add_argument('--no-virtme-ng-init', action='store_true',
+                   help='Fallback to the bash virtme-init (useful for debugging/development)')
 
     g = parser.add_argument_group(title='Guest userspace configuration').add_mutually_exclusive_group()
     g.add_argument('--pwd', action='store_true',
@@ -536,7 +538,9 @@ def do_it() -> int:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
     # Use the faster virtme-ng-init if we are running on a native architecture.
-    if is_native and os.path.exists(guest_tools_path + '/bin/virtme-ng-init'):
+    if is_native and \
+       not args.no_virtme_ng_init and \
+       os.path.exists(guest_tools_path + '/bin/virtme-ng-init'):
         virtme_init_cmd = 'bin/virtme-ng-init'
     else:
         virtme_init_cmd = 'virtme-init'
