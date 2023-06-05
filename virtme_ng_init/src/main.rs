@@ -699,7 +699,7 @@ fn run_user_gui(tty_fd: libc::c_int, app: &str) {
         utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
 
         // Start xinit directly.
-        args.push(format!("su - {} -c 'xinit /tmp/.xinitrc'", user));
+        args.push(format!("su {} -c 'xinit /tmp/.xinitrc'", user));
     } else {
         args.push("xinit /tmp/.xinitrc".to_owned());
     }
@@ -710,7 +710,7 @@ fn run_user_shell(tty_fd: libc::c_int) {
     let mut args: Vec<String> = vec!["-l".to_owned()];
     if let Ok(user) = env::var("virtme_user") {
         args.push("-c".to_owned());
-        args.push(format!("su - {}", user));
+        args.push(format!("su {}", user));
     }
     run_shell(tty_fd, args);
 }
