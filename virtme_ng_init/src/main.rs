@@ -27,6 +27,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
 use std::thread;
+use std::time::Duration;
 mod utils;
 
 struct MountInfo {
@@ -496,7 +497,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
 
 fn get_guest_tools_dir() -> Option<String> {
     if let Ok(current_exe) = env::current_exe() {
-        if let Some(parent_dir) = current_exe.parent() {
+        if let Some(parent_dir) = current_exe.parent()?.parent() {
             if let Some(dir) = parent_dir.to_str() {
                 return Some(dir.to_string());
             }
@@ -505,32 +506,39 @@ fn get_guest_tools_dir() -> Option<String> {
     None
 }
 
-fn get_network_device() -> Option<String> {
-    let virtio_net_dir = "/sys/bus/virtio/drivers/virtio_net";
-    if let Ok(entries) = std::fs::read_dir(virtio_net_dir) {
-        // Sort and get the first entry in this directory
-        let mut sorted_entries: Vec<_> = entries
-            .filter_map(|entry| entry.ok())
-            .map(|entry| entry.path())
-            .filter(|path| path.is_dir())
-            .collect();
-        sorted_entries.sort();
-
-        if let Some(first_entry) = sorted_entries.first() {
-            let net_dir = first_entry.join("net");
-            if let Ok(net_entries) = std::fs::read_dir(net_dir) {
-                if let Some(first_net_entry) = net_entries
-                    .filter_map(|entry| entry.ok())
-                    .map(|entry| entry.file_name())
-                    .filter_map(|name| name.to_str().map(|s| s.to_owned()))
-                    .next()
-                {
-                    return Some(first_net_entry);
+fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String> {
+    for entry in entries {
+        if let Ok(entry) = entry {
+            let path = entry.path();
+            if !path.is_dir() {
+                continue;
+            }
+            if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
+                for entry in net_entries {
+                    if let Ok(entry) = entry {
+                        let path = entry.path().file_name()?.to_string_lossy().to_string();
+                        return Some(path);
+                    }
                 }
             }
         }
     }
-    None
+    return None;
+}
+
+fn get_network_device() -> Option<String> {
+    let virtio_net_dir = "/sys/bus/virtio/drivers/virtio_net";
+    loop {
+        match std::fs::read_dir(virtio_net_dir) {
+            Ok(entries) => {
+                return _get_network_device_from_entries(entries);
+            }
+            Err(_) => {
+                // Wait a bit to make sure virtio-net is properly registered in the system.
+                thread::sleep(Duration::from_secs_f32(0.25));
+            }
+        }
+    }
 }
 
 fn setup_network() -> Option<thread::JoinHandle<()>> {
@@ -538,12 +546,13 @@ fn setup_network() -> Option<thread::JoinHandle<()>> {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if cmdline.contains("virtme.dhcp") {
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                if let Some(network_device) = get_network_device() {
+                if let Some(network_dev) = get_network_device() {
+                    utils::log(&format!("setting up network device {}", network_dev));
                     let handle = thread::spawn(move || {
                         let args = [
                             "udhcpc",
                             "-i",
-                            &network_device,
+                            &network_dev,
                             "-n",
                             "-q",
                             "-f",
