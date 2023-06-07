@@ -684,7 +684,6 @@ class KernelSource:
         self._get_virtme_busybox(args)
         self._get_virtme_qemu(args)
         self._get_virtme_qemu_opts(args)
-        self._get_virtme_qemu_opts(args)
 
         # Start VM using virtme-run
         cmd = ('virtme-run ' +
