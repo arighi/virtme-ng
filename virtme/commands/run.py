@@ -774,7 +774,10 @@ def do_it() -> int:
             qemuargs.extend(['-netdev', 'bridge,id=n0,br=virbr0'])
         else:
             assert False
-        kernelargs.extend(['virtme.dhcp'])
+        kernelargs.extend(['virtme.dhcp',
+                           # Prevent annoying interface renaming
+                           'net.ifnames=0',
+                           'biosdevname=0'])
 
     if args.pwd:
         rel_pwd = os.path.relpath(os.getcwd(), args.root)
