@@ -70,6 +70,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Enable basic network access.')
     g.add_argument('--balloon', action='store_true',
                    help='Allow the host to ask the guest to release memory.')
+    g.add_argument('--enable-snaps', action='store_true',
+                   help='Allow to execute snaps inside virtme-ng')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
                    help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
     g.add_argument('--blk-disk', action='append', default=[], metavar='NAME=PATH',
@@ -496,16 +498,7 @@ def do_it() -> int:
     # Check if we need to run in quiet or verbose mode.
     verbose = not (args.quiet or args.script_sh or args.script_exec)
 
-    # In verbose mode, check and warn if snapd requires permission adjustments.
-    if verbose:
-        snapd_state = '/var/lib/snapd/state.json'
-        if os.path.exists(snapd_state):
-            file_status = os.stat(snapd_state)
-            if file_status.st_mode & 0o004 == 0:
-                sys.stderr.write(f"\nWARNING: {snapd_state} is not readable, snap support is disabled.\n")
-                sys.stderr.write(f"Run `sudo chmod +r {snapd_state}` on the **host** to enable snaps.\n")
-                sys.stderr.write(f"This may have security implications on the host!\n\n")
-
+    # Check if initramfs is required.
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
     config = mkinitramfs.Config()
@@ -531,6 +524,26 @@ def do_it() -> int:
         if not has_memory_suffix(args.memory):
             args.memory += 'M'
         qemuargs.extend(['-m', args.memory])
+
+    # In verbose mode, check and warn if snapd requires permission adjustments.
+    if args.enable_snaps:
+        if args.root == '/':
+            snapd_state = '/var/lib/snapd/state.json'
+            if os.path.exists(snapd_state):
+                file_status = os.stat(snapd_state)
+                if file_status.st_mode & 0o004 == 0:
+                    if verbose:
+                        sys.stderr.write(f"\nWARNING: {snapd_state} is not readable, snap support is disabled.\n")
+                        sys.stderr.write(f"Run `sudo chmod +r {snapd_state}` on the **host** to enable snaps.\n")
+                        sys.stderr.write(f"This may have security implications on the host!\n\n")
+                else:
+                    if verbose:
+                        sys.stderr.write(f"virtme: enable snap support\n")
+                    kernelargs.append('virtme.snapd')
+            else:
+                sys.stderr.write(f"\nWARNING: {snapd_state} does not exist, snap support is disabled.\n\n")
+        else:
+            sys.stderr.write(f"\nWARNING: snaps can be enabled only when exporting the entire rootfs to the guest.\n\n")
 
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
     # is forced.

@@ -767,37 +767,40 @@ fn setup_user_session() {
 }
 
 fn run_snapd() {
-    // If snapd is present in the system try to start it, to properly support snaps.
-    let snapd_bin = "/usr/lib/snapd/snapd";
-    if !Path::new(snapd_bin).exists() {
-        return;
-    }
-    let snapd_state = "/var/lib/snapd/state.json";
-    if !Path::new(snapd_state).exists() {
-        return;
-    }
-    if !utils::check_file_permissions(snapd_state, 0o004) {
-        return;
-    }
-    if let Some(guest_tools_dir) = get_guest_tools_dir() {
-        utils::run_cmd(&format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
-    }
-    Command::new(snapd_bin)
-        .stdin(Stdio::null())
-        .stdout(Stdio::null())
-        .stderr(Stdio::null())
-        .spawn()
-        .ok();
-    let snapd_apparmor_bin = "/usr/lib/snapd/snapd-apparmor";
-    if Path::new(snapd_apparmor_bin).exists() {
-        Command::new(snapd_apparmor_bin)
-            .arg("start")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .output()
-            .ok();
-
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
+        if cmdline.contains("virtme.snapd") {
+            // If snapd is present in the system try to start it, to properly support snaps.
+            let snapd_bin = "/usr/lib/snapd/snapd";
+            if !Path::new(snapd_bin).exists() {
+                return;
+            }
+            let snapd_state = "/var/lib/snapd/state.json";
+            if !Path::new(snapd_state).exists() {
+                return;
+            }
+            if !utils::check_file_permissions(snapd_state, 0o004) {
+                return;
+            }
+            if let Some(guest_tools_dir) = get_guest_tools_dir() {
+                utils::run_cmd(&format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
+            }
+            Command::new(snapd_bin)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .ok();
+            let snapd_apparmor_bin = "/usr/lib/snapd/snapd-apparmor";
+            if Path::new(snapd_apparmor_bin).exists() {
+                Command::new(snapd_apparmor_bin)
+                    .arg("start")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .output()
+                    .ok();
+            }
+        }
     }
 }
 

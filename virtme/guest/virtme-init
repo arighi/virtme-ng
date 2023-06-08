@@ -206,18 +206,20 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     busybox udhcpc -i "$virtme_net" -n -q -f -s "$(dirname $0)/virtme-udhcpc-script"
 fi
 
-# If snapd is present in the system try to start it, to properly support snaps.
-snapd_bin="/usr/lib/snapd/snapd";
-if [ -e "$snapd_bin" ]; then
-    snapd_state="/var/lib/snapd/state.json"
-    if [ -e "$snapd_state" ]; then
-	permissions=$((0$(stat -c "%a" "$snapd_state") & 0x4))
-        if [ $permissions -ne 0 ]; then
-            $(dirname $0)/virtme-snapd-script
-            $snapd_bin >/dev/null 2>&1 </dev/null &
-            snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
-            if [ -e $snapd_apparmor_bin ]; then
-                $snapd_apparmor_bin start
+if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
+    # If snapd is present in the system try to start it, to properly support snaps.
+    snapd_bin="/usr/lib/snapd/snapd";
+    if [ -e "$snapd_bin" ]; then
+        snapd_state="/var/lib/snapd/state.json"
+        if [ -e "$snapd_state" ]; then
+            permissions=$((0$(stat -c "%a" "$snapd_state") & 0x4))
+            if [ $permissions -ne 0 ]; then
+                $(dirname $0)/virtme-snapd-script
+                $snapd_bin >/dev/null 2>&1 </dev/null &
+                snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
+                if [ -e $snapd_apparmor_bin ]; then
+                    $snapd_apparmor_bin start >/dev/null 2>&1 </dev/null
+                fi
             fi
         fi
     fi
