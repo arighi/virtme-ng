@@ -1,0 +1,29 @@
+#!/bin/bash
+
+if [ -n "$(which pipewire)" ]; then
+    # Start audio system services.
+    pipewire &
+    wireplumber &
+    pipewire-pulse &
+
+    # Wait for pulseaudio backend to be up and running.
+    for i in $(seq 1 5); do
+        pactl info && break
+        sleep 1
+    done
+
+    # Configure pulseaudio backend.
+    pactl load-module module-combine-sink sink_name=combine
+    pactl load-module module-null-sink sink_name=Virtme
+    pactl load-module module-loopback sink=Virtme
+    pactl load-module module-loopback sink=Virtme
+elif [ -n "$(which pulseaudio)" ]; then
+    echo "WARNING: pulseaudio subsystem not supported yet"
+    exit 1
+elif [ -n "$(which jackd)" ]; then
+    echo "WARNING: jack subsystem not supported yet"
+    exit 1
+else
+    echo "WARNING: could not find a compatible sound subsystem"
+    exit 1
+fi

@@ -319,9 +319,16 @@ if [[ -n "${virtme_graphics}" ]]; then
     export XDG_RUNTIME_DIR=/run/user/$(id -u ${virtme_user})
     mkdir -p $XDG_RUNTIME_DIR
 
+    # Check if we need to enable the sound system.
+    if cat /proc/cmdline |grep -q -E '(^| )virtme.sound($| )'; then
+        pre_exec_cmd="$(dirname $0)/virtme-sound-script"
+    else
+        pre_exec_cmd=""
+    fi
+
     # Create a .xinitrc to start the requested graphical application.
     xinit_rc=/tmp/.xinitrc
-    echo "exec ${virtme_graphics}" > ${xinit_rc}
+    echo -e "${pre_exec_cmd}\nexec ${virtme_graphics}" > ${xinit_rc}
     if [[ -n "${virtme_user}" ]]; then
         chown ${virtme_user}:${virtme_user} $XDG_RUNTIME_DIR
         chown ${virtme_user}:${virtme_user} ${xinit_rc}

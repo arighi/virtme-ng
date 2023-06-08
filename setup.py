@@ -68,6 +68,7 @@ setup(
             'virtme-init',
             'virtme-udhcpc-script',
             'virtme-snapd-script',
+            'virtme-sound-script',
         ],
     },
     include_package_data=True,
