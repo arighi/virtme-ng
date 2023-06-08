@@ -109,6 +109,8 @@ def make_parser() -> argparse.ArgumentParser:
                    metavar='OPTS...', help='Additional arguments for QEMU.  This will consume all remaining arguments, so it must be specified last.  Avoid using -append; use --kopt instead.')
 
     g = parser.add_argument_group(title='Debugging/testing')
+    g.add_argument('--disable-microvm', action='store_true',
+                   help='Avoid using the "microvm" QEMU architecture (only on x86_64)')
     g.add_argument('--force-initramfs', action='store_true',
                    help='Use an initramfs even if unnecessary')
     g.add_argument('--force-9p', action='store_true',
@@ -474,6 +476,9 @@ def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
 
     return name, fn
 
+def can_use_microvm(args):
+    return not args.disable_microvm and args.arch == 'x86_64'
+
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.-]+'
 _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
@@ -487,6 +492,9 @@ def do_it() -> int:
 
     qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
     qemu.probe()
+
+    # Check if we need to run in quiet or verbose mode.
+    verbose = not (args.quiet or args.script_sh or args.script_exec)
 
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
@@ -521,14 +529,15 @@ def do_it() -> int:
     else:
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
-        if args.arch == 'x86_64':
+        if can_use_microvm(args):
             virt_arch = architectures.get('microvm')
         else:
             virt_arch = arch
-        verbose = not (args.quiet or args.script_sh or args.script_exec)
         use_virtiofs = export_virtiofs(qemu, virt_arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, \
                                        readonly=(not args.rw), verbose=verbose)
-        if use_virtiofs:
+        if can_use_microvm(args) and use_virtiofs:
+            if verbose:
+                sys.stderr.write("virtme: use 'microvm' QEMU architecture\n")
             arch = virt_arch
     if not use_virtiofs:
         export_virtfs(qemu, arch, qemuargs, args.root, '/dev/root', readonly=(not args.rw))

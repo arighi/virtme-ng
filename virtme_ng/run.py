@@ -144,6 +144,9 @@ def make_parser():
     parser.add_argument('--force-9p', action='store_true',
             help='Use legacy 9p filesystem as rootfs')
 
+    parser.add_argument('--disable-microvm', action='store_true',
+            help='Avoid using the "microvm" QEMU architecture (only on x86_64)')
+
     parser.add_argument('--cwd', action='store',
             help='Change guest working directory ' +
                  '(default is current working directory when possible)')
@@ -577,6 +580,12 @@ class KernelSource:
         else:
             self.virtme_param['disk'] = ''
 
+    def _get_virtme_disable_microvm(self, args):
+        if args.disable_microvm:
+            self.virtme_param['disable_microvm'] = '--disable-microvm'
+        else:
+            self.virtme_param['disable_microvm'] = ''
+
     def _get_virtme_9p(self, args):
         if args.force_9p:
             self.virtme_param['force_9p'] = '--force-9p'
@@ -673,6 +682,7 @@ class KernelSource:
         self._get_virtme_show_boot_console(args)
         self._get_virtme_network(args)
         self._get_virtme_disk(args)
+        self._get_virtme_disable_microvm(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
@@ -704,6 +714,7 @@ class KernelSource:
             f'{self.virtme_param["show_boot_console"]} ' +
             f'{self.virtme_param["network"]} ' +
             f'{self.virtme_param["disk"]} ' +
+            f'{self.virtme_param["disable_microvm"]} ' +
             f'{self.virtme_param["force_9p"]} ' +
             f'{self.virtme_param["force_initramfs"]} ' +
             f'{self.virtme_param["graphics"]} ' +
