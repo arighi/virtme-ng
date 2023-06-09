@@ -10,6 +10,7 @@ import socket
 import shutil
 import json
 import tempfile
+import getpass
 from subprocess import check_call, check_output, Popen, DEVNULL, PIPE, CalledProcessError
 from select import select
 from pathlib import Path
@@ -304,8 +305,8 @@ def get_username():
     try:
         username = os.getlogin()
     except OSError:
-        # If os.getlogin() fails, try alternative methods
-        username = os.getenv('USER') or os.getenv('LOGNAME')
+        # If os.getlogin() fails, try alternative method
+        username = getpass.getuser()
     return username
 
 class KernelSource:
