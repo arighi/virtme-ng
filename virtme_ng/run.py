@@ -303,10 +303,10 @@ def create_root(destdir, arch):
 def get_username():
     """Reliably get current username."""
     try:
-        username = os.getlogin()
-    except OSError:
-        # If os.getlogin() fails, try alternative method
         username = getpass.getuser()
+    except OSError:
+        # If getpass.getuser() fails, try alternative methods
+        username = os.getenv('USER') or os.getenv('LOGNAME')
     return username
 
 class KernelSource:
