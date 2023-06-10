@@ -215,6 +215,14 @@ Examples
    (virtme-ng is started in graphical mode)
 ```
 
+ - Run the `steam` snap inside a virtme-ng instance using the
+   6.2.0-1003-lowlatency kernel:
+```
+   $ vng -r 6.2.0-1003-lowlatency --enable-snaps --net user -g /snap/bin/steam
+
+   (virtme-ng is started in graphical mode)
+```
+
 Implementation details
 ======================
 
@@ -316,6 +324,11 @@ Troubleshooting
 ```
   $ vng --clean --build-host HOSTNAME
 ```
+
+ - Snap support is still experimental and something may not work as expected
+   (keep in mind that virtme-ng will try to run snapd in a bare minimum system
+   environment without systemd), if some snaps are not running try to disable
+   apparmor, adding `--append="apparmor=0"` to the virtme-ng command line.
 
 Contributing
 ============
