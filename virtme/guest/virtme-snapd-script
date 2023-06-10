@@ -1,0 +1,7 @@
+#!/bin/bash
+#
+# Initialize a snap cgroup to emulate a systemd environment, tricking snapd
+# into recognizing our system as a valid one.
+
+mkdir /sys/fs/cgroup/snap.virtme.service
+echo 1 > /sys/fs/cgroup/snap.virtme.service/cgroup.procs

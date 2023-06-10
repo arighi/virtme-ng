@@ -142,6 +142,14 @@ _GENERIC_CONFIG_OPTIONAL = [
     'CONFIG_DRM_BOCHS=y',
     'CONFIG_VIRTIO_IOMMU=y',
 
+    '# Required to run snaps',
+    'CONFIG_SECURITYFS=y',
+    'CONFIG_CGROUP_BPF=y',
+    'CONFIG_SQUASHFS=y',
+    'CONFIG_SQUASHFS_XZ=y',
+    'CONFIG_SQUASHFS_ZSTD=y',
+    'CONFIG_FUSE_FS=y',
+
     '# Unnecessary configs',
     '# CONFIG_LOCALVERSION_AUTO is not set',
     '# CONFIG_TEST_KMOD is not set',

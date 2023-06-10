@@ -101,6 +101,9 @@ def make_parser():
     parser.add_argument('--no-virtme-ng-init', action='store_true',
             help='Fallback to the bash virtme-init (useful for debugging/development)')
 
+    parser.add_argument('--enable-snaps', action='store_true',
+            help='Allow to execute snaps inside virtme-ng')
+
     parser.add_argument('--debug', action='store_true',
             help='Start the instance with debugging enabled (allow to generate crash dumps)')
 
@@ -633,6 +636,12 @@ class KernelSource:
         else:
             self.virtme_param['balloon'] = ''
 
+    def _get_virtme_enable_snaps(self, args):
+        if args.enable_snaps:
+            self.virtme_param['enable_snaps'] = '--enable-snaps'
+        else:
+            self.virtme_param['enable_snaps'] = ''
+
     def _get_virtme_busybox(self, args):
         if args.busybox is not None:
             self.virtme_param['busybox'] = '--busybox ' + args.busybox
@@ -691,6 +700,7 @@ class KernelSource:
         self._get_virtme_cpus(args)
         self._get_virtme_memory(args)
         self._get_virtme_balloon(args)
+        self._get_virtme_enable_snaps(args)
         self._get_virtme_busybox(args)
         self._get_virtme_qemu(args)
         self._get_virtme_qemu_opts(args)
@@ -723,6 +733,7 @@ class KernelSource:
             f'{self.virtme_param["cpus"]} ' +
             f'{self.virtme_param["memory"]} ' +
             f'{self.virtme_param["balloon"]} ' +
+            f'{self.virtme_param["enable_snaps"]} ' +
             f'{self.virtme_param["busybox"]} ' +
             f'{self.virtme_param["qemu"]} ' +
             f'{self.virtme_param["qemu_opts"]} '

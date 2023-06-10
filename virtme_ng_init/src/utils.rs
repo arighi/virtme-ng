@@ -82,13 +82,17 @@ pub fn do_symlink(src: &str, dst: &str) {
     }
 }
 
-pub fn is_file_executable(file_path: &str) -> bool {
+pub fn check_file_permissions(file_path: &str, mask: u32) -> bool {
     if let Ok(metadata) = std::fs::metadata(file_path) {
         let permissions = metadata.permissions();
-        permissions.mode() & 0o111 != 0
+        permissions.mode() & mask != 0
     } else {
         false
     }
+}
+
+pub fn is_file_executable(file_path: &str) -> bool {
+    check_file_permissions(file_path, 0o111)
 }
 
 pub fn do_mount(source: &str, target: &str, fstype: &str, flags: u64, fsdata: &str) {

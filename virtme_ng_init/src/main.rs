@@ -89,6 +89,13 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         fsdata: "",
     },
     MountInfo {
+        source: "securityfs",
+        target: "/sys/kernel/security",
+        fs_type: "securityfs",
+        flags: 0,
+        fsdata: "",
+    },
+    MountInfo {
         source: "cgroup2",
         target: "/sys/fs/cgroup",
         fs_type: "cgroup2",
@@ -164,6 +171,13 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
     MountInfo {
         source: "tmpfs",
         target: "/var/cache",
+        fs_type: "tmpfs",
+        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        fsdata: "",
+    },
+    MountInfo {
+        source: "tmpfs",
+        target: "/var/lib/snapd/cookie",
         fs_type: "tmpfs",
         flags: libc::MS_NOSUID | libc::MS_NODEV,
         fsdata: "",
@@ -752,12 +766,51 @@ fn setup_user_session() {
     setup_root_home();
 }
 
+fn run_snapd() {
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
+        if cmdline.contains("virtme.snapd") {
+            // If snapd is present in the system try to start it, to properly support snaps.
+            let snapd_bin = "/usr/lib/snapd/snapd";
+            if !Path::new(snapd_bin).exists() {
+                return;
+            }
+            let snapd_state = "/var/lib/snapd/state.json";
+            if !Path::new(snapd_state).exists() {
+                return;
+            }
+            if !utils::check_file_permissions(snapd_state, 0o004) {
+                return;
+            }
+            if let Some(guest_tools_dir) = get_guest_tools_dir() {
+                utils::run_cmd(&format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
+            }
+            Command::new(snapd_bin)
+                .stdin(Stdio::null())
+                .stdout(Stdio::null())
+                .stderr(Stdio::null())
+                .spawn()
+                .ok();
+            let snapd_apparmor_bin = "/usr/lib/snapd/snapd-apparmor";
+            if Path::new(snapd_apparmor_bin).exists() {
+                Command::new(snapd_apparmor_bin)
+                    .arg("start")
+                    .stdin(Stdio::null())
+                    .stdout(Stdio::null())
+                    .stderr(Stdio::null())
+                    .output()
+                    .ok();
+            }
+        }
+    }
+}
+
 fn run_misc_services() -> Option<thread::JoinHandle<()>> {
     let handle = thread::spawn(move || {
         symlink_fds();
         mount_virtme_initmounts();
         fix_packaging_files();
         override_system_files();
+        run_snapd();
     });
     Some(handle)
 }
