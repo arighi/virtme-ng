@@ -707,13 +707,30 @@ fn run_shell(tty_fd: libc::c_int, args: Vec<String>) {
     }
 }
 
+fn init_xdg_runtime_dir() {
+    // Initialize XDG_RUNTIME_DIR (required to provide a better compatibility with graphic apps).
+    let mut uid = 0;
+    if let Ok(user) = env::var("virtme_user") {
+        if let Some(virtme_uid) = utils::get_user_id(&user) {
+            uid = virtme_uid;
+        }
+    }
+    let dir = format!("/run/user/{}", uid);
+    utils::do_mkdir(&dir);
+    utils::do_chown(&dir, uid, uid).ok();
+    env::set_var("XDG_RUNTIME_DIR", dir);
+}
+
 fn run_user_gui(tty_fd: libc::c_int, app: &str) {
+    init_xdg_runtime_dir();
+
     // Generate a bare minimum xinitrc
     let xinitrc = "/tmp/.xinitrc";
     if let Err(err) = utils::create_file(xinitrc, 0o0644, &format!("exec {}", app)) {
         utils::log(&format!("failed to generate {}: {}", xinitrc, err));
         return;
     }
+
     // Run graphical app using xinit directly
     let mut args: Vec<String> = vec!["-l".to_owned(), "-c".to_owned()];
     if let Ok(user) = env::var("virtme_user") {
