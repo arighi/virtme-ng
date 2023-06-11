@@ -10,6 +10,7 @@ import socket
 import shutil
 import json
 import tempfile
+import getpass
 from subprocess import check_call, check_output, Popen, DEVNULL, PIPE, CalledProcessError
 from select import select
 from pathlib import Path
@@ -305,9 +306,9 @@ def create_root(destdir, arch):
 def get_username():
     """Reliably get current username."""
     try:
-        username = os.getlogin()
+        username = getpass.getuser()
     except OSError:
-        # If os.getlogin() fails, try alternative methods
+        # If getpass.getuser() fails, try alternative methods
         username = os.getenv('USER') or os.getenv('LOGNAME')
     return username
 
