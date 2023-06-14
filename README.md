@@ -218,7 +218,7 @@ Examples
  - Run the `steam` snap inside a virtme-ng instance using the
    6.2.0-1003-lowlatency kernel:
 ```
-   $ vng -r 6.2.0-1003-lowlatency --enable-snaps --net user -g /snap/bin/steam
+   $ vng -r 6.2.0-1003-lowlatency --snaps --net user -g /snap/bin/steam
 
    (virtme-ng is started in graphical mode)
 ```

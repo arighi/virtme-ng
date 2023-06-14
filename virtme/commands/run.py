@@ -72,7 +72,7 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Allow the host to ask the guest to release memory.')
     g.add_argument('--sound', action='store_true',
                    help='Enable audio device (if the architecture supports it).')
-    g.add_argument('--enable-snaps', action='store_true',
+    g.add_argument('--snaps', action='store_true',
                    help='Allow to execute snaps inside virtme-ng')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
                    help='Add a read/write virtio-scsi disk.  The device node will be /dev/disk/by-id/scsi-0virtme_disk_NAME.')
@@ -524,8 +524,7 @@ def do_it() -> int:
             args.memory += 'M'
         qemuargs.extend(['-m', args.memory])
 
-    # In verbose mode, check and warn if snapd requires permission adjustments.
-    if args.enable_snaps:
+    if args.snaps:
         if args.root == '/':
             snapd_state = '/var/lib/snapd/state.json'
             if os.path.exists(snapd_state):
