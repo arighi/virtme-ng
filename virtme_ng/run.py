@@ -73,7 +73,7 @@ def make_parser():
     parser = argparse.ArgumentParser(
         description='Build and run kernels inside a virtualized snapshot of your live system',
     )
-    parser.add_argument('--version', '-v', action='version', version=f'virtme-ng {VERSION}')
+    parser.add_argument('--version', '-V', action='version', version=f'virtme-ng {VERSION}')
 
     g_action = parser.add_argument_group(title='Action').add_mutually_exclusive_group()
 
@@ -189,9 +189,6 @@ def make_parser():
     parser.add_argument('--exec', '-e', action='store',
             help='Execute a command inside the kernel and exit')
 
-    parser.add_argument('--show-boot-console', action='store_true',
-            help='Show the boot console when running a single command with --exec')
-
     parser.add_argument('--append', '-a', action='append',
             help='Additional kernel boot options (can be used multiple times)')
 
@@ -206,8 +203,8 @@ def make_parser():
             help='Show graphical output instead of using a console. ' +
                  'An argument can be optionally specified to start a graphical application.')
 
-    parser.add_argument('--quiet', '-q', action='store_true',
-            help='Reduce console output verbosity.')
+    parser.add_argument('--verbose', '-v', action='store_true',
+            help='Increase console output verbosity.')
 
     parser.add_argument('--qemu-opts', '-o', action='append',
             help='Additional arguments for QEMU (can be used multiple times)')
@@ -362,7 +359,7 @@ class KernelSource:
                 arg_fail("error: you have uncommitted changes in your git repository, " + \
                          "use --force to drop them", show_usage=False)
             check_call_cmd(['git', 'reset', '--hard', target],
-                            quiet=args.quiet, dry_run=args.dry_run)
+                            quiet=not args.verbose, dry_run=args.dry_run)
 
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
@@ -382,28 +379,28 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in args.envs:
             cmd += f' {var} '
-        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet, dry_run=args.dry_run)
+        check_call_cmd(self._format_cmd(cmd), quiet=not args.verbose, dry_run=args.dry_run)
 
     def _make_remote(self, args, make_command):
         check_call_cmd(['ssh', args.build_host, 'mkdir -p ~/.virtme'],
-                       quiet=args.quiet, dry_run=args.dry_run)
+                       quiet=not args.verbose, dry_run=args.dry_run)
         check_call_cmd(['ssh', args.build_host, 'git init ~/.virtme'],
-                       quiet=args.quiet, dry_run=args.dry_run)
+                       quiet=not args.verbose, dry_run=args.dry_run)
         check_call_cmd(['git', 'push', '--force', '--porcelain',
                         f"{args.build_host}:~/.virtme",
-                        'HEAD:__virtme__', ], quiet=args.quiet, dry_run=args.dry_run)
+                        'HEAD:__virtme__', ], quiet=not args.verbose, dry_run=args.dry_run)
         cmd = f'rsync .config {args.build_host}:.virtme/.config'
-        check_call_cmd(self._format_cmd(cmd), quiet=args.quiet, dry_run=args.dry_run)
+        check_call_cmd(self._format_cmd(cmd), quiet=not args.verbose, dry_run=args.dry_run)
         # Create remote build script
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             tmp.write(REMOTE_BUILD_SCRIPT.format(args.build_host_exec_prefix or '', \
                                                  make_command + ' -j$(nproc --all)'))
             tmp.flush()
             cmd = f'rsync {tmp.name} {args.build_host}:.virtme/.kc-build'
-            check_call_cmd(self._format_cmd(cmd), quiet=args.quiet, dry_run=args.dry_run)
+            check_call_cmd(self._format_cmd(cmd), quiet=not args.verbose, dry_run=args.dry_run)
         # Execute remote build script
         check_call_cmd(['ssh', args.build_host, 'bash', '.virtme/.kc-build'],
-                       quiet=args.quiet, dry_run=args.dry_run)
+                       quiet=not args.verbose, dry_run=args.dry_run)
         # Copy artifacts back to the running host
         with tempfile.NamedTemporaryFile(mode='w+t') as tmp:
             if args.build_host_vmlinux or args.arch == 'ppc64el':
@@ -424,13 +421,13 @@ class KernelSource:
                       f'{args.build_host}:.virtme/ ./'
             tmp.write(cmd)
             tmp.flush()
-            check_call_cmd(['bash', tmp.name], quiet=args.quiet, dry_run=args.dry_run)
+            check_call_cmd(['bash', tmp.name], quiet=not args.verbose, dry_run=args.dry_run)
         if not args.skip_modules:
             if os.path.exists('./debian/rules'):
-                check_call_cmd(['fakeroot', 'debian/rules', 'clean'], quiet=args.quiet)
+                check_call_cmd(['fakeroot', 'debian/rules', 'clean'], quiet=not args.verbose)
             check_call_cmd(self._format_cmd(make_command +
                            f' -j {self.cpus}' + ' modules_prepare'),
-                           quiet=args.quiet, dry_run=args.dry_run)
+                           quiet=not args.verbose, dry_run=args.dry_run)
 
     def make(self, args):
         """Perform a make operation on a kernel source directory."""
@@ -464,7 +461,7 @@ class KernelSource:
         if args.build_host is None:
             # Build the kernel locally
             check_call_cmd(self._format_cmd(make_command + ' -j' + self.cpus),
-                           quiet=args.quiet, dry_run=args.dry_run)
+                           quiet=not args.verbose, dry_run=args.dry_run)
         else:
             # Build the kernel on a remote build host
             self._make_remote(args, make_command)
@@ -566,12 +563,6 @@ class KernelSource:
         else:
             self.virtme_param['exec'] = ''
 
-    def _get_virtme_show_boot_console(self, args):
-        if args.show_boot_console:
-            self.virtme_param['show_boot_console'] = '--show-boot-console'
-        else:
-            self.virtme_param['show_boot_console'] = ''
-
     def _get_virtme_network(self, args):
         if args.network is not None:
             self.virtme_param['network'] = f'--net {args.network}'
@@ -617,11 +608,11 @@ class KernelSource:
         else:
             self.virtme_param['graphics'] = ''
 
-    def _get_virtme_quiet(self, args):
-        if args.quiet:
-            self.virtme_param['quiet'] = '--quiet'
+    def _get_virtme_verbose(self, args):
+        if args.verbose:
+            self.virtme_param['verbose'] = '--verbose --show-boot-console'
         else:
-            self.virtme_param['quiet'] = ''
+            self.virtme_param['verbose'] = ''
 
     def _get_virtme_append(self, args):
         if args.append is not None:
@@ -698,7 +689,6 @@ class KernelSource:
         self._get_virtme_no_virtme_ng_init(args)
         self._get_virtme_mods(args)
         self._get_virtme_exec(args)
-        self._get_virtme_show_boot_console(args)
         self._get_virtme_network(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
@@ -706,7 +696,7 @@ class KernelSource:
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
-        self._get_virtme_quiet(args)
+        self._get_virtme_verbose(args)
         self._get_virtme_append(args)
         self._get_virtme_cpus(args)
         self._get_virtme_memory(args)
@@ -732,7 +722,6 @@ class KernelSource:
             f'{self.virtme_param["no_virtme_ng_init"]} ' +
             f'{self.virtme_param["mods"]} ' +
             f'{self.virtme_param["exec"]} ' +
-            f'{self.virtme_param["show_boot_console"]} ' +
             f'{self.virtme_param["network"]} ' +
             f'{self.virtme_param["disk"]} ' +
             f'{self.virtme_param["sound"]} ' +
@@ -740,7 +729,7 @@ class KernelSource:
             f'{self.virtme_param["force_9p"]} ' +
             f'{self.virtme_param["force_initramfs"]} ' +
             f'{self.virtme_param["graphics"]} ' +
-            f'{self.virtme_param["quiet"]} ' +
+            f'{self.virtme_param["verbose"]} ' +
             f'{self.virtme_param["append"]} ' +
             f'{self.virtme_param["cpus"]} ' +
             f'{self.virtme_param["memory"]} ' +
@@ -763,13 +752,13 @@ class KernelSource:
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
-        if not args.quiet:
+        if args.verbose:
             sys.stdout.write(data.decode('utf-8'))
         sock.send("{ \"execute\": \"qmp_capabilities\" }\r".encode('utf-8'))
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
-        if not args.quiet:
+        if args.verbose:
             sys.stdout.write(data.decode('utf-8'))
         dump_file = args.dump
         with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
@@ -779,16 +768,16 @@ class KernelSource:
                 "\"protocol\":\"file:" + tmp.name + "\"}}"
                 "\r"
             )
-            if not args.quiet:
+            if args.verbose:
                 sys.stdout.write(msg + "\n")
             sock.send(msg.encode('utf-8'))
             data = sock.recv(1024)
             if not data:
                 sys.exit(1)
-            if not args.quiet:
+            if args.verbose:
                 sys.stdout.write(data.decode('utf-8'))
             data = sock.recv(1024)
-            if not args.quiet:
+            if args.verbose:
                 sys.stdout.write(data.decode('utf-8'))
             # Save memory dump to target file
             shutil.move(tmp.name, dump_file)
@@ -803,7 +792,7 @@ class KernelSource:
             cmd = f'ssh {args.build_host} --'
             cmd = self._format_cmd(cmd)
             cmd.append('cd ~/.virtme && git clean -xdf')
-        check_call_cmd(cmd, quiet=args.quiet, dry_run=args.dry_run)
+        check_call_cmd(cmd, quiet=not args.verbose, dry_run=args.dry_run)
 
 @spinner_decorator(message="📦 checking out kernel")
 def checkout(kern_source, args):

@@ -34,7 +34,7 @@ Quick start
  5.19.0-23-generic
  $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
  $ cd linux
- $ vng --build --quiet --commit v6.2-rc4
+ $ vng --build --commit v6.2-rc4
            _      _
     __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
     \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |

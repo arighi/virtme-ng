@@ -63,8 +63,8 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument('--graphics', action='store', nargs='?',
                    metavar='BINARY', const='',
                    help='Show graphical output instead of using a console. An argument can be optionally specified to start a graphical application.')
-    g.add_argument('--quiet', action='store_true',
-                   help='Reduce console output verbosity.')
+    g.add_argument('--verbose', action='store_true',
+                   help='Increase console output verbosity.')
     g.add_argument('--net', action='store', const='user', nargs='?',
                    choices=['user', 'bridge'],
                    help='Enable basic network access.')
@@ -497,9 +497,6 @@ def do_it() -> int:
     qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
     qemu.probe()
 
-    # Check if we need to run in quiet or verbose mode.
-    verbose = not (args.quiet or args.script_sh or args.script_exec)
-
     # Check if initramfs is required.
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
@@ -534,12 +531,12 @@ def do_it() -> int:
             if os.path.exists(snapd_state):
                 file_status = os.stat(snapd_state)
                 if file_status.st_mode & 0o004 == 0:
-                    if verbose:
-                        sys.stderr.write(f"\nWARNING: {snapd_state} is not readable, snap support is disabled.\n")
-                        sys.stderr.write(f"Run `sudo chmod +r {snapd_state}` on the **host** to enable snaps.\n")
-                        sys.stderr.write(f"This may have security implications on the host!\n\n")
+                    # Warn if snapd requires permission adjustments.
+                    sys.stderr.write(f"\nWARNING: {snapd_state} is not readable, snap support is disabled.\n")
+                    sys.stderr.write(f"Run `sudo chmod +r {snapd_state}` on the **host** to enable snaps.\n")
+                    sys.stderr.write(f"This may have security implications on the host!\n\n")
                 else:
-                    if verbose:
+                    if args.verbose:
                         sys.stderr.write(f"virtme: enable snap support\n")
                     kernelargs.append('virtme.snapd')
             else:
@@ -559,9 +556,9 @@ def do_it() -> int:
         else:
             virt_arch = arch
         use_virtiofs = export_virtiofs(qemu, virt_arch, qemuargs, args.root, 'ROOTFS', memory=args.memory, \
-                                       readonly=(not args.rw), verbose=verbose)
+                                       readonly=(not args.rw), verbose=args.verbose)
         if can_use_microvm(args) and use_virtiofs:
-            if verbose:
+            if args.verbose:
                 sys.stderr.write("virtme: use 'microvm' QEMU architecture\n")
             arch = virt_arch
     if not use_virtiofs:
@@ -655,7 +652,7 @@ def do_it() -> int:
 
         qemuargs.extend(['-mon', 'chardev=console'])
 
-        if not args.quiet:
+        if args.verbose:
             kernelargs.extend(arch.earlyconsole_args())
         qemuargs.extend(arch.qemu_nodisplay_args())
 
@@ -893,7 +890,7 @@ def do_it() -> int:
         initrdpath = None
         initcmds.insert(0, 'mount -t tmpfs run /run')
 
-    if args.quiet:
+    if not args.verbose:
         kernelargs.append('quiet')
         kernelargs.append('loglevel=0')
 
