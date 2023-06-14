@@ -27,7 +27,7 @@ from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
 from .. import resources
-from ..util import SilentError, uname
+from ..util import SilentError, uname, get_username
 
 def make_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
@@ -483,6 +483,26 @@ def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
 def can_use_microvm(args):
     return not args.disable_microvm and args.arch == 'x86_64'
 
+def has_read_acl(username, file_path):
+    try:
+        # Execute the `getfacl` command and capture the output
+        output = subprocess.check_output(
+            ["getfacl", file_path], stderr=subprocess.DEVNULL
+        ).decode("utf-8")
+
+        # Parse the output to check for the current user's read permission
+        lines = output.split("\n")
+        for line in lines:
+            if line.startswith(f"user:{username}"):
+                parts = line.split(":")
+                if len(parts) >= 3 and "r" in parts[2]:
+                    return True  # Current user has read permission
+
+        return False  # Current user does not have read permission
+
+    except subprocess.CalledProcessError:
+        return False  # Error occurred while executing getfacl command
+
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = '[a-zA-Z0-9_+ /.-]+'
 _RWDIR_RE = re.compile('^(%s)(?:=(%s))?$' %
@@ -528,16 +548,20 @@ def do_it() -> int:
         if args.root == '/':
             snapd_state = '/var/lib/snapd/state.json'
             if os.path.exists(snapd_state):
-                file_status = os.stat(snapd_state)
-                if file_status.st_mode & 0o004 == 0:
+                username = get_username()
+                if not has_read_acl(username, snapd_state):
                     # Warn if snapd requires permission adjustments.
-                    sys.stderr.write(f"\nWARNING: {snapd_state} is not readable, snap support is disabled.\n")
-                    sys.stderr.write(f"Run `sudo chmod +r {snapd_state}` on the **host** to enable snaps.\n")
-                    sys.stderr.write(f"This may have security implications on the host!\n\n")
-                else:
-                    if args.verbose:
-                        sys.stderr.write(f"virtme: enable snap support\n")
-                    kernelargs.append('virtme.snapd')
+                    cmd = f"sudo setfacl -m u:{username}:r {snapd_state}"
+                    sys.stderr.write(f"WARNING: `--snaps` specified but {snapd_state} is not readable.\n")
+                    sys.stderr.write(f"Running `{cmd}` to enable snaps in the guest.\n\n")
+                    sys.stderr.write(f"❗This may have security implications on the **host** (CTRL+C to abort)❗\n\n")
+                    try:
+                        subprocess.run(cmd.split(' '))
+                    except KeyboardInterrupt:
+                        sys.exit(1)
+                if args.verbose:
+                    sys.stderr.write(f"virtme: enable snap support\n")
+                kernelargs.append('virtme.snapd')
             else:
                 sys.stderr.write(f"\nWARNING: {snapd_state} does not exist, snap support is disabled.\n\n")
         else:

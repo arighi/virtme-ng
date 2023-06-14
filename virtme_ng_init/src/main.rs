@@ -805,9 +805,6 @@ fn run_snapd() {
             if !Path::new(snapd_state).exists() {
                 return;
             }
-            if !utils::check_file_permissions(snapd_state, 0o004) {
-                return;
-            }
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
                 utils::run_cmd(&format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
             }

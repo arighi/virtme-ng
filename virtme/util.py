@@ -9,12 +9,22 @@ from typing import Optional, Sequence
 
 import os
 import shutil
+import getpass
 import itertools
 
 uname = os.uname()
 
 class SilentError(Exception):
     pass
+
+def get_username():
+    """Reliably get current username."""
+    try:
+        username = getpass.getuser()
+    except OSError:
+        # If getpass.getuser() fails, try alternative methods
+        username = os.getenv('USER') or os.getenv('LOGNAME')
+    return username
 
 def check_kernel_repo():
     if not os.path.isfile('scripts/kconfig/merge_config.sh') and \

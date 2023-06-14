@@ -212,14 +212,11 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
     if [ -e "$snapd_bin" ]; then
         snapd_state="/var/lib/snapd/state.json"
         if [ -e "$snapd_state" ]; then
-            permissions=$((0$(stat -c "%a" "$snapd_state") & 0x4))
-            if [ $permissions -ne 0 ]; then
-                $(dirname $0)/virtme-snapd-script
-                $snapd_bin >/dev/null 2>&1 </dev/null &
-                snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
-                if [ -e $snapd_apparmor_bin ]; then
-                    $snapd_apparmor_bin start >/dev/null 2>&1 </dev/null
-                fi
+	    $(dirname $0)/virtme-snapd-script
+            $snapd_bin >/dev/null 2>&1 </dev/null &
+            snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
+            if [ -e $snapd_apparmor_bin ]; then
+                $snapd_apparmor_bin start >/dev/null 2>&1 </dev/null
             fi
         fi
     fi

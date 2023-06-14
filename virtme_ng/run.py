@@ -10,13 +10,12 @@ import socket
 import shutil
 import json
 import tempfile
-import getpass
 from subprocess import check_call, check_output, Popen, DEVNULL, PIPE, CalledProcessError
 from select import select
 from pathlib import Path
 from argcomplete import autocomplete
 
-from virtme.util import SilentError, uname
+from virtme.util import SilentError, uname, get_username
 from virtme_ng.utils import VERSION, CONF_FILE
 from virtme_ng.spinner import Spinner
 
@@ -302,15 +301,6 @@ def create_root(destdir, arch):
     os.chdir(destdir)
     os.system(f'curl -s {url} | sudo tar xvJ')
     os.chdir(prevdir)
-
-def get_username():
-    """Reliably get current username."""
-    try:
-        username = getpass.getuser()
-    except OSError:
-        # If getpass.getuser() fails, try alternative methods
-        username = os.getenv('USER') or os.getenv('LOGNAME')
-    return username
 
 class KernelSource:
     """Main class that implement actions to perform on a kernel source directory."""

@@ -43,6 +43,7 @@ Depends:
  libtool,
  uuid-dev,
  libnuma-dev,
+ acl,
  dkms,
  curl,
  zstd,
