@@ -198,6 +198,9 @@ def make_parser():
     parser.add_argument('--force-initramfs', action='store_true',
             help='Use an initramfs even if unnecessary')
 
+    parser.add_argument('--sound', action='store_true',
+            help='Enable audio device (if the architecture supports it)')
+
     parser.add_argument('--graphics', '-g', action='store',
             nargs='?', const='', metavar="BINARY",
             help='Show graphical output instead of using a console. ' +
@@ -584,6 +587,12 @@ class KernelSource:
         else:
             self.virtme_param['disk'] = ''
 
+    def _get_virtme_sound(self, args):
+        if args.sound:
+            self.virtme_param['sound'] = f'--sound'
+        else:
+            self.virtme_param['sound'] = ''
+
     def _get_virtme_disable_microvm(self, args):
         if args.disable_microvm:
             self.virtme_param['disable_microvm'] = '--disable-microvm'
@@ -692,6 +701,7 @@ class KernelSource:
         self._get_virtme_show_boot_console(args)
         self._get_virtme_network(args)
         self._get_virtme_disk(args)
+        self._get_virtme_sound(args)
         self._get_virtme_disable_microvm(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
@@ -725,6 +735,7 @@ class KernelSource:
             f'{self.virtme_param["show_boot_console"]} ' +
             f'{self.virtme_param["network"]} ' +
             f'{self.virtme_param["disk"]} ' +
+            f'{self.virtme_param["sound"]} ' +
             f'{self.virtme_param["disable_microvm"]} ' +
             f'{self.virtme_param["force_9p"]} ' +
             f'{self.virtme_param["force_initramfs"]} ' +

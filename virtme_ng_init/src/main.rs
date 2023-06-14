@@ -726,7 +726,17 @@ fn run_user_gui(tty_fd: libc::c_int, app: &str) {
 
     // Generate a bare minimum xinitrc
     let xinitrc = "/tmp/.xinitrc";
-    if let Err(err) = utils::create_file(xinitrc, 0o0644, &format!("exec {}", app)) {
+
+    // Check if we need to start the sound system.
+    let mut pre_exec_cmd: String = String::new();
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
+        if cmdline.contains("virtme.sound") {
+            if let Some(guest_tools_dir) = get_guest_tools_dir() {
+                pre_exec_cmd = format!("{}/virtme-sound-script", guest_tools_dir);
+            }
+        }
+    }
+    if let Err(err) = utils::create_file(xinitrc, 0o0644, &format!("{}\nexec {}", pre_exec_cmd, app)) {
         utils::log(&format!("failed to generate {}: {}", xinitrc, err));
         return;
     }

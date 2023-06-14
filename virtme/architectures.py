@@ -52,6 +52,10 @@ class Arch(object):
         return ['-device', 'virtio-gpu-pci']
 
     @staticmethod
+    def qemu_sound_args() -> List[str]:
+        return []
+
+    @staticmethod
     def qemu_serial_console_args() -> List[str]:
         # We should be using the new-style -device serialdev,chardev=xyz,
         # but many architecture-specific serial devices don't support that.
@@ -97,6 +101,12 @@ class Arch_x86(Arch):
             ret.extend(['-cpu', 'host'])  # We can't migrate regardless.
 
         return ret
+
+    @staticmethod
+    def qemu_sound_args() -> List[str]:
+        return ['-audiodev', 'sdl,id=snd0',
+                '-device', 'intel-hda',
+                '-device', 'hda-output,audiodev=snd0']
 
     @staticmethod
     def earlyconsole_args():
@@ -155,7 +165,7 @@ class Arch_microvm(Arch_x86):
         ret = Arch.qemuargs(is_native)
 
         # Use microvm architecture for faster boot
-        ret.extend(['-M', 'microvm'])
+        ret.extend(['-M', 'microvm,accel=kvm,pcie=on'])
 
         if is_native and os.access('/dev/kvm', os.R_OK):
             # If we're likely to use KVM, request a full-featured CPU.

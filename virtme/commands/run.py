@@ -70,6 +70,8 @@ def make_parser() -> argparse.ArgumentParser:
                    help='Enable basic network access.')
     g.add_argument('--balloon', action='store_true',
                    help='Allow the host to ask the guest to release memory.')
+    g.add_argument('--sound', action='store_true',
+                   help='Enable audio device (if the architecture supports it).')
     g.add_argument('--enable-snaps', action='store_true',
                    help='Allow to execute snaps inside virtme-ng')
     g.add_argument('--disk', action='append', default=[], metavar='NAME=PATH',
@@ -677,6 +679,10 @@ def do_it() -> int:
         # Propagate the terminal type
         if 'TERM' in os.environ:
             kernelargs.extend(['TERM=%s' % os.environ['TERM']])
+
+    if args.sound:
+        qemuargs.extend(arch.qemu_sound_args())
+        kernelargs.extend(['virtme.sound'])
 
     if args.balloon:
         qemuargs.extend(['-device', '%s,id=balloon0' % arch.virtio_dev_type('balloon')])
