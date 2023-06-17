@@ -1,7 +1,7 @@
 #!/usr/bin/make -f
 
 virtme-ng-prompt:
-	register-python-argcomplete virtme-ng > $@
+	register-python-argcomplete virtme-ng vng > $@
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
