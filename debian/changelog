@@ -1,3 +1,13 @@
+virtme-ng (1.10-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.10:
+    - boot time improvements with virtme-ng-init
+    - allow to run snaps inside virtme-ng instances (option --snaps)
+    - sound support (option --sound)
+    - UI improvements
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Sat, 17 Jun 2023 17:10:36 +0200
+
 virtme-ng (1.9-1) unstable; urgency=medium
 
   * New version virtme-ng 1.9:
