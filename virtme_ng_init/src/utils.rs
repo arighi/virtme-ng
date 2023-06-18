@@ -98,19 +98,6 @@ pub fn do_symlink(src: &str, dst: &str) {
     }
 }
 
-pub fn check_file_permissions(file_path: &str, mask: u32) -> bool {
-    if let Ok(metadata) = std::fs::metadata(file_path) {
-        let permissions = metadata.permissions();
-        permissions.mode() & mask != 0
-    } else {
-        false
-    }
-}
-
-pub fn is_file_executable(file_path: &str) -> bool {
-    check_file_permissions(file_path, 0o111)
-}
-
 pub fn do_mount(source: &str, target: &str, fstype: &str, flags: u64, fsdata: &str) {
     let source_cstr = CString::new(source).expect("CString::new failed");
     let fstype_cstr = CString::new(fstype).expect("CString::new failed");
