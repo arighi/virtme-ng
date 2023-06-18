@@ -9,23 +9,24 @@
 
 import os
 import shutil
-import pkg_resources
 import subprocess
+import pkg_resources
+
 
 def find_guest_tools():
-    """Return the path of the guest tools installed with the running virtme.
-    """
+    """Return the path of the guest tools installed with the running virtme."""
 
-    if pkg_resources.resource_isdir(__name__, 'guest'):
-        return pkg_resources.resource_filename(__name__, 'guest')
+    if pkg_resources.resource_isdir(__name__, "guest"):
+        return pkg_resources.resource_filename(__name__, "guest")
 
     # No luck.  This is somewhat surprising.
     return None
 
+
 def find_script(name) -> str:
     # If we're running out of a source checkout, we can find scripts through
     # the 'virtme/scripts' symlink.
-    fn = pkg_resources.resource_filename(__name__, 'scripts/%s' % name)
+    fn = pkg_resources.resource_filename(__name__, "scripts/%s" % name)
     if os.path.isfile(fn):
         return fn
 
@@ -35,7 +36,8 @@ def find_script(name) -> str:
         return guess
 
     # No luck.  This is somewhat surprising.
-    raise Exception('could not find script %s' % name)
+    raise FileNotFoundError("could not find script %s" % name)
+
 
 def run_script(name, **kwargs) -> None:
     fn = find_script(name)

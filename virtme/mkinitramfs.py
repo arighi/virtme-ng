@@ -7,18 +7,16 @@
 
 from typing import List, Dict, Optional
 
-import shutil
 import io
 import os.path
 import shlex
-import itertools
 from . import cpiowriter
 from . import util
 
 def make_base_layout(cw):
-    for dir in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',
+    for d in (b'lib', b'bin', b'var', b'etc', b'newroot', b'dev', b'proc',
                 b'tmproot', b'run_virtme', b'run_virtme/data', b'run_virtme/guesttools'):
-        cw.mkdir(dir, 0o755)
+        cw.mkdir(d, 0o755)
 
     cw.symlink(b'bin', b'sbin')
     cw.symlink(b'lib', b'lib64')
@@ -70,7 +68,7 @@ def install_modules(cw, modfiles):
     cw.write_file(name=b'modules/load_all.sh',
                   body=script.encode('ascii'), mode=0o644)
 
-_INIT = """#!/bin/sh
+_INIT = r"""#!/bin/sh
 
 {logfunc}
 

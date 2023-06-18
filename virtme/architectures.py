@@ -8,7 +8,7 @@
 import os
 from typing import List, Optional
 
-class Arch(object):
+class Arch:
     def __init__(self, name) -> None:
         self.virtmename = name
         self.qemuname = name
@@ -23,6 +23,7 @@ class Arch(object):
 
     @staticmethod
     def qemuargs(is_native) -> List[str]:
+        _ = is_native
         return []
 
     @staticmethod
@@ -187,10 +188,10 @@ class Arch_arm(Arch):
         # Emulate a vexpress-a15.
         ret.extend(['-M', 'vexpress-a15'])
 
-        # TODO: consider adding a PCI bus (and figuring out how)
-
-        # TODO: This won't boot unless -dtb is set, but we need to figure
-        # out how to find the dtb file.
+        # NOTE: consider adding a PCI bus (and figuring out how)
+        #
+        # This won't boot unless -dtb is set, but we need to figure out
+        # how to find the dtb file.
 
         return ret
 
@@ -213,7 +214,8 @@ class Arch_arm(Arch):
     def kimg_path(self):
         return 'arch/arm/boot/zImage'
 
-    def dtb_path(self):
+    @staticmethod
+    def dtb_path():
         return 'arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb'
 
 class Arch_aarch64(Arch):
@@ -266,9 +268,9 @@ class Arch_ppc(Arch):
         self.linuxname = 'powerpc'
         self.gccname = 'powerpc64le'
 
-    def qemuargs(self, is_native):
+    @staticmethod
+    def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
-
         ret.extend(['-M', 'pseries'])
 
         return ret
@@ -299,9 +301,9 @@ class Arch_riscv64(Arch):
     def virtiofs_support() -> bool:
         return True
 
-    def qemuargs(self, is_native):
+    @staticmethod
+    def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
-
         ret.extend(['-machine', 'virt'])
         ret.extend(['-bios', 'default'])
 
@@ -323,15 +325,15 @@ class Arch_sparc64(Arch):
         self.linuxname = 'sparc'
         self.gccname = 'sparc64'
 
-    def qemuargs(self, is_native):
-        ret = Arch.qemuargs(is_native)
-
-        return ret
+    @staticmethod
+    def qemuargs(is_native):
+        return Arch.qemuargs(is_native)
 
     def kimg_path(self):
         return 'arch/sparc/boot/image'
 
-    def qemu_nodisplay_args(self):
+    @staticmethod
+    def qemu_nodisplay_args():
         # qemu-system-sparc fails to boot if -display none is set.
         return ['-nographic', '-vga', 'none']
 
@@ -347,7 +349,8 @@ class Arch_s390x(Arch):
     def virtio_dev_type(virtiotype):
         return 'virtio-%s-ccw' % virtiotype
 
-    def qemuargs(self, is_native):
+    @staticmethod
+    def qemuargs(is_native):
         ret = Arch.qemuargs(is_native)
 
         # Ask for the latest version of s390-ccw
@@ -387,5 +390,4 @@ ARCHES = {arch.virtmename: arch for arch in [
 def get(arch: str) -> Arch:
     if arch in ARCHES:
         return ARCHES[arch]
-    else:
-        return Arch_unknown(arch)
+    return Arch_unknown(arch)
