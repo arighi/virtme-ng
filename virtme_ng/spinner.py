@@ -97,7 +97,7 @@ class Spinner:
 
     def _spinner_line(self):
         self.pos = (self.pos + 1) % len(self.spinner_str)
-        spinner = self.spinner_str[self.pos :] + self.spinner_str[: self.pos]
+        spinner = self.spinner_str[self.pos:] + self.spinner_str[:self.pos]
         delta_t = int(time.time()) - self.start_time
         header = f"{spinner[:3]} {self.message} ({delta_t} sec)\033[?25l"
         spacer = f"\r{' ' * len(header)}\r"

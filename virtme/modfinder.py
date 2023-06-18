@@ -19,30 +19,32 @@ import os
 import itertools
 from . import util
 
-_INSMOD_RE = re.compile('insmod (.*[^ ]) *$')
+_INSMOD_RE = re.compile("insmod (.*[^ ]) *$")
+
 
 def resolve_dep(modalias, root=None, kver=None, moddir=None):
     # /usr/sbin might not be in the path, and modprobe is usually in /usr/sbin
-    modprobe = util.find_binary_or_raise(['modprobe'])
-    args = [modprobe, '--show-depends']
-    args += ['-C', '/var/empty']
+    modprobe = util.find_binary_or_raise(["modprobe"])
+    args = [modprobe, "--show-depends"]
+    args += ["-C", "/var/empty"]
     if root is not None:
-        args += ['-d', root]
+        args += ["-d", root]
     if kver is not None and kver != os.uname().release:
         # If booting the loaded kernel, skip -S.  This helps certain
         # buggy modprobe versions that don't support -S.
-        args += ['-S', kver]
+        args += ["-S", kver]
     if moddir is not None:
-        args += ['--moddir', moddir]
-    args += ['--', modalias]
+        args += ["--moddir", moddir]
+    args += ["--", modalias]
 
     deps = []
 
     try:
-        with open('/dev/null', 'r+b') as devnull:
-            script = subprocess.check_output(args, stderr=devnull.fileno()).\
-                     decode('utf-8', errors='replace')
-        for line in script.split('\n'):
+        with open("/dev/null", "r+b") as devnull:
+            script = subprocess.check_output(args, stderr=devnull.fileno()).decode(
+                "utf-8", errors="replace"
+            )
+        for line in script.split("\n"):
             m = _INSMOD_RE.match(line)
             if m:
                 deps.append(m.group(1))
@@ -50,6 +52,7 @@ def resolve_dep(modalias, root=None, kver=None, moddir=None):
         pass  # This is most likely because the module is built in.
 
     return deps
+
 
 def merge_mods(lists) -> List[str]:
     found: set = set()
@@ -60,6 +63,8 @@ def merge_mods(lists) -> List[str]:
             mods.append(mod)
     return mods
 
+
 def find_modules_from_install(aliases, root=None, kver=None, moddir=None):
-    return merge_mods(resolve_dep(a, root=root, kver=kver, moddir=moddir)
-                      for a in aliases)
+    return merge_mods(
+        resolve_dep(a, root=root, kver=kver, moddir=moddir) for a in aliases
+    )

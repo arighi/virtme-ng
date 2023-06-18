@@ -56,8 +56,8 @@ def make_parser() -> argparse.ArgumentParser:
         nargs="?",
         const=uname.release,
         default=None,
-        help="Use specified kernel image or an installed kernel version. " + \
-             "If no argument is specified the running kernel will be used.",
+        help="Use specified kernel image or an installed kernel version. "
+        + "If no argument is specified the running kernel will be used.",
     )
 
     g.add_argument(
@@ -73,10 +73,10 @@ def make_parser() -> argparse.ArgumentParser:
         action="store",
         choices=["none", "use", "auto"],
         default="use",
-        help="Setup loadable kernel modules inside a compiled kernel source directory " +
-             "(used in conjunction with --kdir); " + \
-             "none: ignore kernel modules, use: asks user to refresh virtme's kernel modules directory, " + \
-             "auto: automatically refreshes virtme's kernel modules directory",
+        help="Setup loadable kernel modules inside a compiled kernel source directory "
+        + "(used in conjunction with --kdir); "
+        + "none: ignore kernel modules, use: asks user to refresh virtme's kernel modules directory, "
+        + "auto: automatically refreshes virtme's kernel modules directory",
     )
 
     g.add_argument(
@@ -102,8 +102,8 @@ def make_parser() -> argparse.ArgumentParser:
         nargs="?",
         metavar="BINARY",
         const="",
-        help="Show graphical output instead of using a console. " + \
-             "An argument can be optionally specified to start a graphical application.",
+        help="Show graphical output instead of using a console. "
+        + "An argument can be optionally specified to start a graphical application.",
     )
     g.add_argument(
         "--verbose", action="store_true", help="Increase console output verbosity."
@@ -162,11 +162,11 @@ def make_parser() -> argparse.ArgumentParser:
 
     g = parser.add_argument_group(
         title="Scripting",
-        description="Using any of the scripting options will run a script in the guest. " + \
-                    "The script's stdin will be attached to virtme-run's stdin and " + \
-                    "the script's stdout and stderr will both be attached to virtme-run's stdout. " + \
-                    "Kernel logs will go to stderr.  This behaves oddly if stdin is a terminal; " + \
-                    "try using 'cat |virtme-run' if you have trouble with script mode.",
+        description="Using any of the scripting options will run a script in the guest. "
+        + "The script's stdin will be attached to virtme-run's stdin and "
+        + "the script's stdout and stderr will both be attached to virtme-run's stdout. "
+        + "Kernel logs will go to stderr.  This behaves oddly if stdin is a terminal; "
+        + "try using 'cat |virtme-run' if you have trouble with script mode.",
     )
     g.add_argument(
         "--script-sh",
@@ -214,9 +214,9 @@ def make_parser() -> argparse.ArgumentParser:
         action="store",
         nargs=argparse.REMAINDER,
         metavar="OPTS...",
-        help="Additional arguments for QEMU. " + \
-             "This will consume all remaining arguments, so it must be specified last. " + \
-             "Avoid using -append; use --kopt instead.",
+        help="Additional arguments for QEMU. "
+        + "This will consume all remaining arguments, so it must be specified last. "
+        + "Avoid using -append; use --kopt instead.",
     )
 
     g = parser.add_argument_group(title="Debugging/testing")
@@ -352,7 +352,9 @@ def get_kernel_version(path):
             kernel_version = match.group(1)
             return kernel_version
     # 'file' failed to get kernel version, try with 'strings'.
-    result = subprocess.run(["strings", path], capture_output=True, text=True, check=False)
+    result = subprocess.run(
+        ["strings", path], capture_output=True, text=True, check=False
+    )
     match = re.search(r"Linux version (\S+)", result.stdout)
     if match:
         kernel_version = match.group(1)
@@ -417,8 +419,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 kernel.use_root_mods = True
             elif root_dir.startswith("/tmp"):
                 sys.stderr.write(
-                    "\nWarning: /tmp is hidden inside the guest, " + \
-                    "kernel modules won't be supported at runtime unless you move them somewhere else.\n\n"
+                    "\nWarning: /tmp is hidden inside the guest, "
+                    + "kernel modules won't be supported at runtime unless you move them somewhere else.\n\n"
                 )
             kernel.moddir = f"{root_dir}/lib/modules/{kver}"
             if not os.path.exists(kernel.moddir):
@@ -487,8 +489,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 )
             else:
                 sys.stderr.write(
-                    f"\n{mod_file} not found: kernel modules not enabled or kernel not compiled properly, " + \
-                    "kernel modules disabled\n\n"
+                    f"\n{mod_file} not found: kernel modules not enabled or kernel not compiled properly, "
+                    + "kernel modules disabled\n\n"
                 )
         else:
             arg_fail(f"invalid argument '{args.mods}', please use --mods=none|use|auto")
