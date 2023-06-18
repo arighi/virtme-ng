@@ -15,11 +15,15 @@ log() {
     fi
 }
 
+# Mount procfs and sysfs (needed for stat, sadly)
+mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-# Setup rw filesystem overlays
+# Mount tmpfs dirs
 mount -t tmpfs tmpfs /tmp/
+mount -t tmpfs run /run/
 
+# Setup rw filesystem overlays
 for tag in "${!virtme_rw_overlay@}"; do
     dir="${!tag}"
     upperdir="/tmp/$tag/upper"
@@ -86,9 +90,6 @@ elif [[ -x /lib/systemd/systemd-udevd ]]; then
 else
     udevd=`which udevd`
 fi
-
-# Mount proc (needed for stat, sadly)
-mount -t proc -o nosuid,noexec,nodev proc /proc/
 
 # devtmpfs might be automounted; if not, mount it.
 if ! grep -q devtmpfs /proc/mounts; then
@@ -222,7 +223,7 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
     fi
 fi
 
-if [[ -x /run/virtme/data/script ]]; then
+if [[ -x /mnt/virtme/data/script ]]; then
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
           ! -e "/dev/virtio-ports/virtme.stdout" ||
           ! -e "/dev/virtio-ports/virtme.stderr" ||
@@ -250,7 +251,7 @@ if [[ -x /run/virtme/data/script ]]; then
 
     # Start the script
     log 'starting script'
-    setsid /run/virtme/data/script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+    setsid /mnt/virtme/data/script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.

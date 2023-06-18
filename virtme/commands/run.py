@@ -730,6 +730,14 @@ def do_it() -> int:
     # Check if initramfs is required.
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
+    # NOTE: running a script requires initramfs at the moment, because the
+    # script to execute is created inside the initramfs.
+    #
+    # Later on we should figure out a way to run scripts directly without
+    # using an initramfs.
+    if args.script_sh or args.script_exec:
+        need_initramfs = True
+
     config = mkinitramfs.Config()
 
     if len(args.overlay_rwdir) > 0:
@@ -830,14 +838,19 @@ def do_it() -> int:
         virtme_init_cmd = "virtme-init"
 
     if args.root == "/":
-        initcmds = [f"exec {guest_tools_path}/{virtme_init_cmd}"]
+        initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
         export_virtfs(qemu, arch, qemuargs, guest_tools_path, "virtme.guesttools")
         initcmds = [
-            "mkdir -p /run/virtme/guesttools",
-            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
-            + "virtme.guesttools /run/virtme/guesttools",
-            f"exec /run/virtme/guesttools/{virtme_init_cmd}",
+            "init=/bin/sh",
+            "--",
+            "-c",
+            ";".join([
+                "mkdir -p /run/virtme/guesttools",
+                "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any " + \
+                "virtme.guesttools /run/virtme/guesttools",
+                f"exec /run/virtme/guesttools/{virtme_init_cmd}",
+            ]),
         ]
 
     # Arrange for modules to end up in the right place
@@ -978,22 +991,9 @@ def do_it() -> int:
                 ]
             )
 
-    has_script = False
-
     def do_script(shellcmd: str, use_exec=False, show_boot_console=False) -> None:
         if args.graphics is not None:
             arg_fail("scripts and --graphics are mutually exclusive")
-
-        nonlocal has_script
-        nonlocal need_initramfs
-        if has_script:
-            arg_fail("conflicting script options")
-        has_script = True
-
-        # NOTE: running a script requires initramfs at the moment, in the
-        # future try to figure out a way to run scripts directly without
-        # generating an initramfs.
-        need_initramfs = True
 
         # Turn off default I/O
         qemuargs.extend(arch.qemu_nodisplay_args())
@@ -1194,7 +1194,6 @@ def do_it() -> int:
             ]
         )
         initrdpath = None
-        initcmds.insert(0, "mount -t tmpfs run /run")
 
     if not args.verbose:
         kernelargs.append("quiet")
@@ -1208,9 +1207,7 @@ def do_it() -> int:
     # because we're explicitly passing '--' to set the arguments directly.
     # Fortunately, 'init=' will clear any arguments parsed so far, so make
     # sure that 'init=' appears directly before '--'.
-    kernelargs.append("init=/bin/sh")
-    kernelargs.append("--")
-    kernelargs.extend(["-c", ";".join(initcmds)])
+    kernelargs.extend(initcmds)
 
     # Load a normal kernel
     qemuargs.extend(["-kernel", kernel.kimg])

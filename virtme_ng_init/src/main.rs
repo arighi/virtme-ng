@@ -40,13 +40,6 @@ struct MountInfo {
 
 const KERNEL_MOUNTS: &[MountInfo] = &[
     MountInfo {
-        source: "sys",
-        target: "/sys",
-        fs_type: "sysfs",
-        flags: libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV,
-        fsdata: "",
-    },
-    MountInfo {
         source: "proc",
         target: "/proc",
         fs_type: "proc",
@@ -54,8 +47,22 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         fsdata: "",
     },
     MountInfo {
+        source: "sys",
+        target: "/sys",
+        fs_type: "sysfs",
+        flags: libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV,
+        fsdata: "",
+    },
+    MountInfo {
         source: "tmpfs",
         target: "/tmp",
+        fs_type: "tmpfs",
+        flags: 0,
+        fsdata: "",
+    },
+    MountInfo {
+        source: "run",
+        target: "/run",
         fs_type: "tmpfs",
         flags: 0,
         fsdata: "",
@@ -633,7 +640,7 @@ fn run_user_script() {
 
         clear_virtme_envs();
         unsafe {
-            Command::new("/run/virtme/data/script")
+            Command::new("/mnt/virtme/data/script")
                 .pre_exec(move || {
                     nix::libc::setsid();
                     libc::close(libc::STDIN_FILENO);
@@ -877,7 +884,7 @@ fn main() {
 
     // Start user session (batch or interactive).
     set_cwd();
-    if utils::is_file_executable("/run/virtme/data/script") {
+    if utils::is_file_executable("/mnt/virtme/data/script") {
         run_user_script();
     } else {
         setup_user_session();
