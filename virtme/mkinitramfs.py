@@ -128,30 +128,6 @@ else
   umount /newroot/proc  # Don't leave garbage behind
 fi
 
-if ! [[ -d /newroot/mnt ]]; then
-  log "your guest's root does not have /mnt -- using a fallback tmpfs"
-  need_fallback_tmpfs=1
-fi
-
-if [[ "$need_fallback_tmpfs" != "" ]]; then
-  mount --move /newroot /tmproot
-  mount -t tmpfs root_workaround /newroot/
-  cd tmproot
-  mkdir /newroot/proc /newroot/sys /newroot/dev /newroot/run /newroot/mnt /newroot/tmp
-  for i in *; do
-    if [[ -d "$i" && \! -d "/newroot/$i" ]]; then
-      mkdir /newroot/"$i"
-      mount --bind "$i" /newroot/"$i"
-    fi
-  done
-  mknod /newroot/dev/null c 1 3
-  mount -o remount,ro -t tmpfs root_workaround /newroot
-  umount -l /tmproot
-fi
-
-mount -t tmpfs mnt /newroot/mnt
-cp -a /run_virtme /newroot/mnt/virtme
-
 # Find init
 mount -t proc none /proc
 for arg in `cat /proc/cmdline`; do

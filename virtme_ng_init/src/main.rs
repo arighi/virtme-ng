@@ -590,7 +590,22 @@ fn setup_network() -> Option<thread::JoinHandle<()>> {
     None
 }
 
-fn run_user_script() {
+fn extract_user_script(virtme_script: &str) -> Option<String> {
+    let start_marker = "virtme.exec=`";
+    let end_marker = "`";
+
+    if let Some(start_index) = virtme_script.find(start_marker) {
+        let start_index = start_index + start_marker.len();
+        if let Some(end_index) = virtme_script[start_index..].find(end_marker) {
+            let cmd = &virtme_script[start_index..start_index + end_index];
+            return Some(cmd.to_string());
+        }
+    }
+
+    None
+}
+
+fn do_run_user_script(cmd: &str) {
     if !std::path::Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stderr").exists()
@@ -640,7 +655,8 @@ fn run_user_script() {
 
         clear_virtme_envs();
         unsafe {
-            Command::new("/mnt/virtme/data/script")
+            Command::new("/bin/sh")
+                .args(["-c", cmd])
                 .pre_exec(move || {
                     nix::libc::setsid();
                     libc::close(libc::STDIN_FILENO);
@@ -657,6 +673,16 @@ fn run_user_script() {
                 .expect("Failed to execute script");
         }
     }
+}
+
+fn run_user_script() -> bool {
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
+        if let Some(cmd) = extract_user_script(&cmdline) {
+            do_run_user_script(&cmd);
+            return true;
+        }
+    }
+    return false;
 }
 
 fn setup_root_home() {
@@ -884,9 +910,7 @@ fn main() {
 
     // Start user session (batch or interactive).
     set_cwd();
-    if utils::is_file_executable("/mnt/virtme/data/script") {
-        run_user_script();
-    } else {
+    if !run_user_script() {
         setup_user_session();
         run_user_session();
     }

@@ -223,7 +223,8 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
     fi
 fi
 
-if [[ -x /mnt/virtme/data/script ]]; then
+user_cmd=$(sed -ne "s/.*virtme.exec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
+if [[ -n "${user_cmd}" ]]; then
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
           ! -e "/dev/virtio-ports/virtme.stdout" ||
           ! -e "/dev/virtio-ports/virtme.stderr" ||
@@ -251,7 +252,7 @@ if [[ -x /mnt/virtme/data/script ]]; then
 
     # Start the script
     log 'starting script'
-    setsid /mnt/virtme/data/script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+    setsid bash -c "$user_cmd" </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.

@@ -730,14 +730,6 @@ def do_it() -> int:
     # Check if initramfs is required.
     need_initramfs = args.force_initramfs or qemu.cannot_overmount_virtfs
 
-    # NOTE: running a script requires initramfs at the moment, because the
-    # script to execute is created inside the initramfs.
-    #
-    # Later on we should figure out a way to run scripts directly without
-    # using an initramfs.
-    if args.script_sh or args.script_exec:
-        need_initramfs = True
-
     config = mkinitramfs.Config()
 
     if len(args.overlay_rwdir) > 0:
@@ -1049,16 +1041,7 @@ def do_it() -> int:
         qemuargs.extend(["-no-reboot"])
 
         # Ask virtme-init to run the script
-        config.virtme_data[
-            b"script"
-        ] = """#!/bin/sh
-
-        {prefix}{shellcmd}
-        """.format(
-            shellcmd=shellcmd, prefix="exec " if use_exec else ""
-        ).encode(
-            "ascii"
-        )
+        kernelargs.append(f"virtme.exec=`{shellcmd}`")
 
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if
