@@ -839,7 +839,7 @@ def do_it() -> int:
             "-c",
             ";".join([
                 "mkdir -p /run/virtme/guesttools",
-                "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any " + \
+                "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any " +
                 "virtme.guesttools /run/virtme/guesttools",
                 f"exec /run/virtme/guesttools/{virtme_init_cmd}",
             ]),
