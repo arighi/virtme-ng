@@ -178,7 +178,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--script-exec",
         action="store",
         metavar="BINARY",
-        help="Run the specified binary in the guest.",
+        help="[Deprecated] use --script-sh instead.",
     )
 
     g = parser.add_argument_group(
@@ -983,7 +983,7 @@ def do_it() -> int:
                 ]
             )
 
-    def do_script(shellcmd: str, use_exec=False, show_boot_console=False) -> None:
+    def do_script(shellcmd: str, show_boot_console=False) -> None:
         if args.graphics is not None:
             arg_fail("scripts and --graphics are mutually exclusive")
 
@@ -1066,7 +1066,6 @@ def do_it() -> int:
     if args.script_exec is not None:
         do_script(
             shlex.quote(args.script_exec),
-            use_exec=True,
             show_boot_console=args.show_boot_console,
         )
 
