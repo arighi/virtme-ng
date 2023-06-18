@@ -68,7 +68,7 @@ Depends:
  latexmk,
  librsvg2-bin,
  fakeroot,
-Recommends: virtiofsd
+Recommends: virtme-virtiofsd
 Description: Build and run specific kernels inside a virtualized snapshot of your live system
  virtme-ng is a tool that allows to setup a lab to experiment different
  kernel versions in a safe virtualized environment, re-using the entire
