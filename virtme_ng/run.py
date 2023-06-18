@@ -16,8 +16,9 @@ from pathlib import Path
 from argcomplete import autocomplete
 
 from virtme.util import SilentError, uname, get_username
-from virtme_ng.utils import VERSION, CONF_FILE
+from virtme_ng.utils import CONF_FILE
 from virtme_ng.spinner import Spinner
+from virtme_ng.version import VERSION
 
 def spinner_decorator(message):
     def decorator(func):

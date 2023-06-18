@@ -6,7 +6,8 @@ import subprocess
 from setuptools import setup
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
-from virtme_ng.utils import VERSION, CONF_PATH
+from virtme_ng.utils import CONF_PATH
+from virtme_ng.version import VERSION
 
 class BuildPy(build_py):
     def run(self):
