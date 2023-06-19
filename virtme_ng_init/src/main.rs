@@ -34,7 +34,10 @@ struct MountInfo {
     source: &'static str,
     target: &'static str,
     fs_type: &'static str,
+    #[cfg(target_pointer_width = "64")]
     flags: u64,
+    #[cfg(not(target_pointer_width = "64"))]
+    flags: u32,
     fsdata: &'static str,
 }
 
