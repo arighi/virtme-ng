@@ -507,9 +507,10 @@ def find_kernel_and_mods(arch, args) -> Kernel:
 
 
 class VirtioFS:
-    def __init__(self):
+    def __init__(self, guest_tools_path):
         self.sock = None
         self.pid = None
+        self.guest_tools_path = guest_tools_path
 
     def _cleanup_virtiofs_temp_files(self):
         # Make sure to kill virtiofsd instances that are still potentially running
@@ -551,6 +552,7 @@ class VirtioFS:
         # simply by running the command with --version as non-root. If it returns
         # an error it means that we are using the qemu daemon and we just skip it.
         possible_paths = (
+            f"{self.guest_tools_path}/bin/virtiofsd",
             which("virtiofsd"),
             "/usr/libexec/virtiofsd",
             "/usr/lib/qemu/virtiofsd",
@@ -606,6 +608,7 @@ def export_virtiofs(
     qemuargs: List[str],
     path: str,
     mount_tag: str,
+    guest_tools_path=None,
     memory=None,
     verbose=False,
 ) -> None:
@@ -613,7 +616,7 @@ def export_virtiofs(
         return False
 
     # Try to start virtiofsd deamon
-    virtio_fs = VirtioFS()
+    virtio_fs = VirtioFS(guest_tools_path)
     ret = virtio_fs.start(path, verbose)
     if not ret:
         return False
@@ -787,6 +790,10 @@ def do_it() -> int:
                 "\nWARNING: snaps can be enabled only when exporting the entire rootfs to the guest.\n\n"
             )
 
+    guest_tools_path = resources.find_guest_tools()
+    if guest_tools_path is None:
+        raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
+
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
     # is forced.
     if args.force_9p:
@@ -803,6 +810,7 @@ def do_it() -> int:
             qemuargs,
             args.root,
             "ROOTFS",
+            guest_tools_path=guest_tools_path,
             memory=args.memory,
             verbose=args.verbose,
         )
@@ -814,10 +822,6 @@ def do_it() -> int:
         export_virtfs(
             qemu, arch, qemuargs, args.root, "/dev/root", readonly=(not args.rw)
         )
-
-    guest_tools_path = resources.find_guest_tools()
-    if guest_tools_path is None:
-        raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
     # Use the faster virtme-ng-init if we are running on a native architecture.
     if (

@@ -1,0 +1,3 @@
+[submodule "virtiofsd"]
+	path = virtiofsd
+	url = https://gitlab.com/virtio-fs/virtiofsd.git

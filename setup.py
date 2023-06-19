@@ -45,6 +45,7 @@ class LintCommand(Command):
 
 class BuildPy(build_py):
     def run(self):
+        # Build virtme-ng-init
         check_call(
             ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
             cwd="virtme_ng_init",
@@ -53,12 +54,24 @@ class BuildPy(build_py):
             ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
             cwd="virtme_ng_init",
         )
+        # Build virtiofsd
+        check_call(
+            ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
+            cwd="virtiofsd",
+        )
+        check_call(
+            ["strip", "-s", "../virtme/guest/bin/virtiofsd"],
+            cwd="virtme_ng_init",
+        )
+        # Run the rest of virtme-ng build
         build_py.run(self)
 
 
 class EggInfo(egg_info):
     def run(self):
         if not os.path.exists("virtme/guest/bin/virtme-ng-init"):
+            self.run_command("build")
+        if not os.path.exists("virtme/guest/bin/virtiofsd"):
             self.run_command("build")
         egg_info.run(self)
 
@@ -108,6 +121,7 @@ setup(
     package_data={
         "virtme.guest": [
             "bin/virtme-ng-init",
+            "bin/virtiofsd",
             "virtme-init",
             "virtme-udhcpc-script",
             "virtme-snapd-script",

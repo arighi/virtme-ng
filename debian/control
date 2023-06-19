@@ -16,9 +16,12 @@ Build-Depends: bash-completion,
                python3-setuptools,
                libpython3-stdlib,
                cargo:native,
+               rustc:native,
                libstd-rust-dev,
                librust-nix-dev,
-               librust-users-dev
+               librust-users-dev,
+               librust-capng-dev,
+               librust-libseccomp-sys-dev
 
 
 Package: virtme-ng
