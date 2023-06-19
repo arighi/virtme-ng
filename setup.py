@@ -3,10 +3,29 @@
 import os
 import sys
 import subprocess
-from setuptools import setup
+from glob import glob
+from setuptools import setup, Command
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
 from virtme_ng.version import VERSION
+
+
+class LintCommand(Command):
+    description = "Run coding style checks"
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        for cmd in ("flake8", "pylint"):
+            command = [cmd]
+            for pattern in ("*.py", "virtme/*.py", "virtme/*/*.py", "virtme_ng/*.py"):
+                command += glob(pattern)
+            subprocess.call(command)
 
 
 class BuildPy(build_py):
@@ -65,6 +84,7 @@ setup(
     cmdclass={
         "build_py": BuildPy,
         "egg_info": EggInfo,
+        "lint": LintCommand,
     },
     data_files=[("/etc", ["cfg/virtme-ng.conf"])],
     scripts=[
