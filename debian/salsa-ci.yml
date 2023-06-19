@@ -1,0 +1,7 @@
+include:
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/salsa-ci.yml
+  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/pipeline-jobs.yml
+
+variables:
+  SALSA_CI_DISABLE_BLHC: 1 #https://bugs.debian.org/103752t:1
+  SALSA_CI_DISABLE_CROSSBUILD_ARM64: 1 #cargo build is called from python-setuptools

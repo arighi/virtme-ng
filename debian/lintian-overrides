@@ -1,0 +1,4 @@
+virtme-ng: no-manual-page [usr/bin/virtme-*]
+virtme-ng: no-manual-page [usr/bin/vng]
+virtme-ng: uses-dpkg-database-directly [usr/lib/python3/dist-packages/virtme/guest/bin/virtme-ng-init]
+virtme-ng: uses-dpkg-database-directly [usr/lib/python3/dist-packages/virtme/guest/virtme-init]

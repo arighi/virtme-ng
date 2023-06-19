@@ -1,12 +1,24 @@
 #!/usr/bin/make -f
 
+export PYBUILD_NAME = virtme-ng
+include /usr/share/dpkg/pkg-info.mk
+
 virtme-ng-prompt:
-	register-python-argcomplete virtme-ng vng > $@
+	(register-python-argcomplete virtme-ng vng || register-python-argcomplete3 virtme-ng vng) > $@
 
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
+override_dh_auto_configure:
+	debian/vendor-rust.sh
+	dh_auto_configure
+
 override_dh_install: virtme-ng-prompt
 	dh_install
-	mkdir -p $(CURDIR)/debian/virtme-ng/etc/bash_completion.d
-	install -m 0644 virtme-ng-prompt $(CURDIR)/debian/virtme-ng/etc/bash_completion.d/virtme-ng-prompt
+
+override_dh_clean:
+	rm -rf virtme_ng.egg-info .pybuild virtme_ng_init/.cargo
+	rm -rf virtme-ng-prompt virtme/guest/bin/
+	rm -rf virtme_ng/__pycache__/ virtme_ng_init/target
+	rm -rf virtme/guest/.crates.toml virtme/guest/.crates2.json
+	dh_clean
