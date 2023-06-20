@@ -1,0 +1,8 @@
+.debhelper/
+debhelper-build-stamp
+files
+virtme-ng.postinst.debhelper
+virtme-ng.prerm.debhelper
+virtme-ng.substvars
+virtme-ng/
+cargo_home/

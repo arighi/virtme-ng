@@ -1,0 +1,40 @@
+From d7d993b0a229b88a08a45517f12a450706c131ea Mon Sep 17 00:00:00 2001
+From: Ricardo Ribalda Delgado <ricardo@ribalda.com>
+Date: Tue, 20 Jun 2023 13:46:40 +0200
+Subject: [PATCH] setup.py: Do not run cargo
+
+Lets build it with debian/rules instead. So it can be cross compiled to
+other arches.
+
+Signed-off-by: Ricardo Ribalda Delgado <ricardo@ribalda.com>
+---
+ setup.py | 16 ++++++++--------
+ 1 file changed, 8 insertions(+), 8 deletions(-)
+
+Index: virtme-ng/setup.py
+===================================================================
+--- virtme-ng.orig/setup.py
++++ virtme-ng/setup.py
+@@ -45,14 +45,14 @@ class LintCommand(Command):
+ 
+ class BuildPy(build_py):
+     def run(self):
+-        check_call(
+-            ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
+-            cwd="virtme_ng_init",
+-        )
+-        check_call(
+-            ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
+-            cwd="virtme_ng_init",
+-        )
++        #check_call(
++        #    ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
++        #    cwd="virtme_ng_init",
++        #)
++        #check_call(
++        #    ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
++        #    cwd="virtme_ng_init",
++        #)
+         build_py.run(self)
+ 
+ 
