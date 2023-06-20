@@ -8,13 +8,13 @@ use nix::libc;
 use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Gid, Uid};
-use users::{get_user_by_name};
 use std::ffi::CString;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
+use users::get_user_by_name;
 
 static PROG_NAME: &'static str = "virtme-ng-init";
 
@@ -43,8 +43,8 @@ pub fn get_user_id(username: &str) -> Option<u32> {
 }
 
 pub fn do_chown(path: &str, uid: u32, gid: u32) -> io::Result<()> {
-     chown(path, Some(Uid::from_raw(uid)), Some(Gid::from_raw(gid)))
-         .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+    chown(path, Some(Uid::from_raw(uid)), Some(Gid::from_raw(gid)))
+        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
 
     Ok(())
 }

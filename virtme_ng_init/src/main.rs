@@ -769,7 +769,9 @@ fn run_user_gui(tty_fd: libc::c_int, app: &str) {
             }
         }
     }
-    if let Err(err) = utils::create_file(xinitrc, 0o0644, &format!("{}\nexec {}", pre_exec_cmd, app)) {
+    if let Err(err) =
+        utils::create_file(xinitrc, 0o0644, &format!("{}\nexec {}", pre_exec_cmd, app))
+    {
         utils::log(&format!("failed to generate {}: {}", xinitrc, err));
         return;
     }
