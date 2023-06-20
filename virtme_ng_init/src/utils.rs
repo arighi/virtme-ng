@@ -98,7 +98,7 @@ pub fn do_symlink(src: &str, dst: &str) {
     }
 }
 
-pub fn do_mount(source: &str, target: &str, fstype: &str, flags: u64, fsdata: &str) {
+pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: &str) {
     let source_cstr = CString::new(source).expect("CString::new failed");
     let fstype_cstr = CString::new(fstype).expect("CString::new failed");
     let fsdata_cstr = CString::new(fsdata).expect("CString::new failed");
@@ -107,7 +107,7 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: u64, fsdata: &s
         Some(source_cstr.as_ref()),
         target,
         Some(fstype_cstr.as_ref()),
-        MsFlags::from_bits_truncate(flags),
+        MsFlags::from_bits_truncate(flags.try_into().unwrap()),
         Some(fsdata_cstr.as_ref()),
     );
     if let Err(err) = result {

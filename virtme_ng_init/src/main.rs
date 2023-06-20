@@ -34,10 +34,7 @@ struct MountInfo {
     source: &'static str,
     target: &'static str,
     fs_type: &'static str,
-    #[cfg(target_pointer_width = "64")]
-    flags: u64,
-    #[cfg(not(target_pointer_width = "64"))]
-    flags: u32,
+    flags: usize,
     fsdata: &'static str,
 }
 
@@ -46,14 +43,14 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         source: "proc",
         target: "/proc",
         fs_type: "proc",
-        flags: libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "sys",
         target: "/sys",
         fs_type: "sysfs",
-        flags: libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NOEXEC | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
@@ -74,7 +71,7 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         source: "devtmpfs",
         target: "/dev",
         fs_type: "devtmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NOEXEC,
+        flags: (libc::MS_NOSUID | libc::MS_NOEXEC) as usize,
         fsdata: "",
     },
     MountInfo {
@@ -119,77 +116,77 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
         source: "devpts",
         target: "/dev/pts",
         fs_type: "devpts",
-        flags: libc::MS_NOSUID | libc::MS_NOEXEC,
+        flags: (libc::MS_NOSUID | libc::MS_NOEXEC) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/dev/shm",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/log",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/tmp",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/spool/rsyslog",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/lib/portables",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/lib/machines",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/lib/private",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/lib/apt",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/cache",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
     MountInfo {
         source: "tmpfs",
         target: "/var/lib/snapd/cookie",
         fs_type: "tmpfs",
-        flags: libc::MS_NOSUID | libc::MS_NODEV,
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
         fsdata: "",
     },
 ];
@@ -281,7 +278,7 @@ fn run_systemd_tmpfiles() {
 
 fn generate_fstab() -> io::Result<()> {
     utils::create_file("/tmp/fstab", 0o0664, "").ok();
-    utils::do_mount("/tmp/fstab", "/etc/fstab", "", libc::MS_BIND, "");
+    utils::do_mount("/tmp/fstab", "/etc/fstab", "", libc::MS_BIND as usize, "");
     Ok(())
 }
 
@@ -303,7 +300,7 @@ fn generate_shadow() -> io::Result<()> {
             writeln!(writer, "{}:!:::::::", username)?;
         }
     }
-    utils::do_mount("/tmp/shadow", "/etc/shadow", "", libc::MS_BIND, "");
+    utils::do_mount("/tmp/shadow", "/etc/shadow", "", libc::MS_BIND as usize, "");
 
     Ok(())
 }
@@ -318,7 +315,7 @@ fn generate_sudoers() -> io::Result<()> {
             user
         );
         file.write_all(content.as_bytes())?;
-        utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND, "");
+        utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
     }
     Ok(())
 }
@@ -450,7 +447,7 @@ fn fix_dpkg_locks() {
         }
         let src_file = format!("/tmp/{}", fname);
         utils::create_file(&src_file, 0o0640, "").ok();
-        utils::do_mount(&src_file, path, "", libc::MS_BIND, "");
+        utils::do_mount(&src_file, path, "", libc::MS_BIND as usize, "");
     }
 }
 
@@ -690,7 +687,7 @@ fn run_user_script() -> bool {
 
 fn setup_root_home() {
     utils::do_mkdir("/tmp/roothome");
-    utils::do_mount("/tmp/roothome", "/root", "", libc::MS_BIND, "");
+    utils::do_mount("/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
     env::set_var("HOME", "/tmp/roothome");
 }
 
