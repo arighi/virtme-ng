@@ -2,12 +2,18 @@
 
 import os
 import sys
+import platform
 from glob import glob
 from subprocess import check_call, CalledProcessError
 from setuptools import setup, Command
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
 from virtme_ng.version import VERSION
+
+
+def is_arm_32bit():
+    arch = platform.machine()
+    return arch.startswith("arm") and platform.architecture()[0] == "32bit"
 
 
 class LintCommand(Command):
@@ -55,14 +61,18 @@ class BuildPy(build_py):
             cwd="virtme_ng_init",
         )
         # Build virtiofsd
-        check_call(
-            ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
-            cwd="virtiofsd",
-        )
-        check_call(
-            ["strip", "-s", "../virtme/guest/bin/virtiofsd"],
-            cwd="virtme_ng_init",
-        )
+        #
+        # NOTE: skip this on armhf, because the build fails (we can probably
+        # fix this, but in virtiofsd, not here).
+        if not is_arm_32bit():
+            check_call(
+                ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
+                cwd="virtiofsd",
+            )
+            check_call(
+                ["strip", "-s", "../virtme/guest/bin/virtiofsd"],
+                cwd="virtme_ng_init",
+            )
         # Run the rest of virtme-ng build
         build_py.run(self)
 
@@ -71,14 +81,26 @@ class EggInfo(egg_info):
     def run(self):
         if not os.path.exists("virtme/guest/bin/virtme-ng-init"):
             self.run_command("build")
-        if not os.path.exists("virtme/guest/bin/virtiofsd"):
-            self.run_command("build")
+        if not is_arm_32bit():
+            if not os.path.exists("virtme/guest/bin/virtiofsd"):
+                self.run_command("build")
         egg_info.run(self)
 
 
 if sys.version_info < (3, 8):
     print("virtme-ng requires Python 3.8 or higher")
     sys.exit(1)
+
+package_files = [
+    "bin/virtme-ng-init",
+    "virtme-init",
+    "virtme-udhcpc-script",
+    "virtme-snapd-script",
+    "virtme-sound-script",
+]
+
+if not is_arm_32bit():
+    package_files.append("bin/virtiofsd")
 
 setup(
     name="virtme-ng",
@@ -118,16 +140,7 @@ setup(
     scripts=[
         "bin/virtme-prep-kdir-mods",
     ],
-    package_data={
-        "virtme.guest": [
-            "bin/virtme-ng-init",
-            "bin/virtiofsd",
-            "virtme-init",
-            "virtme-udhcpc-script",
-            "virtme-snapd-script",
-            "virtme-sound-script",
-        ],
-    },
+    package_data={"virtme.guest": package_files},
     include_package_data=True,
     classifiers=[
         "Environment :: Console",
