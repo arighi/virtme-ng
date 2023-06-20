@@ -68,9 +68,10 @@ Recommends: qemu-system-x86,
 	python3-sphinx-rtd-theme,
 	fontconfig,
 	python3-docutils,
-	virtiofsd,
+Recommends: qemu-system-x86
 Suggests: qemu-system-arm,
-          qemu-system-ppc
+          qemu-system-ppc,
+          virtiofsd
 Description: Build and run specific kernels inside a virtualized snapshot of your live system
  virtme-ng is a tool that allows to setup a lab to experiment different
  kernel versions in a safe virtualized environment, re-using the entire
