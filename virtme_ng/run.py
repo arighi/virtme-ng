@@ -1086,7 +1086,7 @@ def do_it() -> int:
                         return
                 make(kern_source, args)
             run(kern_source, args)
-    except Exception as exc:
+    except CalledProcessError as exc:
         raise SilentError() from exc
 
 

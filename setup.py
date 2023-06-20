@@ -2,8 +2,8 @@
 
 import os
 import sys
-import subprocess
 from glob import glob
+from subprocess import check_call, CalledProcessError
 from setuptools import setup, Command
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
@@ -21,20 +21,35 @@ class LintCommand(Command):
         pass
 
     def run(self):
-        for cmd in ("flake8", "pylint"):
-            command = [cmd]
-            for pattern in ("*.py", "virtme/*.py", "virtme/*/*.py", "virtme_ng/*.py"):
-                command += glob(pattern)
-            subprocess.call(command)
+        try:
+            sys.stderr.write("checking python coding style\n")
+            for cmd in ("flake8", "pylint"):
+                command = [cmd]
+                for pattern in (
+                    "*.py",
+                    "virtme/*.py",
+                    "virtme/*/*.py",
+                    "virtme_ng/*.py",
+                ):
+                    command += glob(pattern)
+                check_call(command)
+            sys.stderr.write("python: ok\n")
+            sys.stderr.write("checking Rust coding style\n")
+            check_call(
+                ["cargo", "fmt", "--", "--check"], cwd="virtme_ng_init"
+            )
+            sys.stderr.write("Rust: ok\n")
+        except CalledProcessError:
+            sys.exit(1)
 
 
 class BuildPy(build_py):
     def run(self):
-        subprocess.check_call(
+        check_call(
             ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
             cwd="virtme_ng_init",
         )
-        subprocess.check_call(
+        check_call(
             ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
             cwd="virtme_ng_init",
         )
