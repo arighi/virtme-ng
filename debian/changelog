@@ -1,3 +1,16 @@
+virtme-ng (1.11-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.11:
+    - fix to properly mount tmpfs on /run when --root is used
+    - allow to build virtme-ng-init on 32-bit architectures
+    - manage virtme-ng-init and virtiofsd as git submodules
+    - allow to enable/disable virtme-ng-init and virtiofsd at build time
+    - small --exec performance improvement
+    - add coding style checks
+    - deb packaging refactoring
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 21 Jun 2023 15:21:51 +0200
+
 virtme-ng (1.10-1) unstable; urgency=medium
 
   * New version virtme-ng 1.10:
