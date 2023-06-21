@@ -11,6 +11,11 @@ from setuptools.command.egg_info import egg_info
 from virtme_ng.version import VERSION
 
 
+# Global variables to store custom build options (as env variables)
+build_virtiofsd = int(os.environ.get("BUILD_VIRTIOFSD", 0))
+build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
+
+
 def is_arm_32bit():
     arch = platform.machine()
     return arch.startswith("arm") and platform.architecture()[0] == "32bit"
@@ -45,19 +50,18 @@ class LintCommand(Command):
 class BuildPy(build_py):
     def run(self):
         # Build virtme-ng-init
-        check_call(
-            ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
-            cwd="virtme_ng_init",
-        )
-        check_call(
-            ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
-            cwd="virtme_ng_init",
-        )
+        if build_virtme_ng_init:
+            check_call(
+                ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
+                cwd="virtme_ng_init",
+            )
+            check_call(
+                ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
+                cwd="virtme_ng_init",
+            )
+
         # Build virtiofsd
-        #
-        # NOTE: skip this on armhf, because the build fails (we can probably
-        # fix this, but in virtiofsd, not here).
-        if not is_arm_32bit():
+        if build_virtiofsd:
             check_call(
                 ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
                 cwd="virtiofsd",
@@ -66,17 +70,24 @@ class BuildPy(build_py):
                 ["strip", "-s", "../virtme/guest/bin/virtiofsd"],
                 cwd="virtme_ng_init",
             )
+
         # Run the rest of virtme-ng build
         build_py.run(self)
 
 
 class EggInfo(egg_info):
     def run(self):
-        if not os.path.exists("virtme/guest/bin/virtme-ng-init"):
+        # Initialize virtme guest binary directory
+        guest_bin_dir = "virtme/guest/bin"
+        if not os.path.exists(guest_bin_dir):
+            os.mkdir(guest_bin_dir)
+
+        # Install guest binaries
+        if (
+            build_virtme_ng_init
+            and not os.path.exists("virtme/guest/bin/virtme-ng-init")
+        ) or (build_virtiofsd and not os.path.exists("virtme/guest/bin/virtiofsd")):
             self.run_command("build")
-        if not is_arm_32bit():
-            if not os.path.exists("virtme/guest/bin/virtiofsd"):
-                self.run_command("build")
         egg_info.run(self)
 
 
@@ -84,16 +95,22 @@ if sys.version_info < (3, 8):
     print("virtme-ng requires Python 3.8 or higher")
     sys.exit(1)
 
+# NOTE: always skip virtiofsd on armhf, because the build fails
+# (we can probably fix this, but in virtiofsd, not here).
+if is_arm_32bit():
+    build_virtiofsd = False
+
 package_files = [
-    "bin/virtme-ng-init",
     "virtme-init",
     "virtme-udhcpc-script",
     "virtme-snapd-script",
     "virtme-sound-script",
 ]
 
-if not is_arm_32bit():
+if build_virtiofsd:
     package_files.append("bin/virtiofsd")
+if build_virtme_ng_init:
+    package_files.append("bin/virtme-ng-init")
 
 setup(
     name="virtme-ng",

@@ -55,17 +55,18 @@ Quick start
 Installation
 ============
 
-If you're running Ubuntu you can install virtme-ng from
+You can clone this git repository and build a standalone virtme-ng running the
+following commands:
+```
+ $ git clone --recurse-submodules https://github.com/arighi/virtme-ng.git
+ $ BUILD_VIRTIOFSD=1 BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt .
+```
+
+Alternatively, if you're using Ubuntu, you can install virtme-ng from
 ppa:arighi/virtme-ng:
 ```
  $ sudo add-apt-repository ppa:arighi/virtme-ng
  $ sudo apt install --yes virtme-ng
-```
-
-Alternatively, you can install via pip directly (after cloning this git
-repository):
-```
- $ pip3 install -r requirements.txt .
 ```
 
 Requirements
