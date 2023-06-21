@@ -2,9 +2,7 @@ name: Rust
 
 on:
   push:
-    branches: [ "main" ]
   pull_request:
-    branches: [ "main" ]
 
 env:
   CARGO_TERM_COLOR: always
@@ -16,6 +14,8 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+    - name: Coding style
+      run: cargo fmt -- --check
     - name: Build
       run: cargo build --verbose
     - name: Run tests
