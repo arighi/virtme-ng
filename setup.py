@@ -28,7 +28,6 @@ class LintCommand(Command):
 
     def run(self):
         try:
-            sys.stderr.write("checking python coding style\n")
             for cmd in ("flake8", "pylint"):
                 command = [cmd]
                 for pattern in (
@@ -39,12 +38,6 @@ class LintCommand(Command):
                 ):
                     command += glob(pattern)
                 check_call(command)
-            sys.stderr.write("python: ok\n")
-            sys.stderr.write("checking Rust coding style\n")
-            check_call(
-                ["cargo", "fmt", "--", "--check"], cwd="virtme_ng_init"
-            )
-            sys.stderr.write("Rust: ok\n")
         except CalledProcessError:
             sys.exit(1)
 
