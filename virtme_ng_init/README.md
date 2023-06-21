@@ -1,9 +1,3 @@
-# This project has been merged into virtme-ng
-
-This project has been merged into: https://github.com/arighi/virtme-ng.
-
-From now on all the development will continue in virtme-ng.
-
 # virtme-ng-init: fast init process for virtme-ng
 
 virtme-ng-init is an extremely lightweight init process for virtme-ng [1]
