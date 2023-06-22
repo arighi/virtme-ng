@@ -10,6 +10,13 @@ from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
 from virtme_ng.version import VERSION
 
+# Source .config if it exists (where we can potentially defined config/build
+# options)
+if os.path.exists(".config"):
+    with open(".config", "r", encoding="utf-8") as config_file:
+        for line in config_file:
+            key, value = line.strip().split("=")
+            os.environ[key] = value
 
 # Global variables to store custom build options (as env variables)
 build_virtiofsd = int(os.environ.get("BUILD_VIRTIOFSD", 0))
@@ -49,6 +56,7 @@ class LintCommand(Command):
 
 class BuildPy(build_py):
     def run(self):
+        print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
         # Build virtme-ng-init
         if build_virtme_ng_init:
             check_call(
@@ -61,6 +69,7 @@ class BuildPy(build_py):
             )
 
         # Build virtiofsd
+        print(f"BUILD_VIRTIOFSD: {build_virtiofsd}")
         if build_virtiofsd:
             check_call(
                 ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
@@ -100,6 +109,13 @@ if sys.version_info < (3, 8):
 if is_arm_32bit():
     build_virtiofsd = False
 
+packages = [
+    "virtme_ng",
+    "virtme",
+    "virtme.commands",
+    "virtme.guest",
+]
+
 package_files = [
     "virtme-init",
     "virtme-udhcpc-script",
@@ -111,6 +127,8 @@ if build_virtiofsd:
     package_files.append("bin/virtiofsd")
 if build_virtme_ng_init:
     package_files.append("bin/virtme-ng-init")
+if build_virtiofsd or build_virtme_ng_init:
+    packages.append("virtme.guest.bin")
 
 setup(
     name="virtme-ng",
@@ -124,13 +142,6 @@ setup(
         os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="utf-8"
     ).read(),
     long_description_content_type="text/markdown",
-    packages=[
-        "virtme_ng",
-        "virtme",
-        "virtme.commands",
-        "virtme.guest",
-        "virtme.guest.bin",
-    ],
     install_requires=["argcomplete"],
     entry_points={
         "console_scripts": [
@@ -146,11 +157,12 @@ setup(
         "egg_info": EggInfo,
         "lint": LintCommand,
     },
+    packages=packages,
+    package_data={"virtme.guest": package_files},
     data_files=[("/etc", ["cfg/virtme-ng.conf"])],
     scripts=[
         "bin/virtme-prep-kdir-mods",
     ],
-    package_data={"virtme.guest": package_files},
     include_package_data=True,
     classifiers=[
         "Environment :: Console",

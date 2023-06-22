@@ -1,11 +1,11 @@
 Source: virtme-ng
 Section: misc
 Priority: optional
-Maintainer: Ricardo Ribalda Delgado <ricardo@ribalda.com>
+Maintainer: Andrea Righi <andrea.righi@canonical.com>
 Standards-Version: 4.6.2
 Homepage: https://github.com/arighi/virtme-ng
-Vcs-Browser: https://salsa.debian.org/ribalda/virtme-ng
-Vcs-Git: https://salsa.debian.org/ribalda/virtme-ng.git
+Vcs-Git: https://github.com/arighi/virtme-ng
+Vcs-Browser: https://github.com/arighi/virtme-ng
 Rules-Requires-Root: no
 Build-Depends: bash-completion,
                debhelper (>= 11),
@@ -23,60 +23,70 @@ Build-Depends: bash-completion,
                librust-capng-dev,
                librust-libseccomp-sys-dev
 
-
 Package: virtme-ng
 Architecture: any
-Depends: ${shlibs:Depends},
-         ${misc:Depends},
-         ${python3:Depends}
-	 rsync,
-	 acl,
-	 autoconf,
-	 automake,
-	 kmod,
-	 fakeroot,
-	 python3-argcomplete,
+Depends:
+ ${misc:Depends},
+ ${python3:Depends},
+ qemu-system-x86,
+ gcc-12,
+ autoconf,
+ automake,
+ kmod,
+ makedumpfile,
+ libcap-dev,
+ libelf-dev,
+ libnewt-dev,
+ libiberty-dev,
+ default-jdk-headless,
+ java-common,
+ rsync,
+ libdw-dev,
+ libpci-dev,
+ pkg-config,
+ flex,
+ bison,
+ libunwind8-dev,
+ liblzma-dev,
+ openssl,
+ libssl-dev,
+ libaudit-dev,
+ bc,
+ gawk,
+ libudev-dev,
+ autoconf,
+ automake,
+ libtool,
+ uuid-dev,
+ libnuma-dev,
+ acl,
+ dkms,
+ curl,
+ zstd,
+ pahole,
+ xmlto,
+ docbook-utils,
+ ghostscript,
+ fig2dev,
+ bzip2,
+ sharutils,
+ asciidoc,
+ python3-argcomplete,
+ python3-dev,
+ python3-sphinx,
+ python3-sphinx-rtd-theme,
+ fontconfig,
+ python3-docutils,
+ imagemagick,
+ graphviz,
+ dvipng,
+ fonts-noto-cjk,
+ latexmk,
+ librsvg2-bin,
+ fakeroot,
 Provides: virtme
 Conflicts: virtme
 Replaces: virtme
-Recommends: qemu-system-x86,
-	libcap-dev,
-	libelf-dev,
-	libnewt-dev,
-	libiberty-dev,
-	libdw-dev,
-	libpci-dev,
-	flex,
-	bison,
-	libunwind8-dev,
-	liblzma-dev,
-	openssl,
-	libssl-dev,
-	libaudit-dev,
-	bc,
-	gawk,
-	libudev-dev,
-	libtool,
-	uuid-dev,
-	libnuma-dev,
-	curl,
-	zstd,
-	pahole,
-	xmlto,
-	docbook-utils,
-	ghostscript,
-	fig2dev,
-	bzip2,
-	sharutils,
-	asciidoc,
-	python3-dev,
-	python3-sphinx,
-	python3-sphinx-rtd-theme,
-	fontconfig,
-	python3-docutils,
-Recommends: qemu-system-x86
-Suggests: qemu-system-arm,
-          qemu-system-ppc
 Description: Build and run specific kernels inside a virtualized snapshot of your live system
  virtme-ng is a tool that allows to setup a lab to experiment different
  kernel versions in a safe virtualized environment, re-using the entire

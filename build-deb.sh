@@ -8,6 +8,7 @@
 # Example usage:
 #  $ ./build-deb.sh -S -sa --lintian-opts --no-lintian
 
+
 MODULES="virtme_ng_init virtiofsd"
 
 if [ ! -d .git ]; then
@@ -36,7 +37,13 @@ EOF
     cd -
 done
 
-git add $MODULES
+# Enable embedded virtiofsd and virtme-ng-init when building the deb package.
+cat << EOF > .config
+BUILD_VIRTME_NG_INIT=1
+BUILD_VIRTIOFSD=1
+EOF
+
+git add .config $MODULES
 git commit -a -m "resync submodules"
 
 # Create upsteam tag
