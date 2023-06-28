@@ -250,9 +250,12 @@ if [[ -n "${user_cmd}" ]]; then
     ln -s /dev/virtio-ports/virtme.dev_stdout /dev/stdout
     ln -s /dev/virtio-ports/virtme.dev_stderr /dev/stderr
 
+    # Decode shell command (base64) and dump it to a script
+    echo $user_cmd | base64 -d > /tmp/.virtme-script
+
     # Start the script
     log 'starting script'
-    setsid bash -c "$user_cmd" </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+    setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
     log "script returned $?"
 
     # Hmm.  We should expose the return value somehow.

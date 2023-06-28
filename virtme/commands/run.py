@@ -21,6 +21,7 @@ import subprocess
 import signal
 from shutil import which
 from time import sleep
+from base64 import b64encode
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -1044,6 +1045,10 @@ def do_it() -> int:
 
         # Scripts shouldn't reboot
         qemuargs.extend(["-no-reboot"])
+
+        # Encode the shell command to base64 to handle special characters (such
+        # as quotes, double quotes, etc.).
+        shellcmd = b64encode(shellcmd.encode('utf-8')).decode('utf-8')
 
         # Ask virtme-init to run the script
         kernelargs.append(f"virtme.exec=`{shellcmd}`")
