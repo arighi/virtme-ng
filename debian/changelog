@@ -1,3 +1,11 @@
+virtme-ng (1.12-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.12:
+    - fix regression with --exec (allow to use double quotes in the command)
+    - updated embedded version of virtiofsd
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Wed, 28 Jun 2023 09:30:25 +0200
+
 virtme-ng (1.11-1) unstable; urgency=medium
 
   * New version virtme-ng 1.11:

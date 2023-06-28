@@ -3,7 +3,7 @@
 
 """virtme-ng version"""
 
-VERSION = "1.11"
+VERSION = "1.12"
 
 if __name__ == '__main__':
     print(VERSION)
