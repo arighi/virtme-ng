@@ -11,6 +11,9 @@
 //!
 //! Author: Andrea Righi <andrea.righi@canonical.com>
 
+use base64::engine::general_purpose::STANDARD as BASE64;
+use base64::engine::Engine as _;
+
 use libc::{uname, utsname};
 use nix::fcntl::{open, OFlag};
 use nix::libc;
@@ -597,8 +600,12 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
     if let Some(start_index) = virtme_script.find(start_marker) {
         let start_index = start_index + start_marker.len();
         if let Some(end_index) = virtme_script[start_index..].find(end_marker) {
-            let cmd = &virtme_script[start_index..start_index + end_index];
-            return Some(cmd.to_string());
+            let encoded_cmd = &virtme_script[start_index..start_index + end_index];
+            if let Ok(decoded_bytes) = BASE64.decode(encoded_cmd) {
+                if let Ok(decoded_string) = String::from_utf8(decoded_bytes) {
+                    return Some(decoded_string);
+                }
+            }
         }
     }
 

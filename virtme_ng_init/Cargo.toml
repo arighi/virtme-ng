@@ -8,3 +8,4 @@ edition = "2021"
 [dependencies]
 nix = "0"
 users = "0"
+base64 = "0.21"
