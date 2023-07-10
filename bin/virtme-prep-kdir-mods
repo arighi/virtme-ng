@@ -2,7 +2,9 @@
 
 # This is still a bit of an experiment.
 FAKEVER=0.0.0
-MODDIR=".virtme_mods/lib/modules/$FAKEVER"
+DIR=".virtme_mods"
+MODDIR_USRMERGE="$DIR/usr"
+MODDIR="$DIR/lib/modules/$FAKEVER"
 
 # Some distro don't have /sbin or /usr/sbin in user's default path. Make sure
 # to setup the right path to find all the commands needed to setup the modules
@@ -46,6 +48,10 @@ fi
 
 mkdir -p "$MODDIR/kernel"
 ln -srfT . "$MODDIR/build"
+
+# depmod can expect kernel modules to live on /usr/lib/modules on distributions
+# that are making use of usrmerge.
+ln -srfT "$DIR" "$MODDIR_USRMERGE"
 
 # Remove all preexisting symlinks and add symlinks to all modules that belong
 # to the build kenrnel.
