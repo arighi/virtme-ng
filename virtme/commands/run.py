@@ -28,7 +28,7 @@ from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
 from .. import resources
-from ..util import SilentError, uname, get_username
+from ..util import SilentError, uname, get_username, find_binary_or_raise
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -430,11 +430,13 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             else:
                 mod_file = os.path.join(kernel.moddir, "modules.dep")
                 if not os.path.exists(mod_file):
+                    depmod = find_binary_or_raise(['depmod'])
+
                     # Try to refresh modules directory. Some packages (e.g., debs)
                     # don't ship all the required modules information, so we
                     # need to refresh the modules directory using depmod.
                     subprocess.call(
-                        ["depmod", "-a", "-b", root_dir, kver],
+                        [depmod, "-a", "-b", root_dir, kver],
                         stderr=subprocess.DEVNULL,
                     )
                 kernel.modfiles = modfinder.find_modules_from_install(
