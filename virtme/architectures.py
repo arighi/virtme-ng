@@ -231,7 +231,11 @@ class Arch_arm(Arch):
 
     @staticmethod
     def dtb_path():
-        return "arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb"
+        if os.path.exists("arch/arm/boot/dts/arm/vexpress-v2p-ca15-tc1.dtb"):
+            return "arch/arm/boot/dts/arm/vexpress-v2p-ca15-tc1.dtb"
+        if os.path.exists("arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb"):
+            return "arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb"
+        return None
 
 
 class Arch_aarch64(Arch):
