@@ -8,7 +8,8 @@
 from typing import List, Dict, Optional
 
 import io
-import os.path
+import os
+import tempfile
 import shlex
 from . import cpiowriter
 from . import util
@@ -89,11 +90,17 @@ def install_modprobe(cw):
 def install_modules(cw, modfiles):
     cw.mkdir(b"modules", 0o755)
     paths = []
-    for mod in modfiles:
-        with open(mod, "rb") as f:
-            modpath = "modules/" + os.path.basename(mod)
-            paths.append(modpath)
-            cw.write_file(name=modpath.encode("ascii"), body=f, mode=0o644)
+    with tempfile.TemporaryDirectory() as tmpdirname:
+        for mod in modfiles:
+            if mod.endswith('.zst'):
+                mod_file = os.path.basename(mod)
+                uncompressed_mod = tmpdirname + os.path.splitext(mod_file)[0]
+                os.system(f"zstd -d < {mod} > {uncompressed_mod}")
+                mod = uncompressed_mod
+            with open(mod, "rb") as f:
+                modpath = "modules/" + os.path.basename(mod)
+                paths.append(modpath)
+                cw.write_file(name=modpath.encode("ascii"), body=f, mode=0o644)
 
     script = _LOGFUNC + "\n".join(
         "log 'loading %s...'; insmod %s" % (os.path.basename(p), shlex.quote(p))
