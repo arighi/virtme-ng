@@ -19,7 +19,6 @@ if os.path.exists(".config"):
             os.environ[key] = value
 
 # Global variables to store custom build options (as env variables)
-build_virtiofsd = int(os.environ.get("BUILD_VIRTIOFSD", 0))
 build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
 
 
@@ -68,18 +67,6 @@ class BuildPy(build_py):
                 cwd="virtme_ng_init",
             )
 
-        # Build virtiofsd
-        print(f"BUILD_VIRTIOFSD: {build_virtiofsd}")
-        if build_virtiofsd:
-            check_call(
-                ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
-                cwd="virtiofsd",
-            )
-            check_call(
-                ["strip", "-s", "../virtme/guest/bin/virtiofsd"],
-                cwd="virtme_ng_init",
-            )
-
         # Run the rest of virtme-ng build
         build_py.run(self)
 
@@ -92,10 +79,7 @@ class EggInfo(egg_info):
             os.mkdir(guest_bin_dir)
 
         # Install guest binaries
-        if (
-            build_virtme_ng_init
-            and not os.path.exists("virtme/guest/bin/virtme-ng-init")
-        ) or (build_virtiofsd and not os.path.exists("virtme/guest/bin/virtiofsd")):
+        if (build_virtme_ng_init and not os.path.exists("virtme/guest/bin/virtme-ng-init")):
             self.run_command("build")
         egg_info.run(self)
 
@@ -103,11 +87,6 @@ class EggInfo(egg_info):
 if sys.version_info < (3, 8):
     print("virtme-ng requires Python 3.8 or higher")
     sys.exit(1)
-
-# NOTE: always skip virtiofsd on armhf, because the build fails
-# (we can probably fix this, but in virtiofsd, not here).
-if is_arm_32bit():
-    build_virtiofsd = False
 
 packages = [
     "virtme_ng",
@@ -123,11 +102,8 @@ package_files = [
     "virtme-sound-script",
 ]
 
-if build_virtiofsd:
-    package_files.append("bin/virtiofsd")
 if build_virtme_ng_init:
     package_files.append("bin/virtme-ng-init")
-if build_virtiofsd or build_virtme_ng_init:
     packages.append("virtme.guest.bin")
 
 setup(

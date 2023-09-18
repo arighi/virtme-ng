@@ -9,7 +9,7 @@
 #  $ ./build-deb.sh -S -sa --lintian-opts --no-lintian
 
 
-MODULES="virtme_ng_init virtiofsd"
+MODULES="virtme_ng_init"
 
 if [ ! -d .git ]; then
     echo "error: must be ran from a git repository"
@@ -19,7 +19,7 @@ fi
 # Include Rust vendor dependencies in the package (external builders usually
 # don't allow to download external packages during the build process).
 #
-# This is required to build virmte-ng-init and virtiofsd.
+# This is required to build virmte-ng-init.
 for mod in $MODULES; do
     cd $mod
     git clean -xdf || true
@@ -37,10 +37,9 @@ EOF
     cd -
 done
 
-# Enable embedded virtiofsd and virtme-ng-init when building the deb package.
+# Enable embedded virtme-ng-init when building the deb package.
 cat << EOF > .config
 BUILD_VIRTME_NG_INIT=1
-BUILD_VIRTIOFSD=1
 EOF
 
 git add .config $MODULES
