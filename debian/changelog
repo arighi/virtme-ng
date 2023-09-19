@@ -1,3 +1,14 @@
+virtme-ng (1.13-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.13:
+    - support kernels with zstd compressed modules
+    - drop custom virtiofsd and rely on upstream version
+    - check for a statically linked busybox
+    - arm: support new dtd path
+    - find the exact location of depmod across distro
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Tue, 19 Sep 2023 09:14:41 +0200
+
 virtme-ng (1.12-1) unstable; urgency=medium
 
   * New version virtme-ng 1.12:
