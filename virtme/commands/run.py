@@ -719,6 +719,16 @@ def has_read_acl(username, file_path):
         return False  # Error occurred while executing getfacl command
 
 
+def is_statically_linked(binary_path):
+    try:
+        # Run the 'file' command on the binary and check for the string
+        # "statically linked"
+        result = subprocess.check_output(['file', binary_path], universal_newlines=True)
+        return "statically linked" in result
+    except subprocess.CalledProcessError:
+        return False
+
+
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
 _RWDIR_RE = re.compile("^(%s)(?:=(%s))?$" % (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
@@ -1134,6 +1144,13 @@ def do_it() -> int:
             if busybox is None:
                 print(
                     "virtme-run: initramfs is needed, and no busybox was found",
+                    file=sys.stderr,
+                )
+                return 1
+            if not is_statically_linked(busybox):
+                print(
+                    "virtme-run: a statically linked busybox could not be found, "
+                    "please install busybox-static",
                     file=sys.stderr,
                 )
                 return 1
