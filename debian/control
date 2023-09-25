@@ -85,6 +85,7 @@ Depends:
  latexmk,
  librsvg2-bin,
  fakeroot,
+Suggests: pulseaudio-utils, dbus-x11
 Provides: virtme
 Conflicts: virtme
 Replaces: virtme
