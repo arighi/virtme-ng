@@ -30,6 +30,7 @@ Depends:
  ${python3:Depends},
  qemu-system-x86,
  busybox-static,
+ file,
  gcc-12,
  autoconf,
  automake,
