@@ -1077,7 +1077,7 @@ def do_it() -> int:
         elif args.dump is not None:
             dump(kern_source, args)
         else:
-            if args.build:
+            if args.build or args.kconfig:
                 if args.commit:
                     checkout(kern_source, args)
                 if not args.skip_config:
