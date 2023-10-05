@@ -346,12 +346,17 @@ def get_kernel_version(path):
         )
     if not os.access(path, os.R_OK):
         arg_fail("unable to access %s (check for read permissions)" % path)
-    result = subprocess.run(["file", path], capture_output=True, text=True, check=False)
-    for item in result.stdout.split(", "):
-        match = re.search(r"^[vV]ersion (\S+)", item)
-        if match:
-            kernel_version = match.group(1)
-            return kernel_version
+    try:
+        result = subprocess.run(["file", path], capture_output=True, text=True, check=False)
+        for item in result.stdout.split(", "):
+            match = re.search(r"^[vV]ersion (\S+)", item)
+            if match:
+                kernel_version = match.group(1)
+                return kernel_version
+    except FileNotFoundError:
+        sys.stderr.write(
+            "warning: `file` is not installed in the system, "
+            "virtme-ng may fail to detect kernel version\n")
     # 'file' failed to get kernel version, try with 'strings'.
     result = subprocess.run(
         ["strings", path], capture_output=True, text=True, check=False
