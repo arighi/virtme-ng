@@ -746,7 +746,9 @@ class KernelSource:
 
     def _get_virtme_overlay_rwdir(self, args):
         # Set default overlays if rootfs is mounted in read-only mode.
-        if not args.rw:
+        if args.rw:
+            self.virtme_param["overlay_rwdir"] = ""
+        else:
             self.virtme_param["overlay_rwdir"] = " ".join(
                 f"--overlay-rwdir {d}"
                 for d in ("/etc", "/home", "/opt", "/srv", "/usr", "/var")
