@@ -126,7 +126,20 @@ pub fn run_cmd(cmd: &str, args: &[&str]) {
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .output()
-        .ok();
-    log(String::from_utf8_lossy(&output.unwrap().stderr).trim_end_matches('\n'));
+        .output();
+
+    match output {
+        Ok(output) => {
+            if !output.stderr.is_empty() {
+                log(String::from_utf8_lossy(&output.stderr).trim_end_matches('\n'));
+            }
+        }
+        Err(_) => {
+            log(&format!(
+                "WARNING: failed to run: {} {}",
+                cmd,
+                args.join(" ")
+            ));
+        }
+    }
 }
