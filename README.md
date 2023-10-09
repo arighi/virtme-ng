@@ -35,6 +35,8 @@ Quick start
  $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
  $ cd linux
  $ vng --build --commit v6.2-rc4
+ ...
+ $ vng --run
            _      _
     __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
     \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |
@@ -103,13 +105,13 @@ Examples
    $ vng -r ./arch/x86/boot/bzImage
 ```
 
- - Test the currently running kernel in a safe snapshot of the system:
+ - Test the kernel recompiled in the current working directory:
 ```
    $ vng -r
 ```
 
- - Test installed kernel 6.2.0-21-generic kernel in a safe snapshot of the
-   system (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
+ - Test installed kernel 6.2.0-21-generic kernel
+   (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
 ```
    $ vng -r 6.2.0-21-generic
 ```
@@ -136,7 +138,8 @@ Examples
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
 ```
 
- - Run the previously compiled kernel and enable networking:
+ - Run the previously compiled kernel from the current working directory and
+   enable networking:
 ```
    $ vng -r . --network user
 ```
@@ -153,8 +156,8 @@ Examples
    $ vng --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
 ```
 
- - Build and test the arm64 kernel (using a separate chroot in
-   /opt/chroot/arm64 as the main filesystem):
+ - Build the arm64 kernel (using a separate chroot in /opt/chroot/arm64 as the
+   main filesystem):
 ```
    $ vng --build --arch arm64 --root /opt/chroot/arm64/
 ```
@@ -216,8 +219,8 @@ Examples
    (virtme-ng is started in graphical mode)
 ```
 
- - Run the `steam` snap inside a virtme-ng instance using the
-   6.2.0-1003-lowlatency kernel:
+ - Run the `steam` snap (tested in Ubuntu) inside a virtme-ng instance using
+   the 6.2.0-1003-lowlatency kernel:
 ```
    $ vng -r 6.2.0-1003-lowlatency --snaps --net user -g /snap/bin/steam
 
@@ -230,7 +233,8 @@ Implementation details
 virtme-ng allows to automatically configure, build and run kernels using the
 main command-line interface called `vng`.
 
-A minimal custom `.config` is automatically generated if not already present.
+A minimal custom `.config` is automatically generated if not already present
+when --build is specified.
 
 It is possible to specify a set of custom configs (.config chunk) in
 `~/.config/virtme-ng/kernel.config`, these user-specific settings will override
