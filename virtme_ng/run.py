@@ -1078,15 +1078,15 @@ def do_it() -> int:
             clean(kern_source, args)
         elif args.dump is not None:
             dump(kern_source, args)
+        elif args.build or args.kconfig:
+            if args.commit:
+                checkout(kern_source, args)
+            if not args.skip_config:
+                config(kern_source, args)
+                if args.kconfig:
+                    return
+            make(kern_source, args)
         else:
-            if args.build or args.kconfig:
-                if args.commit:
-                    checkout(kern_source, args)
-                if not args.skip_config:
-                    config(kern_source, args)
-                    if args.kconfig:
-                        return
-                make(kern_source, args)
             run(kern_source, args)
     except CalledProcessError as exc:
         raise SilentError() from exc
