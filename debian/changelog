@@ -1,3 +1,18 @@
+virtme-ng (1.14-1) unstable; urgency=medium
+
+  * New version virtme-ng 1.13:
+    - doc: update README.md with the latest UI changes
+    - virtme-ng: fix runtime error with --rw
+    - virtme-ng: --run should default to current directory
+    - virtme-ng: do not run instance with --build
+    - virtme: print a warning if "file" is not installed
+    - virtme-ng: implicitly assume --build with --kconfig
+    - virtme-ng-init: resync with latest upstream version
+    - deb: add file as dependency
+    - deb: add dependencies to support audio
+
+ -- Andrea Righi <andrea.righi@canonical.com>  Mon, 09 Oct 2023 08:30:35 +0200
+
 virtme-ng (1.13-1) unstable; urgency=medium
 
   * New version virtme-ng 1.13:
