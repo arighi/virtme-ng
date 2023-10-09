@@ -96,7 +96,7 @@ def make_parser():
         "-r",
         action="store",
         nargs="?",
-        const=uname.release,
+        const=None,
         default=None,
         help="Run specified kernel image or an installed kernel version. "
         "If no argument is specified the running kernel will be used.",
