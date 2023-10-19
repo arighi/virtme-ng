@@ -755,7 +755,7 @@ class KernelSource:
             )
         # Add user-specified overlays.
         for item in args.overlay_rwdir:
-            self.virtme_param["overlay_rwdir"] += "--overlay-rwdir " + item
+            self.virtme_param["overlay_rwdir"] += " --overlay-rwdir " + item
 
     def _get_virtme_run(self, args):
         if args.run is not None:
