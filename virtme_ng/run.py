@@ -782,6 +782,8 @@ class KernelSource:
             self.virtme_param["no_virtme_ng_init"] = ""
 
     def _get_virtme_exec(self, args):
+        if args.envs:
+            args.exec = " ".join(args.envs)
         if args.exec is not None:
             self.virtme_param["exec"] = f'--script-sh "{args.exec}"'
         else:
