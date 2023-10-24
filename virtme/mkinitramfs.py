@@ -94,7 +94,7 @@ def install_modules(cw, modfiles):
         for mod in modfiles:
             if mod.endswith('.zst'):
                 mod_file = os.path.basename(mod)
-                uncompressed_mod = tmpdirname + os.path.splitext(mod_file)[0]
+                uncompressed_mod = tmpdirname + '/' + os.path.splitext(mod_file)[0]
                 os.system(f"zstd -d < {mod} > {uncompressed_mod}")
                 mod = uncompressed_mod
             with open(mod, "rb") as f:
