@@ -4,6 +4,7 @@ build
 dist
 .mypy_cache
 virtme-ng-prompt
+vng-prompt
 virtme_ng.egg-info/
 .pybuild/
 debian/virtme-ng/
