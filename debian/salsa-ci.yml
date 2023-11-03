@@ -1,6 +1,0 @@
-include:
-  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/salsa-ci.yml
-  - https://salsa.debian.org/salsa-ci-team/pipeline/raw/master/pipeline-jobs.yml
-
-variables:
-  SALSA_CI_DISABLE_BLHC: 1 #https://bugs.debian.org/1037521
