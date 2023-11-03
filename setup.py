@@ -4,6 +4,7 @@ import os
 import sys
 import platform
 from glob import glob
+from shutil import which
 from subprocess import check_call, CalledProcessError
 from setuptools import setup, Command
 from setuptools.command.build_py import build_py
@@ -66,6 +67,16 @@ class BuildPy(build_py):
                 ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
                 cwd="virtme_ng_init",
             )
+        # Generate bash autocompletion scripts
+        if which("register-python-argcomplete"):
+            completion_command = "register-python-argcomplete"
+        elif which("register-python-argcomplete3"):
+            completion_command = "register-python-argcomplete3"
+        else:
+            print("ERROR: 'register-python-argcomplete' or 'register-python-argcomplete3' not found.")
+            sys.exit(1)
+        check_call(completion_command + ' virtme-ng > virtme-ng-prompt', shell=True)
+        check_call(completion_command + ' vng > vng-prompt', shell=True)
 
         # Run the rest of virtme-ng build
         build_py.run(self)
@@ -135,7 +146,11 @@ setup(
     },
     packages=packages,
     package_data={"virtme.guest": package_files},
-    data_files=[("/etc", ["cfg/virtme-ng.conf"])],
+    data_files=[
+        ("/etc", ["cfg/virtme-ng.conf"]),
+        ("/etc/bash_completion.d", ["virtme-ng-prompt"]),
+        ("/etc/bash_completion.d", ["vng-prompt"]),
+    ],
     scripts=[
         "bin/virtme-prep-kdir-mods",
     ],

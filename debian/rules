@@ -1,13 +1,9 @@
 #!/usr/bin/make -f
 
-virtme-ng-prompt:
-	(register-python-argcomplete virtme-ng || register-python-argcomplete3 virtme-ng) > virtme-ng-prompt
-	(register-python-argcomplete vng || register-python-argcomplete3 vng) > vng-prompt
-
 %:
 	dh $@ --with python3 --buildsystem=pybuild
 
-override_dh_install: virtme-ng-prompt
+override_dh_install:
 	dh_install
 	mkdir -p $(CURDIR)/debian/virtme-ng/etc/bash_completion.d
 	install -m 0644 virtme-ng-prompt $(CURDIR)/debian/virtme-ng/etc/bash_completion.d/virtme-ng-prompt
