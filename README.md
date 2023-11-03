@@ -57,18 +57,29 @@ Quick start
 Installation
 ============
 
-You can clone this git repository and build a standalone virtme-ng running the
-following commands:
+* Debian / Ubuntu
+
+You can install the latest stable version of virtme-ng via:
 ```
- $ git clone --recurse-submodules https://github.com/arighi/virtme-ng.git
- $ BUILD_VIRTIOFSD=1 BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt .
+ $ sudo apt install virtme-ng
 ```
 
-Alternatively, if you're using Ubuntu, you can install virtme-ng from
-ppa:arighi/virtme-ng:
+* Ubuntu ppa
+
+If you're using Ubuntu, you can install the latest experimental version of
+virtme-ng from ppa:arighi/virtme-ng:
 ```
  $ sudo add-apt-repository ppa:arighi/virtme-ng
  $ sudo apt install --yes virtme-ng
+```
+
+* Install from source
+
+To install virtme-ng from source you can clone this git repository and build a
+standalone virtme-ng running the following commands:
+```
+ $ git clone --recurse-submodules https://github.com/arighi/virtme-ng.git
+ $ BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt .
 ```
 
 Requirements
@@ -86,6 +97,9 @@ Requirements
 
  * Depending on the options you use, you may need a statically linked `busybox`
    binary somewhere in your path.
+
+ * Optionally, you may need virtiofsd 1.7.0 (or higher) for better filesystem
+   performance inside the virtme-ng guests.
 
 Examples
 ========
@@ -125,14 +139,13 @@ Examples
    $ vng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
 ```
 
- - Only generate .config in the current kernel build directory:
+ - Generate a minimal kernel .config in the current kernel build directory:
 ```
    $ vng --kconfig
 ```
 
- - Test the tip of the latest kernel, building the kernel on a remote build
-   host called "builder", running make inside a specific build chroot
-   (managed remotely by schroot):
+ - Build the tip of the latest kernel on a remote build host called "builder",
+   running make inside a specific build chroot (managed remotely by schroot):
 ```
    $ vng --build --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
@@ -165,7 +178,7 @@ Examples
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
 ```
-   $ vng --exec 'uname -r' | cowsay
+   $ vng -- uname -r | cowsay
     __________________
    < 6.1.0-rc6-virtme >
     ------------------
