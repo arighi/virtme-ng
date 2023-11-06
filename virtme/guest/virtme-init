@@ -253,15 +253,17 @@ if [[ -n "${user_cmd}" ]]; then
     # Decode shell command (base64) and dump it to a script
     echo $user_cmd | base64 -d > /tmp/.virtme-script
 
-    # Start the script
-    log 'starting script'
-    setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
-    log "script returned $?"
+    if [[ ! -n "${virtme_graphics}" ]]; then
+        # Start the script
+        log 'starting script'
+        setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+        log "script returned $?"
 
-    # Hmm.  We should expose the return value somehow.
-    sync
-    poweroff -f
-    exit 0
+        # Hmm.  We should expose the return value somehow.
+        sync
+        poweroff -f
+        exit 0
+    fi
 fi
 
 # Figure out what the main console is
@@ -330,7 +332,8 @@ if [[ -n "${virtme_graphics}" ]]; then
 
     # Create a .xinitrc to start the requested graphical application.
     xinit_rc=/tmp/.xinitrc
-    echo -e "${pre_exec_cmd}\nexec ${virtme_graphics}" > ${xinit_rc}
+    echo -e "${pre_exec_cmd}\nexec /tmp/.virtme-script" > ${xinit_rc}
+    chmod +x /tmp/.virtme-script
     if [[ -n "${virtme_user}" ]]; then
         chown ${virtme_user}:${virtme_user} $XDG_RUNTIME_DIR
         chown ${virtme_user}:${virtme_user} ${xinit_rc}

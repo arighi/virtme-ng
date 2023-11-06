@@ -329,12 +329,8 @@ def make_parser():
     parser.add_argument(
         "--graphics",
         "-g",
-        action="store",
-        nargs="?",
-        const="",
-        metavar="BINARY",
-        help="Show graphical output instead of using a console. "
-        + "An argument can be optionally specified to start a graphical application.",
+        action="store_true",
+        help="Show graphical output instead of using a console.",
     )
 
     parser.add_argument(
@@ -829,8 +825,8 @@ class KernelSource:
             self.virtme_param["force_initramfs"] = ""
 
     def _get_virtme_graphics(self, args):
-        if args.graphics is not None:
-            self.virtme_param["graphics"] = f'--graphics "{args.graphics}"'
+        if args.graphics:
+            self.virtme_param["graphics"] = '--graphics'
         else:
             self.virtme_param["graphics"] = ""
 

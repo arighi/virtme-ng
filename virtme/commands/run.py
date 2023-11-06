@@ -1007,11 +1007,9 @@ def do_it() -> int:
             )
 
     def do_script(shellcmd: str, show_boot_console=False) -> None:
-        if args.graphics is not None:
-            arg_fail("scripts and --graphics are mutually exclusive")
-
-        # Turn off default I/O
-        qemuargs.extend(arch.qemu_nodisplay_args())
+        if args.graphics is None:
+            # Turn off default I/O
+            qemuargs.extend(arch.qemu_nodisplay_args())
 
         # Configure kernel console output
         if show_boot_console:
@@ -1063,13 +1061,6 @@ def do_it() -> int:
         # Scripts shouldn't reboot
         qemuargs.extend(["-no-reboot"])
 
-        # Encode the shell command to base64 to handle special characters (such
-        # as quotes, double quotes, etc.).
-        shellcmd = b64encode(shellcmd.encode('utf-8')).decode('utf-8')
-
-        # Ask virtme-init to run the script
-        kernelargs.append(f"virtme.exec=`{shellcmd}`")
-
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if
         # another process is reading from 1 or writing to 0, which is
@@ -1087,6 +1078,20 @@ def do_it() -> int:
                     os.dup2(newfd, oldfd)
                     os.close(newfd)
 
+        # Encode the shell command to base64 to handle special characters (such
+        # as quotes, double quotes, etc.).
+        shellcmd = b64encode(shellcmd.encode('utf-8')).decode('utf-8')
+
+        if args.graphics is not None:
+            kernelargs.append("virtme_graphics=1")
+
+        # Ask virtme-init to run the script
+        kernelargs.append(f"virtme.exec=`{shellcmd}`")
+
+    # Do not break old syntax "-g command"
+    if args.graphics is not None and args.script_sh is None:
+        args.script_sh = args.graphics
+
     if args.script_sh is not None:
         do_script(args.script_sh, show_boot_console=args.show_boot_console)
 
@@ -1100,8 +1105,6 @@ def do_it() -> int:
         video_args = arch.qemu_display_args()
         if video_args:
             qemuargs.extend(video_args)
-        if args.graphics != "":
-            kernelargs.append("virtme_graphics=%s" % args.graphics)
 
     if args.net:
         qemuargs.extend(["-device", "%s,netdev=n0" % arch.virtio_dev_type("net")])
