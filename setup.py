@@ -148,8 +148,8 @@ setup(
     package_data={"virtme.guest": package_files},
     data_files=[
         ("/etc", ["cfg/virtme-ng.conf"]),
-        ("/etc/bash_completion.d", ["virtme-ng-prompt"]),
-        ("/etc/bash_completion.d", ["vng-prompt"]),
+        ("/usr/share/bash-completion/completions", ["virtme-ng-prompt"]),
+        ("/usr/share/bash-completion/completions", ["vng-prompt"]),
     ],
     scripts=[
         "bin/virtme-prep-kdir-mods",
