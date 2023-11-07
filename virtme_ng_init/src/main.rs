@@ -612,7 +612,7 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
     None
 }
 
-fn do_run_user_script(cmd: &str) {
+fn run_user_script() {
     if !std::path::Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stderr").exists()
@@ -663,7 +663,7 @@ fn do_run_user_script(cmd: &str) {
         clear_virtme_envs();
         unsafe {
             Command::new("/bin/sh")
-                .args(["-c", cmd])
+                .args(["/tmp/.virtme-script"])
                 .pre_exec(move || {
                     nix::libc::setsid();
                     libc::close(libc::STDIN_FILENO);
@@ -679,17 +679,27 @@ fn do_run_user_script(cmd: &str) {
                 .output()
                 .expect("Failed to execute script");
         }
+        poweroff();
     }
 }
 
-fn run_user_script() -> bool {
+fn create_user_script(cmd: &str) {
+    let file_path = "/tmp/.virtme-script";
+    let mut file = File::create(file_path).expect("Failed to create virtme-script file");
+    file.write_all(cmd.as_bytes())
+        .expect("Failed to write data to virtme-script file");
+}
+
+fn setup_user_script() {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if let Some(cmd) = extract_user_script(&cmdline) {
-            do_run_user_script(&cmd);
-            return true;
+            create_user_script(&cmd);
+            if let Ok(_) = env::var("virtme_graphics") {
+                return;
+            }
+            run_user_script();
         }
     }
-    return false;
 }
 
 fn setup_root_home() {
@@ -761,7 +771,7 @@ fn init_xdg_runtime_dir() {
     env::set_var("XDG_RUNTIME_DIR", dir);
 }
 
-fn run_user_gui(tty_fd: libc::c_int, app: &str) {
+fn run_user_gui(tty_fd: libc::c_int) {
     init_xdg_runtime_dir();
 
     // Generate a bare minimum xinitrc
@@ -776,9 +786,11 @@ fn run_user_gui(tty_fd: libc::c_int, app: &str) {
             }
         }
     }
-    if let Err(err) =
-        utils::create_file(xinitrc, 0o0644, &format!("{}\nexec {}", pre_exec_cmd, app))
-    {
+    if let Err(err) = utils::create_file(
+        xinitrc,
+        0o0644,
+        &format!("{}\n/bin/bash /tmp/.virtme-script", pre_exec_cmd),
+    ) {
         utils::log(&format!("failed to generate {}: {}", xinitrc, err));
         return;
     }
@@ -823,10 +835,11 @@ fn run_user_session() {
     let tty_fd = open(consdev.as_str(), OFlag::from_bits_truncate(flags), mode)
         .expect("failed to open console");
 
-    if let Ok(app) = env::var("virtme_graphics") {
-        run_user_gui(tty_fd, &app);
+    if let Ok(_) = env::var("virtme_graphics") {
+        run_user_gui(tty_fd);
+    } else {
+        run_user_shell(tty_fd);
     }
-    run_user_shell(tty_fd);
 }
 
 fn setup_user_session() {
@@ -919,10 +932,9 @@ fn main() {
 
     // Start user session (batch or interactive).
     set_cwd();
-    if !run_user_script() {
-        setup_user_session();
-        run_user_session();
-    }
+    setup_user_script();
+    setup_user_session();
+    run_user_session();
 
     // Shutdown the system.
     poweroff();
