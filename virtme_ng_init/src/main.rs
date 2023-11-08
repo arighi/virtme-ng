@@ -194,6 +194,8 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
     },
 ];
 
+const USER_SCRIPT: &str = "/tmp/.virtme-script";
+
 fn check_init_pid() {
     if id() != 1 {
         utils::log(&format!("must be run as PID 1"));
@@ -663,7 +665,7 @@ fn run_user_script() {
         clear_virtme_envs();
         unsafe {
             Command::new("/bin/sh")
-                .args(["/tmp/.virtme-script"])
+                .args([USER_SCRIPT])
                 .pre_exec(move || {
                     nix::libc::setsid();
                     libc::close(libc::STDIN_FILENO);
@@ -684,8 +686,7 @@ fn run_user_script() {
 }
 
 fn create_user_script(cmd: &str) {
-    let file_path = "/tmp/.virtme-script";
-    let mut file = File::create(file_path).expect("Failed to create virtme-script file");
+    let mut file = File::create(USER_SCRIPT).expect("Failed to create virtme-script file");
     file.write_all(cmd.as_bytes())
         .expect("Failed to write data to virtme-script file");
 }
@@ -789,7 +790,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
     if let Err(err) = utils::create_file(
         xinitrc,
         0o0644,
-        &format!("{}\n/bin/bash /tmp/.virtme-script", pre_exec_cmd),
+        &format!("{}\n/bin/bash {}", pre_exec_cmd, USER_SCRIPT),
     ) {
         utils::log(&format!("failed to generate {}: {}", xinitrc, err));
         return;
