@@ -662,10 +662,26 @@ fn run_user_script() {
         )
         .expect("failed to open console.");
 
+        // Determine if we need to switch to a different user, or if we can run the script as root.
+        let cmd: String;
+        let args: Vec<&str>;
+        let user: String;
+        if let Ok(virtme_user) = env::var("virtme_user") {
+            user = virtme_user;
+        } else {
+            user = String::new();
+        }
+        if !user.is_empty() {
+            cmd = "su".to_string();
+            args = vec![&user, "-c", USER_SCRIPT];
+        } else {
+            cmd = "/bin/sh".to_string();
+            args = vec![USER_SCRIPT];
+        }
         clear_virtme_envs();
         unsafe {
-            Command::new("/bin/sh")
-                .args([USER_SCRIPT])
+            Command::new(&cmd)
+                .args(&args)
                 .pre_exec(move || {
                     nix::libc::setsid();
                     libc::close(libc::STDIN_FILENO);
@@ -686,9 +702,7 @@ fn run_user_script() {
 }
 
 fn create_user_script(cmd: &str) {
-    let mut file = File::create(USER_SCRIPT).expect("Failed to create virtme-script file");
-    file.write_all(cmd.as_bytes())
-        .expect("Failed to write data to virtme-script file");
+    utils::create_file(USER_SCRIPT, 0o0755, cmd).expect("Failed to create virtme-script file");
 }
 
 fn setup_user_script() {
