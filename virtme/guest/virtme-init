@@ -256,7 +256,12 @@ if [[ -n "${user_cmd}" ]]; then
     if [[ ! -n "${virtme_graphics}" ]]; then
         # Start the script
         log 'starting script'
-        setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+        if [[ -n "${virtme_user}" ]]; then
+            chmod +x /tmp/.virtme-script
+            setsid su ${virtme_user} -c /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+        else
+            setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+        fi
         log "script returned $?"
 
         # Hmm.  We should expose the return value somehow.

@@ -689,6 +689,30 @@ class KernelSource:
         else:
             self.virtme_param["name"] = "--name " + socket.gethostname()
 
+    def _get_virtme_exec(self, args):
+        if args.envs:
+            args.exec = " ".join(args.envs)
+        if args.exec is not None:
+            self.virtme_param["exec"] = f'--script-sh "{args.exec}"'
+        else:
+            self.virtme_param["exec"] = ""
+
+    def _get_virtme_user(self, args):
+        # Default user for scripts is root, default user for interactive
+        # sessions is current user.
+        #
+        # NOTE: graphic sessions are considered interactive.
+        if args.exec and not args.graphics:
+            self.virtme_param["user"] = ""
+        else:
+            self.virtme_param["user"] = "--user " + get_username()
+        # Override default user, if specified by the --user argument.
+        if args.user is not None:
+            if args.user != "root":
+                self.virtme_param["user"] = "--user " + args.user
+            else:
+                self.virtme_param["user"] = ""
+
     def _get_virtme_arch(self, args):
         if args.arch is not None:
             if args.arch not in ARCH_MAPPING:
@@ -698,14 +722,6 @@ class KernelSource:
             self.virtme_param["arch"] = "--arch " + ARCH_MAPPING[args.arch]["qemu_name"]
         else:
             self.virtme_param["arch"] = ""
-
-    def _get_virtme_user(self, args):
-        if args.user is not None:
-            self.virtme_param["user"] = "--user " + args.user
-        elif args.root is None:
-            self.virtme_param["user"] = "--user " + get_username()
-        else:
-            self.virtme_param["user"] = ""
 
     def _get_virtme_root(self, args):
         if args.root is not None:
@@ -776,14 +792,6 @@ class KernelSource:
             self.virtme_param["no_virtme_ng_init"] = "--no-virtme-ng-init"
         else:
             self.virtme_param["no_virtme_ng_init"] = ""
-
-    def _get_virtme_exec(self, args):
-        if args.envs:
-            args.exec = " ".join(args.envs)
-        if args.exec is not None:
-            self.virtme_param["exec"] = f'--script-sh "{args.exec}"'
-        else:
-            self.virtme_param["exec"] = ""
 
     def _get_virtme_network(self, args):
         if args.network is not None:
@@ -898,6 +906,7 @@ class KernelSource:
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
         self._get_virtme_name(args)
+        self._get_virtme_exec(args)
         self._get_virtme_user(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
@@ -910,7 +919,6 @@ class KernelSource:
         self._get_virtme_dry_run(args)
         self._get_virtme_no_virtme_ng_init(args)
         self._get_virtme_mods(args)
-        self._get_virtme_exec(args)
         self._get_virtme_network(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
@@ -932,6 +940,7 @@ class KernelSource:
         cmd = (
             "virtme-run "
             + f'{self.virtme_param["name"]} '
+            + f'{self.virtme_param["exec"]} '
             + f'{self.virtme_param["user"]} '
             + f'{self.virtme_param["arch"]} '
             + f'{self.virtme_param["root"]} '
@@ -944,7 +953,6 @@ class KernelSource:
             + f'{self.virtme_param["dry_run"]} '
             + f'{self.virtme_param["no_virtme_ng_init"]} '
             + f'{self.virtme_param["mods"]} '
-            + f'{self.virtme_param["exec"]} '
             + f'{self.virtme_param["network"]} '
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
