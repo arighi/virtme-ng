@@ -1,0 +1,21 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# vng: The main command-line virtme-ng frontend
+
+# This file is not installed; it's just use to run virtme-ng from inside a
+# source distribution.
+
+import os
+import sys
+from virtme_ng import run
+
+# Update PATH to make sure that virtme-ng can be executed directly from the
+# source directory, without necessarily installing virtme-ng in the system.
+def update_path():
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    current_path = os.environ.get('PATH', '')
+    new_path = f'{script_dir}:{current_path}'
+    os.environ['PATH'] = new_path
+
+update_path()
+exit(run.main())

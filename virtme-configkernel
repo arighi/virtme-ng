@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# virtme-configkernel: Configure a kernel for virtme
+# Copyright © 2014 Andy Lutomirski
+# Licensed under the GPLv2, which is available in the virtme distribution
+# as a file called LICENSE with SHA-256 hash:
+# 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
+
+# This file is not installed; it's just used to run virtme from inside
+# a source distribution.
+
+# NOTE: this command is deprecated, please use vng instead.
+
+import sys
+from virtme.commands import configkernel
+
+exit(configkernel.main())
