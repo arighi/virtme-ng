@@ -20,7 +20,12 @@ from subprocess import (
 )
 from select import select
 from pathlib import Path
-from argcomplete import autocomplete
+try:
+    from argcomplete import autocomplete
+except ModuleNotFoundError:
+    def autocomplete(*args, **kwargs):
+        # pylint: disable=unused-argument
+        pass
 
 from virtme.util import SilentError, get_username
 from virtme_ng.utils import CONF_FILE
