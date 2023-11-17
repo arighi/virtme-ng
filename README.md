@@ -36,7 +36,7 @@ Quick start
  $ cd linux
  $ vng --build --commit v6.2-rc4
  ...
- $ vng --run
+ $ vng
            _      _
     __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
     \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |
@@ -104,22 +104,30 @@ Requirements
 Examples
 ========
 
- - Build and run tag v6.1-rc3 from a local kernel git repository:
+ - Build a kernel from a clean local kernel source directory (if a .config is
+   not available virtme-ng will automatically create a minimum .config with
+   all the required feature to boot the instance):
+```
+   $ vng -b
+```
+
+ - Build tag v6.1-rc3 from a local kernel git repository:
 ```
    $ vng -b -c v6.1-rc3
 ```
 
- - Build and run a kernel 2 commits before the previously compiled kernel:
+ - Generate a minimal kernel .config in the current kernel build directory:
 ```
-   $ vng -b -c HEAD~2
-```
-
- - Run a kernel previously compiled from a local git repository:
-```
-   $ vng -r ./arch/x86/boot/bzImage
+   $ vng --kconfig
 ```
 
- - Test the kernel recompiled in the current working directory:
+ - Run a kernel previously compiled from a local git repository in the current
+   working directory:
+```
+   $ vng
+```
+
+ - Run an interactive virtme-ng session using the same kernel of the host:
 ```
    $ vng -r
 ```
@@ -139,11 +147,6 @@ Examples
    $ vng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
 ```
 
- - Generate a minimal kernel .config in the current kernel build directory:
-```
-   $ vng --kconfig
-```
-
  - Build the tip of the latest kernel on a remote build host called "builder",
    running make inside a specific build chroot (managed remotely by schroot):
 ```
@@ -154,7 +157,7 @@ Examples
  - Run the previously compiled kernel from the current working directory and
    enable networking:
 ```
-   $ vng -r . --network user
+   $ vng --network user
 ```
 
  - Run the previously compiled kernel adding an additional virtio-scsi device:
