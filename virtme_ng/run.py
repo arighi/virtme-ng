@@ -27,7 +27,7 @@ except ModuleNotFoundError:
         # pylint: disable=unused-argument
         pass
 
-from virtme.util import SilentError, get_username
+from virtme.util import SilentError, uname, get_username
 from virtme_ng.utils import CONF_FILE
 from virtme_ng.spinner import Spinner
 from virtme_ng.version import VERSION
@@ -101,7 +101,7 @@ def make_parser():
         "-r",
         action="store",
         nargs="?",
-        const=None,
+        const=uname.release,
         default=None,
         help="Run specified kernel image or an installed kernel version. "
         "If no argument is specified the running kernel will be used.",
