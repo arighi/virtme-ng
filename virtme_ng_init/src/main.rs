@@ -652,12 +652,7 @@ fn run_user_script() {
         // Determine if we need to switch to a different user, or if we can run the script as root.
         let cmd: String;
         let args: Vec<&str>;
-        let user: String;
-        if let Ok(virtme_user) = env::var("virtme_user") {
-            user = virtme_user;
-        } else {
-            user = String::new();
-        }
+        let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
         if !user.is_empty() {
             cmd = "su".to_string();
             args = vec![&user, "-c", USER_SCRIPT];
