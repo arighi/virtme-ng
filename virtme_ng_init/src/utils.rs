@@ -4,7 +4,6 @@
 //!
 //! Author: Andrea Righi <andrea.righi@canonical.com>
 
-use nix::libc;
 use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Gid, Uid};
@@ -47,8 +46,8 @@ pub fn do_chown(path: &str, uid: u32, gid: u32) -> io::Result<()> {
 }
 
 pub fn do_mkdir(path: &str) {
-    let dmask = libc::S_IRWXU | libc::S_IRGRP | libc::S_IXGRP | libc::S_IROTH | libc::S_IXOTH;
-    nix::unistd::mkdir(path, Mode::from_bits_truncate(dmask as u32)).ok();
+    let dmask = Mode::S_IRWXU | Mode::S_IRGRP | Mode::S_IXGRP | Mode::S_IROTH | Mode::S_IXOTH;
+    nix::unistd::mkdir(path, dmask).ok();
 }
 
 pub fn do_unlink(path: &str) {
