@@ -200,7 +200,7 @@ const USER_SCRIPT: &str = "/tmp/.virtme-script";
 
 fn check_init_pid() {
     if id() != 1 {
-        utils::log(&format!("must be run as PID 1"));
+        utils::log("must be run as PID 1");
         exit(1);
     }
 }
@@ -269,7 +269,7 @@ fn configure_hostname() {
             utils::log(&format!("failed to change hostname: {}", err));
         }
     } else {
-        utils::log(&format!("virtme_hostname is not defined"));
+        utils::log("virtme_hostname is not defined");
     }
 }
 

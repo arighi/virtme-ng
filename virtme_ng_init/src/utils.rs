@@ -107,12 +107,7 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
         Some(fsdata_cstr.as_ref()),
     );
     if let Err(err) = result {
-        log(&format!(
-            "mount {} -> {}: {}",
-            source,
-            target,
-            err.to_string()
-        ));
+        log(&format!("mount {} -> {}: {}", source, target, err));
     }
 }
 
