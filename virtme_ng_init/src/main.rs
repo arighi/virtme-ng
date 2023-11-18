@@ -20,7 +20,6 @@ use nix::libc;
 use nix::sys::reboot;
 use nix::sys::stat::Mode;
 use nix::unistd::sethostname;
-use std::collections::HashMap;
 use std::env;
 use std::ffi::CStr;
 use std::fs::{File, OpenOptions};
@@ -343,14 +342,12 @@ fn set_cwd() {
 }
 
 fn symlink_fds() {
-    let fd_links: HashMap<&str, &str> = vec![
+    let fd_links = [
         ("/proc/self/fd", "/dev/fd"),
         ("/proc/self/fd/0", "/dev/stdin"),
         ("/proc/self/fd/1", "/dev/stdout"),
         ("/proc/self/fd/2", "/dev/stderr"),
-    ]
-    .into_iter()
-    .collect();
+    ];
 
     // Install /proc/self/fd symlinks into /dev if not already present.
     for (src, dst) in fd_links.iter() {
@@ -618,13 +615,11 @@ fn run_user_script() {
         );
     } else {
         // Re-create stdout/stderr to connect to the virtio-serial ports.
-        let io_files: HashMap<&str, &str> = vec![
+        let io_files = [
             ("/dev/virtio-ports/virtme.dev_stdin", "/dev/stdin"),
             ("/dev/virtio-ports/virtme.dev_stdout", "/dev/stdout"),
             ("/dev/virtio-ports/virtme.dev_stderr", "/dev/stderr"),
-        ]
-        .into_iter()
-        .collect();
+        ];
         for (src, dst) in io_files.iter() {
             if std::path::Path::new(dst).exists() {
                 utils::do_unlink(dst);
