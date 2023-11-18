@@ -290,11 +290,7 @@ fn generate_shadow() -> io::Result<()> {
     let mut writer = BufWriter::new(output_file);
 
     for line in reader.lines() {
-        let line = line?;
-        let parts: Vec<&str> = line.split(':').collect();
-
-        if !parts.is_empty() {
-            let username = parts[0];
+        if let Some((username, _)) = line?.split_once(':') {
             writeln!(writer, "{}:!:::::::", username)?;
         }
     }
