@@ -392,7 +392,7 @@ fn mount_virtme_initmounts() {
         if key.starts_with("virtme_initmount") {
             utils::do_mkdir(&path);
             utils::do_mount(
-                &key.replace("_", "."),
+                &key.replace('_', "."),
                 &path,
                 "9p",
                 0,
@@ -891,7 +891,7 @@ fn print_logo() {
     \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |
      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
                                                 |___/"#;
-    println!("{}", logo.trim_start_matches("\n"));
+    println!("{}", logo.trim_start_matches('\n'));
     println!("   kernel version: {}\n", get_kernel_version(true));
 }
 
