@@ -16,7 +16,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
 use users::get_user_by_name;
 
-static PROG_NAME: &'static str = "virtme-ng-init";
+static PROG_NAME: &str = "virtme-ng-init";
 
 pub fn log(msg: &str) {
     if msg.is_empty() {
