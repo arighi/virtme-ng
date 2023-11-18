@@ -599,15 +599,11 @@ fn setup_network() -> Option<thread::JoinHandle<()>> {
 
 fn extract_user_script(virtme_script: &str) -> Option<String> {
     let start_marker = "virtme.exec=`";
-    let end_marker = "`";
+    let end_marker = '`';
 
-    let start_index = virtme_script.find(start_marker)?;
-    let start_index = start_index + start_marker.len();
-    let end_index = virtme_script[start_index..].find(end_marker)?;
-    let encoded_cmd = &virtme_script[start_index..start_index + end_index];
-    let decoded_bytes = BASE64.decode(encoded_cmd).ok()?;
-    let decoded_string = String::from_utf8(decoded_bytes).ok()?;
-    Some(decoded_string)
+    let (_before, remaining) = virtme_script.split_once(start_marker)?;
+    let (encoded_cmd, _after) = remaining.split_once(end_marker)?;
+    Some(String::from_utf8(BASE64.decode(encoded_cmd).ok()?).ok()?)
 }
 
 fn run_user_script() {
