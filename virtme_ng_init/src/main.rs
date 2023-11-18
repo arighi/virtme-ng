@@ -267,6 +267,9 @@ fn configure_hostname() {
 }
 
 fn run_systemd_tmpfiles() {
+    if !Path::new("/etc/systemd").exists() {
+        return;
+    }
     let args: &[&str] = &[
         "--create",
         "--boot",
