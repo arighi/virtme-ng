@@ -33,6 +33,9 @@ use std::thread;
 use std::time::Duration;
 mod utils;
 
+#[cfg(test)]
+mod test;
+
 struct MountInfo {
     source: &'static str,
     target: &'static str,
