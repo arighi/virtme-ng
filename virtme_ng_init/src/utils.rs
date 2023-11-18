@@ -8,6 +8,7 @@ use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Gid, Uid};
 use std::ffi::{CString, OsStr};
+use std::fmt::Arguments;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::fs;
@@ -15,21 +16,39 @@ use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
 use users::get_user_by_name;
 
-static PROG_NAME: &str = "virtme-ng-init";
+macro_rules! log {
+    ($($arg:tt)*) => {
+        $crate::utils::log_impl(std::format_args!($($arg)*))
+    };
+}
 
-pub fn log(msg: &str) {
-    if msg.is_empty() {
+pub fn log_impl(msg: Arguments<'_>) {
+    static PREFIX: &str = "<6>virtme-ng-init: ";
+    static LOG_LEVEL: &str = "<6>";
+
+    let mut msg = format!("{}{}", PREFIX, msg);
+
+    // Remove all trailing \n
+    while msg.ends_with('\n') {
+        msg.pop();
+    }
+
+    // Was the message empty? If so, do not log anything
+    if PREFIX == msg {
         return;
     }
-    let msg = format!("{}: {}", PROG_NAME, msg.trim_end_matches('\n'));
-    let mut file = OpenOptions::new().write(true).open("/dev/kmsg").ok();
-    match &mut file {
-        Some(file) => {
-            let msg = format!("<6>{}\n", msg);
-            file.write(msg.as_bytes()).ok();
+
+    match OpenOptions::new().write(true).open("/dev/kmsg") {
+        Ok(mut file) => {
+            msg.push('\n');
+            file.write_all(msg.as_bytes()).ok();
         }
-        None => {
-            println!("{}", msg);
+        Err(_) => {
+            println!(
+                "{}",
+                msg.strip_prefix(LOG_LEVEL)
+                    .expect("The message should always start with the log level")
+            );
         }
     }
 }
@@ -54,7 +73,7 @@ pub fn do_unlink(path: &str) {
     match std::fs::remove_file(path) {
         Ok(_) => (),
         Err(err) => {
-            log(&format!("failed to unlink file {}: {}", path, err));
+            log!("failed to unlink file {}: {}", path, err);
         }
     }
 }
@@ -68,7 +87,7 @@ fn do_touch(path: &str, mode: u32) {
         Ok(())
     }
     if let Err(err) = _do_touch(path, mode) {
-        log(&format!("error creating file: {}", err));
+        log!("error creating file: {}", err);
     }
 }
 
@@ -86,10 +105,7 @@ pub fn do_symlink(src: &str, dst: &str) {
     match fs::symlink(src, dst) {
         Ok(_) => (),
         Err(err) => {
-            log(&format!(
-                "failed to create symlink {} -> {}: {}",
-                src, dst, err
-            ));
+            log!("failed to create symlink {} -> {}: {}", src, dst, err);
         }
     }
 }
@@ -107,7 +123,7 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
         Some(fsdata_cstr.as_ref()),
     );
     if let Err(err) = result {
-        log(&format!("mount {} -> {}: {}", source, target, err));
+        log!("mount {} -> {}: {}", source, target, err);
     }
 }
 
@@ -122,15 +138,18 @@ pub fn run_cmd(cmd: impl AsRef<OsStr>, args: &[&str]) {
     match output {
         Ok(output) => {
             if !output.stderr.is_empty() {
-                log(String::from_utf8_lossy(&output.stderr).trim_end_matches('\n'));
+                log!(
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr).trim_end_matches('\n')
+                );
             }
         }
         Err(_) => {
-            log(&format!(
+            log!(
                 "WARNING: failed to run: {:?} {}",
                 cmd.as_ref(),
                 args.join(" ")
-            ));
+            );
         }
     }
 }
