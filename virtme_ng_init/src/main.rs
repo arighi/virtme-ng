@@ -822,7 +822,7 @@ fn run_user_session() {
     let tty_fd = open(consdev.as_str(), OFlag::from_bits_truncate(flags), mode)
         .expect("failed to open console");
 
-    if let Ok(_) = env::var("virtme_graphics") {
+    if env::var("virtme_graphics").is_ok() {
         run_user_gui(tty_fd);
     } else {
         run_user_shell(tty_fd);
