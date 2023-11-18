@@ -677,10 +677,7 @@ fn configure_terminal(consdev: &str) {
             .stderr(Stdio::inherit())
             // Replace the current init process with a shell session.
             .output();
-        log!(
-            "{}",
-            String::from_utf8_lossy(&output.unwrap().stderr).trim_end_matches('\n')
-        );
+        log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
     }
 }
 
