@@ -17,7 +17,13 @@ use users::get_user_by_name;
 
 static PROG_NAME: &str = "virtme-ng-init";
 
-pub fn log(msg: &str) {
+macro_rules! log {
+    ($($arg:tt)*) => {
+        $crate::utils::log_impl(&std::format!($($arg)*))
+    };
+}
+
+pub fn log_impl(msg: &str) {
     if msg.is_empty() {
         return;
     }
@@ -54,7 +60,7 @@ pub fn do_unlink(path: &str) {
     match std::fs::remove_file(path) {
         Ok(_) => (),
         Err(err) => {
-            log(&format!("failed to unlink file {}: {}", path, err));
+            log!("failed to unlink file {}: {}", path, err);
         }
     }
 }
@@ -68,7 +74,7 @@ fn do_touch(path: &str, mode: u32) {
         Ok(())
     }
     if let Err(err) = _do_touch(path, mode) {
-        log(&format!("error creating file: {}", err));
+        log!("error creating file: {}", err);
     }
 }
 
@@ -86,10 +92,7 @@ pub fn do_symlink(src: &str, dst: &str) {
     match fs::symlink(src, dst) {
         Ok(_) => (),
         Err(err) => {
-            log(&format!(
-                "failed to create symlink {} -> {}: {}",
-                src, dst, err
-            ));
+            log!("failed to create symlink {} -> {}: {}", src, dst, err);
         }
     }
 }
@@ -107,7 +110,7 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
         Some(fsdata_cstr.as_ref()),
     );
     if let Err(err) = result {
-        log(&format!("mount {} -> {}: {}", source, target, err));
+        log!("mount {} -> {}: {}", source, target, err);
     }
 }
 
@@ -122,15 +125,18 @@ pub fn run_cmd(cmd: impl AsRef<OsStr>, args: &[&str]) {
     match output {
         Ok(output) => {
             if !output.stderr.is_empty() {
-                log(String::from_utf8_lossy(&output.stderr).trim_end_matches('\n'));
+                log!(
+                    "{}",
+                    String::from_utf8_lossy(&output.stderr).trim_end_matches('\n')
+                );
             }
         }
         Err(_) => {
-            log(&format!(
+            log!(
                 "WARNING: failed to run: {:?} {}",
                 cmd.as_ref(),
                 args.join(" ")
-            ));
+            );
         }
     }
 }

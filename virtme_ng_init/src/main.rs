@@ -28,6 +28,8 @@ use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
 use std::thread;
 use std::time::Duration;
+
+#[macro_use]
 mod utils;
 
 #[cfg(test)]
@@ -198,7 +200,7 @@ const USER_SCRIPT: &str = "/tmp/.virtme-script";
 
 fn check_init_pid() {
     if id() != 1 {
-        utils::log("must be run as PID 1");
+        log!("must be run as PID 1");
         exit(1);
     }
 }
@@ -208,7 +210,7 @@ fn poweroff() {
         libc::sync();
     }
     if let Err(err) = reboot::reboot(reboot::RebootMode::RB_POWER_OFF) {
-        utils::log(&format!("error powering off: {}", err));
+        log!("error powering off: {}", err);
         exit(1);
     }
     exit(0);
@@ -248,7 +250,7 @@ fn get_active_console() -> Option<String> {
             None
         }
         Err(error) => {
-            utils::log(&format!("failed to open /proc/consoles: {}", error));
+            log!("failed to open /proc/consoles: {}", error);
             None
         }
     }
@@ -257,10 +259,10 @@ fn get_active_console() -> Option<String> {
 fn configure_hostname() {
     if let Ok(hostname) = env::var("virtme_hostname") {
         if let Err(err) = sethostname(hostname) {
-            utils::log(&format!("failed to change hostname: {}", err));
+            log!("failed to change hostname: {}", err);
         }
     } else {
-        utils::log("virtme_hostname is not defined");
+        log!("virtme_hostname is not defined");
     }
 }
 
@@ -321,7 +323,7 @@ fn override_system_files() {
 fn set_cwd() {
     if let Ok(dir) = env::var("virtme_chdir") {
         if let Err(err) = env::set_current_dir(dir) {
-            utils::log(&format!("error changing directory: {}", err));
+            log!("error changing directory: {}", err);
         }
     }
 }
@@ -450,14 +452,14 @@ fn disable_uevent_helper() {
 
     if Path::new(uevent_helper_path).exists() {
         // This kills boot performance.
-        utils::log("you have CONFIG_UEVENT_HELPER on, turn it off");
+        log!("you have CONFIG_UEVENT_HELPER on, turn it off");
         let mut file = OpenOptions::new().write(true).open(uevent_helper_path).ok();
         match &mut file {
             Some(file) => {
                 write!(file, "").ok();
             }
             None => {
-                utils::log(&format!("error opening {}", uevent_helper_path));
+                log!("error opening {}", uevent_helper_path);
             }
         }
     }
@@ -483,16 +485,16 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
             disable_uevent_helper();
             let args: &[&str] = &["--daemon", "--resolve-names=never"];
             utils::run_cmd(udevd_path, args);
-            utils::log("triggering udev coldplug");
+            log!("triggering udev coldplug");
             utils::run_cmd("udevadm", &["trigger", "--type=subsystems", "--action=add"]);
             utils::run_cmd("udevadm", &["trigger", "--type=devices", "--action=add"]);
-            utils::log("waiting for udev to settle");
+            log!("waiting for udev to settle");
             utils::run_cmd("udevadm", &["settle"]);
-            utils::log("udev is done");
+            log!("udev is done");
         });
         Some(handle)
     } else {
-        utils::log("unable to find udevd, skip udev.");
+        log!("unable to find udevd, skip udev.");
         None
     }
 }
@@ -547,7 +549,7 @@ fn setup_network() -> Option<thread::JoinHandle<()>> {
     if cmdline.contains("virtme.dhcp") {
         if let Some(guest_tools_dir) = get_guest_tools_dir() {
             if let Some(network_dev) = get_network_device() {
-                utils::log(&format!("setting up network device {}", network_dev));
+                log!("setting up network device {}", network_dev);
                 let handle = thread::spawn(move || {
                     let args = [
                         "udhcpc",
@@ -584,9 +586,7 @@ fn run_user_script() {
         || !std::path::Path::new("/dev/virtio-ports/virtme.dev_stdout").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.dev_stderr").exists()
     {
-        utils::log(
-            "virtme-init: cannot find script I/O ports; make sure virtio-serial is available",
-        );
+        log!("virtme-init: cannot find script I/O ports; make sure virtio-serial is available",);
     } else {
         // Re-create stdout/stderr to connect to the virtio-serial ports.
         let io_files = [
@@ -677,7 +677,10 @@ fn configure_terminal(consdev: &str) {
             .stderr(Stdio::inherit())
             // Replace the current init process with a shell session.
             .output();
-        utils::log(String::from_utf8_lossy(&output.unwrap().stderr).trim_end_matches('\n'));
+        log!(
+            "{}",
+            String::from_utf8_lossy(&output.unwrap().stderr).trim_end_matches('\n')
+        );
     }
 }
 
@@ -740,7 +743,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
         0o0644,
         &format!("{}\n/bin/bash {}", pre_exec_cmd, USER_SCRIPT),
     ) {
-        utils::log(&format!("failed to generate {}: {}", xinitrc, err));
+        log!("failed to generate {}: {}", xinitrc, err);
         return;
     }
 
@@ -776,7 +779,7 @@ fn run_user_session() {
     let consdev = match get_active_console() {
         Some(console) => console,
         None => {
-            utils::log("failed to determine console");
+            log!("failed to determine console");
             Command::new("bash").arg("-l").exec();
             return;
         }
@@ -795,7 +798,7 @@ fn run_user_session() {
 }
 
 fn setup_user_session() {
-    utils::log("initialization done");
+    log!("initialization done");
     print_logo();
     setup_root_home();
 }
