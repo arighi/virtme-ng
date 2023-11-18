@@ -549,7 +549,7 @@ fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String>
             }
         }
     }
-    return None;
+    None
 }
 
 fn get_network_device() -> Option<String> {
