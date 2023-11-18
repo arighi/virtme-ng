@@ -783,10 +783,9 @@ fn run_user_session() {
     };
     configure_terminal(consdev.as_str());
 
-    let flags = libc::O_RDWR | libc::O_NONBLOCK;
+    let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
     let mode = Mode::empty();
-    let tty_fd = open(consdev.as_str(), OFlag::from_bits_truncate(flags), mode)
-        .expect("failed to open console");
+    let tty_fd = open(consdev.as_str(), flags, mode).expect("failed to open console");
 
     if env::var("virtme_graphics").is_ok() {
         run_user_gui(tty_fd);
