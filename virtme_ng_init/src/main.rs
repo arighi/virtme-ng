@@ -885,15 +885,14 @@ fn run_snapd() {
     }
 }
 
-fn run_misc_services() -> Option<thread::JoinHandle<()>> {
-    let handle = thread::spawn(move || {
+fn run_misc_services() -> thread::JoinHandle<()> {
+    thread::spawn(|| {
         symlink_fds();
         mount_virtme_initmounts();
         fix_packaging_files();
         override_system_files();
         run_snapd();
-    });
-    Some(handle)
+    })
 }
 
 fn print_logo() {
@@ -925,7 +924,7 @@ fn main() {
     let mut handles: Vec<Option<thread::JoinHandle<()>>> = Vec::new();
     handles.push(run_udevd());
     handles.push(setup_network());
-    handles.push(run_misc_services());
+    handles.push(Some(run_misc_services()));
 
     // Wait for the completion of the detached services.
     for handle in handles.into_iter().flatten() {
