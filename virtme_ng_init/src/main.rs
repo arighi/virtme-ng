@@ -422,12 +422,12 @@ fn fix_dpkg_locks() {
     if !Path::new("/var/lib/dpkg").exists() {
         return;
     }
-    let lock_files = vec![
+    let lock_files = [
         "/var/lib/dpkg/lock",
         "/var/lib/dpkg/lock-frontend",
         "/var/lib/dpkg/triggers/Lock",
     ];
-    for path in &lock_files {
+    for path in lock_files {
         let fname = Path::new(path)
             .file_name()
             .and_then(|name| name.to_str())
