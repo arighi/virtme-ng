@@ -540,7 +540,7 @@ fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String>
         }
         if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
             // .flatten() ignores lines with reading errors
-            for entry in net_entries.flatten() {
+            if let Some(entry) = net_entries.flatten().next() {
                 let path = entry.path().file_name()?.to_string_lossy().to_string();
                 return Some(path);
             }
