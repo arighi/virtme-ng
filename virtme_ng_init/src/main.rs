@@ -302,13 +302,11 @@ fn generate_shadow() -> io::Result<()> {
 fn generate_sudoers() -> io::Result<()> {
     if let Ok(user) = env::var("virtme_user") {
         let fname = "/tmp/sudoers";
-        utils::create_file(fname, 0o0440, "").ok();
-        let mut file = File::create(fname)?;
         let content = format!(
             "root ALL = (ALL) NOPASSWD: ALL\n{} ALL = (ALL) NOPASSWD: ALL\n",
             user
         );
-        file.write_all(content.as_bytes())?;
+        utils::create_file(fname, 0o0440, &content).ok();
         utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
     }
     Ok(())
