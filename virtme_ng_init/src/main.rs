@@ -600,7 +600,7 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
 
     let (_before, remaining) = virtme_script.split_once(start_marker)?;
     let (encoded_cmd, _after) = remaining.split_once(end_marker)?;
-    Some(String::from_utf8(BASE64.decode(encoded_cmd).ok()?).ok()?)
+    String::from_utf8(BASE64.decode(encoded_cmd).ok()?).ok()
 }
 
 fn run_user_script() {
