@@ -123,7 +123,9 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
         Some(fsdata_cstr.as_ref()),
     );
     if let Err(err) = result {
-        log!("mount {} -> {}: {}", source, target, err);
+        if err != nix::errno::Errno::ENOENT {
+            log!("mount {} -> {}: {}", source, target, err);
+        }
     }
 }
 
