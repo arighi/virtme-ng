@@ -464,26 +464,17 @@ fn disable_uevent_helper() {
 }
 
 fn find_udevd() -> Option<PathBuf> {
-    let mut udevd = PathBuf::new();
+    let static_candidates = [
+        PathBuf::from("/usr/lib/systemd/systemd-udevd"),
+        PathBuf::from("/lib/systemd/systemd-udevd"),
+    ];
+    let path = env::var("PATH").unwrap_or_else(|_| String::new());
+    let path_candidates = path.split(':').map(|dir| PathBuf::from(dir).join("udevd"));
 
-    if PathBuf::from("/usr/lib/systemd/systemd-udevd").exists() {
-        udevd = PathBuf::from("/usr/lib/systemd/systemd-udevd");
-    } else if PathBuf::from("/lib/systemd/systemd-udevd").exists() {
-        udevd = PathBuf::from("/lib/systemd/systemd-udevd");
-    } else if let Ok(path) = env::var("PATH") {
-        for dir in path.split(':') {
-            let udevd_path = PathBuf::from(dir).join("udevd");
-            if udevd_path.exists() {
-                udevd = udevd_path;
-                break;
-            }
-        }
-    }
-    if udevd.exists() {
-        Some(udevd)
-    } else {
-        None
-    }
+    static_candidates
+        .into_iter()
+        .chain(path_candidates)
+        .find(|path| path.exists())
 }
 
 fn run_udevd() -> Option<thread::JoinHandle<()>> {
