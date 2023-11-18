@@ -14,24 +14,24 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
 
-use libc::{uname, utsname};
 use nix::fcntl::{open, OFlag};
 use nix::libc;
 use nix::sys::reboot;
 use nix::sys::stat::Mode;
+use nix::sys::utsname::uname;
 use nix::unistd::sethostname;
-use std::collections::HashMap;
 use std::env;
-use std::ffi::CStr;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::mem;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
 use std::thread;
 use std::time::Duration;
 mod utils;
+
+#[cfg(test)]
+mod test;
 
 struct MountInfo {
     source: &'static str,
@@ -198,7 +198,7 @@ const USER_SCRIPT: &str = "/tmp/.virtme-script";
 
 fn check_init_pid() {
     if id() != 1 {
-        utils::log(&format!("must be run as PID 1"));
+        utils::log("must be run as PID 1");
         exit(1);
     }
 }
@@ -219,22 +219,16 @@ fn configure_environment() {
 }
 
 fn get_kernel_version(show_machine: bool) -> String {
-    unsafe {
-        let mut utsname: utsname = mem::zeroed();
-        if uname(&mut utsname) == -1 {
-            return String::from("None");
-        }
-        let release = CStr::from_ptr(utsname.release.as_ptr())
-            .to_string_lossy()
-            .into_owned();
-        if show_machine {
-            let machine = CStr::from_ptr(utsname.machine.as_ptr())
-                .to_string_lossy()
-                .into_owned();
-            format!("{} {}", release, machine)
-        } else {
-            release
-        }
+    let utsname = match uname() {
+        Ok(utsname) => utsname,
+        Err(_) => return "None".to_string(),
+    };
+    let release = utsname.release().to_string_lossy();
+    if show_machine {
+        let machine = utsname.machine().to_string_lossy();
+        format!("{} {}", release, machine)
+    } else {
+        release.into_owned()
     }
 }
 
@@ -244,12 +238,11 @@ fn get_active_console() -> Option<String> {
         Ok(file) => {
             let reader = BufReader::new(file);
 
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    if line.chars().nth(27) == Some('C') {
-                        let console = line.split(' ').next()?.to_string();
-                        return Some(format!("/dev/{}", console));
-                    }
+            // .flatten() ignores lines with reading errors
+            for line in reader.lines().flatten() {
+                if line.chars().nth(27) == Some('C') {
+                    let console = line.split(' ').next()?;
+                    return Some(format!("/dev/{}", console));
                 }
             }
             None
@@ -267,7 +260,7 @@ fn configure_hostname() {
             utils::log(&format!("failed to change hostname: {}", err));
         }
     } else {
-        utils::log(&format!("virtme_hostname is not defined"));
+        utils::log("virtme_hostname is not defined");
     }
 }
 
@@ -297,11 +290,7 @@ fn generate_shadow() -> io::Result<()> {
     let mut writer = BufWriter::new(output_file);
 
     for line in reader.lines() {
-        let line = line?;
-        let parts: Vec<&str> = line.split(':').collect();
-
-        if !parts.is_empty() {
-            let username = parts[0];
+        if let Some((username, _)) = line?.split_once(':') {
             writeln!(writer, "{}:!:::::::", username)?;
         }
     }
@@ -313,13 +302,11 @@ fn generate_shadow() -> io::Result<()> {
 fn generate_sudoers() -> io::Result<()> {
     if let Ok(user) = env::var("virtme_user") {
         let fname = "/tmp/sudoers";
-        utils::create_file(fname, 0o0440, "").ok();
-        let mut file = File::create(fname)?;
         let content = format!(
             "root ALL = (ALL) NOPASSWD: ALL\n{} ALL = (ALL) NOPASSWD: ALL\n",
             user
         );
-        file.write_all(content.as_bytes())?;
+        utils::create_file(fname, 0o0440, &content).ok();
         utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
     }
     Ok(())
@@ -340,14 +327,12 @@ fn set_cwd() {
 }
 
 fn symlink_fds() {
-    let fd_links: HashMap<&str, &str> = vec![
+    let fd_links = [
         ("/proc/self/fd", "/dev/fd"),
         ("/proc/self/fd/0", "/dev/stdin"),
         ("/proc/self/fd/1", "/dev/stdout"),
         ("/proc/self/fd/2", "/dev/stderr"),
-    ]
-    .into_iter()
-    .collect();
+    ];
 
     // Install /proc/self/fd symlinks into /dev if not already present.
     for (src, dst) in fd_links.iter() {
@@ -392,7 +377,7 @@ fn mount_virtme_initmounts() {
         if key.starts_with("virtme_initmount") {
             utils::do_mkdir(&path);
             utils::do_mount(
-                &key.replace("_", "."),
+                &key.replace('_', "."),
                 &path,
                 "9p",
                 0,
@@ -437,12 +422,12 @@ fn fix_dpkg_locks() {
     if !Path::new("/var/lib/dpkg").exists() {
         return;
     }
-    let lock_files = vec![
+    let lock_files = [
         "/var/lib/dpkg/lock",
         "/var/lib/dpkg/lock-frontend",
         "/var/lib/dpkg/triggers/Lock",
     ];
-    for path in &lock_files {
+    for path in lock_files {
         let fname = Path::new(path)
             .file_name()
             .and_then(|name| name.to_str())
@@ -479,26 +464,17 @@ fn disable_uevent_helper() {
 }
 
 fn find_udevd() -> Option<PathBuf> {
-    let mut udevd = PathBuf::new();
+    let static_candidates = [
+        PathBuf::from("/usr/lib/systemd/systemd-udevd"),
+        PathBuf::from("/lib/systemd/systemd-udevd"),
+    ];
+    let path = env::var("PATH").unwrap_or_else(|_| String::new());
+    let path_candidates = path.split(':').map(|dir| Path::new(dir).join("udevd"));
 
-    if PathBuf::from("/usr/lib/systemd/systemd-udevd").exists() {
-        udevd = PathBuf::from("/usr/lib/systemd/systemd-udevd");
-    } else if PathBuf::from("/lib/systemd/systemd-udevd").exists() {
-        udevd = PathBuf::from("/lib/systemd/systemd-udevd");
-    } else if let Ok(path) = env::var("PATH") {
-        for dir in path.split(':') {
-            let udevd_path = PathBuf::from(dir).join("udevd");
-            if udevd_path.exists() {
-                udevd = udevd_path;
-                break;
-            }
-        }
-    }
-    if udevd.exists() {
-        Some(udevd)
-    } else {
-        None
-    }
+    static_candidates
+        .into_iter()
+        .chain(path_candidates)
+        .find(|path| path.exists())
 }
 
 fn run_udevd() -> Option<thread::JoinHandle<()>> {
@@ -506,7 +482,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         let handle = thread::spawn(move || {
             disable_uevent_helper();
             let args: &[&str] = &["--daemon", "--resolve-names=never"];
-            utils::run_cmd(&udevd_path.to_string_lossy(), args);
+            utils::run_cmd(udevd_path, args);
             utils::log("triggering udev coldplug");
             utils::run_cmd("udevadm", &["trigger", "--type=subsystems", "--action=add"]);
             utils::run_cmd("udevadm", &["trigger", "--type=devices", "--action=add"]);
@@ -522,34 +498,32 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
 }
 
 fn get_guest_tools_dir() -> Option<String> {
-    if let Ok(current_exe) = env::current_exe() {
-        if let Some(parent_dir) = current_exe.parent()?.parent() {
-            if let Some(dir) = parent_dir.to_str() {
-                return Some(dir.to_string());
+    Some(
+        env::current_exe()
+            .ok()?
+            .parent()?
+            .parent()?
+            .to_str()?
+            .to_string(),
+    )
+}
+
+fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String> {
+    // .flatten() ignores lines with reading errors
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
+            // .flatten() ignores lines with reading errors
+            if let Some(entry) = net_entries.flatten().next() {
+                let path = entry.path().file_name()?.to_string_lossy().to_string();
+                return Some(path);
             }
         }
     }
     None
-}
-
-fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String> {
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
-                for entry in net_entries {
-                    if let Ok(entry) = entry {
-                        let path = entry.path().file_name()?.to_string_lossy().to_string();
-                        return Some(path);
-                    }
-                }
-            }
-        }
-    }
-    return None;
 }
 
 fn get_network_device() -> Option<String> {
@@ -569,26 +543,25 @@ fn get_network_device() -> Option<String> {
 
 fn setup_network() -> Option<thread::JoinHandle<()>> {
     utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if cmdline.contains("virtme.dhcp") {
-            if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                if let Some(network_dev) = get_network_device() {
-                    utils::log(&format!("setting up network device {}", network_dev));
-                    let handle = thread::spawn(move || {
-                        let args = [
-                            "udhcpc",
-                            "-i",
-                            &network_dev,
-                            "-n",
-                            "-q",
-                            "-f",
-                            "-s",
-                            &format!("{}/virtme-udhcpc-script", guest_tools_dir),
-                        ];
-                        utils::run_cmd("busybox", &args);
-                    });
-                    return Some(handle);
-                }
+    let cmdline = std::fs::read_to_string("/proc/cmdline").ok()?;
+    if cmdline.contains("virtme.dhcp") {
+        if let Some(guest_tools_dir) = get_guest_tools_dir() {
+            if let Some(network_dev) = get_network_device() {
+                utils::log(&format!("setting up network device {}", network_dev));
+                let handle = thread::spawn(move || {
+                    let args = [
+                        "udhcpc",
+                        "-i",
+                        &network_dev,
+                        "-n",
+                        "-q",
+                        "-f",
+                        "-s",
+                        &format!("{}/virtme-udhcpc-script", guest_tools_dir),
+                    ];
+                    utils::run_cmd("busybox", &args);
+                });
+                return Some(handle);
             }
         }
     }
@@ -597,21 +570,11 @@ fn setup_network() -> Option<thread::JoinHandle<()>> {
 
 fn extract_user_script(virtme_script: &str) -> Option<String> {
     let start_marker = "virtme.exec=`";
-    let end_marker = "`";
+    let end_marker = '`';
 
-    if let Some(start_index) = virtme_script.find(start_marker) {
-        let start_index = start_index + start_marker.len();
-        if let Some(end_index) = virtme_script[start_index..].find(end_marker) {
-            let encoded_cmd = &virtme_script[start_index..start_index + end_index];
-            if let Ok(decoded_bytes) = BASE64.decode(encoded_cmd) {
-                if let Ok(decoded_string) = String::from_utf8(decoded_bytes) {
-                    return Some(decoded_string);
-                }
-            }
-        }
-    }
-
-    None
+    let (_before, remaining) = virtme_script.split_once(start_marker)?;
+    let (encoded_cmd, _after) = remaining.split_once(end_marker)?;
+    String::from_utf8(BASE64.decode(encoded_cmd).ok()?).ok()
 }
 
 fn run_user_script() {
@@ -626,13 +589,11 @@ fn run_user_script() {
         );
     } else {
         // Re-create stdout/stderr to connect to the virtio-serial ports.
-        let io_files: HashMap<&str, &str> = vec![
+        let io_files = [
             ("/dev/virtio-ports/virtme.dev_stdin", "/dev/stdin"),
             ("/dev/virtio-ports/virtme.dev_stdout", "/dev/stdout"),
             ("/dev/virtio-ports/virtme.dev_stderr", "/dev/stderr"),
-        ]
-        .into_iter()
-        .collect();
+        ];
         for (src, dst) in io_files.iter() {
             if std::path::Path::new(dst).exists() {
                 utils::do_unlink(dst);
@@ -641,46 +602,22 @@ fn run_user_script() {
         }
 
         // Detach the process from the controlling terminal
-        let flags = libc::O_RDWR;
-        let mode = Mode::empty();
-        let tty_in = open(
-            "/dev/virtio-ports/virtme.stdin",
-            OFlag::from_bits_truncate(flags),
-            mode,
-        )
-        .expect("failed to open console.");
-        let tty_out = open(
-            "/dev/virtio-ports/virtme.stdout",
-            OFlag::from_bits_truncate(flags),
-            mode,
-        )
-        .expect("failed to open console.");
-        let tty_err = open(
-            "/dev/virtio-ports/virtme.stderr",
-            OFlag::from_bits_truncate(flags),
-            mode,
-        )
-        .expect("failed to open console.");
+        let open_tty =
+            |path| open(path, OFlag::O_RDWR, Mode::empty()).expect("failed to open console.");
+        let tty_in = open_tty("/dev/virtio-ports/virtme.stdin");
+        let tty_out = open_tty("/dev/virtio-ports/virtme.stdout");
+        let tty_err = open_tty("/dev/virtio-ports/virtme.stderr");
 
         // Determine if we need to switch to a different user, or if we can run the script as root.
-        let cmd: String;
-        let args: Vec<&str>;
-        let user: String;
-        if let Ok(virtme_user) = env::var("virtme_user") {
-            user = virtme_user;
+        let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
+        let (cmd, args) = if !user.is_empty() {
+            ("su", vec![&user, "-c", USER_SCRIPT])
         } else {
-            user = String::new();
-        }
-        if !user.is_empty() {
-            cmd = "su".to_string();
-            args = vec![&user, "-c", USER_SCRIPT];
-        } else {
-            cmd = "/bin/sh".to_string();
-            args = vec![USER_SCRIPT];
-        }
+            ("/bin/sh", vec![USER_SCRIPT])
+        };
         clear_virtme_envs();
         unsafe {
-            Command::new(&cmd)
+            Command::new(cmd)
                 .args(&args)
                 .pre_exec(move || {
                     nix::libc::setsid();
@@ -709,10 +646,9 @@ fn setup_user_script() {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if let Some(cmd) = extract_user_script(&cmdline) {
             create_user_script(&cmd);
-            if let Ok(_) = env::var("virtme_graphics") {
-                return;
+            if env::var("virtme_graphics").is_err() {
+                run_user_script();
             }
-            run_user_script();
         }
     }
 }
@@ -759,10 +695,10 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
-fn run_shell(tty_fd: libc::c_int, args: Vec<String>) {
+fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
     unsafe {
         Command::new("bash")
-            .args(args.into_iter())
+            .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
                 Ok(())
@@ -774,12 +710,10 @@ fn run_shell(tty_fd: libc::c_int, args: Vec<String>) {
 
 fn init_xdg_runtime_dir() {
     // Initialize XDG_RUNTIME_DIR (required to provide a better compatibility with graphic apps).
-    let mut uid = 0;
-    if let Ok(user) = env::var("virtme_user") {
-        if let Some(virtme_uid) = utils::get_user_id(&user) {
-            uid = virtme_uid;
-        }
-    }
+    let uid = env::var("virtme_user")
+        .ok()
+        .and_then(|user| utils::get_user_id(&user))
+        .unwrap_or(0);
     let dir = format!("/run/user/{}", uid);
     utils::do_mkdir(&dir);
     utils::do_chown(&dir, uid, uid).ok();
@@ -811,27 +745,31 @@ fn run_user_gui(tty_fd: libc::c_int) {
     }
 
     // Run graphical app using xinit directly
-    let mut args: Vec<String> = vec!["-l".to_owned(), "-c".to_owned()];
+    let mut args = vec!["-l", "-c"];
+    let storage;
     if let Ok(user) = env::var("virtme_user") {
         // Try to fix permissions on the virtual consoles, we are starting X
         // directly here so we may need extra permissions on the tty devices.
         utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
 
         // Start xinit directly.
-        args.push(format!("su {} -c 'xinit /tmp/.xinitrc'", user));
+        storage = format!("su {} -c 'xinit /tmp/.xinitrc'", user);
+        args.push(&storage);
     } else {
-        args.push("xinit /tmp/.xinitrc".to_owned());
+        args.push("xinit /tmp/.xinitrc");
     }
-    run_shell(tty_fd, args);
+    run_shell(tty_fd, &args);
 }
 
 fn run_user_shell(tty_fd: libc::c_int) {
-    let mut args: Vec<String> = vec!["-l".to_owned()];
+    let mut args = vec!["-l"];
+    let storage;
     if let Ok(user) = env::var("virtme_user") {
-        args.push("-c".to_owned());
-        args.push(format!("su {}", user));
+        args.push("-c");
+        storage = format!("su {}", user);
+        args.push(&storage);
     }
-    run_shell(tty_fd, args);
+    run_shell(tty_fd, &args);
 }
 
 fn run_user_session() {
@@ -845,12 +783,11 @@ fn run_user_session() {
     };
     configure_terminal(consdev.as_str());
 
-    let flags = libc::O_RDWR | libc::O_NONBLOCK;
+    let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
     let mode = Mode::empty();
-    let tty_fd = open(consdev.as_str(), OFlag::from_bits_truncate(flags), mode)
-        .expect("failed to open console");
+    let tty_fd = open(consdev.as_str(), flags, mode).expect("failed to open console");
 
-    if let Ok(_) = env::var("virtme_graphics") {
+    if env::var("virtme_graphics").is_ok() {
         run_user_gui(tty_fd);
     } else {
         run_user_shell(tty_fd);
@@ -876,7 +813,7 @@ fn run_snapd() {
                 return;
             }
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                utils::run_cmd(&format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
+                utils::run_cmd(format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
             }
             Command::new(snapd_bin)
                 .stdin(Stdio::null())
@@ -898,15 +835,14 @@ fn run_snapd() {
     }
 }
 
-fn run_misc_services() -> Option<thread::JoinHandle<()>> {
-    let handle = thread::spawn(move || {
+fn run_misc_services() -> thread::JoinHandle<()> {
+    thread::spawn(|| {
         symlink_fds();
         mount_virtme_initmounts();
         fix_packaging_files();
         override_system_files();
         run_snapd();
-    });
-    Some(handle)
+    })
 }
 
 fn print_logo() {
@@ -917,7 +853,7 @@ fn print_logo() {
     \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |
      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
                                                 |___/"#;
-    println!("{}", logo.trim_start_matches("\n"));
+    println!("{}", logo.trim_start_matches('\n'));
     println!("   kernel version: {}\n", get_kernel_version(true));
 }
 
@@ -935,10 +871,7 @@ fn main() {
     run_systemd_tmpfiles();
 
     // Service initialization (some services can be parallelized here).
-    let mut handles: Vec<Option<thread::JoinHandle<()>>> = Vec::new();
-    handles.push(run_udevd());
-    handles.push(setup_network());
-    handles.push(run_misc_services());
+    let handles = vec![run_udevd(), setup_network(), Some(run_misc_services())];
 
     // Wait for the completion of the detached services.
     for handle in handles.into_iter().flatten() {

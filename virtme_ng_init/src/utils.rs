@@ -4,11 +4,10 @@
 //!
 //! Author: Andrea Righi <andrea.righi@canonical.com>
 
-use nix::libc;
 use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Gid, Uid};
-use std::ffi::CString;
+use std::ffi::{CString, OsStr};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::fs;
@@ -16,7 +15,7 @@ use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
 use users::get_user_by_name;
 
-static PROG_NAME: &'static str = "virtme-ng-init";
+static PROG_NAME: &str = "virtme-ng-init";
 
 pub fn log(msg: &str) {
     if msg.is_empty() {
@@ -36,10 +35,7 @@ pub fn log(msg: &str) {
 }
 
 pub fn get_user_id(username: &str) -> Option<u32> {
-    if let Some(user) = get_user_by_name(username) {
-        return Some(user.uid());
-    }
-    None
+    Some(get_user_by_name(username)?.uid())
 }
 
 pub fn do_chown(path: &str, uid: u32, gid: u32) -> io::Result<()> {
@@ -50,8 +46,8 @@ pub fn do_chown(path: &str, uid: u32, gid: u32) -> io::Result<()> {
 }
 
 pub fn do_mkdir(path: &str) {
-    let dmask = libc::S_IRWXU | libc::S_IRGRP | libc::S_IXGRP | libc::S_IROTH | libc::S_IXOTH;
-    nix::unistd::mkdir(path, Mode::from_bits_truncate(dmask as u32)).ok();
+    let dmask = Mode::S_IRWXU | Mode::S_IRGRP | Mode::S_IXGRP | Mode::S_IROTH | Mode::S_IXOTH;
+    nix::unistd::mkdir(path, dmask).ok();
 }
 
 pub fn do_unlink(path: &str) {
@@ -111,17 +107,12 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
         Some(fsdata_cstr.as_ref()),
     );
     if let Err(err) = result {
-        log(&format!(
-            "mount {} -> {}: {}",
-            source,
-            target,
-            err.to_string()
-        ));
+        log(&format!("mount {} -> {}: {}", source, target, err));
     }
 }
 
-pub fn run_cmd(cmd: &str, args: &[&str]) {
-    let output = Command::new(cmd)
+pub fn run_cmd(cmd: impl AsRef<OsStr>, args: &[&str]) {
+    let output = Command::new(&cmd)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -136,8 +127,8 @@ pub fn run_cmd(cmd: &str, args: &[&str]) {
         }
         Err(_) => {
             log(&format!(
-                "WARNING: failed to run: {} {}",
-                cmd,
+                "WARNING: failed to run: {:?} {}",
+                cmd.as_ref(),
                 args.join(" ")
             ));
         }
