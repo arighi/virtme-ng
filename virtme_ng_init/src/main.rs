@@ -14,17 +14,15 @@
 use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
 
-use libc::{uname, utsname};
 use nix::fcntl::{open, OFlag};
 use nix::libc;
 use nix::sys::reboot;
 use nix::sys::stat::Mode;
+use nix::sys::utsname::uname;
 use nix::unistd::sethostname;
 use std::env;
-use std::ffi::CStr;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::mem;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
@@ -221,22 +219,16 @@ fn configure_environment() {
 }
 
 fn get_kernel_version(show_machine: bool) -> String {
-    unsafe {
-        let mut utsname: utsname = mem::zeroed();
-        if uname(&mut utsname) == -1 {
-            return String::from("None");
-        }
-        let release = CStr::from_ptr(utsname.release.as_ptr())
-            .to_string_lossy()
-            .into_owned();
-        if show_machine {
-            let machine = CStr::from_ptr(utsname.machine.as_ptr())
-                .to_string_lossy()
-                .into_owned();
-            format!("{} {}", release, machine)
-        } else {
-            release
-        }
+    let utsname = match uname() {
+        Ok(utsname) => utsname,
+        Err(_) => return "None".to_string(),
+    };
+    let release = utsname.release().to_string_lossy();
+    if show_machine {
+        let machine = utsname.machine().to_string_lossy();
+        format!("{} {}", release, machine)
+    } else {
+        release.into_owned()
     }
 }
 
