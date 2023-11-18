@@ -41,7 +41,7 @@ pub fn log_impl(msg: Arguments<'_>) {
     match OpenOptions::new().write(true).open("/dev/kmsg") {
         Ok(mut file) => {
             msg.push('\n');
-            file.write(msg.as_bytes()).ok();
+            file.write_all(msg.as_bytes()).ok();
         }
         Err(_) => {
             println!(
