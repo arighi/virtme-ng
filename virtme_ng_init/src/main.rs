@@ -241,7 +241,7 @@ fn get_active_console() -> Option<String> {
             // .flatten() ignores lines with reading errors
             for line in reader.lines().flatten() {
                 if line.chars().nth(27) == Some('C') {
-                    let console = line.split(' ').next()?.to_string();
+                    let console = line.split(' ').next()?;
                     return Some(format!("/dev/{}", console));
                 }
             }
