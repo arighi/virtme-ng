@@ -906,10 +906,7 @@ fn main() {
     run_systemd_tmpfiles();
 
     // Service initialization (some services can be parallelized here).
-    let mut handles: Vec<Option<thread::JoinHandle<()>>> = Vec::new();
-    handles.push(run_udevd());
-    handles.push(setup_network());
-    handles.push(Some(run_misc_services()));
+    let handles = vec![run_udevd(), setup_network(), Some(run_misc_services())];
 
     // Wait for the completion of the detached services.
     for handle in handles.into_iter().flatten() {
