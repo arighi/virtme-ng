@@ -8,6 +8,7 @@ use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Gid, Uid};
 use std::ffi::{CString, OsStr};
+use std::fmt::Arguments;
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::fs;
@@ -15,27 +16,39 @@ use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
 use users::get_user_by_name;
 
-static PROG_NAME: &str = "virtme-ng-init";
-
 macro_rules! log {
     ($($arg:tt)*) => {
-        $crate::utils::log_impl(&std::format!($($arg)*))
+        $crate::utils::log_impl(std::format_args!($($arg)*))
     };
 }
 
-pub fn log_impl(msg: &str) {
-    if msg.is_empty() {
+pub fn log_impl(msg: Arguments<'_>) {
+    static PREFIX: &str = "<6>virtme-ng-init: ";
+    static LOG_LEVEL: &str = "<6>";
+
+    let mut msg = format!("{}{}", PREFIX, msg);
+
+    // Remove all trailing \n
+    while msg.ends_with('\n') {
+        msg.pop();
+    }
+
+    // Was the message empty? If so, do not log anything
+    if PREFIX == msg {
         return;
     }
-    let msg = format!("{}: {}", PROG_NAME, msg.trim_end_matches('\n'));
-    let mut file = OpenOptions::new().write(true).open("/dev/kmsg").ok();
-    match &mut file {
-        Some(file) => {
-            let msg = format!("<6>{}\n", msg);
+
+    match OpenOptions::new().write(true).open("/dev/kmsg") {
+        Ok(mut file) => {
+            msg.push('\n');
             file.write(msg.as_bytes()).ok();
         }
-        None => {
-            println!("{}", msg);
+        Err(_) => {
+            println!(
+                "{}",
+                msg.strip_prefix(LOG_LEVEL)
+                    .expect("The message should always start with the log level")
+            );
         }
     }
 }
