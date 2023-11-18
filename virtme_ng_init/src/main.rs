@@ -469,7 +469,7 @@ fn find_udevd() -> Option<PathBuf> {
         PathBuf::from("/lib/systemd/systemd-udevd"),
     ];
     let path = env::var("PATH").unwrap_or_else(|_| String::new());
-    let path_candidates = path.split(':').map(|dir| PathBuf::from(dir).join("udevd"));
+    let path_candidates = path.split(':').map(|dir| Path::new(dir).join("udevd"));
 
     static_candidates
         .into_iter()
