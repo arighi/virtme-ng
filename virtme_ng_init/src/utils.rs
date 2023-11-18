@@ -7,7 +7,7 @@
 use nix::mount::{mount, MsFlags};
 use nix::sys::stat::Mode;
 use nix::unistd::{chown, Gid, Uid};
-use std::ffi::CString;
+use std::ffi::{CString, OsStr};
 use std::fs::{File, OpenOptions};
 use std::io::{self, Write};
 use std::os::unix::fs;
@@ -111,8 +111,8 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
     }
 }
 
-pub fn run_cmd(cmd: &str, args: &[&str]) {
-    let output = Command::new(cmd)
+pub fn run_cmd(cmd: impl AsRef<OsStr>, args: &[&str]) {
+    let output = Command::new(&cmd)
         .args(args)
         .stdin(Stdio::null())
         .stdout(Stdio::piped())
@@ -127,8 +127,8 @@ pub fn run_cmd(cmd: &str, args: &[&str]) {
         }
         Err(_) => {
             log(&format!(
-                "WARNING: failed to run: {} {}",
-                cmd,
+                "WARNING: failed to run: {:?} {}",
+                cmd.as_ref(),
                 args.join(" ")
             ));
         }

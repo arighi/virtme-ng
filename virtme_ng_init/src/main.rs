@@ -482,7 +482,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         let handle = thread::spawn(move || {
             disable_uevent_helper();
             let args: &[&str] = &["--daemon", "--resolve-names=never"];
-            utils::run_cmd(&udevd_path.to_string_lossy(), args);
+            utils::run_cmd(udevd_path, args);
             utils::log("triggering udev coldplug");
             utils::run_cmd("udevadm", &["trigger", "--type=subsystems", "--action=add"]);
             utils::run_cmd("udevadm", &["trigger", "--type=devices", "--action=add"]);
@@ -810,7 +810,7 @@ fn run_snapd() {
                 return;
             }
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                utils::run_cmd(&format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
+                utils::run_cmd(format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
             }
             Command::new(snapd_bin)
                 .stdin(Stdio::null())
