@@ -696,10 +696,9 @@ fn setup_user_script() {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if let Some(cmd) = extract_user_script(&cmdline) {
             create_user_script(&cmd);
-            if let Ok(_) = env::var("virtme_graphics") {
-                return;
+            if env::var("virtme_graphics").is_err() {
+                run_user_script();
             }
-            run_user_script();
         }
     }
 }
