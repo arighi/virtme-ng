@@ -760,12 +760,10 @@ fn run_shell(tty_fd: libc::c_int, args: Vec<String>) {
 
 fn init_xdg_runtime_dir() {
     // Initialize XDG_RUNTIME_DIR (required to provide a better compatibility with graphic apps).
-    let mut uid = 0;
-    if let Ok(user) = env::var("virtme_user") {
-        if let Some(virtme_uid) = utils::get_user_id(&user) {
-            uid = virtme_uid;
-        }
-    }
+    let uid = env::var("virtme_user")
+        .ok()
+        .and_then(|user| utils::get_user_id(&user))
+        .unwrap_or(0);
     let dir = format!("/run/user/{}", uid);
     utils::do_mkdir(&dir);
     utils::do_chown(&dir, uid, uid).ok();
