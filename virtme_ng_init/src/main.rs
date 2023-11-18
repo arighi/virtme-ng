@@ -246,12 +246,11 @@ fn get_active_console() -> Option<String> {
         Ok(file) => {
             let reader = BufReader::new(file);
 
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    if line.chars().nth(27) == Some('C') {
-                        let console = line.split(' ').next()?.to_string();
-                        return Some(format!("/dev/{}", console));
-                    }
+            // .flatten() ignores lines with reading errors
+            for line in reader.lines().flatten() {
+                if line.chars().nth(27) == Some('C') {
+                    let console = line.split(' ').next()?.to_string();
+                    return Some(format!("/dev/{}", console));
                 }
             }
             None
@@ -533,19 +532,17 @@ fn get_guest_tools_dir() -> Option<String> {
 }
 
 fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String> {
-    for entry in entries {
-        if let Ok(entry) = entry {
-            let path = entry.path();
-            if !path.is_dir() {
-                continue;
-            }
-            if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
-                for entry in net_entries {
-                    if let Ok(entry) = entry {
-                        let path = entry.path().file_name()?.to_string_lossy().to_string();
-                        return Some(path);
-                    }
-                }
+    // .flatten() ignores lines with reading errors
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if !path.is_dir() {
+            continue;
+        }
+        if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
+            // .flatten() ignores lines with reading errors
+            for entry in net_entries.flatten() {
+                let path = entry.path().file_name()?.to_string_lossy().to_string();
+                return Some(path);
             }
         }
     }
