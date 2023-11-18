@@ -625,26 +625,11 @@ fn run_user_script() {
         }
 
         // Detach the process from the controlling terminal
-        let flags = libc::O_RDWR;
-        let mode = Mode::empty();
-        let tty_in = open(
-            "/dev/virtio-ports/virtme.stdin",
-            OFlag::from_bits_truncate(flags),
-            mode,
-        )
-        .expect("failed to open console.");
-        let tty_out = open(
-            "/dev/virtio-ports/virtme.stdout",
-            OFlag::from_bits_truncate(flags),
-            mode,
-        )
-        .expect("failed to open console.");
-        let tty_err = open(
-            "/dev/virtio-ports/virtme.stderr",
-            OFlag::from_bits_truncate(flags),
-            mode,
-        )
-        .expect("failed to open console.");
+        let open_tty =
+            |path| open(path, OFlag::O_RDWR, Mode::empty()).expect("failed to open console.");
+        let tty_in = open_tty("/dev/virtio-ports/virtme.stdin");
+        let tty_out = open_tty("/dev/virtio-ports/virtme.stdout");
+        let tty_err = open_tty("/dev/virtio-ports/virtme.stderr");
 
         // Determine if we need to switch to a different user, or if we can run the script as root.
         let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
