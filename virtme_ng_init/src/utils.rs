@@ -36,10 +36,7 @@ pub fn log(msg: &str) {
 }
 
 pub fn get_user_id(username: &str) -> Option<u32> {
-    if let Some(user) = get_user_by_name(username) {
-        return Some(user.uid());
-    }
-    None
+    Some(get_user_by_name(username)?.uid())
 }
 
 pub fn do_chown(path: &str, uid: u32, gid: u32) -> io::Result<()> {

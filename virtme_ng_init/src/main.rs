@@ -522,14 +522,14 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
 }
 
 fn get_guest_tools_dir() -> Option<String> {
-    if let Ok(current_exe) = env::current_exe() {
-        if let Some(parent_dir) = current_exe.parent()?.parent() {
-            if let Some(dir) = parent_dir.to_str() {
-                return Some(dir.to_string());
-            }
-        }
-    }
-    None
+    Some(
+        env::current_exe()
+            .ok()?
+            .parent()?
+            .parent()?
+            .to_str()?
+            .to_string(),
+    )
 }
 
 fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String> {
@@ -569,26 +569,25 @@ fn get_network_device() -> Option<String> {
 
 fn setup_network() -> Option<thread::JoinHandle<()>> {
     utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if cmdline.contains("virtme.dhcp") {
-            if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                if let Some(network_dev) = get_network_device() {
-                    utils::log(&format!("setting up network device {}", network_dev));
-                    let handle = thread::spawn(move || {
-                        let args = [
-                            "udhcpc",
-                            "-i",
-                            &network_dev,
-                            "-n",
-                            "-q",
-                            "-f",
-                            "-s",
-                            &format!("{}/virtme-udhcpc-script", guest_tools_dir),
-                        ];
-                        utils::run_cmd("busybox", &args);
-                    });
-                    return Some(handle);
-                }
+    let cmdline = std::fs::read_to_string("/proc/cmdline").ok()?;
+    if cmdline.contains("virtme.dhcp") {
+        if let Some(guest_tools_dir) = get_guest_tools_dir() {
+            if let Some(network_dev) = get_network_device() {
+                utils::log(&format!("setting up network device {}", network_dev));
+                let handle = thread::spawn(move || {
+                    let args = [
+                        "udhcpc",
+                        "-i",
+                        &network_dev,
+                        "-n",
+                        "-q",
+                        "-f",
+                        "-s",
+                        &format!("{}/virtme-udhcpc-script", guest_tools_dir),
+                    ];
+                    utils::run_cmd("busybox", &args);
+                });
+                return Some(handle);
             }
         }
     }
@@ -599,19 +598,13 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
     let start_marker = "virtme.exec=`";
     let end_marker = "`";
 
-    if let Some(start_index) = virtme_script.find(start_marker) {
-        let start_index = start_index + start_marker.len();
-        if let Some(end_index) = virtme_script[start_index..].find(end_marker) {
-            let encoded_cmd = &virtme_script[start_index..start_index + end_index];
-            if let Ok(decoded_bytes) = BASE64.decode(encoded_cmd) {
-                if let Ok(decoded_string) = String::from_utf8(decoded_bytes) {
-                    return Some(decoded_string);
-                }
-            }
-        }
-    }
-
-    None
+    let start_index = virtme_script.find(start_marker)?;
+    let start_index = start_index + start_marker.len();
+    let end_index = virtme_script[start_index..].find(end_marker)?;
+    let encoded_cmd = &virtme_script[start_index..start_index + end_index];
+    let decoded_bytes = BASE64.decode(encoded_cmd).ok()?;
+    let decoded_string = String::from_utf8(decoded_bytes).ok()?;
+    Some(decoded_string)
 }
 
 fn run_user_script() {
