@@ -695,10 +695,10 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
-fn run_shell(tty_fd: libc::c_int, args: Vec<String>) {
+fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
     unsafe {
         Command::new("bash")
-            .args(args.into_iter())
+            .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
                 Ok(())
@@ -745,27 +745,31 @@ fn run_user_gui(tty_fd: libc::c_int) {
     }
 
     // Run graphical app using xinit directly
-    let mut args: Vec<String> = vec!["-l".to_owned(), "-c".to_owned()];
+    let mut args = vec!["-l", "-c"];
+    let storage;
     if let Ok(user) = env::var("virtme_user") {
         // Try to fix permissions on the virtual consoles, we are starting X
         // directly here so we may need extra permissions on the tty devices.
         utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
 
         // Start xinit directly.
-        args.push(format!("su {} -c 'xinit /tmp/.xinitrc'", user));
+        storage = format!("su {} -c 'xinit /tmp/.xinitrc'", user);
+        args.push(&storage);
     } else {
-        args.push("xinit /tmp/.xinitrc".to_owned());
+        args.push("xinit /tmp/.xinitrc");
     }
-    run_shell(tty_fd, args);
+    run_shell(tty_fd, &args);
 }
 
 fn run_user_shell(tty_fd: libc::c_int) {
-    let mut args: Vec<String> = vec!["-l".to_owned()];
+    let mut args = vec!["-l"];
+    let storage;
     if let Ok(user) = env::var("virtme_user") {
-        args.push("-c".to_owned());
-        args.push(format!("su {}", user));
+        args.push("-c");
+        storage = format!("su {}", user);
+        args.push(&storage);
     }
-    run_shell(tty_fd, args);
+    run_shell(tty_fd, &args);
 }
 
 fn run_user_session() {
