@@ -725,21 +725,7 @@ fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
     }
 }
 
-fn init_xdg_runtime_dir() {
-    // Initialize XDG_RUNTIME_DIR (required to provide a better compatibility with graphic apps).
-    let uid = env::var("virtme_user")
-        .ok()
-        .and_then(|user| utils::get_user_id(&user))
-        .unwrap_or(0);
-    let dir = format!("/run/user/{}", uid);
-    utils::do_mkdir(&dir);
-    utils::do_chown(&dir, uid, uid).ok();
-    env::set_var("XDG_RUNTIME_DIR", dir);
-}
-
 fn run_user_gui(tty_fd: libc::c_int) {
-    init_xdg_runtime_dir();
-
     // Generate a bare minimum xinitrc
     let xinitrc = "/tmp/.xinitrc";
 
@@ -778,6 +764,15 @@ fn run_user_gui(tty_fd: libc::c_int) {
     run_shell(tty_fd, &args);
 }
 
+fn init_xdg_runtime_dir(uid: u32) {
+    // $XDG_RUNTIME_DIR defines the base directory relative to which user-specific non-essential
+    // runtime files and other file objects (such as sockets, named pipes, ...) should be stored.
+    let dir = format!("/run/user/{}", uid);
+    utils::do_mkdir(&dir);
+    utils::do_chown(&dir, uid, uid).ok();
+    env::set_var("XDG_RUNTIME_DIR", dir);
+}
+
 fn run_user_shell(tty_fd: libc::c_int) {
     let mut args = vec!["-l"];
     let storage;
@@ -790,6 +785,11 @@ fn run_user_shell(tty_fd: libc::c_int) {
 }
 
 fn run_user_session() {
+    let uid = env::var("virtme_user")
+        .ok()
+        .and_then(|user| utils::get_user_id(&user))
+        .unwrap_or(0);
+
     let consdev = match get_active_console() {
         Some(console) => console,
         None => {
@@ -799,6 +799,8 @@ fn run_user_session() {
         }
     };
     configure_terminal(consdev.as_str());
+
+    init_xdg_runtime_dir(uid);
 
     let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
     let mode = Mode::empty();
