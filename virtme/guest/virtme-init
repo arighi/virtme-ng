@@ -235,6 +235,16 @@ if [[ -n "${user_cmd}" ]]; then
         exit 1
     fi
 
+    # Set proper ownership on the virtio-ports devices
+    if [[ -n "${virtme_user}" ]]; then
+        chown ${virtme_user}:${virtme_user}     \
+            /dev/virtio-ports/virtme.stdin      \
+            /dev/virtio-ports/virtme.stdout     \
+            /dev/virtio-ports/virtme.stderr     \
+            /dev/virtio-ports/virtme.dev_stdout \
+            /dev/virtio-ports/virtme.dev_stderr
+    fi
+
     # Fix /dev/stdout and /dev/stderr.
     #
     # When using a virtio serial port, the EBUSY error can occur if multiple
@@ -277,6 +287,9 @@ if [[ -z "$consdev" ]]; then
     log "can't deduce console device"
     exec bash --login  # At least try to be helpful
 fi
+if [[ -n "${virtme_user}" ]]; then
+    chown ${virtme_user}:${virtme_user} /dev/${consdev}
+fi
 
 deallocvt
 
@@ -312,6 +325,15 @@ install -d -m 0755 /tmp/roothome
 export HOME=/tmp/roothome
 mount --bind /tmp/roothome /root
 
+# $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
+# non-essential runtime files and other file objects (such as sockets, named
+# pipes, ...) should be stored.
+export XDG_RUNTIME_DIR=/run/user/$(id -u ${virtme_user})
+mkdir -p $XDG_RUNTIME_DIR
+if [[ -n "${virtme_user}" ]]; then
+    chown ${virtme_user}:${virtme_user} $XDG_RUNTIME_DIR
+fi
+
 # Bring up a functioning shell on the console.  This is a bit magical:
 # We have no controlling terminal because we're attached to a fake
 # console device (probably something like /dev/console), which can't
@@ -323,11 +345,6 @@ if [[ -n "${virtme_stty_con}" ]]; then
     stty ${virtme_stty_con} <"/dev/$consdev"
 fi
 if [[ -n "${virtme_graphics}" ]]; then
-    # Initialize XDG_RUNTIME_DIR (required to provide a better compatibility
-    # with graphic apps).
-    export XDG_RUNTIME_DIR=/run/user/$(id -u ${virtme_user})
-    mkdir -p $XDG_RUNTIME_DIR
-
     # Check if we need to enable the sound system.
     if cat /proc/cmdline |grep -q -E '(^| )virtme.sound($| )'; then
         pre_exec_cmd="$(dirname $0)/virtme-sound-script"
@@ -340,7 +357,6 @@ if [[ -n "${virtme_graphics}" ]]; then
     echo -e "${pre_exec_cmd}\nexec /tmp/.virtme-script" > ${xinit_rc}
     chmod +x /tmp/.virtme-script
     if [[ -n "${virtme_user}" ]]; then
-        chown ${virtme_user}:${virtme_user} $XDG_RUNTIME_DIR
         chown ${virtme_user}:${virtme_user} ${xinit_rc}
         # Try to fix permissions on the virtual consoles, we are starting X
         # directly here so we may need extra permissions on the tty devices.
