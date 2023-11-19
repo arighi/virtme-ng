@@ -317,10 +317,24 @@ fn generate_sudoers() -> io::Result<()> {
     Ok(())
 }
 
+fn generate_hosts() -> io::Result<()> {
+    if let Ok(hostname) = env::var("virtme_hostname") {
+        std::fs::copy("/etc/hosts", "/tmp/hosts")?;
+        let mut h = OpenOptions::new()
+            .write(true)
+            .append(true)
+            .open("/tmp/hosts")?;
+        writeln!(h, "\n127.0.0.1 {}\n::1 {}", hostname, hostname)?;
+        utils::do_mount("/tmp/hosts", "/etc/hosts", "", libc::MS_BIND as usize, "");
+    }
+    Ok(())
+}
+
 fn override_system_files() {
     generate_fstab().ok();
     generate_shadow().ok();
     generate_sudoers().ok();
+    generate_hosts().ok();
 }
 
 fn set_cwd() {
