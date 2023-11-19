@@ -685,7 +685,7 @@ fn clear_virtme_envs() {
     }
 }
 
-fn configure_terminal(consdev: &str) {
+fn configure_terminal(consdev: &str, uid: u32) {
     if let Ok(params) = env::var("virtme_stty_con") {
         let output = Command::new("stty")
             .args(params.split_whitespace())
@@ -695,6 +695,8 @@ fn configure_terminal(consdev: &str) {
             // Replace the current init process with a shell session.
             .output();
         log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
+        // Set proper user ownership on the default console device
+        utils::do_chown(&consdev, uid, uid).ok();
     }
 }
 
@@ -798,7 +800,7 @@ fn run_user_session() {
             return;
         }
     };
-    configure_terminal(consdev.as_str());
+    configure_terminal(consdev.as_str(), uid);
 
     init_xdg_runtime_dir(uid);
 
