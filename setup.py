@@ -59,10 +59,7 @@ class BuildPy(build_py):
         print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
         # Build virtme-ng-init
         if build_virtme_ng_init:
-            check_call(
-                ["cargo", "install", "--path", ".", "--root", "../virtme/guest"],
-                cwd="virtme_ng_init",
-            )
+            check_call(["make", "init"])
             check_call(
                 ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
                 cwd="virtme_ng_init",
