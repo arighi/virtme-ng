@@ -596,7 +596,7 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
     String::from_utf8(BASE64.decode(encoded_cmd).ok()?).ok()
 }
 
-fn run_user_script() {
+fn run_user_script(uid: u32) {
     if !std::path::Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !std::path::Path::new("/dev/virtio-ports/virtme.stderr").exists()
@@ -615,6 +615,7 @@ fn run_user_script() {
             if std::path::Path::new(dst).exists() {
                 utils::do_unlink(dst);
             }
+            utils::do_chown(src, uid, uid).ok();
             utils::do_symlink(src, dst);
         }
 
@@ -659,12 +660,12 @@ fn create_user_script(cmd: &str) {
     utils::create_file(USER_SCRIPT, 0o0755, cmd).expect("Failed to create virtme-script file");
 }
 
-fn setup_user_script() {
+fn setup_user_script(uid: u32) {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if let Some(cmd) = extract_user_script(&cmdline) {
             create_user_script(&cmd);
             if env::var("virtme_graphics").is_err() {
-                run_user_script();
+                run_user_script(uid);
             }
         }
     }
@@ -695,9 +696,9 @@ fn configure_terminal(consdev: &str, uid: u32) {
             // Replace the current init process with a shell session.
             .output();
         log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
-        // Set proper user ownership on the default console device
-        utils::do_chown(&consdev, uid, uid).ok();
     }
+    // Set proper user ownership on the default console device
+    utils::do_chown(&consdev, uid, uid).ok();
 }
 
 fn detach_from_terminal(tty_fd: libc::c_int) {
@@ -783,10 +784,25 @@ fn run_user_shell(tty_fd: libc::c_int) {
         storage = format!("su {}", user);
         args.push(&storage);
     }
+    print_logo();
     run_shell(tty_fd, &args);
 }
 
-fn run_user_session() {
+fn run_user_session(consdev: &str, uid: u32) {
+    let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
+    let mode = Mode::empty();
+    let tty_fd = open(consdev, flags, mode).expect("failed to open console");
+
+    setup_user_script(uid);
+
+    if env::var("virtme_graphics").is_ok() {
+        run_user_gui(tty_fd);
+    } else {
+        run_user_shell(tty_fd);
+    }
+}
+
+fn setup_user_session() {
     let uid = env::var("virtme_user")
         .ok()
         .and_then(|user| utils::get_user_id(&user))
@@ -801,24 +817,12 @@ fn run_user_session() {
         }
     };
     configure_terminal(consdev.as_str(), uid);
-
     init_xdg_runtime_dir(uid);
-
-    let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
-    let mode = Mode::empty();
-    let tty_fd = open(consdev.as_str(), flags, mode).expect("failed to open console");
-
-    if env::var("virtme_graphics").is_ok() {
-        run_user_gui(tty_fd);
-    } else {
-        run_user_shell(tty_fd);
-    }
-}
-
-fn setup_user_session() {
-    log!("initialization done");
-    print_logo();
     setup_root_home();
+
+    log!("initialization done");
+
+    run_user_session(consdev.as_str(), uid);
 }
 
 fn run_snapd() {
@@ -901,9 +905,7 @@ fn main() {
 
     // Start user session (batch or interactive).
     set_cwd();
-    setup_user_script();
     setup_user_session();
-    run_user_session();
 
     // Shutdown the system.
     poweroff();
