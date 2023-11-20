@@ -47,6 +47,27 @@ elif [[ -d "/lib/modules/$kver" ]]; then
     mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
 fi
 
+# devtmpfs might be automounted; if not, mount it.
+if ! grep -q devtmpfs /proc/mounts; then
+    # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
+    if [[ -c /dev/null ]]; then
+	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
+	    &>/dev/null
+    else
+	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+    fi
+
+    if (( $? != 0 )); then
+	# The running kernel doesn't have devtmpfs.  Use regular tmpfs.
+	mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
+
+	# Make some basic devices first, and let udev handle the rest
+	mknod -m 0666 /dev/null c 1 3
+	mknod -m 0660 /dev/kmsg c 1 11
+	mknod -m 0600 /dev/console c 5 1
+    fi
+fi
+
 # Setup rw tmpfs directories
 [ -e /var/log ] && mount -t tmpfs tmpfs /var/log/ &
 [ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/ &
@@ -95,27 +116,6 @@ elif [[ -x /lib/systemd/systemd-udevd ]]; then
     udevd=/lib/systemd/systemd-udevd
 else
     udevd=`which udevd`
-fi
-
-# devtmpfs might be automounted; if not, mount it.
-if ! grep -q devtmpfs /proc/mounts; then
-    # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
-    if [[ -c /dev/null ]]; then
-	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
-	    &>/dev/null
-    else
-	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
-    fi
-
-    if (( $? != 0 )); then
-	# The running kernel doesn't have devtmpfs.  Use regular tmpfs.
-	mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
-
-	# Make some basic devices first, and let udev handle the rest
-	mknod -m 0666 /dev/null c 1 3
-	mknod -m 0660 /dev/kmsg c 1 11
-	mknod -m 0600 /dev/console c 5 1
-    fi
 fi
 
 for tag in "${!virtme_initmount@}"; do
