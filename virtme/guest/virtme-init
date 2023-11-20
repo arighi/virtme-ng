@@ -204,6 +204,9 @@ if [[ -n "virtme_user" ]]; then
     echo "root ALL = (ALL) NOPASSWD: ALL" > $tmpfile
     echo "${virtme_user} ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
     chmod 440 "$tmpfile"
+    if [ ! -f "$real_sudoers" ]; then
+        touch "$real_sudoers"
+    fi
     mount --bind "$tmpfile" "$real_sudoers"
 fi
 
