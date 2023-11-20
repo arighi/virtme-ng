@@ -205,7 +205,10 @@ def make_parser():
     parser.add_argument("--qemu", action="store", help="Use the specified QEMU binary")
 
     parser.add_argument(
-        "--name", action="store", help="Set guest hostname and qemu -name flag"
+        "--name",
+        action="store",
+        default="virtme-ng",
+        help="Set guest hostname and qemu -name flag"
     )
 
     parser.add_argument(

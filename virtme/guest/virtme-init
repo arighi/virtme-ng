@@ -68,6 +68,12 @@ fi
 touch /tmp/fstab
 mount --bind /tmp/fstab /etc/fstab
 
+if [[ -n "$virtme_hostname" ]]; then
+    cp /etc/hosts /tmp/hosts
+    printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /tmp/hosts
+    mount --bind /tmp/hosts /etc/hosts
+fi
+
 # Fix dpkg if we are on a Debian-based distro
 if [ -d /var/lib/dpkg ]; then
     lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
