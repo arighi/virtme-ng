@@ -82,6 +82,16 @@ standalone virtme-ng running the following commands:
  $ BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt .
 ```
 
+* Run from source
+
+You can also run virtme-ng directly from source, make sure you have all the
+requirements installed (optionally you can build `virtme-ng-init` for a faster
+boot, by running `make`), then from the source directory simply run any
+virtme-ng command, such as:
+```
+ $ ./vng --help
+```
+
 Requirements
 ============
 
@@ -136,6 +146,13 @@ Examples
    (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
 ```
    $ vng -r 6.2.0-21-generic
+```
+
+ - Run a pre-compiled vanilla v6.6 kernel fetched from the Ubuntu mainline
+   builds repository (useful to test a specific kernel version directly and
+   save a lot of build time):
+```
+   $ vng -r v6.6
 ```
 
  - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
