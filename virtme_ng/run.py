@@ -28,21 +28,9 @@ except ModuleNotFoundError:
         pass
 
 from virtme.util import SilentError, uname, get_username
-from virtme_ng.utils import CONF_FILE
-from virtme_ng.spinner import Spinner
+from virtme_ng.utils import CONF_FILE, spinner_decorator
+from virtme_ng.mainline import KernelDownloader
 from virtme_ng.version import VERSION
-
-
-def spinner_decorator(message):
-    def decorator(func):
-        def wrapper(*args, **kwargs):
-            with Spinner(message=message):
-                result = func(*args, **kwargs)
-                return result
-
-        return wrapper
-
-    return decorator
 
 
 def check_call_cmd(command, quiet=False, dry_run=False):
@@ -779,7 +767,22 @@ class KernelSource:
 
     def _get_virtme_run(self, args):
         if args.run is not None:
-            self.virtme_param["kdir"] = "--kimg " + args.run
+            # If an upstream version is specified (using an upstream tag) fetch
+            # and run the corresponding kernel from the Ubuntu mainline
+            # repository.
+            if args.run.startswith('v'):
+                if args.arch is None:
+                    arch = 'amd64'
+                else:
+                    arch = args.arch
+                try:
+                    mainline = KernelDownloader(args.run, arch=arch, verbose=args.verbose)
+                    self.virtme_param["kdir"] = "--kimg " + mainline.target
+                except FileNotFoundError as exc:
+                    sys.stderr.write(str(exc) + "\n")
+                    sys.exit(1)
+            else:
+                self.virtme_param["kdir"] = "--kimg " + args.run
         else:
             self.virtme_param["kdir"] = "--kdir ./"
 
