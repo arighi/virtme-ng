@@ -82,6 +82,16 @@ standalone virtme-ng running the following commands:
  $ BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt .
 ```
 
+If you are in Debian/Ubuntu you may need to install the following packages to
+build virtme-ng from source properly:
+```
+ $ sudo apt install python3-pip python3-argcomplete flake8 pylint \
+   cargo rustc qemu-system-x86
+```
+
+In recent versions of pip3 you may need to specify `--break-system-packages` to
+properly install virtme-ng in your system from source.
+
 * Run from source
 
 You can also run virtme-ng directly from source, make sure you have all the
