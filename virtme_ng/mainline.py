@@ -8,6 +8,7 @@ import re
 import sys
 import subprocess
 from glob import glob
+from shutil import which
 import requests
 from virtme_ng.utils import CACHE_DIR, spinner_decorator
 
@@ -41,6 +42,9 @@ class KernelDownloader:
 
     @spinner_decorator(message="📥 downloading kernel")
     def _fetch_kernel(self):
+        if not which("dpkg"):
+            raise FileNotFoundError("dpkg is not available, unable to uncompress kernel deb")
+
         url = BASE_URL + "/" + self.version + "/" + self.arch
         response = requests.get(url, timeout=HTTP_TIMEOUT)
         if response.status_code != 200:
