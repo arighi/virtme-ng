@@ -629,7 +629,7 @@ fn run_user_script(uid: u32) {
         // Determine if we need to switch to a different user, or if we can run the script as root.
         let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
         let (cmd, args) = if !user.is_empty() {
-            ("su", vec![&user, "-c", USER_SCRIPT])
+            ("su", vec![user.as_str(), "-c", USER_SCRIPT])
         } else {
             ("/bin/sh", vec![USER_SCRIPT])
         };
