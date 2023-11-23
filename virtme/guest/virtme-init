@@ -201,7 +201,8 @@ ip link set dev lo up
 if [[ -n "virtme_user" ]]; then
     real_sudoers=/etc/sudoers
     tmpfile="`mktemp --tmpdir=/tmp`"
-    echo "root ALL = (ALL) NOPASSWD: ALL" > $tmpfile
+    echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
+    echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
     echo "${virtme_user} ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
     chmod 440 "$tmpfile"
     if [ ! -f "$real_sudoers" ]; then
