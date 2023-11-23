@@ -126,7 +126,7 @@ setup(
         os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="utf-8"
     ).read(),
     long_description_content_type="text/markdown",
-    install_requires=["argcomplete"],
+    install_requires=["argcomplete", "requests"],
     entry_points={
         "console_scripts": [
             "vng = virtme_ng.run:main",
