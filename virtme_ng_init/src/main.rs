@@ -307,10 +307,11 @@ fn generate_shadow() -> io::Result<()> {
 fn generate_sudoers() -> io::Result<()> {
     if let Ok(user) = env::var("virtme_user") {
         let fname = "/tmp/sudoers";
-        let content = format!(
-            "root ALL = (ALL) NOPASSWD: ALL\n{} ALL = (ALL) NOPASSWD: ALL\n",
-            user
-        );
+        let content = "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n".to_string()
+            + &format!(
+                "root ALL = (ALL) NOPASSWD: ALL\n{} ALL = (ALL) NOPASSWD: ALL\n",
+                user
+            );
         utils::create_file(fname, 0o0440, &content).ok();
         utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
     }
