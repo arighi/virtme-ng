@@ -334,7 +334,7 @@ class Kernel:
 
 
 def get_rootfs_from_kernel_path(path):
-    while path != "/" and not os.path.exists(path + "/lib/modules"):
+    while path and path != "/" and not os.path.exists(path + "/lib/modules"):
         path, _ = os.path.split(path)
     return os.path.abspath(path)
 
