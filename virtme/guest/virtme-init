@@ -247,7 +247,7 @@ if [[ -n "${user_cmd}" ]]; then
 
     # Set proper ownership on the virtio-ports devices
     if [[ -n "${virtme_user}" ]]; then
-        chown ${virtme_user}:${virtme_user}     \
+        chown ${virtme_user}                    \
             /dev/virtio-ports/virtme.stdin      \
             /dev/virtio-ports/virtme.stdout     \
             /dev/virtio-ports/virtme.stderr     \
@@ -298,7 +298,7 @@ if [[ -z "$consdev" ]]; then
     exec bash --login  # At least try to be helpful
 fi
 if [[ -n "${virtme_user}" ]]; then
-    chown ${virtme_user}:${virtme_user} /dev/${consdev}
+    chown ${virtme_user} /dev/${consdev}
 fi
 
 deallocvt
@@ -341,7 +341,7 @@ mount --bind /tmp/roothome /root
 export XDG_RUNTIME_DIR=/run/user/$(id -u ${virtme_user})
 mkdir -p $XDG_RUNTIME_DIR
 if [[ -n "${virtme_user}" ]]; then
-    chown ${virtme_user}:${virtme_user} $XDG_RUNTIME_DIR
+    chown ${virtme_user} $XDG_RUNTIME_DIR
 fi
 
 # Bring up a functioning shell on the console.  This is a bit magical:
@@ -367,7 +367,7 @@ if [[ -n "${virtme_graphics}" ]]; then
     echo -e "${pre_exec_cmd}\nexec /tmp/.virtme-script" > ${xinit_rc}
     chmod +x /tmp/.virtme-script
     if [[ -n "${virtme_user}" ]]; then
-        chown ${virtme_user}:${virtme_user} ${xinit_rc}
+        chown ${virtme_user} ${xinit_rc}
         # Try to fix permissions on the virtual consoles, we are starting X
         # directly here so we may need extra permissions on the tty devices.
         chown ${virtme_user} /dev/char/*
