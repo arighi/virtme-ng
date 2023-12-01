@@ -57,9 +57,11 @@ pub fn get_user_id(username: &str) -> Option<u32> {
     Some(get_user_by_name(username)?.uid())
 }
 
-pub fn do_chown(path: &str, uid: u32, gid: u32) -> io::Result<()> {
-    chown(path, Some(Uid::from_raw(uid)), Some(Gid::from_raw(gid)))
-        .map_err(|err| io::Error::new(io::ErrorKind::Other, err))?;
+pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> std::io::Result<()> {
+    let gid_option = gid.map(|gid| Gid::from_raw(gid));
+
+    chown(path, Some(Uid::from_raw(uid)), gid_option)
+        .map_err(|err| io::Error::new(std::io::ErrorKind::Other, err))?;
 
     Ok(())
 }

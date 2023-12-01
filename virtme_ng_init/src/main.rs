@@ -616,7 +616,7 @@ fn run_user_script(uid: u32) {
             if std::path::Path::new(dst).exists() {
                 utils::do_unlink(dst);
             }
-            utils::do_chown(src, uid, uid).ok();
+            utils::do_chown(src, uid, None).ok();
             utils::do_symlink(src, dst);
         }
 
@@ -699,7 +699,7 @@ fn configure_terminal(consdev: &str, uid: u32) {
         log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
     }
     // Set proper user ownership on the default console device
-    utils::do_chown(&consdev, uid, uid).ok();
+    utils::do_chown(&consdev, uid, None).ok();
 }
 
 fn detach_from_terminal(tty_fd: libc::c_int) {
@@ -773,7 +773,7 @@ fn init_xdg_runtime_dir(uid: u32) {
     // runtime files and other file objects (such as sockets, named pipes, ...) should be stored.
     let dir = format!("/run/user/{}", uid);
     utils::do_mkdir(&dir);
-    utils::do_chown(&dir, uid, uid).ok();
+    utils::do_chown(&dir, uid, None).ok();
     env::set_var("XDG_RUNTIME_DIR", dir);
 }
 
