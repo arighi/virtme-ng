@@ -19,6 +19,8 @@ import re
 import itertools
 import subprocess
 import signal
+import termios
+import tty
 from shutil import which
 from time import sleep
 from base64 import b64encode
@@ -1259,12 +1261,31 @@ def do_it() -> int:
             os.execv(qemu.qemubin, qemuargs)
     return 0
 
+def save_terminal_settings():
+    try:
+        return termios.tcgetattr(sys.stdin)
+    except:
+        return None
+
+def restore_terminal_settings(settings):
+    if settings is not None:
+        termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, settings)
+
+def signal_handler(signum, frame):
+    sys.exit(1)
+
 
 def main() -> int:
+    # Catch potential signals that may interrupt the execution (SIGTERM) and
+    # make sure the terminal settings are restored on exit.
+    settings = save_terminal_settings()
+    signal.signal(signal.SIGTERM, signal_handler)
     try:
         return do_it()
     except SilentError:
         return 1
+    finally:
+        restore_terminal_settings(settings)
 
 
 if __name__ == "__main__":
