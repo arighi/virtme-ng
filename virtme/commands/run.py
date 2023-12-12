@@ -1267,10 +1267,7 @@ def do_it() -> int:
 
 
 def save_terminal_settings():
-    try:
-        return termios.tcgetattr(sys.stdin)
-    except termios.error:
-        return None
+    return termios.tcgetattr(sys.stdin) if sys.stdin.isatty() else None
 
 
 def restore_terminal_settings(settings):
