@@ -20,7 +20,6 @@ import itertools
 import subprocess
 import signal
 import termios
-import tty
 from shutil import which
 from time import sleep
 from base64 import b64encode
@@ -349,7 +348,9 @@ def get_kernel_version(path):
     if not os.access(path, os.R_OK):
         arg_fail("unable to access %s (check for read permissions)" % path)
     try:
-        result = subprocess.run(["file", path], capture_output=True, text=True, check=False)
+        result = subprocess.run(
+            ["file", path], capture_output=True, text=True, check=False
+        )
         for item in result.stdout.split(", "):
             match = re.search(r"^[vV]ersion (\S+)", item)
             if match:
@@ -358,7 +359,8 @@ def get_kernel_version(path):
     except FileNotFoundError:
         sys.stderr.write(
             "warning: `file` is not installed in the system, "
-            "virtme-ng may fail to detect kernel version\n")
+            "virtme-ng may fail to detect kernel version\n"
+        )
     # 'file' failed to get kernel version, try with 'strings'.
     result = subprocess.run(
         ["strings", path], capture_output=True, text=True, check=False
@@ -437,7 +439,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             else:
                 mod_file = os.path.join(kernel.moddir, "modules.dep")
                 if not os.path.exists(mod_file):
-                    depmod = find_binary_or_raise(['depmod'])
+                    depmod = find_binary_or_raise(["depmod"])
 
                     # Try to refresh modules directory. Some packages (e.g., debs)
                     # don't ship all the required modules information, so we
@@ -730,7 +732,7 @@ def is_statically_linked(binary_path):
     try:
         # Run the 'file' command on the binary and check for the string
         # "statically linked"
-        result = subprocess.check_output(['file', binary_path], universal_newlines=True)
+        result = subprocess.check_output(["file", binary_path], universal_newlines=True)
         return "statically linked" in result
     except subprocess.CalledProcessError:
         return False
@@ -861,13 +863,15 @@ def do_it() -> int:
             "init=/bin/sh",
             "--",
             "-c",
-            ";".join([
-                "mount -t tmpfs run /run",
-                "mkdir -p /run/virtme/guesttools",
-                "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any " +
-                "virtme.guesttools /run/virtme/guesttools",
-                f"exec /run/virtme/guesttools/{virtme_init_cmd}",
-            ]),
+            ";".join(
+                [
+                    "mount -t tmpfs run /run",
+                    "mkdir -p /run/virtme/guesttools",
+                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
+                    + "virtme.guesttools /run/virtme/guesttools",
+                    f"exec /run/virtme/guesttools/{virtme_init_cmd}",
+                ]
+            ),
         ]
 
     # Arrange for modules to end up in the right place
@@ -1082,7 +1086,7 @@ def do_it() -> int:
 
         # Encode the shell command to base64 to handle special characters (such
         # as quotes, double quotes, etc.).
-        shellcmd = b64encode(shellcmd.encode('utf-8')).decode('utf-8')
+        shellcmd = b64encode(shellcmd.encode("utf-8")).decode("utf-8")
 
         if args.graphics is not None:
             kernelargs.append("virtme_graphics=1")
@@ -1261,17 +1265,20 @@ def do_it() -> int:
             os.execv(qemu.qemubin, qemuargs)
     return 0
 
+
 def save_terminal_settings():
     try:
         return termios.tcgetattr(sys.stdin)
-    except:
+    except termios.error:
         return None
+
 
 def restore_terminal_settings(settings):
     if settings is not None:
         termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, settings)
 
-def signal_handler(signum, frame):
+
+def signal_handler(_signum, _frame):
     sys.exit(1)
 
 
