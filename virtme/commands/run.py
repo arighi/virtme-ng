@@ -425,7 +425,10 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         else:
             # Try to automatically detect modules' path
             root_dir = get_rootfs_from_kernel_path(kernel.kimg)
-            if root_dir == "/":
+            # If we are using the entire host filesystem or if we are using
+            # a chroot (via --root) we don't have to do anything special action
+            # the modules, just rely on /lib/modules in the target rootfs.
+            if root_dir == "/" or args.root != '/':
                 kernel.use_root_mods = True
             elif root_dir.startswith("/tmp"):
                 sys.stderr.write(
