@@ -247,6 +247,17 @@ Examples
    sys     0m8.806s
 ```
 
+ - Run the vanilla v6.7-rc5 kernel with an Ubuntu 22.04 rootfs:
+```
+   $ vng -r v6.7-rc5 --user root --root ./rootfs/22.04 --root-release jammy -- cat /etc/lsb-release /proc/version
+   ...
+   DISTRIB_ID=Ubuntu
+   DISTRIB_RELEASE=22.04
+   DISTRIB_CODENAME=jammy
+   DISTRIB_DESCRIPTION="Ubuntu 22.04.3 LTS"
+   Linux version 6.7.0-060700rc5-generic (kernel@kathleen) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-7ubuntu1) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #202312102332 SMP PREEMPT_DYNAMIC Sun Dec 10 23:41:31 UTC 2023
+```
+
  - Run `glxgears` inside a kernel recompiled in the current directory:
 ```
    $ vng -g -- glxgears

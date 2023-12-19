@@ -213,6 +213,12 @@ def make_parser():
     )
 
     parser.add_argument(
+        "--root-release",
+        action="store",
+        help="Use a target Ubuntu release to create a new chroot (used with --root)",
+    )
+
+    parser.add_argument(
         "--rw",
         action="store_true",
         help="Give the guest read-write access to its root filesystem. "
@@ -446,17 +452,18 @@ git reset --hard __virtme__
 """
 
 
-def create_root(destdir, arch):
+def create_root(destdir, arch, release):
     """Initialize a rootfs directory, populating files/directory if it doesn't exist."""
     if os.path.exists(destdir):
         return
     # Use Ubuntu's cloud images to create a rootfs, these images are fairly
     # small and they provide a nice environment to test kernels.
-    release = (
-        check_output("lsb_release -s -c", shell=True)
-        .decode(sys.stdout.encoding)
-        .rstrip()
-    )
+    if release is None:
+        release = (
+            check_output("lsb_release -s -c", shell=True)
+            .decode(sys.stdout.encoding)
+            .rstrip()
+        )
     url = (
         "https://cloud-images.ubuntu.com/"
         + f"{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz"
@@ -721,7 +728,7 @@ class KernelSource:
 
     def _get_virtme_root(self, args):
         if args.root is not None:
-            create_root(args.root, args.arch or "amd64")
+            create_root(args.root, args.arch or "amd64", args.root_release)
             self.virtme_param["root"] = f"--root {args.root}"
         else:
             self.virtme_param["root"] = ""
