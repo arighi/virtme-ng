@@ -198,7 +198,7 @@ fi
 # Bring up networking
 ip link set dev lo up
 
-if [[ -n "virtme_user" ]]; then
+if [[ -n "${virtme_user}" ]]; then
     real_sudoers=/etc/sudoers
     tmpfile="`mktemp --tmpdir=/tmp`"
     echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
