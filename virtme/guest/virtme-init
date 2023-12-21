@@ -36,6 +36,13 @@ done
 # Setup kernel modules
 kver="`uname -r`"
 
+# Make sure to always have /lib/modules, otherwise we won't be able to
+# configure kmod support properly (this can happen in some container
+# environments, such as docker).
+if [[ ! -d /lib/modules ]]; then
+    mkdir -p /lib/modules
+fi
+
 if [[ -n "$virtme_root_mods" ]]; then
     # /lib/modules is already set up
     true
@@ -330,10 +337,12 @@ echo "                                                |___/ "
 echo "   kernel version: $(uname -mr)"
 echo ""
 
-# Set up a basic environment
-install -d -m 0755 /tmp/roothome
-export HOME=/tmp/roothome
-mount --bind /tmp/roothome /root
+# Set up a basic environment (unless virtme-ng is running as root on the host)
+if [[ ! -n "${virtme_root_user}" ]]; then
+    install -d -m 0755 /tmp/roothome
+    export HOME=/tmp/roothome
+    mount --bind /tmp/roothome /root
+fi
 
 # $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
 # non-essential runtime files and other file objects (such as sockets, named

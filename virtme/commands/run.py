@@ -1168,6 +1168,12 @@ def do_it() -> int:
     if args.user:
         kernelargs.append("virtme_user=%s" % args.user)
 
+    # If we are running as root on the host pass this information to the guest
+    # (this can be useful to properly support running virtme-ng instances
+    # inside docker)
+    if os.geteuid() == 0:
+        kernelargs.append("virtme_root_user=1")
+
     initrdpath: Optional[str]
 
     if need_initramfs:
