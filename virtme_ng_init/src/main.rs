@@ -411,6 +411,12 @@ fn mount_kernel_modules() {
     let kver = get_kernel_version(false);
     let mod_dir = format!("/lib/modules/{}", kver);
 
+    // Make sure to always have /lib/modules, otherwise we won't be able to configure kmod support
+    // properly (this can happen in some container environments, such as docker).
+    if !Path::new(&mod_dir).exists() {
+        utils::do_mkdir("/lib/modules");
+    }
+
     if env::var("virtme_root_mods").is_ok() {
         // /lib/modules is already set up.
     } else if let Ok(dir) = env::var("virtme_link_mods") {
@@ -673,9 +679,12 @@ fn setup_user_script(uid: u32) {
 }
 
 fn setup_root_home() {
-    utils::do_mkdir("/tmp/roothome");
-    utils::do_mount("/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
-    env::set_var("HOME", "/tmp/roothome");
+    // Set up a basic environment (unless virtme-ng is running as root on the host)
+    if let Err(_) = env::var("virtme_root_user") {
+        utils::do_mkdir("/tmp/roothome");
+        utils::do_mount("/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
+        env::set_var("HOME", "/tmp/roothome");
+    }
 }
 
 fn clear_virtme_envs() {
