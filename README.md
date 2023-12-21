@@ -281,6 +281,20 @@ Examples
    (virtme-ng is started in graphical mode)
 ```
 
+ - Run virtme-ng inside a docker container:
+```
+   $ docker run -it ubuntu:22.04 /bin/bash
+   # apt update
+   # echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
+   # apt install --yes git qemu-kvm udev iproute2 busybox-static \
+     coreutils python3-requests libvirt-clients kbd kmod file rsync zstd udev
+   # git clone --recursive https://github.com/arighi/virtme-ng.git
+   # ./virtme-ng/vng -r v6.6 -- uname -r
+   6.6.0-060600-generic
+```
+   See also: `.github/workflows/run.yml` as a practical example on how to use
+   virtme-ng inside docker.
+
 Implementation details
 ======================
 
@@ -388,6 +402,14 @@ Troubleshooting
    (keep in mind that virtme-ng will try to run snapd in a bare minimum system
    environment without systemd), if some snaps are not running try to disable
    apparmor, adding `--append="apparmor=0"` to the virtme-ng command line.
+
+ - Running virtme-ng instances inside docker: in case of failures/issues,
+   especially with stdin/stdout/stderr redirections, make sure that you have
+   `udev` installed in your docker image and run the following command before
+   using `vng`:
+```
+  $ udevadm trigger --subsystem-match --action=change
+```
 
 Contributing
 ============

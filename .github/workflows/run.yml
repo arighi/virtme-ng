@@ -1,0 +1,26 @@
+name: Run
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  run:
+    runs-on: ubuntu-22.04
+    steps:
+      ### DEPENDENCIES ###
+
+      # Hard turn-off interactive mode
+      - run: echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections
+
+      # Install dependencies
+      - run: sudo apt update
+      - run: sudo apt install --yes git qemu-kvm udev iproute2 busybox-static coreutils python3-requests libvirt-clients kbd kmod file rsync zstd udev
+
+      ### END DEPENDENCIES ###
+
+      # Checkout git repository
+      - uses: actions/checkout@v4
+
+      # Run `uname -r` using a vanilla v6.6 kernel
+      - run: ./vng -r v6.6 -- uname -r

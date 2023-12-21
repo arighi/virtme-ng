@@ -766,7 +766,7 @@ class KernelSource:
         else:
             self.virtme_param["overlay_rwdir"] = " ".join(
                 f"--overlay-rwdir {d}"
-                for d in ("/etc", "/home", "/opt", "/srv", "/usr", "/var")
+                for d in ("/etc", "/lib", "/home", "/opt", "/srv", "/usr", "/var")
             )
         # Add user-specified overlays.
         for item in args.overlay_rwdir:

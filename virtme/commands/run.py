@@ -600,8 +600,12 @@ class VirtioFS:
 
         # Export the whole root fs of the host, do not enable sandbox, otherwise we
         # would get permission errors.
+        if not verbose:
+            stderr = "2>/dev/null"
+        else:
+            stderr = ""
         os.system(
-            f"{virtiofsd_path} --syslog --socket-path {self.sock} --shared-dir {path} --sandbox none &"
+            f"{virtiofsd_path} --syslog --socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} &"
         )
         max_attempts = 5
         check_duration = 0.1
@@ -613,7 +617,8 @@ class VirtioFS:
             sleep(check_duration)
             check_duration *= 2
         else:
-            print("virtme-run: failed to start virtiofsd, fallback to 9p")
+            if verbose:
+                sys.stderr.write("virtme-run: failed to start virtiofsd, fallback to 9p")
             return False
         return True
 
@@ -706,8 +711,20 @@ def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
     return name, fn
 
 
+def can_use_kvm():
+    if not os.path.exists("/dev/kvm"):
+        return False
+    try:
+        fd = os.open('/dev/kvm', os.O_RDWR | os.O_CLOEXEC)
+        os.close(fd)
+        return True
+
+    except OSError:
+        return False
+
+
 def can_use_microvm(args):
-    return not args.disable_microvm and args.arch == "x86_64"
+    return not args.disable_microvm and args.arch == "x86_64" and can_use_kvm()
 
 
 def has_read_acl(username, file_path):
@@ -924,7 +941,7 @@ def do_it() -> int:
         kernelargs.append("virtme_rw_overlay%d=%s" % (i, d))
 
     # Turn on KVM if available
-    if is_native:
+    if is_native and can_use_kvm():
         qemuargs.extend(["-machine", "accel=kvm:tcg"])
 
     # Add architecture-specific options
@@ -1150,6 +1167,12 @@ def do_it() -> int:
 
     if args.user:
         kernelargs.append("virtme_user=%s" % args.user)
+
+    # If we are running as root on the host pass this information to the guest
+    # (this can be useful to properly support running virtme-ng instances
+    # inside docker)
+    if os.geteuid() == 0:
+        kernelargs.append("virtme_root_user=1")
 
     initrdpath: Optional[str]
 
