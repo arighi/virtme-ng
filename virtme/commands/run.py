@@ -600,8 +600,12 @@ class VirtioFS:
 
         # Export the whole root fs of the host, do not enable sandbox, otherwise we
         # would get permission errors.
+        if not verbose:
+            stderr = "2>/dev/null"
+        else:
+            stderr = ""
         os.system(
-            f"{virtiofsd_path} --syslog --socket-path {self.sock} --shared-dir {path} --sandbox none &"
+            f"{virtiofsd_path} --syslog --socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} &"
         )
         max_attempts = 5
         check_duration = 0.1
@@ -613,7 +617,8 @@ class VirtioFS:
             sleep(check_duration)
             check_duration *= 2
         else:
-            print("virtme-run: failed to start virtiofsd, fallback to 9p")
+            if verbose:
+                sys.stderr.write("virtme-run: failed to start virtiofsd, fallback to 9p")
             return False
         return True
 
