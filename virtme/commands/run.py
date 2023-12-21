@@ -711,8 +711,20 @@ def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
     return name, fn
 
 
+def can_use_kvm():
+    if not os.path.exists("/dev/kvm"):
+        return False
+    try:
+        fd = os.open('/dev/kvm', os.O_RDWR | os.O_CLOEXEC)
+        os.close(fd)
+        return True
+
+    except OSError:
+        return False
+
+
 def can_use_microvm(args):
-    return not args.disable_microvm and args.arch == "x86_64"
+    return not args.disable_microvm and args.arch == "x86_64" and can_use_kvm()
 
 
 def has_read_acl(username, file_path):
@@ -929,7 +941,7 @@ def do_it() -> int:
         kernelargs.append("virtme_rw_overlay%d=%s" % (i, d))
 
     # Turn on KVM if available
-    if is_native:
+    if is_native and can_use_kvm():
         qemuargs.extend(["-machine", "accel=kvm:tcg"])
 
     # Add architecture-specific options
