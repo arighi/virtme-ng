@@ -302,7 +302,7 @@ virtme-ng allows to automatically configure, build and run kernels using the
 main command-line interface called `vng`.
 
 A minimal custom `.config` is automatically generated if not already present
-when --build is specified.
+when `--build` is specified.
 
 It is possible to specify a set of custom configs (.config chunk) in
 `~/.config/virtme-ng/kernel.config`, these user-specific settings will override
@@ -315,7 +315,7 @@ needed to test the kernel are copied from the remote host if an external build
 host is used.
 
 When a remote build host is used (`--build-host`) the target branch is force
-pushed to the remote host inside the `~/.virtme folder`.
+pushed to the remote host inside the `~/.virtme` directory.
 
 Then the kernel is executed using the virtme module. This allows to test the
 kernel using a safe copy-on-write snapshot of the entire host filesystem.
