@@ -364,6 +364,21 @@ fn symlink_fds() {
 
 fn mount_kernel_filesystems() {
     for mount_info in KERNEL_MOUNTS {
+        // In the case where a rootfs is specified when launching virtme-ng, it
+        // mounts /run and /run/virtme/guesttools prior to executing
+        // virtme-ng-init. We do not want to re-mount /run, as we will lose
+        // access to guesttools, which is required for network setup.
+        //
+        // Note, get_test_tools_dir() relies on /proc, so that must be mounted
+        // prior to /run.
+        if mount_info.target == "/run" {
+            if let Some(guest_tools_dir) = get_guest_tools_dir() {
+                if guest_tools_dir.starts_with("/run") {
+                    log!("/run previously mounted, skipping");
+                    continue;
+                }
+            }
+        }
         utils::do_mount(
             mount_info.source,
             mount_info.target,
