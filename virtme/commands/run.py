@@ -152,6 +152,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="Set guest memory and qemu -m flag.",
     )
     g.add_argument(
+        "--numa",
+        action="append",
+        default=None,
+        help="Create NUMA nodes in the guest.",
+    )
+    g.add_argument(
         "--cpus", action="store", default=None, help="Set guest cpu and qemu -smp flag."
     )
     g.add_argument(
@@ -643,11 +649,14 @@ def export_virtiofs(
 
     # Adjust qemu options to use virtiofsd
     fsid = "virtfs%d" % len(qemuargs)
-    if memory is None:
-        memory = "128M"
+
     vhost_dev_type = arch.vhost_dev_type()
     qemuargs.extend(["-chardev", f"socket,id=char{fsid},path={virtio_fs.sock}"])
     qemuargs.extend(["-device", f"{vhost_dev_type},chardev=char{fsid},tag={mount_tag}"])
+    if memory is None:
+        memory = "128M"
+    elif memory == 0:
+        return True
     qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
     qemuargs.extend(["-numa", "node,memdev=mem"])
 
@@ -724,7 +733,7 @@ def can_use_kvm():
 
 
 def can_use_microvm(args):
-    return not args.disable_microvm and args.arch == "x86_64" and can_use_kvm()
+    return not args.disable_microvm and not args.numa and args.arch == "x86_64" and can_use_kvm()
 
 
 def has_read_acl(username, file_path):
@@ -799,6 +808,16 @@ def do_it() -> int:
             args.memory += "M"
         qemuargs.extend(["-m", args.memory])
 
+    # Parse NUMA settings.
+    if args.numa:
+        for i, numa in enumerate(args.numa, start=1):
+            size, cpus = numa.split(",", 1) if "," in numa else (numa, None)
+            cpus = f",{cpus}" if cpus else ""
+            qemuargs.extend([
+                "-object", f"memory-backend-memfd,id=mem{i},size={size},share=on",
+                "-numa", f"node,memdev=mem{i}{cpus}"
+            ])
+
     if args.snaps:
         if args.root == "/":
             snapd_state = "/var/lib/snapd/state.json"
@@ -853,7 +872,10 @@ def do_it() -> int:
             args.root,
             "ROOTFS",
             guest_tools_path=guest_tools_path,
-            memory=args.memory,
+            # virtiofsd requires a NUMA not, if --numa is specified simply use
+            # the user-defined NUMA node, otherwise create a NUMA node with all
+            # the memory.
+            memory=0 if args.numa else args.memory,
             verbose=args.verbose,
         )
         if can_use_microvm(args) and use_virtiofs:

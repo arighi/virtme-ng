@@ -281,6 +281,13 @@ def make_parser():
     )
 
     parser.add_argument(
+        "--numa",
+        metavar="MEM[,cpus=FIRST_CPU1[-LAST_CPU1]][,cpus=FIRST_CPU2[-LAST_CPU2]]...",
+        action="append",
+        help="Create NUMA nodes in the guest (this implicitly disables the microvm architecture)"
+    )
+
+    parser.add_argument(
         "--balloon",
         action="store_true",
         help="Allow the host to ask the guest to release memory",
@@ -879,6 +886,13 @@ class KernelSource:
         else:
             self.virtme_param["memory"] = "--memory " + args.memory
 
+    def _get_virtme_numa(self, args):
+        if args.numa is not None:
+            numa_str = " ".join([f"--numa {numa}" for numa in args.numa])
+            self.virtme_param["numa"] = numa_str
+        else:
+            self.virtme_param["numa"] = ""
+
     def _get_virtme_balloon(self, args):
         if args.balloon:
             self.virtme_param["balloon"] = "--balloon"
@@ -948,6 +962,7 @@ class KernelSource:
         self._get_virtme_append(args)
         self._get_virtme_cpus(args)
         self._get_virtme_memory(args)
+        self._get_virtme_numa(args)
         self._get_virtme_balloon(args)
         self._get_virtme_snaps(args)
         self._get_virtme_busybox(args)
@@ -982,6 +997,7 @@ class KernelSource:
             + f'{self.virtme_param["append"]} '
             + f'{self.virtme_param["cpus"]} '
             + f'{self.virtme_param["memory"]} '
+            + f'{self.virtme_param["numa"]} '
             + f'{self.virtme_param["balloon"]} '
             + f'{self.virtme_param["snaps"]} '
             + f'{self.virtme_param["busybox"]} '
