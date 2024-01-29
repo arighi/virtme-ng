@@ -350,6 +350,13 @@ def make_parser():
     )
 
     parser.add_argument(
+        "--quiet",
+        "-q",
+        action="store_true",
+        help="Override verbose mode (disable --verbose).",
+    )
+
+    parser.add_argument(
         "--qemu-opts",
         "-o",
         action="append",
@@ -1113,6 +1120,9 @@ def do_it() -> int:
         for opt in kern_source.default_opts:
             val = kern_source.default_opts[opt]
             setattr(args, opt, val)
+
+    if args.verbose and args.quiet:
+        args.verbose = False
     try:
         if args.clean:
             clean(kern_source, args)
