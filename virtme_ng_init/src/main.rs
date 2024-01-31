@@ -629,11 +629,15 @@ fn run_user_script(uid: u32) {
     } else {
         // Re-create stdout/stderr to connect to the virtio-serial ports.
         let io_files = [
+            ("/dev/virtio-ports/virtme.ret", "/dev/virtme.ret"),
             ("/dev/virtio-ports/virtme.dev_stdin", "/dev/stdin"),
             ("/dev/virtio-ports/virtme.dev_stdout", "/dev/stdout"),
             ("/dev/virtio-ports/virtme.dev_stderr", "/dev/stderr"),
         ];
         for (src, dst) in io_files.iter() {
+            if !std::path::Path::new(src).exists() {
+                continue;
+            }
             if std::path::Path::new(dst).exists() {
                 utils::do_unlink(dst);
             }
@@ -657,7 +661,7 @@ fn run_user_script(uid: u32) {
         };
         clear_virtme_envs();
         unsafe {
-            Command::new(cmd)
+            let ret = Command::new(cmd)
                 .args(&args)
                 .pre_exec(move || {
                     nix::libc::setsid();
@@ -673,6 +677,18 @@ fn run_user_script(uid: u32) {
                 })
                 .output()
                 .expect("Failed to execute script");
+
+            // Channel the return code to the host via /dev/virtme.ret
+            if let Ok(mut file) = OpenOptions::new().write(true).open("/dev/virtme.ret") {
+                // Write the value of output.status.code() to the file
+                if let Some(code) = ret.status.code() {
+                    file.write_all(code.to_string().as_bytes())
+                        .expect("Failed to write to file");
+                } else {
+                    // Handle the case where output.status.code() is None
+                    file.write_all(b"-1").expect("Failed to write to file");
+                }
+            }
         }
         poweroff();
     }
