@@ -1102,8 +1102,7 @@ def clean(kern_source, args):
 
 def run(kern_source, args):
     """Run the kernel."""
-    kern_source.run(args)
-    return True
+    return kern_source.run(args)
 
 
 @spinner_decorator(message="🐞 generating memory dump")
@@ -1137,12 +1136,17 @@ def do_it() -> int:
             if not args.skip_config:
                 config(kern_source, args)
                 if args.kconfig:
-                    return
+                    return 0
             make(kern_source, args)
         else:
-            run(kern_source, args)
+            try:
+                run(kern_source, args)
+                return 0
+            except CalledProcessError as exc:
+                return exc.returncode
     except CalledProcessError as exc:
         raise SilentError() from exc
+    return 0
 
 
 def main() -> int:

@@ -1054,7 +1054,24 @@ def do_it() -> int:
                 ]
             )
 
-    def do_script(shellcmd: str, show_boot_console=False) -> None:
+    ret_path = None
+
+    def cleanup_script_retcode():
+        os.unlink(ret_path)
+
+    def fetch_script_retcode():
+        if ret_path is None:
+            return None
+        try:
+            with open(ret_path, 'r', encoding="utf-8") as file:
+                number_str = file.read().strip()
+                if number_str.isdigit():
+                    return int(number_str)
+                return None
+        except FileNotFoundError:
+            return None
+
+    def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
         if args.graphics is None:
             # Turn off default I/O
             qemuargs.extend(arch.qemu_nodisplay_args())
@@ -1106,6 +1123,13 @@ def do_it() -> int:
             ["-device", "virtserialport,name=virtme.dev_stderr,chardev=dev_stderr"]
         )
 
+        # Create a virtio serial device to channel the retcode of the script
+        # executed in the guest to the host.
+        if ret_path is not None:
+            qemuargs.extend(["-chardev", f"file,id=ret,path={ret_path}"])
+            qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
+            qemuargs.extend(["-device", "virtserialport,name=virtme.ret,chardev=ret"])
+
         # Scripts shouldn't reboot
         qemuargs.extend(["-no-reboot"])
 
@@ -1141,7 +1165,9 @@ def do_it() -> int:
         args.script_sh = args.graphics
 
     if args.script_sh is not None:
-        do_script(args.script_sh, show_boot_console=args.show_boot_console)
+        _, ret_path = tempfile.mkstemp(prefix="virtme_ret")
+        atexit.register(cleanup_script_retcode)
+        do_script(args.script_sh, ret_path=ret_path, show_boot_console=args.show_boot_console)
 
     if args.script_exec is not None:
         do_script(
@@ -1305,7 +1331,11 @@ def do_it() -> int:
         if pid:
             try:
                 pid, status = os.waitpid(pid, 0)
+                ret = fetch_script_retcode()
+                if ret is not None:
+                    return ret
                 return status
+
             except KeyboardInterrupt:
                 sys.stderr.write("Interrupted.")
                 sys.exit(1)

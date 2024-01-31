@@ -260,6 +260,11 @@ if [[ -n "${user_cmd}" ]]; then
             /dev/virtio-ports/virtme.stderr     \
             /dev/virtio-ports/virtme.dev_stdout \
             /dev/virtio-ports/virtme.dev_stderr
+
+        if [ -e /dev/virtio-ports/virtme.ret ]; then
+            chown ${virtme_user}                \
+                /dev/virtio-ports/virtme.ret
+        fi
     fi
 
     # Fix /dev/stdout and /dev/stderr.
@@ -289,7 +294,13 @@ if [[ -n "${user_cmd}" ]]; then
         else
             setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
         fi
-        log "script returned $?"
+	ret=$?
+        log "script returned {$ret}"
+
+        # Channel exit code to the host.
+        if [ -e /dev/virtio-ports/virtme.ret ]; then
+            echo ${ret} > /dev/virtio-ports/virtme.ret
+        fi
 
         # Hmm.  We should expose the return value somehow.
         sync
