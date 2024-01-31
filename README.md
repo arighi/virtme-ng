@@ -258,6 +258,23 @@ Examples
    Linux version 6.7.0-060700rc5-generic (kernel@kathleen) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-7ubuntu1) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #202312102332 SMP PREEMPT_DYNAMIC Sun Dec 10 23:41:31 UTC 2023
 ```
 
+ - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
+   and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
+```
+   $ vng -r -m 4G --numa 1G,cpus=0-1,cpus=3 --numa 3G,cpus=2,cpus=4-7 -- numactl -H
+   available: 2 nodes (0-1)
+   node 0 cpus: 0 1 3
+   node 0 size: 1005 MB
+   node 0 free: 914 MB
+   node 1 cpus: 2 4 5 6 7
+   node 1 size: 2916 MB
+   node 1 free: 2797 MB
+   node distances:
+   node   0   1
+     0:  10  20
+     1:  20  10
+```
+
  - Run `glxgears` inside a kernel recompiled in the current directory:
 ```
    $ vng -g -- glxgears

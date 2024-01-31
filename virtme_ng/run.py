@@ -284,7 +284,10 @@ def make_parser():
         "--numa",
         metavar="MEM[,cpus=FIRST_CPU1[-LAST_CPU1]][,cpus=FIRST_CPU2[-LAST_CPU2]]...",
         action="append",
-        help="Create NUMA nodes in the guest (this implicitly disables the microvm architecture)"
+        help="Create a NUMA node in the guest. "
+        + "Use this option multiple times to create more NUMA nodes. "
+        + "The total memory size assigned to NUMA nodes must match the guest memory size (specified with --memory/-m). "
+        + "This option implicitly disables the microvm architecture."
     )
 
     parser.add_argument(
