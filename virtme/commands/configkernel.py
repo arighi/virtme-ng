@@ -154,7 +154,6 @@ _GENERIC_CONFIG_OPTIONAL = [
     "CONFIG_UPROBES=y",
     "CONFIG_UPROBE_EVENTS=y",
     "CONFIG_DEBUG_FS=y",
-    "CONFIG_PROVE_LOCKING=y",
     "# Graphics support",
     "CONFIG_DRM=y",
     "CONFIG_DRM_VIRTIO_GPU=y",
