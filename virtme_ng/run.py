@@ -236,6 +236,12 @@ def make_parser():
     )
 
     parser.add_argument(
+        "--disable-kvm",
+        action="store_true",
+        help='Avoid using hardware virtualization / KVM',
+    )
+
+    parser.add_argument(
         "--cwd",
         action="store",
         help="Change guest working directory "
@@ -855,6 +861,12 @@ class KernelSource:
         else:
             self.virtme_param["disable_microvm"] = ""
 
+    def _get_virtme_disable_kvm(self, args):
+        if args.disable_kvm:
+            self.virtme_param["disable_kvm"] = "--disable-kvm"
+        else:
+            self.virtme_param["disable_kvm"] = ""
+
     def _get_virtme_9p(self, args):
         if args.force_9p:
             self.virtme_param["force_9p"] = "--force-9p"
@@ -965,6 +977,7 @@ class KernelSource:
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_disable_microvm(args)
+        self._get_virtme_disable_kvm(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
@@ -1000,6 +1013,7 @@ class KernelSource:
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
             + f'{self.virtme_param["disable_microvm"]} '
+            + f'{self.virtme_param["disable_kvm"]} '
             + f'{self.virtme_param["force_9p"]} '
             + f'{self.virtme_param["force_initramfs"]} '
             + f'{self.virtme_param["graphics"]} '
