@@ -963,11 +963,12 @@ def do_it() -> int:
         kernelargs.append("virtme_rw_overlay%d=%s" % (i, d))
 
     # Turn on KVM if available
-    if is_native and can_use_kvm():
+    kvm_ok = can_use_kvm()
+    if is_native and kvm_ok:
         qemuargs.extend(["-machine", "accel=kvm:tcg"])
 
     # Add architecture-specific options
-    qemuargs.extend(arch.qemuargs(is_native))
+    qemuargs.extend(arch.qemuargs(is_native, kvm_ok))
 
     # Set up / override baseline devices
     qemuargs.extend(["-parallel", "none"])

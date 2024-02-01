@@ -23,8 +23,9 @@ class Arch:
         return False
 
     @staticmethod
-    def qemuargs(is_native) -> List[str]:
+    def qemuargs(is_native, use_kvm) -> List[str]:
         _ = is_native
+        _ = use_kvm
         return []
 
     @staticmethod
@@ -77,8 +78,8 @@ class Arch:
 
 class Arch_unknown(Arch):
     @staticmethod
-    def qemuargs(is_native):
-        return Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        return Arch.qemuargs(is_native, use_kvm)
 
 
 class Arch_x86(Arch):
@@ -93,13 +94,13 @@ class Arch_x86(Arch):
         return True
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
 
         # Add a watchdog.  This is useful for testing.
         ret.extend(["-device", "i6300esb,id=watchdog0"])
 
-        if is_native and os.access("/dev/kvm", os.R_OK):
+        if is_native and use_kvm:
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
             ret.extend(["-cpu", "host"])  # We can't migrate regardless.
@@ -176,13 +177,13 @@ class Arch_microvm(Arch_x86):
         ]
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
 
         # Use microvm architecture for faster boot
         ret.extend(["-M", "microvm,accel=kvm,pcie=on"])
 
-        if is_native and os.access("/dev/kvm", os.R_OK):
+        if is_native and use_kvm:
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
             ret.extend(["-cpu", "host"])  # We can't migrate regardless.
@@ -197,8 +198,8 @@ class Arch_arm(Arch):
         self.defconfig_target = "vexpress_defconfig"
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
 
         # Emulate a vexpress-a15.
         ret.extend(["-M", "vexpress-a15"])
@@ -247,8 +248,8 @@ class Arch_aarch64(Arch):
         self.gccname = "aarch64"
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
 
         if is_native:
             ret.extend(["-M", "virt,gic-version=host"])
@@ -289,8 +290,8 @@ class Arch_ppc(Arch):
         self.gccname = "powerpc64le"
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
         ret.extend(["-M", "pseries"])
 
         return ret
@@ -324,8 +325,8 @@ class Arch_riscv64(Arch):
         return True
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
         ret.extend(["-machine", "virt"])
         ret.extend(["-bios", "default"])
 
@@ -349,8 +350,8 @@ class Arch_sparc64(Arch):
         self.gccname = "sparc64"
 
     @staticmethod
-    def qemuargs(is_native):
-        return Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        return Arch.qemuargs(is_native, use_kvm)
 
     def kimg_path(self):
         return "arch/sparc/boot/image"
@@ -374,8 +375,8 @@ class Arch_s390x(Arch):
         return "virtio-%s-ccw" % virtiotype
 
     @staticmethod
-    def qemuargs(is_native):
-        ret = Arch.qemuargs(is_native)
+    def qemuargs(is_native, use_kvm):
+        ret = Arch.qemuargs(is_native, use_kvm)
 
         # Ask for the latest version of s390-ccw
         ret.extend(["-M", "s390-ccw-virtio"])
