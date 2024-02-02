@@ -234,6 +234,11 @@ def make_parser() -> argparse.ArgumentParser:
         help='Avoid using the "microvm" QEMU architecture (only on x86_64)',
     )
     g.add_argument(
+        "--disable-kvm",
+        action="store_true",
+        help='Avoid using hardware virtualization / KVM',
+    )
+    g.add_argument(
         "--force-initramfs",
         action="store_true",
         help="Use an initramfs even if unnecessary",
@@ -720,7 +725,9 @@ def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
     return name, fn
 
 
-def can_use_kvm():
+def can_use_kvm(args):
+    if args.disable_kvm:
+        return False
     if not os.path.exists("/dev/kvm"):
         return False
     try:
@@ -733,7 +740,7 @@ def can_use_kvm():
 
 
 def can_use_microvm(args):
-    return not args.disable_microvm and not args.numa and args.arch == "x86_64" and can_use_kvm()
+    return not args.disable_microvm and not args.numa and args.arch == "x86_64" and can_use_kvm(args)
 
 
 def has_read_acl(username, file_path):
@@ -963,11 +970,12 @@ def do_it() -> int:
         kernelargs.append("virtme_rw_overlay%d=%s" % (i, d))
 
     # Turn on KVM if available
-    if is_native and can_use_kvm():
+    kvm_ok = can_use_kvm(args)
+    if is_native and kvm_ok:
         qemuargs.extend(["-machine", "accel=kvm:tcg"])
 
     # Add architecture-specific options
-    qemuargs.extend(arch.qemuargs(is_native))
+    qemuargs.extend(arch.qemuargs(is_native, kvm_ok))
 
     # Set up / override baseline devices
     qemuargs.extend(["-parallel", "none"])
