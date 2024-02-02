@@ -725,18 +725,22 @@ def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
     return name, fn
 
 
-def can_use_kvm(args):
-    if args.disable_kvm:
-        return False
-    if not os.path.exists("/dev/kvm"):
+def can_access_file(path):
+    if not os.path.exists(path):
         return False
     try:
-        fd = os.open('/dev/kvm', os.O_RDWR | os.O_CLOEXEC)
+        fd = os.open(path, os.O_RDWR | os.O_CLOEXEC)
         os.close(fd)
         return True
 
     except OSError:
         return False
+
+
+def can_use_kvm(args):
+    if args.disable_kvm:
+        return False
+    return can_access_file("/dev/kvm")
 
 
 def can_use_microvm(args):
@@ -1083,6 +1087,16 @@ def do_it() -> int:
         if args.graphics is None:
             # Turn off default I/O
             qemuargs.extend(arch.qemu_nodisplay_args())
+
+        # Check if we can redirect stdin/stdout/stderr.
+        if not can_access_file("/proc/self/fd/0") or \
+           not can_access_file("/proc/self/fd/1") or \
+           not can_access_file("/proc/self/fd/2"):
+            print(
+                "ERROR: not a valid pts, try to run vng inside tmux or screen",
+                file=sys.stderr,
+            )
+            sys.exit(1)
 
         # Configure kernel console output
         if show_boot_console:
