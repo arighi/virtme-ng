@@ -23,6 +23,7 @@ use nix::unistd::sethostname;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::os::fd::{AsRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
@@ -234,7 +235,7 @@ fn get_kernel_version(show_machine: bool) -> String {
     }
 }
 
-fn get_active_console() -> Option<String> {
+fn get_legacy_active_console() -> Option<String> {
     // See Documentation/filesystems/proc.rst for /proc/consoles documentation.
     match File::open("/proc/consoles") {
         Ok(file) => {
@@ -253,6 +254,14 @@ fn get_active_console() -> Option<String> {
             log!("failed to open /proc/consoles: {}", error);
             None
         }
+    }
+}
+
+fn get_active_console() -> Option<String> {
+    if let Ok(console) = env::var("virtme_console") {
+        Some(format!("/dev/{}", console))
+    } else {
+        get_legacy_active_console()
     }
 }
 
@@ -727,6 +736,33 @@ fn clear_virtme_envs() {
     }
 }
 
+// Redirect a file descriptor to another.
+fn redirect_fd(src_fd: i32, dst_fd: i32) {
+    unsafe {
+        libc::dup2(src_fd, dst_fd);
+    }
+}
+
+// Redirect stdout/stderr to a new console device.
+fn redirect_console(consdev: &str) {
+    let file = OpenOptions::new()
+        .write(true)
+        .open(consdev)
+        .expect("Failed to open console device");
+
+    let fd = file.into_raw_fd();
+
+    let stdout = std::io::stdout();
+    let handle = stdout.lock();
+    let stdout_fd = handle.as_raw_fd();
+    redirect_fd(fd, stdout_fd);
+
+    let stderr = std::io::stderr();
+    let handle = stderr.lock();
+    let stderr_fd = handle.as_raw_fd();
+    redirect_fd(fd, stderr_fd);
+}
+
 fn configure_terminal(consdev: &str, uid: u32) {
     if let Ok(params) = env::var("virtme_stty_con") {
         let output = Command::new("stty")
@@ -740,6 +776,9 @@ fn configure_terminal(consdev: &str, uid: u32) {
     }
     // Set proper user ownership on the default console device
     utils::do_chown(&consdev, uid, None).ok();
+
+    // Redirect stdout/stderr to the new console device.
+    redirect_console(&consdev);
 }
 
 fn detach_from_terminal(tty_fd: libc::c_int) {
