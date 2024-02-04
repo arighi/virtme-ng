@@ -986,22 +986,37 @@ def do_it() -> int:
     qemuargs.extend(["-net", "none"])
 
     if args.graphics is None and not args.script_sh and not args.script_exec:
-        # It would be nice to use virtconsole, but it's terminally broken
-        # in current kernels.  Nonetheless, I'm configuring the console
-        # manually to make it easier to tweak in the future.
         qemuargs.extend(["-echr", "1"])
         qemuargs.extend(["-serial", "none"])
-        qemuargs.extend(["-chardev", "stdio,id=console,signal=off,mux=on"])
-
-        qemuargs.extend(arch.qemu_serial_console_args())
-
-        qemuargs.extend(["-mon", "chardev=console"])
 
         if args.verbose:
+            # Check if we have permission to access the current stderr.
+            if not can_access_file("/proc/self/fd/2"):
+                print(
+                    "ERROR: not a valid pts, try to run vng inside tmux or screen",
+                    file=sys.stderr,
+                )
+                sys.exit(1)
+
+            # Redirect kernel messages to stderr, creating a separate console
+            qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
+            qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
+            qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
+            kernelargs.extend(["console=hvc0"])
+
+            # Unfortunately we can't use hvc0 to redirect early console
+            # messages to stderr, so just send them to the main console, in
+            # this way we don't lose early printk's in verbose mode and we can
+            # catch potential boot issues.
             kernelargs.extend(arch.earlyconsole_args())
-        qemuargs.extend(arch.qemu_nodisplay_args())
+
+        qemuargs.extend(["-chardev", "stdio,id=console,signal=off,mux=on"])
+        qemuargs.extend(["-serial", "chardev:console"])
+        qemuargs.extend(["-mon", "chardev=console"])
 
         kernelargs.extend(arch.serial_console_args())
+
+        qemuargs.extend(arch.qemu_nodisplay_args())
 
         # PS/2 probing is slow; give the kernel a hint to speed it up.
         kernelargs.extend(["psmouse.proto=exps"])
