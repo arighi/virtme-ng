@@ -310,7 +310,11 @@ if [[ -n "${user_cmd}" ]]; then
 fi
 
 # Figure out what the main console is
-consdev="`grep ' ... (.C' /proc/consoles  |cut -d' ' -f1`"
+if [[ -n "${virtme_console}" ]]; then
+    consdev=${virtme_console}
+else
+    consdev="`grep ' ... (.C' /proc/consoles  |cut -d' ' -f1`"
+fi
 if [[ -z "$consdev" ]]; then
     log "can't deduce console device"
     exec bash --login  # At least try to be helpful
@@ -334,6 +338,10 @@ if [[ ! -e "/dev/$consdev" ]]; then
     log "/dev/$consdev doesn't exist."
     exec bash --login
 fi
+
+# Redirect current stdout/stderr to consdev
+exec 1>/dev/${consdev}
+exec 2>&1
 
 # Parameters that start with virtme_ shouldn't pollute the environment
 for p in "${!virtme_@}"; do export -n "$p"; done
