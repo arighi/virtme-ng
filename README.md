@@ -298,6 +298,26 @@ Examples
    (virtme-ng is started in graphical mode)
 ```
 
+ - Generate a memory dump of a running instance and read 'jiffies' from the
+   memory dump using the drgn debugger:
+````
+   # Start the vng instance in debug mode
+   $ vng --debug
+
+   # In a separate shell session trigger the memory dump to /tmp/vmcore.img
+   $ vng --dump /tmp/vmcore.img
+
+   # Use drgn to read 'jiffies' from the memory dump:
+   $ echo "print(prog['jiffies'])" | drgn -q -s vmlinux -c /tmp/vmcore.img
+   drgn 0.0.23 (using Python 3.11.6, elfutils 0.189, with libkdumpfile)
+   For help, type help(drgn).
+   >>> import drgn
+   >>> from drgn import NULL, Object, cast, container_of, execscript, offsetof, reinterpret, sizeof
+   >>> from drgn.helpers.common import *
+   >>> from drgn.helpers.linux import *
+   >>> (volatile unsigned long)4294675464
+```
+
  - Run virtme-ng inside a docker container:
 ```
    $ docker run -it ubuntu:22.04 /bin/bash

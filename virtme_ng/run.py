@@ -856,7 +856,9 @@ class KernelSource:
             self.virtme_param["sound"] = ""
 
     def _get_virtme_disable_microvm(self, args):
-        if args.disable_microvm:
+        # Automatically disable microvm in debug mode, since it seems to
+        # produce incomplete memory dumps.
+        if args.disable_microvm or args.debug:
             self.virtme_param["disable_microvm"] = "--disable-microvm"
         else:
             self.virtme_param["disable_microvm"] = ""
@@ -951,7 +953,10 @@ class KernelSource:
         if args.qemu_opts is not None:
             qemu_args += " ".join(args.qemu_opts)
         if args.debug:
-            qemu_args += "-s -qmp tcp:localhost:3636,server,nowait"
+            # Enable vmcoreinfo (required by drgn memory dumps)
+            qemu_args += "-device vmcoreinfo "
+            # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
+            qemu_args += "-s -qmp tcp:localhost:3636,server,nowait "
         if qemu_args != "":
             self.virtme_param["qemu_opts"] = "--qemu-opts " + qemu_args
         else:
@@ -1032,11 +1037,6 @@ class KernelSource:
 
     def dump(self, args):
         """Generate or analyze a crash memory dump."""
-        if not os.path.isfile("vmlinux"):
-            arg_fail(
-                "vmlinux not found, try to recompile the kernel with "
-                + "--build-host-vmlinux (if --build-host was used)"
-            )
         # Use QMP to generate a memory dump
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", 3636))
@@ -1055,7 +1055,7 @@ class KernelSource:
         with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
             msg = (
                 '{"execute":"dump-guest-memory",'
-                '"arguments":{"paging":false,'
+                '"arguments":{"paging":true,'
                 '"protocol":"file:' + tmp.name + '"}}'
                 "\r"
             )
