@@ -1,4 +1,4 @@
-![Alt text](/img/screenshot.png?raw=true "virtme-ng screenshot")
+https://github.com/arighi/virtme-ng/assets/423281/485608ee-0c82-46d1-b311-e1b7af0a4e44
 
 What is virtme-ng?
 ====================
@@ -300,7 +300,7 @@ Examples
 
  - Generate a memory dump of a running instance and read 'jiffies' from the
    memory dump using the drgn debugger:
-````
+```
    # Start the vng instance in debug mode
    $ vng --debug
 
