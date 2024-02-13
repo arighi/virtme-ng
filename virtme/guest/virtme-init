@@ -205,18 +205,19 @@ fi
 # Bring up networking
 ip link set dev lo up
 
+# Setup sudoers
+real_sudoers=/etc/sudoers
+tmpfile="`mktemp --tmpdir=/tmp`"
+echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
+echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
 if [[ -n "${virtme_user}" ]]; then
-    real_sudoers=/etc/sudoers
-    tmpfile="`mktemp --tmpdir=/tmp`"
-    echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
-    echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
     echo "${virtme_user} ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
-    chmod 440 "$tmpfile"
-    if [ ! -f "$real_sudoers" ]; then
-        touch "$real_sudoers"
-    fi
-    mount --bind "$tmpfile" "$real_sudoers"
 fi
+chmod 440 "$tmpfile"
+if [ ! -f "$real_sudoers" ]; then
+touch "$real_sudoers"
+fi
+mount --bind "$tmpfile" "$real_sudoers"
 
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     # udev is liable to rename the interface out from under us.
