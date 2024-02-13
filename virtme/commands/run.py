@@ -1014,7 +1014,7 @@ def do_it() -> int:
         qemuargs.extend(["-serial", "chardev:console"])
         qemuargs.extend(["-mon", "chardev=console"])
 
-        kernelargs.extend(arch.serial_console_args())
+        kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
 
         qemuargs.extend(arch.qemu_nodisplay_args())
 
@@ -1123,7 +1123,7 @@ def do_it() -> int:
         qemuargs.extend(arch.qemu_serial_console_args())
         qemuargs.extend(["-chardev", f"file,id=console,path={output}"])
 
-        kernelargs.extend(arch.serial_console_args())
+        kernelargs.extend(["console=" + arg for arg in arch.serial_console_args()])
         kernelargs.extend(arch.earlyconsole_args())
         kernelargs.extend(console_args)
 

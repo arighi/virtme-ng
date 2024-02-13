@@ -124,7 +124,7 @@ class Arch_x86(Arch):
 
     @staticmethod
     def serial_console_args():
-        return ["virtme_console=ttyS0"]
+        return ["ttyS0"]
 
     @staticmethod
     def config_base():
@@ -225,7 +225,7 @@ class Arch_arm(Arch):
 
     @staticmethod
     def serial_console_args():
-        return ["virtme_console=ttyAMA0"]
+        return ["ttyAMA0"]
 
     def kimg_path(self):
         return "arch/arm/boot/zImage"
@@ -274,7 +274,7 @@ class Arch_aarch64(Arch):
 
     @staticmethod
     def serial_console_args():
-        return ["virtme_console=ttyAMA0"]
+        return ["ttyAMA0"]
 
     def kimg_path(self):
         return "arch/arm64/boot/Image"
@@ -334,7 +334,7 @@ class Arch_riscv64(Arch):
 
     @staticmethod
     def serial_console_args():
-        return ["virtme_console=ttyS0"]
+        return ["ttyS0"]
 
     def kimg_path(self):
         return "arch/riscv/boot/Image"
