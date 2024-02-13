@@ -128,7 +128,7 @@ def make_parser():
         "--skip-config",
         "-s",
         action="store_true",
-        help="Do not re-generate kernel .config",
+        help="[deprecated] Do not re-generate kernel .config",
     )
 
     parser.add_argument(
@@ -1147,10 +1147,9 @@ def do_it() -> int:
         elif args.build or args.kconfig:
             if args.commit:
                 checkout(kern_source, args)
-            if not args.skip_config:
-                config(kern_source, args)
-                if args.kconfig:
-                    return 0
+            config(kern_source, args)
+            if args.kconfig:
+                return 0
             make(kern_source, args)
         else:
             try:
