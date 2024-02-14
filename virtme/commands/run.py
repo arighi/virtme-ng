@@ -1167,8 +1167,10 @@ def do_it() -> int:
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtserialport,name=virtme.ret,chardev=ret"])
 
-        # Scripts shouldn't reboot
+        # Scripts shouldn't reboot and shouldn't hang on panic: make sure to
+        # force an exit condition if a panic happens.
         qemuargs.extend(["-no-reboot"])
+        kernelargs.append("panic=-1")
 
         # Nasty issue: QEMU will set O_NONBLOCK on fds 0, 1, and 2.
         # This isn't inherently bad, but it can cause a problem if
@@ -1371,7 +1373,11 @@ def do_it() -> int:
                 ret = fetch_script_retcode()
                 if ret is not None:
                     return ret
-                return status
+                if not args.script_sh and not args.script_exec:
+                    return status
+                # Return special error code 255 in case of unexpected exit
+                # (e.g., kernel panic).
+                return 255
 
             except KeyboardInterrupt:
                 sys.stderr.write("Interrupted.")
