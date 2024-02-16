@@ -20,6 +20,11 @@ if os.path.exists(".config"):
             key, value = line.strip().split("=")
             os.environ[key] = value
 
+# Make sure virtme-ng-init submodule has been cloned
+if not os.listdir("virtme_ng_init"):
+    sys.stderr.write("WARNING: virtme-ng-init submoule not available, trying to clone it\n")
+    check_call("git submodule update --init --recursive", shell=True)
+
 # Always include standard site-packages to PYTHONPATH
 os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
 
