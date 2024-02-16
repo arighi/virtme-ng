@@ -3,6 +3,7 @@
 import os
 import sys
 import platform
+import sysconfig
 from glob import glob
 from shutil import which
 from subprocess import check_call, CalledProcessError
@@ -18,6 +19,9 @@ if os.path.exists(".config"):
         for line in config_file:
             key, value = line.strip().split("=")
             os.environ[key] = value
+
+# Always include standard site-packages to PYTHONPATH
+os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
 
 # Global variables to store custom build options (as env variables)
 build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
