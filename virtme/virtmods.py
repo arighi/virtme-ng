@@ -12,6 +12,10 @@ MODALIASES = [
     'virtio:d00000009v00001AF4',  # 9pnet_virtio
     'virtio:d00000003v00001AF4',  # virtio_console
 
+    # These are required by the microvm architecture.
+    'virtio_pci',                 # virtio-pci
+    'virtio_mmio',                # virtio-mmio
+
     # For virtio_pci architectures (which are, hopefully, all that we care
     # about), there's really only one required driver, virtio_pci.
     # For completeness, here are both of the instances we care about
