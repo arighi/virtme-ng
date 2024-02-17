@@ -390,6 +390,7 @@ def get_kernel_version(path):
 
 def find_kernel_and_mods(arch, args) -> Kernel:
     kernel = Kernel()
+    kernel.config = None
 
     kernel.use_root_mods = False
     if args.installed_kernel is not None:
