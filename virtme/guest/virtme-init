@@ -97,6 +97,9 @@ fi
 # Additional rw dirs required by snapd (if present)
 [ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie &
 
+# Hide additional sudo settings
+[ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo &
+
 # Fix up /etc a little bit
 touch /tmp/fstab
 mount --bind /tmp/fstab /etc/fstab
@@ -212,6 +215,9 @@ ip link set dev lo up
 
 # Setup sudoers
 real_sudoers=/etc/sudoers
+if [ ! -e ${real_sudoers} ]; then
+    touch ${real_sudoers}
+fi
 tmpfile="`mktemp --tmpdir=/tmp`"
 echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
 echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
