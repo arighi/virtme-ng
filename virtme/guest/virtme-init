@@ -54,6 +54,11 @@ elif [[ -d "/lib/modules/$kver" ]]; then
     mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
 fi
 
+# Adjust max limit of open files
+if [[ -n "${nr_open}" ]]; then
+    echo ${nr_open} > /proc/sys/fs/nr_open
+fi
+
 # devtmpfs might be automounted; if not, mount it.
 if ! grep -q devtmpfs /proc/mounts; then
     # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
