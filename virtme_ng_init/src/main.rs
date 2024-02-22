@@ -975,9 +975,9 @@ fn main() {
 
     // Basic system initialization (order is important here).
     configure_environment();
-    configure_limits();
     configure_hostname();
     mount_kernel_filesystems();
+    configure_limits();
     mount_virtme_overlays();
     mount_sys_filesystems();
     mount_kernel_modules();
