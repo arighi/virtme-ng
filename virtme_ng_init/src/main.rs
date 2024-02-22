@@ -976,7 +976,8 @@ fn print_logo() {
      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
                                                 |___/"#;
     println!("{}", logo.trim_start_matches('\n'));
-    println!("   kernel version: {}\n", get_kernel_version(true));
+    println!("   kernel version: {}", get_kernel_version(true));
+    println!("   (CTRL+d to exit)\n");
 }
 
 fn main() {
