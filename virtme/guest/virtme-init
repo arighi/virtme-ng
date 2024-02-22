@@ -54,6 +54,11 @@ elif [[ -d "/lib/modules/$kver" ]]; then
     mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
 fi
 
+# Adjust max limit of open files
+if [[ -n "${nr_open}" ]]; then
+    echo ${nr_open} > /proc/sys/fs/nr_open
+fi
+
 # devtmpfs might be automounted; if not, mount it.
 if ! grep -q devtmpfs /proc/mounts; then
     # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
@@ -91,6 +96,9 @@ fi
 
 # Additional rw dirs required by snapd (if present)
 [ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie &
+
+# Hide additional sudo settings
+[ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo &
 
 # Fix up /etc a little bit
 touch /tmp/fstab
@@ -207,6 +215,9 @@ ip link set dev lo up
 
 # Setup sudoers
 real_sudoers=/etc/sudoers
+if [ ! -e ${real_sudoers} ]; then
+    touch ${real_sudoers}
+fi
 tmpfile="`mktemp --tmpdir=/tmp`"
 echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
 echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile

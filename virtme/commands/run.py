@@ -826,6 +826,13 @@ def do_it() -> int:
             args.memory += "M"
         qemuargs.extend(["-m", args.memory])
 
+    # Propagate /proc/sys/fs/nr_open from the host to the guest, otherwise we
+    # may see some EPERM errors, because certain applications/settings may
+    # expect to be able to use a higher limit of the max number of open files.
+    with open('/proc/sys/fs/nr_open', 'r', encoding="utf-8") as file:
+        nr_open = file.readline().strip()
+        kernelargs.append(f"nr_open={nr_open}")
+
     # Parse NUMA settings.
     if args.numa:
         for i, numa in enumerate(args.numa, start=1):
