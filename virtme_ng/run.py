@@ -92,8 +92,13 @@ def make_parser():
         nargs="?",
         const=uname.release,
         default=None,
-        help="Run specified kernel image or an installed kernel version. "
-        "If no argument is specified the running kernel will be used.",
+        help="Run a specified kernel; "
+        "--run can accept one of the following arguments: 1) nothing (in this "
+        "case it'll try to boot the same kernel running on the host), 2) a kernel "
+        "binary (like ./arch/x86/boot/bzImage), 3) a directory (where it'll try "
+        "to find a valid kernel binary file), 4) an upstream version, for "
+        "example `vng --run v6.6.17` (in this case vng will download a "
+        "precompiled upstream kernel from the Ubuntu mainline repository)",
     )
 
     g_action.add_argument(
