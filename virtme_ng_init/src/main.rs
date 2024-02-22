@@ -265,6 +265,15 @@ fn get_active_console() -> Option<String> {
     }
 }
 
+fn configure_limits() {
+    if let Ok(nr_open) = env::var("nr_open") {
+        if let Ok(mut file) = OpenOptions::new().write(true).open("/proc/sys/fs/nr_open") {
+            file.write_all(nr_open.as_bytes())
+                .expect("Failed to write nr_open");
+        }
+    }
+}
+
 fn configure_hostname() {
     if let Ok(hostname) = env::var("virtme_hostname") {
         if let Err(err) = sethostname(hostname) {
@@ -966,6 +975,7 @@ fn main() {
 
     // Basic system initialization (order is important here).
     configure_environment();
+    configure_limits();
     configure_hostname();
     mount_kernel_filesystems();
     mount_virtme_overlays();
