@@ -176,6 +176,13 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
     },
     MountInfo {
         source: "tmpfs",
+        target: "/var/lib/sudo",
+        fs_type: "tmpfs",
+        flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
+        fsdata: "",
+    },
+    MountInfo {
+        source: "tmpfs",
         target: "/var/lib/apt",
         fs_type: "tmpfs",
         flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
@@ -328,6 +335,9 @@ fn generate_sudoers() -> io::Result<()> {
     content += "root ALL = (ALL) NOPASSWD: ALL\n";
     if let Ok(user) = env::var("virtme_user") {
         content += &format!("{} ALL = (ALL) NOPASSWD: ALL\n", user);
+    }
+    if !Path::new("/etc/sudoers").exists() {
+        utils::create_file("/etc/sudoers", 0o0440, "").unwrap_or_else(|_| {});
     }
     utils::create_file(fname, 0o0440, &content).ok();
     utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
