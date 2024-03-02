@@ -108,13 +108,6 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         flags: 0,
         fsdata: "",
     },
-    MountInfo {
-        source: "cgroup2",
-        target: "/sys/fs/cgroup",
-        fs_type: "cgroup2",
-        flags: 0,
-        fsdata: "",
-    },
 ];
 
 const SYSTEM_MOUNTS: &[MountInfo] = &[
@@ -412,6 +405,25 @@ fn mount_kernel_filesystems() {
             mount_info.flags,
             mount_info.fsdata,
         )
+    }
+}
+
+fn mount_cgroupfs() {
+    // If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's behavior and mount
+    // the legacy cgroup v1 layout.
+    let cmdline = std::fs::read_to_string("/proc/cmdline").unwrap();
+    if cmdline.contains("SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1") {
+        utils::do_mount("cgroup", "/sys/fs/cgroup", "tmpfs", 0, "");
+        let subsystems = vec!["cpu", "cpuacct", "blkio", "memory", "devices", "pids"];
+        for subsys in &subsystems {
+            let target = format!("/sys/fs/cgroup/{}", subsys);
+            utils::do_mkdir(&target);
+            // Don't treat failure as critical here, since the kernel may not
+            // support all the legacy cgroups.
+            utils::do_mount(subsys, &target, "cgroup", 0, subsys);
+        }
+    } else {
+        utils::do_mount("cgroup2", "/sys/fs/cgroup", "cgroup2", 0, "");
     }
 }
 
@@ -988,6 +1000,7 @@ fn main() {
     configure_environment();
     configure_hostname();
     mount_kernel_filesystems();
+    mount_cgroupfs();
     configure_limits();
     mount_virtme_overlays();
     mount_sys_filesystems();
