@@ -448,6 +448,19 @@ Troubleshooting
   $ udevadm trigger --subsystem-match --action=change
 ```
 
+ - To mount the legacy cgroup filesystem (v1) layout, add
+   `SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1` to the kernel boot options:
+```
+$ vng -r --append "SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1" -- 'df -T /sys/fs/cgroup/*'
+Filesystem     Type   1K-blocks  Used Available Use% Mounted on
+blkio          cgroup         0     0         0    - /sys/fs/cgroup/blkio
+cpu            cgroup         0     0         0    - /sys/fs/cgroup/cpu
+cpuacct        cgroup         0     0         0    - /sys/fs/cgroup/cpuacct
+devices        cgroup         0     0         0    - /sys/fs/cgroup/devices
+memory         cgroup         0     0         0    - /sys/fs/cgroup/memory
+pids           cgroup         0     0         0    - /sys/fs/cgroup/pids
+```
+
 Contributing
 ============
 
