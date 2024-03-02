@@ -188,7 +188,21 @@ mount -t tracefs tracefs /sys/kernel/tracing &>/dev/null
 mount -t securityfs securityfs /sys/kernel/security &>/dev/null
 
 # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
-mount -t cgroup2 cgroup2 /sys/fs/cgroup
+#
+# If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
+# behavior and mount the legacy cgroup v1 layout.
+if cat /proc/cmdline |grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )'; then
+    mount -t tmpfs cgroup /sys/fs/cgroup
+    sybsys=(cpu cpuacct blkio memory devices pids)
+    for s in "${sybsys[@]}"; do
+        mkdir -p "/sys/fs/cgroup/${s}"
+        # Don't treat failure as critical here, since the kernel may not
+        # support all the legacy cgroups.
+        mount -t cgroup "${s}" -o "${s}" "/sys/fs/cgroup/${s}" || true
+    done
+else
+    mount -t cgroup2 cgroup2 /sys/fs/cgroup
+fi
 
 # Set up filesystems that live in /dev
 mkdir -p -m 0755 /dev/shm /dev/pts
