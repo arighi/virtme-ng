@@ -306,7 +306,7 @@ def do_it():
     if config_dir and os.path.isdir(config_dir):
         config = os.path.join(config_dir, config)
 
-    if not os.path.exists(config):
+    if maketarget is not None or not os.path.exists(config):
         # Set up an initial config
         if maketarget is None:
             maketarget = arch.defconfig_target
