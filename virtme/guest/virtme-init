@@ -388,6 +388,8 @@ if [[ ! -n "${virtme_root_user}" ]]; then
     install -d -m 0755 /tmp/roothome
     export HOME=/tmp/roothome
     mount --bind /tmp/roothome /root
+else
+    export HOME=/root
 fi
 
 # $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
