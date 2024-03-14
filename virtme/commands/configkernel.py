@@ -315,9 +315,9 @@ def do_it():
         except Exception as exc:
             raise SilentError() from exc
 
-        # Append virtme configs
-        with open(config, "ab") as conffile:
-            conffile.write("\n".join(conf).encode("utf-8"))
+    # Append virtme configs
+    with open(config, "ab") as conffile:
+        conffile.write("\n".join(conf).encode("utf-8"))
 
     # Run the update target
     try:
