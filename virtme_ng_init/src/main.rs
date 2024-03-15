@@ -795,6 +795,12 @@ fn redirect_console(consdev: &str) {
 }
 
 fn configure_terminal(consdev: &str, uid: u32) {
+    // Set proper user ownership on the default console device
+    utils::do_chown(&consdev, uid, None).ok();
+
+    // Redirect stdout/stderr to the new console device.
+    redirect_console(&consdev);
+
     if let Ok(params) = env::var("virtme_stty_con") {
         let output = Command::new("stty")
             .args(params.split_whitespace())
@@ -805,11 +811,6 @@ fn configure_terminal(consdev: &str, uid: u32) {
             .output();
         log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
     }
-    // Set proper user ownership on the default console device
-    utils::do_chown(&consdev, uid, None).ok();
-
-    // Redirect stdout/stderr to the new console device.
-    redirect_console(&consdev);
 }
 
 fn detach_from_terminal(tty_fd: libc::c_int) {
