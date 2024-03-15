@@ -753,6 +753,8 @@ fn setup_root_home() {
         utils::do_mkdir("/tmp/roothome");
         utils::do_mount("/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
         env::set_var("HOME", "/tmp/roothome");
+    } else {
+        env::set_var("HOME", "/root");
     }
 }
 
