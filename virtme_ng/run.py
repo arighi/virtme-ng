@@ -565,7 +565,7 @@ class KernelSource:
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
-        cmd = "virtme-configkernel --update"
+        cmd = "virtme-configkernel --defconfig --no-update"
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f"unsupported architecture: {arch}")

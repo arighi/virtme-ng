@@ -38,6 +38,12 @@ def make_parser():
         help="Use a custom config snippet file to override specific config options",
     )
 
+    parser.add_argument(
+        "--no-update",
+        action="store_true",
+        help="Skip if the config file already exists",
+    )
+
     g = parser.add_argument_group(title="Mode").add_mutually_exclusive_group()
 
     g.add_argument(
@@ -289,6 +295,8 @@ def do_it():
         maketarget = arch.defconfig_target
         updatetarget = "olddefconfig"
     elif args.update:
+        if args.no_update:
+            arg_fail("--update and --no-update cannot be used together")
         maketarget = None
         updatetarget = "olddefconfig"
     else:
@@ -306,10 +314,16 @@ def do_it():
     if config_dir and os.path.isdir(config_dir):
         config = os.path.join(config_dir, config)
 
-    if maketarget is not None or not os.path.exists(config):
-        # Set up an initial config
-        if maketarget is None:
-            maketarget = arch.defconfig_target
+    if os.path.exists(config):
+        if args.no_update:
+            print(f"{config} file exists: no modifications have been done")
+            return 0
+    else:
+        if args.update:
+            print(f"Error: {config} file is missing")
+            return 1
+
+    if maketarget is not None:
         try:
             subprocess.check_call(["make"] + archargs + [maketarget])
         except Exception as exc:
