@@ -408,7 +408,8 @@ def make_parser():
         "--force",
         action="store_true",
         help="Force reset git repository to target branch or commit "
-        "(warning: this may drop uncommitted changes)",
+        "(warning: this may drop uncommitted changes), "
+        "and force kernel config override",
     )
 
     parser.add_argument(
@@ -565,7 +566,9 @@ class KernelSource:
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
-        cmd = "virtme-configkernel --defconfig --no-update"
+        cmd = "virtme-configkernel --defconfig"
+        if not args.force:
+            cmd += " --no-update"
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f"unsupported architecture: {arch}")
