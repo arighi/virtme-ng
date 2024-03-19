@@ -157,7 +157,7 @@ def make_parser():
         "--kconfig",
         "-k",
         action="store_true",
-        help="Only generate the kernel .config without building/running anything",
+        help="Only override the kernel .config without building/running anything",
     )
 
     parser.add_argument(
@@ -567,7 +567,7 @@ class KernelSource:
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
         cmd = "virtme-configkernel --defconfig"
-        if not args.force:
+        if not args.force and not args.kconfig:
             cmd += " --no-update"
         if arch is not None:
             if arch not in ARCH_MAPPING:
