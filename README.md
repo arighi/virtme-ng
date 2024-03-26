@@ -320,7 +320,7 @@ Examples
 
  - Run virtme-ng inside a docker container:
 ```
-   $ docker run -it ubuntu:22.04 /bin/bash
+   $ docker run -it --privileged ubuntu:22.04 /bin/bash
    # apt update
    # echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
    # apt install --yes git qemu-kvm udev iproute2 busybox-static \
