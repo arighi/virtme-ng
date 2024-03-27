@@ -320,11 +320,11 @@ Examples
 
  - Run virtme-ng inside a docker container:
 ```
-   $ docker run -it ubuntu:22.04 /bin/bash
+   $ docker run -it --privileged ubuntu:23.10 /bin/bash
    # apt update
    # echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
    # apt install --yes git qemu-kvm udev iproute2 busybox-static \
-     coreutils python3-requests libvirt-clients kbd kmod file rsync zstd udev
+     coreutils python3-requests libvirt-clients kbd kmod file rsync zstd virtiofsd
    # git clone --recursive https://github.com/arighi/virtme-ng.git
    # ./virtme-ng/vng -r v6.6 -- uname -r
    6.6.0-060600-generic
