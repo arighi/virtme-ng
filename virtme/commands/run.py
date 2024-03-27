@@ -1001,7 +1001,6 @@ def do_it() -> int:
 
     if args.graphics is None and not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
-        qemuargs.extend(["-serial", "none"])
 
         if args.verbose:
             # Check if we have permission to access the current stderr.
