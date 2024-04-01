@@ -282,7 +282,7 @@ def do_it():
     linuxname = shlex.quote(arch.linuxname)
     archargs = [f"ARCH={linuxname}"]
 
-    if shutil.which(f"{arch.gccname}-linux-gnu-gcc"):
+    if shutil.which(f"{arch.gccname}-linux-gnu-gcc") and arch.gccname != uname.machine:
         gccname = shlex.quote(f"{arch.gccname}-linux-gnu-")
         archargs.append(f"CROSS_COMPILE={gccname}")
 
