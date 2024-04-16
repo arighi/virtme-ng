@@ -312,7 +312,7 @@ def make_parser():
         "--network",
         "-n",
         action="store",
-        metavar="user|bridge",
+        metavar="user|bridge|loop",
         help="Enable network access",
     )
 

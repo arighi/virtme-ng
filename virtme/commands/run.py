@@ -115,7 +115,7 @@ def make_parser() -> argparse.ArgumentParser:
         action="store",
         const="user",
         nargs="?",
-        choices=["user", "bridge"],
+        choices=["user", "bridge", "loop"],
         help="Enable basic network access.",
     )
     g.add_argument(
@@ -1237,13 +1237,18 @@ def do_it() -> int:
         qemuargs.extend(["-device", "%s,netdev=n0" % arch.virtio_dev_type("net")])
         if args.net == "user":
             qemuargs.extend(["-netdev", "user,id=n0"])
+            kernelargs.extend(["virtme.dhcp"])
         elif args.net == "bridge":
             qemuargs.extend(["-netdev", "bridge,id=n0,br=virbr0"])
+            kernelargs.extend(["virtme.dhcp"])
+        elif args.net == "loop":
+            qemuargs.extend(["-netdev", "hubport,id=n0,hubid=0"])
+            qemuargs.extend(["-device", "%s,netdev=n1" % arch.virtio_dev_type("net")])
+            qemuargs.extend(["-netdev", "hubport,id=n1,hubid=0"])
         else:
             assert False
         kernelargs.extend(
             [
-                "virtme.dhcp",
                 # Prevent annoying interface renaming
                 "net.ifnames=0",
                 "biosdevname=0",
