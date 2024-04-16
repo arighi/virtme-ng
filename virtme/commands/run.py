@@ -112,7 +112,7 @@ def make_parser() -> argparse.ArgumentParser:
     )
     g.add_argument(
         "--net",
-        action="store",
+        action="append",
         const="user",
         nargs="?",
         choices=["user", "bridge", "loop"],
@@ -1234,19 +1234,27 @@ def do_it() -> int:
             qemuargs.extend(video_args)
 
     if args.net:
-        qemuargs.extend(["-device", "%s,netdev=n0" % arch.virtio_dev_type("net")])
-        if args.net == "user":
-            qemuargs.extend(["-netdev", "user,id=n0"])
+        extend_dhcp = False
+        index = 0
+        for net in args.net:
+            qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
+            if net == "user":
+                qemuargs.extend(["-netdev", "user,id=n%d" % index])
+                extend_dhcp = True
+            elif net == "bridge":
+                qemuargs.extend(["-netdev", "bridge,id=n%d,br=virbr0" % index])
+                extend_dhcp = True
+            elif net == "loop":
+                hubid = index
+                qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
+                index += 1
+                qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
+                qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
+            else:
+                assert False
+            index += 1
+        if extend_dhcp:
             kernelargs.extend(["virtme.dhcp"])
-        elif args.net == "bridge":
-            qemuargs.extend(["-netdev", "bridge,id=n0,br=virbr0"])
-            kernelargs.extend(["virtme.dhcp"])
-        elif args.net == "loop":
-            qemuargs.extend(["-netdev", "hubport,id=n0,hubid=0"])
-            qemuargs.extend(["-device", "%s,netdev=n1" % arch.virtio_dev_type("net")])
-            qemuargs.extend(["-netdev", "hubport,id=n1,hubid=0"])
-        else:
-            assert False
         kernelargs.extend(
             [
                 # Prevent annoying interface renaming
