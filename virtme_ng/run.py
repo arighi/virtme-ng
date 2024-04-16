@@ -311,8 +311,8 @@ def make_parser():
     parser.add_argument(
         "--network",
         "-n",
-        action="store",
-        metavar="user|bridge",
+        action="append",
+        choices=['user', 'bridge', 'loop'],
         help="Enable network access",
     )
 
@@ -845,7 +845,8 @@ class KernelSource:
 
     def _get_virtme_network(self, args):
         if args.network is not None:
-            self.virtme_param["network"] = f"--net {args.network}"
+            network_str = " ".join([f"--net {network}" for network in args.network])
+            self.virtme_param["network"] = network_str
         else:
             self.virtme_param["network"] = ""
 

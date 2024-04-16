@@ -112,10 +112,10 @@ def make_parser() -> argparse.ArgumentParser:
     )
     g.add_argument(
         "--net",
-        action="store",
+        action="append",
         const="user",
         nargs="?",
-        choices=["user", "bridge"],
+        choices=["user", "bridge", "loop"],
         help="Enable basic network access.",
     )
     g.add_argument(
@@ -1234,16 +1234,29 @@ def do_it() -> int:
             qemuargs.extend(video_args)
 
     if args.net:
-        qemuargs.extend(["-device", "%s,netdev=n0" % arch.virtio_dev_type("net")])
-        if args.net == "user":
-            qemuargs.extend(["-netdev", "user,id=n0"])
-        elif args.net == "bridge":
-            qemuargs.extend(["-netdev", "bridge,id=n0,br=virbr0"])
-        else:
-            assert False
+        extend_dhcp = False
+        index = 0
+        for net in args.net:
+            qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
+            if net == "user":
+                qemuargs.extend(["-netdev", "user,id=n%d" % index])
+                extend_dhcp = True
+            elif net == "bridge":
+                qemuargs.extend(["-netdev", "bridge,id=n%d,br=virbr0" % index])
+                extend_dhcp = True
+            elif net == "loop":
+                hubid = index
+                qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
+                index += 1
+                qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
+                qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
+            else:
+                assert False
+            index += 1
+        if extend_dhcp:
+            kernelargs.extend(["virtme.dhcp"])
         kernelargs.extend(
             [
-                "virtme.dhcp",
                 # Prevent annoying interface renaming
                 "net.ifnames=0",
                 "biosdevname=0",
