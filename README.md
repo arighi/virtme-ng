@@ -184,7 +184,7 @@ Examples
  - Run the previously compiled kernel from the current working directory and
    enable networking:
 ```
-   $ vng --network user
+   $ vng --net user
 ```
 
  - Run the previously compiled kernel adding an additional virtio-scsi device:
