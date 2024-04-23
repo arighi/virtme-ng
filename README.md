@@ -400,7 +400,7 @@ Troubleshooting
   $ groups | grep "kvm\|libvirt"
 ```
 
- - When using `--network bridge` to create a bridged network in the guest you
+ - When using `--net bridge` to create a bridged network in the guest you
    may get the following error:
 ```
   ...
