@@ -113,7 +113,14 @@ Requirements
      you should be on bare metal with hardware virtualization (VT-x or SVM)
      enabled or in a VM that supports nested virtualization.  On some Linux
      distributions, you may need to be a member of the "kvm" group.  Using
-     VirtualBox or most VPS providers will fall back to emulation.
+     VirtualBox or most VPS providers will fall back to emulation. If you are
+     using GitHub Actions, KVM support is supported on "larger Linux runners" --
+     which is [now](https://github.blog/2024-01-17-github-hosted-runners-double-the-power-for-open-source/)
+     the default runner -- but it has to be
+     [manually enabled](https://github.blog/changelog/2023-02-23-hardware-accelerated-android-virtualization-on-actions-windows-and-linux-larger-hosted-runners/),
+     see how it is used in [our tests](.github/workflows/run.yml) or
+     [here](https://github.com/multipath-tcp/mptcp_net-next/commit/677b5ecd223c)
+     with Docker.
 
  * Depending on the options you use, you may need a statically linked `busybox`
    binary somewhere in your path.

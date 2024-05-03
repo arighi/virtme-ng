@@ -24,3 +24,16 @@ jobs:
 
       # Run `uname -r` using a vanilla v6.6 kernel
       - run: ./vng -r v6.6 -- uname -r
+
+      # Setup KVM support
+      - name: "KVM support"
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      # Re-run with KVM support
+      - name: "Check KVM support"
+        run: |
+          clocksource="/sys/devices/system/clocksource/clocksource0/current_clocksource"
+          [ "$(./vng -r v6.6 -- cat "${clocksource}")" = "kvm-clock" ]
