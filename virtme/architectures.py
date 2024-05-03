@@ -104,6 +104,8 @@ class Arch_x86(Arch):
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
             ret.extend(["-cpu", "host"])  # We can't migrate regardless.
+        else:
+            ret.extend(["-machine", "q35"])
 
         return ret
 
