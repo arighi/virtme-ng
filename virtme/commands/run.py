@@ -447,11 +447,6 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             # the modules, just rely on /lib/modules in the target rootfs.
             if root_dir == "/" or args.root != '/':
                 kernel.use_root_mods = True
-            elif root_dir.startswith("/tmp"):
-                sys.stderr.write(
-                    "\nWarning: /tmp is hidden inside the guest, "
-                    + "kernel modules won't be supported at runtime unless you move them somewhere else.\n\n"
-                )
             kernel.moddir = f"{root_dir}/lib/modules/{kver}"
             if not os.path.exists(kernel.moddir):
                 kernel.modfiles = []
