@@ -183,7 +183,7 @@ class Arch_microvm(Arch_x86):
         ret = Arch.qemuargs(is_native, use_kvm)
 
         # Use microvm architecture for faster boot
-        ret.extend(["-M", "microvm,accel=kvm,pcie=on"])
+        ret.extend(["-M", "microvm,accel=kvm,pcie=on,rtc=on"])
 
         if is_native and use_kvm:
             # If we're likely to use KVM, request a full-featured CPU.
