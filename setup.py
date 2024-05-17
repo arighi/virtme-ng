@@ -74,6 +74,7 @@ class BuildPy(build_py):
                 cwd="virtme_ng_init",
             )
         # Generate bash autocompletion scripts
+        completion_command = ''
         if which("register-python-argcomplete"):
             completion_command = "register-python-argcomplete"
         elif which("register-python-argcomplete3"):

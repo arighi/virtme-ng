@@ -288,6 +288,7 @@ def do_it():
 
     maketarget: Optional[str]
 
+    updatetarget = ""
     if args.allnoconfig:
         maketarget = "allnoconfig"
         updatetarget = "syncconfig"
