@@ -54,6 +54,23 @@ user	0m0.736s
 sys	0m0.795s
 ```
 
+# Building
+
+Static building is necessary as this binary is going to be executed
+before the file system is up and running.
+
+```
+RUSTFLAGS='-C target-feature=+crt-static' cargo build -r
+```
+
+# Local installation
+
+Put the binary into virtme/guest/bin/.
+e.g. when used as a submodule:
+```
+cp target/release/virtme-ng-init ../virtme/guest/bin
+```
+
 # Credits
 
 Author: Andrea Righi <andrea.righi@canonical.com>
