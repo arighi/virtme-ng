@@ -60,13 +60,6 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         fsdata: "",
     },
     MountInfo {
-        source: "tmpfs",
-        target: "/tmp",
-        fs_type: "tmpfs",
-        flags: 0,
-        fsdata: "",
-    },
-    MountInfo {
         source: "run",
         target: "/run",
         fs_type: "tmpfs",
@@ -428,9 +421,10 @@ fn mount_cgroupfs() {
 }
 
 fn mount_virtme_overlays() {
+    utils::do_mkdir("/run/tmp/");
     for (key, path) in env::vars() {
         if key.starts_with("virtme_rw_overlay") {
-            let dir = &format!("/tmp/{}", key);
+            let dir = &format!("/run/tmp/{}", key);
             let upperdir = &format!("{}/upper", dir);
             let workdir = &format!("{}/work", dir);
             let mnt_opts = &format!(
