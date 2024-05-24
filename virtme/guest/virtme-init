@@ -20,14 +20,13 @@ mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 # Mount tmpfs dirs
-mount -t tmpfs tmpfs /tmp/
 mount -t tmpfs run /run/
 
 # Setup rw filesystem overlays
 for tag in "${!virtme_rw_overlay@}"; do
     dir="${!tag}"
-    upperdir="/tmp/$tag/upper"
-    workdir="/tmp/$tag/work"
+    upperdir="/run/tmp/$tag/upper"
+    workdir="/run/tmp/$tag/work"
     mkdir -p "$upperdir" "$workdir"
     mnt_opts="xino=off,lowerdir=$dir,upperdir=$upperdir,workdir=$workdir"
     mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
