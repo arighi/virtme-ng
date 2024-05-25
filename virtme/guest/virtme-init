@@ -100,28 +100,28 @@ fi
 [ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo &
 
 # Fix up /etc a little bit
-touch /tmp/fstab
-mount --bind /tmp/fstab /etc/fstab
+touch /run/tmp/fstab
+mount --bind /run/tmp/fstab /etc/fstab
 
 if [[ -n "$virtme_hostname" ]]; then
-    cp /etc/hosts /tmp/hosts
-    printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /tmp/hosts
-    mount --bind /tmp/hosts /etc/hosts
+    cp /etc/hosts /run/tmp/hosts
+    printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /run/tmp/hosts
+    mount --bind /run/tmp/hosts /etc/hosts
 fi
 
 # Fix dpkg if we are on a Debian-based distro
 if [ -d /var/lib/dpkg ]; then
     lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
     for file in "${lock_files[@]}"; do
-	[ -e $file ] && touch "/tmp/${file##*/}" && mount --bind "/tmp/${file##*/}" "$file" &
+	[ -e $file ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file" &
     done
 fi
 
 # Populate dummy entries in /etc/shadow to allow switching to any user defined
 # in the system
-(umask 0644 && touch /tmp/shadow)
-sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /tmp/shadow
-mount --bind /tmp/shadow /etc/shadow &
+(umask 0644 && touch /run/tmp/shadow)
+sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /run/tmp/shadow
+mount --bind /run/tmp/shadow /etc/shadow &
 
 # Find udevd
 if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
@@ -231,7 +231,7 @@ real_sudoers=/etc/sudoers
 if [ ! -e ${real_sudoers} ]; then
     touch ${real_sudoers}
 fi
-tmpfile="`mktemp --tmpdir=/tmp`"
+tmpfile="`mktemp --tmpdir=/run/tmp`"
 echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
 echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
 if [[ -n "${virtme_user}" ]]; then
@@ -308,16 +308,16 @@ if [[ -n "${user_cmd}" ]]; then
     ln -s /dev/virtio-ports/virtme.dev_stderr /dev/stderr
 
     # Decode shell command (base64) and dump it to a script
-    echo $user_cmd | base64 -d > /tmp/.virtme-script
+    echo $user_cmd | base64 -d > /run/tmp/.virtme-script
 
     if [[ ! -n "${virtme_graphics}" ]]; then
         # Start the script
         log 'starting script'
         if [[ -n "${virtme_user}" ]]; then
-            chmod +x /tmp/.virtme-script
-            setsid su ${virtme_user} -c /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+            chmod +x /run/tmp/.virtme-script
+            setsid su ${virtme_user} -c /run/tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
         else
-            setsid bash /tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+            setsid bash /run/tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
         fi
 	ret=$?
         log "script returned {$ret}"
@@ -384,9 +384,9 @@ echo ""
 
 # Set up a basic environment (unless virtme-ng is running as root on the host)
 if [[ ! -n "${virtme_root_user}" ]]; then
-    install -d -m 0755 /tmp/roothome
-    export HOME=/tmp/roothome
-    mount --bind /tmp/roothome /root
+    install -d -m 0755 /run/tmp/roothome
+    export HOME=/run/tmp/roothome
+    mount --bind /run/tmp/roothome /root
 else
     export HOME=/root
 fi
@@ -419,9 +419,9 @@ if [[ -n "${virtme_graphics}" ]]; then
     fi
 
     # Create a .xinitrc to start the requested graphical application.
-    xinit_rc=/tmp/.xinitrc
-    echo -e "${pre_exec_cmd}\nexec /tmp/.virtme-script" > ${xinit_rc}
-    chmod +x /tmp/.virtme-script
+    xinit_rc=/run/tmp/.xinitrc
+    echo -e "${pre_exec_cmd}\nexec /run/tmp/.virtme-script" > ${xinit_rc}
+    chmod +x /run/tmp/.virtme-script
     if [[ -n "${virtme_user}" ]]; then
         chown ${virtme_user} ${xinit_rc}
         # Try to fix permissions on the virtual consoles, we are starting X
