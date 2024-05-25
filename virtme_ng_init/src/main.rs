@@ -190,7 +190,7 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
     },
 ];
 
-const USER_SCRIPT: &str = "/tmp/.virtme-script";
+const USER_SCRIPT: &str = "/run/tmp/.virtme-script";
 
 fn check_init_pid() {
     if id() != 1 {
@@ -291,16 +291,22 @@ fn run_systemd_tmpfiles() {
 }
 
 fn generate_fstab() -> io::Result<()> {
-    utils::create_file("/tmp/fstab", 0o0664, "").ok();
-    utils::do_mount("/tmp/fstab", "/etc/fstab", "", libc::MS_BIND as usize, "");
+    utils::create_file("/run/tmp/fstab", 0o0664, "").ok();
+    utils::do_mount(
+        "/run/tmp/fstab",
+        "/etc/fstab",
+        "",
+        libc::MS_BIND as usize,
+        "",
+    );
     Ok(())
 }
 
 fn generate_shadow() -> io::Result<()> {
-    utils::create_file("/tmp/shadow", 0o0644, "").ok();
+    utils::create_file("/run/tmp/shadow", 0o0644, "").ok();
 
     let input_file = File::open("/etc/passwd")?;
-    let output_file = File::create("/tmp/shadow")?;
+    let output_file = File::create("/run/tmp/shadow")?;
 
     let reader = BufReader::new(input_file);
     let mut writer = BufWriter::new(output_file);
@@ -310,13 +316,19 @@ fn generate_shadow() -> io::Result<()> {
             writeln!(writer, "{}:!:::::::", username)?;
         }
     }
-    utils::do_mount("/tmp/shadow", "/etc/shadow", "", libc::MS_BIND as usize, "");
+    utils::do_mount(
+        "/run/tmp/shadow",
+        "/etc/shadow",
+        "",
+        libc::MS_BIND as usize,
+        "",
+    );
 
     Ok(())
 }
 
 fn generate_sudoers() -> io::Result<()> {
-    let fname = "/tmp/sudoers";
+    let fname = "/run/tmp/sudoers";
     let mut content = "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n".to_string();
     content += "root ALL = (ALL) NOPASSWD: ALL\n";
     if let Ok(user) = env::var("virtme_user") {
@@ -332,13 +344,19 @@ fn generate_sudoers() -> io::Result<()> {
 
 fn generate_hosts() -> io::Result<()> {
     if let Ok(hostname) = env::var("virtme_hostname") {
-        std::fs::copy("/etc/hosts", "/tmp/hosts")?;
+        std::fs::copy("/etc/hosts", "/run/tmp/hosts")?;
         let mut h = OpenOptions::new()
             .write(true)
             .append(true)
-            .open("/tmp/hosts")?;
+            .open("/run/tmp/hosts")?;
         writeln!(h, "\n127.0.0.1 {}\n::1 {}", hostname, hostname)?;
-        utils::do_mount("/tmp/hosts", "/etc/hosts", "", libc::MS_BIND as usize, "");
+        utils::do_mount(
+            "/run/tmp/hosts",
+            "/etc/hosts",
+            "",
+            libc::MS_BIND as usize,
+            "",
+        );
     }
     Ok(())
 }
@@ -508,7 +526,7 @@ fn fix_dpkg_locks() {
         if fname.is_empty() {
             continue;
         }
-        let src_file = format!("/tmp/{}", fname);
+        let src_file = format!("/run/tmp/{}", fname);
         utils::create_file(&src_file, 0o0640, "").ok();
         utils::do_mount(&src_file, path, "", libc::MS_BIND as usize, "");
     }
@@ -744,9 +762,9 @@ fn setup_user_script(uid: u32) {
 fn setup_root_home() {
     // Set up a basic environment (unless virtme-ng is running as root on the host)
     if let Err(_) = env::var("virtme_root_user") {
-        utils::do_mkdir("/tmp/roothome");
-        utils::do_mount("/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
-        env::set_var("HOME", "/tmp/roothome");
+        utils::do_mkdir("/run/tmp/roothome");
+        utils::do_mount("/run/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
+        env::set_var("HOME", "/run/tmp/roothome");
     } else {
         env::set_var("HOME", "/root");
     }
@@ -836,7 +854,7 @@ fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
 
 fn run_user_gui(tty_fd: libc::c_int) {
     // Generate a bare minimum xinitrc
-    let xinitrc = "/tmp/.xinitrc";
+    let xinitrc = "/run/tmp/.xinitrc";
 
     // Check if we need to start the sound system.
     let mut pre_exec_cmd: String = String::new();
@@ -865,10 +883,10 @@ fn run_user_gui(tty_fd: libc::c_int) {
         utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
 
         // Start xinit directly.
-        storage = format!("su {} -c 'xinit /tmp/.xinitrc'", user);
+        storage = format!("su {} -c 'xinit /run/tmp/.xinitrc'", user);
         args.push(&storage);
     } else {
-        args.push("xinit /tmp/.xinitrc");
+        args.push("xinit /run/tmp/.xinitrc");
     }
     run_shell(tty_fd, &args);
 }
