@@ -77,7 +77,30 @@ def make_parser():
     """Main virtme-ng command line parser."""
 
     parser = argparse.ArgumentParser(
+        formatter_class=argparse.RawTextHelpFormatter,
         description="Build and run kernels inside a virtualized snapshot of your live system",
+        epilog="""\
+virtme-ng is a tool that allows to easily and quickly recompile and test a
+Linux kernel, starting from the source code. It allows to re‐ compile  the
+kernel in a few minutes (rather than hours), then the kernel is automatically
+started in a virtualized environment that is an exact copy-on-write copy of
+your live system, which means that any changes made to the virtualized
+environment do not affect the host system.
+
+In order to do this, a minimal config is produced (with the bare minimum
+support to test the kernel inside qemu), then the selected ker‐ nel is
+automatically built and started inside qemu, using the filesystem of the host
+as a copy-on-write snapshot.
+
+This means that you can safely destroy the entire filesystem, crash the kernel,
+etc. without affecting the host.
+
+NOTE: kernels produced with virtme-ng are lacking lots of features, in order to
+reduce the build time to the minimum and still provide you a usable kernel
+capable of running your tests and experiments.
+
+virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
+""",
     )
     parser.add_argument(
         "--version", "-V", action="version", version=f"virtme-ng {VERSION}"

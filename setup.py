@@ -63,6 +63,18 @@ class LintCommand(Command):
             sys.exit(1)
 
 
+man_command = f"""
+argparse-manpage \
+  --pyfile ./virtme_ng/run.py --function make_parser \
+  --prog vng --version v{VERSION} \
+  --author "virtme-ng is written by Andrea Righi <andrea.righi@canonical.com>" \
+  --author "Based on virtme by Andy Lutomirski <luto@kernel.org>" \
+  --project-name virtme-ng --manual-title virtme-ng \
+  --description "Quickly run kernels inside a virtualized snapshot of your live system" \
+  --url https://github.com/arighi/virtme-ng > vng.1
+"""
+
+
 class BuildPy(build_py):
     def run(self):
         print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
@@ -73,6 +85,12 @@ class BuildPy(build_py):
                 ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
                 cwd="virtme_ng_init",
             )
+        # Generate manpage
+        if which('argparse-manpage'):
+            env = os.environ.copy()
+            env["PYTHONPATH"] = os.path.dirname(os.path.abspath(__file__))
+            check_call(man_command, shell=True, env=env)
+
         # Generate bash autocompletion scripts
         completion_command = ''
         if which("register-python-argcomplete"):
@@ -157,6 +175,7 @@ setup(
         ("/etc", ["cfg/virtme-ng.conf"]),
         ("/usr/share/bash-completion/completions", ["virtme-ng-prompt"]),
         ("/usr/share/bash-completion/completions", ["vng-prompt"]),
+        ("/usr/share/man/man1", ["vng.1"]),
     ],
     scripts=[
         "bin/virtme-prep-kdir-mods",
