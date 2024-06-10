@@ -781,6 +781,18 @@ def is_statically_linked(binary_path):
         return False
 
 
+def is_subpath(path, potential_parent):
+    # Normalize the paths to avoid issues with trailing slashes and different formats
+    path = os.path.abspath(path)
+    potential_parent = os.path.abspath(potential_parent)
+
+    # Find the common path
+    common_path = os.path.commonpath([path, potential_parent])
+
+    # Check if the common path is the same as the potential parent path
+    return common_path == potential_parent
+
+
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
 _RWDIR_RE = re.compile("^(%s)(?:=(%s))?$" % (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
@@ -971,6 +983,19 @@ def do_it() -> int:
             guestpath = os.path.relpath(hostpath, args.root)
             if guestpath.startswith(".."):
                 arg_fail("%r is not inside the root" % hostpath)
+
+        # Check if paths are accessible both on the host and the guest.
+        if not os.path.exists(hostpath):
+            arg_fail(f"error: cannot access {hostpath} on the host")
+        # Guest path must be defined inside one of the overlays
+        guest_path_ok = False
+        for i, d in enumerate(args.overlay_rwdir):
+            if os.path.exists(guestpath) or is_subpath(guestpath, d):
+                guest_path_ok = True
+                break
+        if not guest_path_ok:
+            arg_fail(f"error: cannot initialize {guestpath} inside the guest " +
+                     "(path must be defined inside a valid overlay)")
 
         idx = mount_index
         mount_index += 1
