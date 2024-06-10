@@ -582,6 +582,7 @@ class VirtioFS:
             f"{self.guest_tools_path}/bin/virtiofsd",
             which("virtiofsd"),
             "/usr/libexec/virtiofsd",
+            "/usr/lib/virtiofsd/virtiofsd",
             "/usr/lib/virtiofsd",
             "/usr/lib/qemu/virtiofsd",
         )
