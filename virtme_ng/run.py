@@ -928,15 +928,15 @@ class KernelSource:
             self.virtme_param["verbose"] = ""
 
     def _get_virtme_append(self, args):
+        append = []
         if args.append is not None:
-            append = []
             for item in args.append:
                 split_items = item.split()
                 for split_item in split_items:
                     append.append("-a " + split_item)
-            self.virtme_param["append"] = " ".join(append)
-        else:
-            self.virtme_param["append"] = ""
+        if args.debug:
+            append.append("-a nokaslr")
+        self.virtme_param["append"] = " ".join(append)
 
     def _get_virtme_memory(self, args):
         if args.memory is None:
