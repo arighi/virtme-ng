@@ -209,7 +209,8 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--compiler",
         action="store",
-        help="Compiler to be used as CC when building the kernel",
+        help="[deprecated] Compiler to be used as CC when building the kernel. "
+        "Please set CC= and HOSTCC= variables in the virtme-ng command line instead.",
     )
 
     parser.add_argument(
