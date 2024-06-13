@@ -99,6 +99,11 @@ def make_parser() -> argparse.ArgumentParser:
         help="Give the guest read-write access to its root filesystem",
     )
     g.add_argument(
+        "--gdb",
+        action="store_true",
+        help="Attach a gdb session to a running instance started with --debug",
+    )
+    g.add_argument(
         "--graphics",
         action="store",
         nargs="?",
@@ -324,9 +329,10 @@ def has_memory_suffix(string):
 
 
 class Kernel:
-    __slots__ = ["kimg", "dtb", "modfiles", "moddir", "use_root_mods", "config"]
+    __slots__ = ["kimg", "version", "dtb", "modfiles", "moddir", "use_root_mods", "config"]
 
     kimg: str
+    version: str
     dtb: Optional[str]
     modfiles: List[str]
     moddir: Optional[str]
@@ -435,6 +441,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 + kimg
                 + " (modules may not work)\n"
             )
+        else:
+            kernel.version = kver
         kernel.kimg = kimg
         if args.mods == "none":
             kernel.modfiles = []
@@ -470,7 +478,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
         # Run get_kernel_version to check at least if the kernel image exist.
-        get_kernel_version(kimg)
+        kernel.version = get_kernel_version(kimg)
         kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, ".virtme_mods")
         mod_file = os.path.join(args.kdir, "modules.order")
@@ -820,6 +828,18 @@ def do_it() -> int:
     config.modfiles = kernel.modfiles
     if config.modfiles:
         need_initramfs = True
+
+    if args.gdb:
+        if kernel.version:
+            print(f"kernel version = {kernel.version}")
+        vmlinux = ''
+        if os.path.exists("vmlinux"):
+            vmlinux = "vmlinux"
+        elif os.path.exists(f"/usr/lib/debug/boot/vmlinux-{kernel.version}"):
+            vmlinux = f"/usr/lib/debug/boot/vmlinux-{kernel.version}"
+        command = ['gdb', '-q', '-ex', 'target remote localhost:1234', vmlinux]
+        os.execvp('gdb', command)
+        sys.exit(0)
 
     qemuargs: List[str] = [qemu.qemubin]
     kernelargs = []

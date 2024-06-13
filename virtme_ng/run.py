@@ -10,6 +10,7 @@ import sys
 import socket
 import shutil
 import json
+import signal
 import tempfile
 from subprocess import (
     check_call,
@@ -164,6 +165,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
+    )
+
+    parser.add_argument(
+        "--gdb",
+        action="store_true",
+        help="Attach a debugging session to a running instance started with --debug",
     )
 
     parser.add_argument(
@@ -957,6 +964,15 @@ class KernelSource:
         else:
             self.virtme_param["balloon"] = ""
 
+    def _get_virtme_gdb(self, args):
+        if args.gdb:
+            def signal_handler(_signum, _frame):
+                pass  # No action needed for SIGINT in child (gdb will handle)
+            signal.signal(signal.SIGINT, signal_handler)
+            self.virtme_param["gdb"] = "--gdb"
+        else:
+            self.virtme_param["gdb"] = ""
+
     def _get_virtme_snaps(self, args):
         if args.snaps:
             self.virtme_param["snaps"] = "--snaps"
@@ -1026,6 +1042,7 @@ class KernelSource:
         self._get_virtme_memory(args)
         self._get_virtme_numa(args)
         self._get_virtme_balloon(args)
+        self._get_virtme_gdb(args)
         self._get_virtme_snaps(args)
         self._get_virtme_busybox(args)
         self._get_virtme_qemu(args)
@@ -1062,6 +1079,7 @@ class KernelSource:
             + f'{self.virtme_param["memory"]} '
             + f'{self.virtme_param["numa"]} '
             + f'{self.virtme_param["balloon"]} '
+            + f'{self.virtme_param["gdb"]} '
             + f'{self.virtme_param["snaps"]} '
             + f'{self.virtme_param["busybox"]} '
             + f'{self.virtme_param["qemu"]} '
