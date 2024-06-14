@@ -39,9 +39,22 @@ def make_parser():
     )
 
     parser.add_argument(
+        "--configitem",
+        action="append",
+        metavar="CONFITEM",
+        help="add or alter a (CONFIG_)?FOO=bar item",
+    )
+
+    parser.add_argument(
         "--no-update",
         action="store_true",
         help="Skip if the config file already exists",
+    )
+
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="get chatty about config assembled",
     )
 
     g = parser.add_argument_group(title="Mode").add_mutually_exclusive_group()
@@ -271,13 +284,31 @@ def do_it():
             with open(conf_chunk, "r", encoding="utf-8") as fd:
                 custom_conf += fd.readlines()
 
+    if args.verbose:
+        print(f"custom:\n{custom_conf}")
+
+    mod_conf = []
+    if args.configitem:
+        mod_conf += [ f"# final config-item mods" ]
+        for conf_item in args.configitem:
+            if not conf_item.startswith("CONFIG_"):
+                conf_item = "CONFIG_" + conf_item
+            mod_conf += [ conf_item ]
+
+    if args.verbose:
+        print(f"mods:\n{mod_conf}")
+
     conf = (
         _GENERIC_CONFIG_OPTIONAL
         + ["# Arch-specific options"]
         + arch.config_base()
         + custom_conf
+        + mod_conf
         + _GENERIC_CONFIG
     )
+
+    if args.verbose:
+        print(f"conf:\n{conf}")
 
     linuxname = shlex.quote(arch.linuxname)
     archargs = [f"ARCH={linuxname}"]
