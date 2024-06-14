@@ -155,7 +155,7 @@ _GENERIC_CONFIG = [
 
 _GENERIC_CONFIG_OPTIONAL = [
     "# initramfs support",
-    "BLK_DEV_INITRD=y",
+    "CONFIG_BLK_DEV_INITRD=y",
     "# BPF stuff & useful debugging features",
     "CONFIG_BPF=y",
     "CONFIG_BPF_SYSCALL=y",
