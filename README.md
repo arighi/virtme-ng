@@ -325,6 +325,25 @@ Examples
    >>> (volatile unsigned long)4294675464
 ```
 
+ - Attach a gdb session to a running instance started with `--debug`:
+```
+   # Start the vng instance in debug mode
+   $ vng --debug
+
+   # In a separate terminal run the following command to attach the gdb session:
+   $ vng --gdb
+   kernel version = 6.9.0-virtme
+   Reading symbols from vmlinux...
+   Remote debugging using localhost:1234
+   native_irq_disable () at ./arch/x86/include/asm/irqflags.h:37
+   37		asm volatile("cli": : :"memory");
+   (gdb)
+
+   # NOTE: a vmlinux must be present in the current working directory in order
+   # to resolve symbols, otherwise vng # will automatically search for a
+   # vmlinux available in the system.
+```
+
  - Run virtme-ng inside a docker container:
 ```
    $ docker run -it --privileged ubuntu:23.10 /bin/bash
