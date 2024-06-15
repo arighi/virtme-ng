@@ -289,11 +289,11 @@ def do_it():
 
     mod_conf = []
     if args.configitem:
-        mod_conf += [ f"# final config-item mods" ]
+        mod_conf += ["# final config-item mods"]
         for conf_item in args.configitem:
             if not conf_item.startswith("CONFIG_"):
                 conf_item = "CONFIG_" + conf_item
-            mod_conf += [ conf_item ]
+            mod_conf += [conf_item]
 
     if args.verbose:
         print(f"mods:\n{mod_conf}")
