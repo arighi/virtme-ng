@@ -214,6 +214,13 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--configitem",
+        action="append",
+        help="add a CONFIG_ITEM=val, after --config <fragments>, "
+        "these override previous config settings",
+    )
+
+    parser.add_argument(
         "--compiler",
         action="store",
         help="[deprecated] Compiler to be used as CC when building the kernel. "
@@ -611,6 +618,9 @@ class KernelSource:
                 cmd += f" --custom {conf}"
         if os.path.exists(user_config):
             cmd += f" --custom {user_config}"
+        if args.configitem:
+            for citem in args.configitem:
+                cmd += f" --configitem {citem}"
         # Propagate additional Makefile variables
         for var in args.envs:
             cmd += f" {var} "

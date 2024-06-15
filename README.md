@@ -368,9 +368,11 @@ A minimal custom `.config` is automatically generated if not already present
 when `--build` is specified.
 
 It is possible to specify a set of custom configs (.config chunk) in
-`~/.config/virtme-ng/kernel.config`, these user-specific settings will override
-the default settings (except for the mandatory configs that are required to
-boot and test the kernel inside qemu, using `virtme-run`).
+`~/.config/virtme-ng/kernel.config`, or using --config chunk-file's
+or --configitem CONFIG_FOO=bar's.  These user-specific settings will
+successively override the default settings.  The final overrides are
+the mandatory config items that are required to boot and test the
+kernel inside qemu, using `virtme-run`.
 
 Then the kernel is compiled either locally or on an external build host (if the
 `--build-host` option is used); once the build is done only the required files
