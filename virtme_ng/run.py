@@ -613,11 +613,11 @@ class KernelSource:
             arch = ARCH_MAPPING[arch]["qemu_name"]
             cmd += f" --arch {arch}"
         user_config = str(Path.home()) + "/.config/virtme-ng/kernel.config"
+        if os.path.exists(user_config):
+            cmd += f" --custom {user_config}"
         if args.config:
             for conf in args.config:
                 cmd += f" --custom {conf}"
-        if os.path.exists(user_config):
-            cmd += f" --custom {user_config}"
         if args.configitem:
             for citem in args.configitem:
                 cmd += f" --configitem {citem}"
