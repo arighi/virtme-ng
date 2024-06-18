@@ -142,6 +142,15 @@ if build_virtme_ng_init:
     package_files.append("bin/virtme-ng-init")
     packages.append("virtme.guest.bin")
 
+data_files = [
+    ("/etc", ["cfg/virtme-ng.conf"]),
+    ("/usr/share/bash-completion/completions", ["virtme-ng-prompt"]),
+    ("/usr/share/bash-completion/completions", ["vng-prompt"]),
+]
+
+if which('argparse-manpage'):
+    data_files.append(("/usr/share/man/man1", ["vng.1"]))
+
 setup(
     name="virtme-ng",
     version=VERSION,
@@ -171,12 +180,7 @@ setup(
     },
     packages=packages,
     package_data={"virtme.guest": package_files},
-    data_files=[
-        ("/etc", ["cfg/virtme-ng.conf"]),
-        ("/usr/share/bash-completion/completions", ["virtme-ng-prompt"]),
-        ("/usr/share/bash-completion/completions", ["vng-prompt"]),
-        ("/usr/share/man/man1", ["vng.1"]),
-    ],
+    data_files=data_files,
     scripts=[
         "bin/virtme-prep-kdir-mods",
     ],
