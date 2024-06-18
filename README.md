@@ -154,7 +154,7 @@ Examples
    $ vng
 ```
 
- - Run an interactive virtme-ng session using the same kernel of the host:
+ - Run an interactive virtme-ng session using the same kernel as the host:
 ```
    $ vng -r
 ```
