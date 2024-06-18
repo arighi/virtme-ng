@@ -28,8 +28,9 @@ for tag in "${!virtme_rw_overlay@}"; do
     upperdir="/run/tmp/$tag/upper"
     workdir="/run/tmp/$tag/work"
     mkdir -p "$upperdir" "$workdir"
-    mnt_opts="xino=off,lowerdir=$dir,upperdir=$upperdir,workdir=$workdir"
-    mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
+    mnt_opts="lowerdir=$dir,upperdir=$upperdir,workdir=$workdir"
+    mount -t overlay -o xino=off,"${mnt_opts}" "${tag}" "${dir}" || \
+        mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
 done
 
 # Setup kernel modules
