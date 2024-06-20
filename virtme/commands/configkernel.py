@@ -336,6 +336,10 @@ def do_it():
 
     # Propagate additional Makefile variables
     for var in args.envs:
+        if var.startswith("O="):
+            # Setting "O=..." takes precedence over KBUILD_OUTPUT.
+            os.environ["KBUILD_OUTPUT"] = var[2:]
+
         archargs.append(shlex.quote(var))
 
     # Determine if an initial config is present
