@@ -112,7 +112,13 @@ pub fn do_symlink(src: &str, dst: &str) {
     }
 }
 
-pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: &str) {
+pub fn do_mount_check(
+    source: &str,
+    target: &str,
+    fstype: &str,
+    flags: usize,
+    fsdata: &str,
+) -> Result<(), nix::Error> {
     let source_cstr = CString::new(source).expect("CString::new failed");
     let fstype_cstr = CString::new(fstype).expect("CString::new failed");
     let fsdata_cstr = CString::new(fsdata).expect("CString::new failed");
@@ -124,6 +130,12 @@ pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: 
         MsFlags::from_bits_truncate(flags.try_into().unwrap()),
         Some(fsdata_cstr.as_ref()),
     );
+
+    result
+}
+
+pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: &str) {
+    let result = do_mount_check(source, target, fstype, flags, fsdata);
     if let Err(err) = result {
         if err != nix::errno::Errno::ENOENT {
             log!("mount {} -> {}: {}", source, target, err);

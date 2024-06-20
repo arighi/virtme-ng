@@ -452,7 +452,15 @@ fn mount_virtme_overlays() {
             utils::do_mkdir(dir);
             utils::do_mkdir(upperdir);
             utils::do_mkdir(workdir);
-            utils::do_mount(&key, &path, "overlay", 0, mnt_opts);
+            let result = utils::do_mount_check(&key, &path, "overlay", 0, mnt_opts);
+            if let Err(_) = result {
+                // Old kernels don't support xino=on|off, re-try without this option.
+                let mnt_opts = &format!(
+                    "lowerdir={},upperdir={},workdir={}",
+                    path, upperdir, workdir
+                );
+                utils::do_mount(&key, &path, "overlay", 0, mnt_opts);
+            }
         }
     }
 }
