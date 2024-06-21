@@ -96,7 +96,7 @@ def arg_fail(message):
 
 
 _GENERIC_CONFIG = [
-    "# Generic",
+    "##: Generic",
     "CONFIG_UEVENT_HELPER=n",  # Obsolete and slow
     "CONFIG_VIRTIO=y",
     "CONFIG_VIRTIO_PCI=y",
@@ -124,25 +124,25 @@ _GENERIC_CONFIG = [
     "CONFIG_EARLY_PRINTK=y",
     "CONFIG_INOTIFY_USER=y",
     "",
-    "# virtio-scsi support",
+    "##: virtio-scsi support",
     "CONFIG_BLOCK=y",
     "CONFIG_SCSI_LOWLEVEL=y",
     "CONFIG_SCSI=y",
     "CONFIG_SCSI_VIRTIO=y",
     "CONFIG_BLK_DEV_SD=y",
     "",
-    "# virt-serial support",
+    "##: virt-serial support",
     "CONFIG_VIRTIO_CONSOLE=y",
     "",
-    "# watchdog (useful for test scripts)",
+    "##: watchdog (useful for test scripts)",
     "CONFIG_WATCHDOG=y",
     "CONFIG_WATCHDOG_CORE=y",
     "CONFIG_I6300ESB_WDT=y",
-    "# Make sure debuginfo are available",
+    "##: Make sure debuginfo are available",
     "CONFIG_DEBUG_INFO_DWARF_TOOLCHAIN_DEFAULT=y",
-    "# Enable overlayfs",
+    "##: Enable overlayfs",
     "CONFIG_OVERLAY_FS=y",
-    "# virtio-fs support",
+    "##: virtio-fs support",
     "CONFIG_DAX=y",
     "CONFIG_DAX_DRIVER=y",
     "CONFIG_FS_DAX=y",
@@ -154,9 +154,9 @@ _GENERIC_CONFIG = [
 ]
 
 _GENERIC_CONFIG_OPTIONAL = [
-    "# initramfs support",
+    "##: initramfs support",
     "CONFIG_BLK_DEV_INITRD=y",
-    "# BPF stuff & useful debugging features",
+    "##: BPF stuff & useful debugging features",
     "CONFIG_BPF=y",
     "CONFIG_BPF_SYSCALL=y",
     "CONFIG_BPF_JIT=y",
@@ -173,16 +173,16 @@ _GENERIC_CONFIG_OPTIONAL = [
     "CONFIG_UPROBES=y",
     "CONFIG_UPROBE_EVENTS=y",
     "CONFIG_DEBUG_FS=y",
-    "# Required to generate memory dumps for drgn",
+    "##: Required to generate memory dumps for drgn",
     "CONFIG_FW_CFG_SYSFS=y",
     "CONFIG_FW_CFG_SYSFS_CMDLINE=y",
-    "# Graphics support",
+    "##: Graphics support",
     "CONFIG_DRM=y",
     "CONFIG_DRM_VIRTIO_GPU=y",
     "CONFIG_DRM_VIRTIO_GPU_KMS=y",
     "CONFIG_DRM_BOCHS=y",
     "CONFIG_VIRTIO_IOMMU=y",
-    "# Sound support",
+    "##: Sound support",
     "CONFIG_SOUND=y",
     "CONFIG_SND=y",
     "CONFIG_SND_SEQUENCER=y",
@@ -289,7 +289,7 @@ def do_it():
 
     mod_conf = []
     if args.configitem:
-        mod_conf += ["# final config-item mods"]
+        mod_conf += ["##: final config-item mods"]
         for conf_item in args.configitem:
             if not conf_item.startswith("CONFIG_"):
                 conf_item = "CONFIG_" + conf_item
@@ -300,7 +300,7 @@ def do_it():
 
     conf = (
         _GENERIC_CONFIG_OPTIONAL
-        + ["# Arch-specific options"]
+        + ["##: Arch-specific options"]
         + arch.config_base()
         + custom_conf
         + mod_conf
