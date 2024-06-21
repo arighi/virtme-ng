@@ -864,7 +864,12 @@ class KernelSource:
             else:
                 self.virtme_param["kdir"] = "--kimg " + args.run
         else:
-            self.virtme_param["kdir"] = "--kdir ./"
+            if args.envs:
+                for var in args.envs:
+                    if var.startswith("O="):
+                        self.virtme_param["kdir"] = "--kdir ./" + var[2:]
+            if self.virtme_param.get("kdir") is None:
+                self.virtme_param["kdir"] = "--kdir ./"
 
     def _get_virtme_mods(self, args):
         if args.skip_modules:
