@@ -355,11 +355,13 @@ def do_it():
 
     # Determine if an initial config is present
     config = ".config"
+    makef = "Makefile"
 
     # Check if KBUILD_OUTPUT is defined and if it's a directory
     config_dir = os.environ.get("KBUILD_OUTPUT", "")
     if config_dir and os.path.isdir(config_dir):
         config = os.path.join(config_dir, config)
+        makef = os.path.join(config_dir, makef)
 
     if os.path.exists(config):
         if args.no_update:
@@ -371,12 +373,23 @@ def do_it():
             return 1
 
     if maketarget is not None:
+        make_args = []
+        if not os.path.exists(makef):
+            if args.verbose:
+                sys.stderr.write(f"missing {makef}, adding -f $src/Makefile\n")
+            if os.path.exists("Makefile"):
+                # assuming we're in linux srcdir
+                make_args = ["-f", str(os.path.abspath("Makefile"))]
+                if args.verbose:
+                    sys.stderr.write(f"adding make_args: {make_args}\n")
         try:
-            subprocess.check_call(["make"] + archargs + [maketarget])
+            subprocess.check_call(["make"] + make_args + archargs + [maketarget])
         except Exception as exc:
             raise SilentError() from exc
 
     # Append virtme configs
+    if args.verbose:
+        sys.stderr.write(f"appending to config: {config}\n")
     with open(config, "ab") as conffile:
         conffile.write("\n".join(conf).encode("utf-8"))
 
