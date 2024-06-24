@@ -207,6 +207,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
 
     parser.add_argument(
         "--config",
+        "--custom",
         "-f",
         action="append",
         help="Use one (or more) specific kernel .config snippet "
