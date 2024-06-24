@@ -33,6 +33,7 @@ def make_parser():
 
     parser.add_argument(
         "--custom",
+        "--config",
         action="append",
         metavar="CUSTOM",
         help="Use a custom config snippet file to override specific config options",
