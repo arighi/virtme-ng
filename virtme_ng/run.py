@@ -611,6 +611,8 @@ class KernelSource:
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
         cmd = "virtme-configkernel --defconfig"
+        if args.verbose:
+            cmd += " --verbose"
         if not args.force and not args.kconfig:
             cmd += " --no-update"
         if arch is not None:
@@ -630,6 +632,8 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in args.envs:
             cmd += f" {var} "
+        if args.verbose:
+            print(f"cmd: {cmd}")
         check_call_cmd(
             self._format_cmd(cmd), quiet=not args.verbose, dry_run=args.dry_run
         )
