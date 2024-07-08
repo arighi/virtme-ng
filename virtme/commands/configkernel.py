@@ -378,6 +378,8 @@ def do_it():
             raise SilentError() from exc
 
     # Append virtme configs
+    if args.verbose:
+        sys.stderr.write(f"writing config: {config}")
     with open(config, "ab") as conffile:
         conffile.write("\n".join(conf).encode("utf-8"))
 
