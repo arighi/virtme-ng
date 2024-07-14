@@ -3,6 +3,7 @@
 
 """virtme-ng version"""
 
+import os
 from subprocess import check_output, DEVNULL, CalledProcessError
 
 PKG_VERSION = "1.25"
@@ -13,7 +14,7 @@ def get_version_string():
         # Get the version from git describe
         version = (
             check_output(
-                "git describe --always --long --dirty",
+                "cd %s && git describe --always --long --dirty" % os.path.dirname(__file__),
                 shell=True,
                 stderr=DEVNULL,
             )
