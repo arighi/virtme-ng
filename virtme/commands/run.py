@@ -205,6 +205,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="Guest architecture",
     )
     g.add_argument(
+        "--cross-compile",
+        action="store",
+        metavar="CROSS_COMPILE_PREFIX",
+        help="Cross-compile compiler prefix",
+    )
+    g.add_argument(
         "--busybox",
         action="store",
         metavar="PATH_TO_BUSYBOX",

@@ -443,6 +443,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--cross-compile",
+        action="store",
+        help="Set cross-compile prefix"
+    )
+
+    parser.add_argument(
         "--force",
         action="store_true",
         help="Force reset git repository to target branch or commit "
@@ -733,6 +739,9 @@ class KernelSource:
                 arg_fail(f"unsupported architecture: {arch}")
             target = ARCH_MAPPING[arch]["kernel_target"]
             cross_compile = ARCH_MAPPING[arch]["cross_compile"]
+            if args.cross_compile != "":
+                cross_compile=args.cross_compile
+
             cross_arch = ARCH_MAPPING[arch]["linux_name"]
         else:
             target = "bzImage"
