@@ -11,10 +11,16 @@ PKG_VERSION = "1.25"
 
 def get_version_string():
     try:
-        # Get the version from git describe
+        # Get the version from `git describe`.
+        #
+        # Make sure to get the proper git repository by using the directory
+        # that contains this file and also make sure that the parent is a
+        # virtme-ng repository.
+        #
+        # Otherwise fallback to the static version defined in PKG_VERSION.
         version = (
             check_output(
-                "cd %s && git describe --always --long --dirty" % os.path.dirname(__file__),
+                "cd %s && [ -e ../.git ] && git describe --always --long --dirty" % os.path.dirname(__file__),
                 shell=True,
                 stderr=DEVNULL,
             )
