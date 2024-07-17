@@ -32,6 +32,13 @@ def make_parser():
     )
 
     parser.add_argument(
+        "--cross-compile",
+        action="store",
+        metavar="CROSS_COMPILE_PREFIX",
+        help="Cross-compile compiler prefix",
+    )
+
+    parser.add_argument(
         "--custom",
         action="append",
         metavar="CUSTOM",
@@ -313,8 +320,12 @@ def do_it():
     linuxname = shlex.quote(arch.linuxname)
     archargs = [f"ARCH={linuxname}"]
 
-    if shutil.which(f"{arch.gccname}-linux-gnu-gcc") and arch.gccname != uname.machine:
-        gccname = shlex.quote(f"{arch.gccname}-linux-gnu-")
+    cross_compile_prefix = f"{arch.gccname}-linux-gnu-"
+    if args.cross_compile != "":
+        cross_compile_prefix = args.cross_compile
+
+    if shutil.which(f"{cross_compile_prefix}-gcc") and arch.gccname != uname.machine:
+        gccname = shlex.quote(f"{cross_compile_prefix}-gcc")
         archargs.append(f"CROSS_COMPILE={gccname}")
 
     maketarget: Optional[str]
