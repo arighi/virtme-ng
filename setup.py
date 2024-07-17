@@ -10,7 +10,10 @@ from subprocess import check_call, CalledProcessError
 from setuptools import setup, Command
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
-from virtme_ng.version import VERSION
+from virtme_ng.version import get_version_string
+
+os.environ["__VNG_LOCAL"] = "1"
+VERSION = get_version_string()
 
 # Source .config if it exists (where we can potentially defined config/build
 # options)
@@ -52,6 +55,7 @@ class LintCommand(Command):
             for cmd in ("flake8", "pylint"):
                 command = [cmd]
                 for pattern in (
+                    "vng",
                     "*.py",
                     "virtme/*.py",
                     "virtme/*/*.py",
