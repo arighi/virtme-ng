@@ -48,9 +48,11 @@ def get_version_string():
 
         return version_pep440
     except CalledProcessError:
-        # If git describe fails to determine a version, try to use the version
-        # from pip, or ultimately simply return the hard-coded package version.
-        return get_package_version()
+        # If git describe fails to determine a version (e.g. building from the
+        # source using a tarball), the version from pip cannot be picked because
+        # it might be different than the local one being used here. Fall back to
+        # the hard-coded package version then.
+        return PKG_VERSION
 
 
 VERSION = get_version_string()
