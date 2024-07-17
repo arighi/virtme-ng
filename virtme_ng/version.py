@@ -18,10 +18,10 @@ def get_package_version():
 
 
 def get_version_string():
-    try:
-        if not os.environ.get("__VNG_LOCAL"):
-            return get_package_version()
+    if not os.environ.get("__VNG_LOCAL"):
+        return get_package_version()
 
+    try:
         # Get the version from `git describe`.
         #
         # Make sure to get the proper git repository by using the directory
