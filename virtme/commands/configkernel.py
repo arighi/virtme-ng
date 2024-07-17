@@ -325,8 +325,8 @@ def do_it():
         cross_compile_prefix = args.cross_compile
 
     if shutil.which(f"{cross_compile_prefix}-gcc") and arch.gccname != uname.machine:
-        gccname = shlex.quote(cross_compile_prefix)
-        archargs.append(f"CROSS_COMPILE={cross_compile_prefix}")
+        gccname = shlex.quote(f"{cross_compile_prefix}-gcc")
+        archargs.append(f"CROSS_COMPILE={gccname}")
 
     maketarget: Optional[str]
 
