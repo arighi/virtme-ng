@@ -5,12 +5,23 @@
 
 import os
 from subprocess import check_output, DEVNULL, CalledProcessError
+import pkg_resources
 
 PKG_VERSION = "1.25"
 
 
+def get_package_version():
+    try:
+        return pkg_resources.get_distribution("virtme-ng").version
+    except pkg_resources.DistributionNotFound:
+        return PKG_VERSION
+
+
 def get_version_string():
     try:
+        if not os.environ.get("__VNG_LOCAL"):
+            return get_package_version()
+
         # Get the version from `git describe`.
         #
         # Make sure to get the proper git repository by using the directory
@@ -37,9 +48,9 @@ def get_version_string():
 
         return version_pep440
     except CalledProcessError:
-        # Default version if git describe fails (e.g., when building virtme-ng
-        # from a source package.
-        return PKG_VERSION
+        # If git describe fails to determine a version, try to use the version
+        # from pip, or ultimately simply return the hard-coded package version.
+        return get_package_version()
 
 
 VERSION = get_version_string()

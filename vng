@@ -7,7 +7,9 @@
 
 import os
 import sys
-from virtme_ng import run
+os.environ["__VNG_LOCAL"] = "1"
+from virtme_ng import run  # noqa: E402
+
 
 # Update PATH to make sure that virtme-ng can be executed directly from the
 # source directory, without necessarily installing virtme-ng in the system.
@@ -17,5 +19,6 @@ def update_path():
     new_path = f'{script_dir}:{current_path}'
     os.environ['PATH'] = new_path
 
+
 update_path()
-exit(run.main())
+sys.exit(run.main())
