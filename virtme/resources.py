@@ -24,9 +24,9 @@ def find_guest_tools():
 
 
 def find_script(name) -> str:
-    # If we're running out of a source checkout, we can find scripts through
-    # the 'virtme/scripts' symlink.
-    fn = pkg_resources.resource_filename(__name__, "scripts/%s" % name)
+    # If we're running out of a source checkout, we can find scripts in the
+    # 'bin' directory.
+    fn = pkg_resources.resource_filename(__name__, "../bin/%s" % name)
     if os.path.isfile(fn):
         return fn
 
