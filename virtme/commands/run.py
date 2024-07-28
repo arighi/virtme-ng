@@ -1063,7 +1063,7 @@ def do_it() -> int:
             qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
-            kernelargs.extend(["console=hvc0"])
+            kernelargs.extend(["console=ttyS0", "debug"])
 
             # Unfortunately we can't use hvc0 to redirect early console
             # messages to stderr, so just send them to the main console, in
