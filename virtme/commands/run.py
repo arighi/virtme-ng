@@ -1063,7 +1063,7 @@ def do_it() -> int:
             qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
-            kernelargs.extend(["console=ttyS0", "debug"])
+            kernelargs.extend(["console=ttyS0"])
 
             # Unfortunately we can't use hvc0 to redirect early console
             # messages to stderr, so just send them to the main console, in
@@ -1410,6 +1410,8 @@ def do_it() -> int:
     if not args.verbose:
         kernelargs.append("quiet")
         kernelargs.append("loglevel=0")
+    else:
+        kernelargs.append("debug")
 
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
