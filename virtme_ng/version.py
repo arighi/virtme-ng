@@ -18,6 +18,9 @@ def get_package_version():
 
 
 def get_version_string():
+    if os.environ.get("VNG_PACKAGE"):
+        return PKG_VERSION
+
     if not os.environ.get("__VNG_LOCAL"):
         return get_package_version()
 
