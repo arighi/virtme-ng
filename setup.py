@@ -40,6 +40,12 @@ def is_arm_32bit():
     return arch.startswith("arm") and platform.architecture()[0] == "32bit"
 
 
+def parse_requirements(filename):
+    with open(filename, 'r', encoding="utf-8") as file:
+        lines = file.readlines()
+    return [line.strip() for line in lines if line.strip() and not line.startswith('#')]
+
+
 class LintCommand(Command):
     description = "Run coding style checks"
     user_options = []
@@ -167,7 +173,7 @@ setup(
         os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="utf-8"
     ).read(),
     long_description_content_type="text/markdown",
-    install_requires=["argcomplete", "requests"],
+    install_requires=parse_requirements('requirements.txt'),
     entry_points={
         "console_scripts": [
             "vng = virtme_ng.run:main",
