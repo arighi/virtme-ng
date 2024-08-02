@@ -207,6 +207,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
 
     parser.add_argument(
         "--config",
+        "--custom",
         "-f",
         action="append",
         help="Use one (or more) specific kernel .config snippet "
@@ -611,6 +612,8 @@ class KernelSource:
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
         cmd = "virtme-configkernel --defconfig"
+        if args.verbose:
+            cmd += " --verbose"
         if not args.force and not args.kconfig:
             cmd += " --no-update"
         if arch is not None:
@@ -630,6 +633,8 @@ class KernelSource:
         # Propagate additional Makefile variables
         for var in args.envs:
             cmd += f" {var} "
+        if args.verbose:
+            print(f"cmd: {cmd}")
         check_call_cmd(
             self._format_cmd(cmd), quiet=not args.verbose, dry_run=args.dry_run
         )
@@ -873,7 +878,11 @@ class KernelSource:
             else:
                 self.virtme_param["kdir"] = "--kimg " + args.run
         else:
-            self.virtme_param["kdir"] = "--kdir ./"
+            for var in args.envs:
+                if var.startswith("O="):
+                    self.virtme_param["kdir"] = "--kdir ./" + var[2:]
+            if self.virtme_param.get("kdir") is None:
+                self.virtme_param["kdir"] = "--kdir ./"
 
     def _get_virtme_mods(self, args):
         if args.skip_modules:
