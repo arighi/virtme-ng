@@ -89,7 +89,7 @@ your live system, which means that any changes made to the virtualized
 environment do not affect the host system.
 
 In order to do this, a minimal config is produced (with the bare minimum
-support to test the kernel inside qemu), then the selected ker‐ nel is
+support to test the kernel inside qemu), then the selected kernel is
 automatically built and started inside qemu, using the filesystem of the host
 as a copy-on-write snapshot.
 
