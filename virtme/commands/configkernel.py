@@ -277,6 +277,7 @@ _GENERIC_CONFIG_OPTIONAL = [
     "# CONFIG_MSDOS_FS is not set",
     "# CONFIG_AUTOFS4_FS is not set",
     "# CONFIG_AUTOFS_FS is not set",
+    "# CONFIG_NVRAM is not set",
 ]
 
 
