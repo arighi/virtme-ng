@@ -21,6 +21,7 @@ mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 # Mount tmpfs dirs
 mount -t tmpfs run /run/
+mkdir /run/tmp
 
 # Setup rw filesystem overlays
 for tag in "${!virtme_rw_overlay@}"; do
