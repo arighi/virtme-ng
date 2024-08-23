@@ -658,7 +658,7 @@ class KernelSource:
                 "--force",
                 "--porcelain",
                 f"{args.build_host}:~/.virtme",
-                "HEAD:__virtme__",
+                "HEAD:refs/heads/__virtme__",
             ],
             quiet=not args.verbose,
             dry_run=args.dry_run,
