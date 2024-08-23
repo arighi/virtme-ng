@@ -593,7 +593,7 @@ class KernelSource:
 
     def checkout(self, args):
         """Perform a git checkout operation on a local kernel git repository."""
-        if not os.path.isdir(".git"):
+        if not os.path.exists(".git"):
             arg_fail("error: must run from a kernel git repository", show_usage=False)
         target = args.commit or "HEAD"
         if args.build_host is not None or target != "HEAD":
@@ -728,7 +728,7 @@ class KernelSource:
 
     def make(self, args):
         """Perform a make operation on a kernel source directory."""
-        if not os.path.isdir(".git") and args.build_host is not None:
+        if not os.path.exists(".git") and args.build_host is not None:
             arg_fail(
                 "error: --build-host can be used only on a kernel git repository",
                 show_usage=False,
@@ -1156,7 +1156,7 @@ class KernelSource:
 
     def clean(self, args):
         """Clean a local or remote git repository."""
-        if not os.path.isdir(".git"):
+        if not os.path.exists(".git"):
             arg_fail("error: must run from a kernel git repository", show_usage=False)
         if args.build_host is None:
             cmd = self._format_cmd("git clean -xdf")
