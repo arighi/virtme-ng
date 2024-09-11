@@ -865,7 +865,7 @@ class KernelSource:
             # If an upstream version is specified (using an upstream tag) fetch
             # and run the corresponding kernel from the Ubuntu mainline
             # repository.
-            if re.match(r'^v\d+(\.\d+)*$', args.run):
+            if re.match(r'^v\d+(\.\d+)*(-rc\d+)?$', args.run):
                 if args.arch is None:
                     arch = 'amd64'
                 else:
