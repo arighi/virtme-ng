@@ -47,7 +47,7 @@ def get_version_string():
             version = version[1:]
 
         # Replace hyphens with plus sign for build metadata
-        version_pep440 = '0.0+dev'+version.replace("-", "+").replace("+", ".")
+        version_pep440 = version.replace("-", "+", 1).replace("-", ".")
 
         return version_pep440
     except CalledProcessError:
