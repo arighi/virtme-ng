@@ -34,7 +34,7 @@ def get_version_string():
         # Otherwise fallback to the static version defined in PKG_VERSION.
         version = (
             check_output(
-                "cd %s && [ -e ../.git ] && git describe --always --long --dirty" % os.path.dirname(__file__),
+                "cd %s && [ -e ../.git ] && git describe --long --dirty" % os.path.dirname(__file__),
                 shell=True,
                 stderr=DEVNULL,
             )
