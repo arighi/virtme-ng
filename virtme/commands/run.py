@@ -380,7 +380,7 @@ def get_kernel_version(path):
             ["file", path], capture_output=True, text=True, check=False
         )
         for item in result.stdout.split(", "):
-            match = re.search(r"^[vV]ersion (\S+)", item)
+            match = re.search(r"^[vV]ersion (\S{3,})", item)
             if match:
                 kernel_version = match.group(1)
                 return kernel_version
@@ -393,7 +393,7 @@ def get_kernel_version(path):
     result = subprocess.run(
         ["strings", path], capture_output=True, text=True, check=False
     )
-    match = re.search(r"Linux version (\S+)", result.stdout)
+    match = re.search(r"Linux version (\S{3,})", result.stdout)
     if match:
         kernel_version = match.group(1)
         return kernel_version
