@@ -71,6 +71,9 @@ class Arch:
     def kimg_path(self) -> str:
         return "arch/%s/boot/bzImage" % self.linuxname
 
+    def img_name(self) -> str:
+        return "vmlinuz"
+
     @staticmethod
     def dtb_path() -> Optional[str]:
         return None
@@ -310,6 +313,9 @@ class Arch_ppc(Arch):
 
     def kimg_path(self):
         # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
+        return "vmlinux"
+
+    def img_name(self) -> str:
         return "vmlinux"
 
 
