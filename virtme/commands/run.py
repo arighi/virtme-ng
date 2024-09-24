@@ -428,11 +428,13 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 args.kimg = None
 
     if args.kimg is not None:
+        img_name = arch.img_name()
+
         # Try to resolve kimg as a kernel version first, then check if a file
         # is provided.
-        kimg = "/usr/lib/modules/%s/vmlinuz" % args.kimg
+        kimg = "/usr/lib/modules/%s/%s" % (args.kimg, img_name)
         if not os.path.exists(kimg):
-            kimg = "/boot/vmlinuz-%s" % args.kimg
+            kimg = "/boot/%s-%s" % (img_name, args.kimg)
             if not os.path.exists(kimg):
                 kimg = args.kimg
                 if not os.path.exists(kimg):
