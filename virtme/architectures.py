@@ -253,6 +253,10 @@ class Arch_aarch64(Arch):
         self.gccname = "aarch64"
 
     @staticmethod
+    def virtiofs_support() -> bool:
+        return True
+
+    @staticmethod
     def qemuargs(is_native, use_kvm):
         ret = Arch.qemuargs(is_native, use_kvm)
 
