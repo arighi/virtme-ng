@@ -51,6 +51,10 @@ class Arch:
         return ["-vga", "none", "-display", "none"]
 
     @staticmethod
+    def qemu_nodisplay_nvgpu_args() -> List[str]:
+        return ["-display", "none"]
+
+    @staticmethod
     def qemu_display_args() -> List[str]:
         return ["-device", "virtio-gpu-pci"]
 
@@ -106,7 +110,7 @@ class Arch_x86(Arch):
         if is_native and use_kvm:
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
-            ret.extend(["-cpu", "host"])  # We can't migrate regardless.
+            ret.extend(["-cpu", "host,host-phys-bits-limit=0x28"])  # We can't migrate regardless.
         else:
             ret.extend(["-machine", "q35"])
 
