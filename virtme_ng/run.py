@@ -465,6 +465,13 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         nargs="*",
         help="Additional Makefile variables",
     )
+
+    parser.add_argument(
+        "--nvgpu",
+        action="store",
+        metavar="[GPU PCI Address]",
+        help="Add a passthrough NVIDIA GPU",
+    )
     return parser
 
 
@@ -1041,6 +1048,12 @@ class KernelSource:
         else:
             self.virtme_param["qemu_opts"] = ""
 
+    def _get_virtme_nvgpu(self, args):
+        if args.nvgpu is not None:
+            self.virtme_param["nvgpu"] = f"--nvgpu 'vfio-pci,host={args.nvgpu}'"
+        else:
+            self.virtme_param["nvgpu"] = ""
+
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
         self._get_virtme_name(args)
@@ -1076,6 +1089,7 @@ class KernelSource:
         self._get_virtme_busybox(args)
         self._get_virtme_qemu(args)
         self._get_virtme_qemu_opts(args)
+        self._get_virtme_nvgpu(args)
 
         # Start VM using virtme-run
         cmd = (
@@ -1113,6 +1127,7 @@ class KernelSource:
             + f'{self.virtme_param["busybox"]} '
             + f'{self.virtme_param["qemu"]} '
             + f'{self.virtme_param["qemu_opts"]} '
+            + f'{self.virtme_param["nvgpu"]} '
         )
         check_call(cmd, shell=True)
 

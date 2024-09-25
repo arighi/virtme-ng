@@ -312,6 +312,9 @@ def make_parser() -> argparse.ArgumentParser:
         help="Supply a directory that is r/w to the guest but read-only in the host.  Use --overlay-rwdir=path.",
     )
 
+    g.add_argument(
+        "--nvgpu", action="store", default=None, help="Set guest NVIDIA GPU."
+    )
     return parser
 
 
@@ -1087,7 +1090,10 @@ def do_it() -> int:
 
         kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
 
-        qemuargs.extend(arch.qemu_nodisplay_args())
+        if args.nvgpu is None:
+            qemuargs.extend(arch.qemu_nodisplay_args())
+        else:
+            qemuargs.extend(arch.qemu_nodisplay_nvgpu_args())
 
         # PS/2 probing is slow; give the kernel a hint to speed it up.
         kernelargs.extend(["psmouse.proto=exps"])
@@ -1172,7 +1178,10 @@ def do_it() -> int:
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
         if args.graphics is None:
             # Turn off default I/O
-            qemuargs.extend(arch.qemu_nodisplay_args())
+            if args.nvgpu is None:
+                qemuargs.extend(arch.qemu_nodisplay_args())
+            else:
+                qemuargs.extend(arch.qemu_nodisplay_nvgpu_args())
 
         # Check if we can redirect stdin/stdout/stderr.
         if not can_access_file("/proc/self/fd/0") or \
@@ -1285,7 +1294,7 @@ def do_it() -> int:
             show_boot_console=args.show_boot_console,
         )
 
-    if args.graphics is not None:
+    if args.graphics is not None and args.nvgpu is None:
         video_args = arch.qemu_display_args()
         if video_args:
             qemuargs.extend(video_args)
@@ -1338,6 +1347,9 @@ def do_it() -> int:
 
     if args.user:
         kernelargs.append("virtme_user=%s" % args.user)
+
+    if args.nvgpu:
+        qemuargs.extend(["-device", args.nvgpu])
 
     # If we are running as root on the host pass this information to the guest
     # (this can be useful to properly support running virtme-ng instances
