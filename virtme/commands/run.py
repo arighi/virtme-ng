@@ -368,7 +368,7 @@ def get_rootfs_from_kernel_path(path):
     return os.path.abspath(path)
 
 
-def get_kernel_version(path):
+def get_kernel_version(img_name, path):
     if not os.path.exists(path):
         arg_fail(
             "kernel file %s does not exist, try --build to build the kernel" % path
@@ -397,6 +397,14 @@ def get_kernel_version(path):
     if match:
         kernel_version = match.group(1)
         return kernel_version
+
+    # The version detection fails s390x using file or strings tools, so check
+    # if the file itself contins the version number.
+    if img_name:
+        match = re.search(fr"{img_name}-" + "(\S{3,})", path)
+        if match:
+            return match.group(1)
+
     return None
 
 
@@ -439,7 +447,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 kimg = args.kimg
                 if not os.path.exists(kimg):
                     arg_fail("%s does not exist" % args.kimg)
-        kver = get_kernel_version(kimg)
+        kver = get_kernel_version(img_name, kimg)
         if kver is None:
             # Unable to detect kernel version, try to boot without
             # automatically detecting modules.
@@ -486,7 +494,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
         # Run get_kernel_version to check at least if the kernel image exist.
-        kernel.version = get_kernel_version(kimg)
+        kernel.version = get_kernel_version(None, kimg)
         kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, ".virtme_mods")
         mod_file = os.path.join(args.kdir, "modules.order")
