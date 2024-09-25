@@ -408,6 +408,9 @@ class Arch_s390x(Arch):
         return ["-device", "sclpconsole,chardev=console"]
 
 
+    def img_name(self) -> str:
+        return "image"
+
 ARCHES = {
     arch.virtmename: arch
     for arch in [
