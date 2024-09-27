@@ -411,9 +411,9 @@ class Arch_s390x(Arch):
     def qemu_serial_console_args():
         return ["-device", "sclpconsole,chardev=console"]
 
-
     def img_name(self) -> str:
         return "image"
+
 
 ARCHES = {
     arch.virtmename: arch
