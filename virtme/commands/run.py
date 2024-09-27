@@ -401,7 +401,7 @@ def get_kernel_version(img_name, path):
     # The version detection fails s390x using file or strings tools, so check
     # if the file itself contins the version number.
     if img_name:
-        match = re.search(fr"{img_name}-" + "(\S{3,})", path)
+        match = re.search(fr"{img_name}-\S{{3,}}", path)
         if match:
             return match.group(1)
 
