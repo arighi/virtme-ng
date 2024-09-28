@@ -662,48 +662,59 @@ class VirtioFS:
         return True
 
 
+class VirtioFSConfig:
+    def __init__(self, path: str, mount_tag: str, guest_tools_path=None, memory=None):
+        self.path = path
+        self.mount_tag = mount_tag
+        self.guest_tools_path = guest_tools_path
+        self.memory = memory
+
+
 def export_virtiofs(
     arch: architectures.Arch,
     qemuargs: List[str],
-    path: str,
-    mount_tag: str,
-    guest_tools_path=None,
-    memory=None,
+    config: VirtioFSConfig,
     verbose=False,
-) -> None:
+) -> bool:
     if not arch.virtiofs_support():
         return False
 
-    # Try to start virtiofsd deamon
-    virtio_fs = VirtioFS(guest_tools_path)
-    ret = virtio_fs.start(path, verbose)
+    # Try to start virtiofsd daemon
+    virtio_fs = VirtioFS(config.guest_tools_path)
+    ret = virtio_fs.start(config.path, verbose)
     if not ret:
         return False
 
     # Adjust qemu options to use virtiofsd
     fsid = "virtfs%d" % len(qemuargs)
-
     vhost_dev_type = arch.vhost_dev_type()
+
     qemuargs.extend(["-chardev", f"socket,id=char{fsid},path={virtio_fs.sock}"])
-    qemuargs.extend(["-device", f"{vhost_dev_type},chardev=char{fsid},tag={mount_tag}"])
-    if memory is None:
-        memory = "128M"
-    elif memory == 0:
+    qemuargs.extend(["-device", f"{vhost_dev_type},chardev=char{fsid},tag={config.mount_tag}"])
+
+    memory = config.memory if config.memory is not None else "128M"
+    if memory == 0:
         return True
+
     qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
     qemuargs.extend(["-numa", "node,memdev=mem"])
 
     return True
 
 
+class VirtFSConfig:
+    def __init__(self, path: str, mount_tag: str, security_model="none", readonly=True):
+        self.path = path
+        self.mount_tag = mount_tag
+        self.security_model = security_model
+        self.readonly = readonly
+
+
 def export_virtfs(
     qemu: qemu_helpers.Qemu,
     arch: architectures.Arch,
     qemuargs: List[str],
-    path: str,
-    mount_tag: str,
-    security_model="none",
-    readonly=True,
+    config: VirtFSConfig,
 ) -> None:
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
@@ -714,9 +725,9 @@ def export_virtfs(
             "local,id=%s,path=%s,security_model=%s%s%s"
             % (
                 fsid,
-                qemu.quote_optarg(path),
-                security_model,
-                ",readonly=on" if readonly else "",
+                qemu.quote_optarg(config.path),
+                config.security_model,
+                ",readonly=on" if config.readonly else "",
                 ",multidevs=remap" if qemu.has_multidevs else "",
             ),
         ]
@@ -725,7 +736,7 @@ def export_virtfs(
         [
             "-device",
             "%s,fsdev=%s,mount_tag=%s"
-            % (arch.virtio_dev_type("9p"), fsid, qemu.quote_optarg(mount_tag)),
+            % (arch.virtio_dev_type("9p"), fsid, qemu.quote_optarg(config.mount_tag)),
         ]
     )
 
@@ -936,16 +947,19 @@ def do_it() -> int:
             virt_arch = architectures.get("microvm")
         else:
             virt_arch = arch
-        use_virtiofs = export_virtiofs(
-            virt_arch,
-            qemuargs,
-            args.root,
-            "ROOTFS",
+        virtiofs_config = VirtioFSConfig(
+            path=args.root,
+            mount_tag="ROOTFS",
             guest_tools_path=guest_tools_path,
             # virtiofsd requires a NUMA not, if --numa is specified simply use
             # the user-defined NUMA node, otherwise create a NUMA node with all
             # the memory.
             memory=0 if args.numa else args.memory,
+        )
+        use_virtiofs = export_virtiofs(
+            virt_arch,
+            qemuargs,
+            virtiofs_config,
             verbose=args.verbose,
         )
         if can_use_microvm(args) and use_virtiofs:
@@ -953,9 +967,12 @@ def do_it() -> int:
                 sys.stderr.write("virtme: use 'microvm' QEMU architecture\n")
             arch = virt_arch
     if not use_virtiofs:
-        export_virtfs(
-            qemu, arch, qemuargs, args.root, "/dev/root", readonly=(not args.rw)
+        virtfs_config = VirtFSConfig(
+            path=args.root,
+            mount_tag="/dev/root",
+            readonly=(not args.rw),
         )
+        export_virtfs(qemu, arch, qemuargs, virtfs_config)
 
     # Use the faster virtme-ng-init if we are running on a native architecture.
     if (
@@ -970,7 +987,11 @@ def do_it() -> int:
     if args.root == "/":
         initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
-        export_virtfs(qemu, arch, qemuargs, guest_tools_path, "virtme.guesttools")
+        virtfs_config = VirtFSConfig(
+            path=guest_tools_path,
+            mount_tag="virtme.guesttools",
+        )
+        export_virtfs(qemu, arch, qemuargs, virtfs_config)
         initcmds = [
             "init=/bin/sh",
             "--",
@@ -1037,9 +1058,12 @@ def do_it() -> int:
         idx = mount_index
         mount_index += 1
         tag = "virtme.initmount%d" % idx
-        export_virtfs(
-            qemu, arch, qemuargs, hostpath, tag, readonly=(dirtype != "rwdir")
+        virtfs_config = VirtFSConfig(
+            path=hostpath,
+            mount_tag=tag,
+            readonly=(dirtype != "rwdir"),
         )
+        export_virtfs(qemu, arch, qemuargs, virtfs_config)
         kernelargs.append("virtme_initmount%d=%s" % (idx, guestpath))
 
     for i, d in enumerate(args.overlay_rwdir):
