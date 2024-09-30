@@ -1078,7 +1078,7 @@ def do_it() -> int:
         qemuargs.extend(["-machine", "accel=kvm:tcg"])
 
     # Add architecture-specific options
-    qemuargs.extend(arch.qemuargs(is_native, kvm_ok))
+    qemuargs.extend(arch.qemuargs(is_native, kvm_ok, args.nvgpu is not None))
 
     # Set up / override baseline devices
     qemuargs.extend(["-parallel", "none"])

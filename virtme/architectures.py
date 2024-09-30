@@ -23,9 +23,10 @@ class Arch:
         return False
 
     @staticmethod
-    def qemuargs(is_native, use_kvm) -> List[str]:
+    def qemuargs(is_native, use_kvm, use_gpu) -> List[str]:
         _ = is_native
         _ = use_kvm
+        _ = use_gpu
         return []
 
     @staticmethod
@@ -85,8 +86,8 @@ class Arch:
 
 class Arch_unknown(Arch):
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        return Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        return Arch.qemuargs(is_native, use_kvm, use_gpu)
 
 
 class Arch_x86(Arch):
@@ -101,8 +102,8 @@ class Arch_x86(Arch):
         return True
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
 
         # Add a watchdog.  This is useful for testing.
         ret.extend(["-device", "i6300esb,id=watchdog0"])
@@ -110,7 +111,10 @@ class Arch_x86(Arch):
         if is_native and use_kvm:
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
-            ret.extend(["-cpu", "host,host-phys-bits-limit=0x28"])  # We can't migrate regardless.
+            cpu_str = "host"
+            if use_gpu:
+                cpu_str += ",host-phys-bits-limit=0x28"
+            ret.extend(["-cpu", cpu_str])
         else:
             ret.extend(["-machine", "q35"])
 
@@ -186,8 +190,8 @@ class Arch_microvm(Arch_x86):
         ]
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
 
         # Use microvm architecture for faster boot
         ret.extend(["-M", "microvm,accel=kvm,pcie=on,rtc=on"])
@@ -207,8 +211,8 @@ class Arch_arm(Arch):
         self.defconfig_target = "vexpress_defconfig"
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
 
         # Emulate a vexpress-a15.
         ret.extend(["-M", "vexpress-a15"])
@@ -261,8 +265,8 @@ class Arch_aarch64(Arch):
         return True
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
 
         if is_native:
             ret.extend(["-M", "virt,gic-version=host"])
@@ -303,8 +307,8 @@ class Arch_ppc(Arch):
         self.gccname = "powerpc64le"
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
         ret.extend(["-M", "pseries"])
 
         return ret
@@ -341,8 +345,8 @@ class Arch_riscv64(Arch):
         return True
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
         ret.extend(["-machine", "virt"])
         ret.extend(["-bios", "default"])
 
@@ -366,8 +370,8 @@ class Arch_sparc64(Arch):
         self.gccname = "sparc64"
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        return Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        return Arch.qemuargs(is_native, use_kvm, use_gpu)
 
     def kimg_path(self):
         return "arch/sparc/boot/image"
@@ -391,8 +395,8 @@ class Arch_s390x(Arch):
         return "virtio-%s-ccw" % virtiotype
 
     @staticmethod
-    def qemuargs(is_native, use_kvm):
-        ret = Arch.qemuargs(is_native, use_kvm)
+    def qemuargs(is_native, use_kvm, use_gpu):
+        ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
 
         # Ask for the latest version of s390-ccw
         ret.extend(["-M", "s390-ccw-virtio"])
