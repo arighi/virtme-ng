@@ -358,6 +358,26 @@ Examples
    See also: `.github/workflows/run.yml` as a practical example on how to use
    virtme-ng inside docker.
 
+ - Run virtme-ng with gpu passthrough:
+```
+   # Confirm host kernel has VFIO and IOMMU support
+   # Check if NVIDIA module is installed on the host
+   $ modinfo nvidia
+   # If the nvidia module is installed, blacklist the nvidia modules
+   $ sudo bash -c 'echo -e "blacklist nvidia\nblacklist nvidia-drm\nblacklist nvidia-modeset\nblacklist nvidia-peermem\nblacklist nvidia-uvm" > /etc/modprobe.d/blacklist-nvidia.conf'
+   # Host will need to be rebooted for blacklist to take effect.
+   # Get GPU device ID
+   $ lspci -nn | grep NVIDIA
+     0000:01:00.0 VGA compatible controller [0300]: NVIDIA Corporation AD104GLM [RTX 3500 Ada Generation Laptop GPU] [10de:27bb] (rev a1)
+     0000:01:00.1 Audio device [0403]: NVIDIA Corporation Device [10de:22bc] (rev a1))
+   # Configure VFIO for device passthrough
+   $ sudo bash -c 'options vfio-pci ids=10de:27bb,10de:22bc' > /etc/modprobe.d/vfio.conf
+   # Load VFIO module
+   $ sudo modprobe vfio-pci
+   # Pass PCI address to virtme-ng
+   $ sudo vng --nvgpu "01:00.0" -r linux
+```
+
 Implementation details
 ======================
 
