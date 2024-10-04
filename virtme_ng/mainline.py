@@ -25,7 +25,7 @@ class KernelDownloader:
         self.version = version
         self.arch = arch
         self.verbose = verbose
-        self.target = f"{self.kernel_dir}/boot/vmlinuz*generic*"
+        self.target = f"{self.kernel_dir}/boot/vmlinuz*generic"
 
         if not glob(self.target):
             self._fetch_kernel()
