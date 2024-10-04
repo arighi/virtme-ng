@@ -752,7 +752,7 @@ class KernelSource:
                 arg_fail(f"unsupported architecture: {arch}")
             target = ARCH_MAPPING[arch]["kernel_target"]
             cross_compile = ARCH_MAPPING[arch]["cross_compile"]
-            if args.cross_compile != "":
+            if args.cross_compile:
                 cross_compile = args.cross_compile
 
             cross_arch = ARCH_MAPPING[arch]["linux_name"]
