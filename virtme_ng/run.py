@@ -542,11 +542,15 @@ def create_root(destdir, arch, release):
     # Use Ubuntu's cloud images to create a rootfs, these images are fairly
     # small and they provide a nice environment to test kernels.
     if release is None:
-        release = (
-            check_output("lsb_release -s -c", shell=True)
-            .decode(sys.stdout.encoding)
-            .rstrip()
-        )
+        try:
+            release = (
+                check_output("lsb_release -s -c", shell=True)
+                .decode(sys.stdout.encoding)
+                .rstrip()
+            )
+        except CalledProcessError as e:
+            print("Try specifying an Ubuntu release with --root-release")
+            raise e
     url = (
         "https://cloud-images.ubuntu.com/"
         + f"{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz"
