@@ -402,7 +402,7 @@ def get_kernel_version(img_name, path):
         return kernel_version
 
     # The version detection fails s390x using file or strings tools, so check
-    # if the file itself contins the version number.
+    # if the file itself contains the version number.
     if img_name:
         match = re.search(fr"{img_name}-(\S{{3,}})", path)
         if match:
@@ -586,7 +586,7 @@ class VirtioFS:
     def _get_virtiofsd_path(self):
         # Define the possible virtiofsd paths.
         #
-        # NOTE: do not use the C implemention of qemu's virtiofsd, because it
+        # NOTE: do not use the C implementation of qemu's virtiofsd, because it
         # doesn't support unprivileged-mode execution and it would be totally
         # unsafe to export the whole rootfs of the host running as root.
         #
