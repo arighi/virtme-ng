@@ -519,7 +519,7 @@ Additional resources
 
  - [LWN: Faster kernel testing with virtme-ng (November, 2023)](https://lwn.net/Articles/951313/)
  - [LPC 2023: Speeding up Kernel Testing and Debugging with virtme-ng](https://lpc.events/event/17/contributions/1506/attachments/1143/2441/virtme-ng.pdf)
- - [Kernel Recipies 2024: virtme-ng](https://kernel-recipes.org/en/2024/virtme-ng/)
+ - [Kernel Recipes 2024: virtme-ng](https://kernel-recipes.org/en/2024/virtme-ng/)
 
 Credits
 =======
