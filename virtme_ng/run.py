@@ -548,9 +548,11 @@ def create_root(destdir, arch, release):
                 .decode(sys.stdout.encoding)
                 .rstrip()
             )
-        except CalledProcessError as e:
-            print("Try specifying an Ubuntu release with --root-release")
-            raise e
+            if release == "n/a":
+                raise ValueError("unknown release")
+        except (CalledProcessError, ValueError):
+            print("Unknown release, try specifying an Ubuntu release with --root-release")
+            sys.exit(1)
     url = (
         "https://cloud-images.ubuntu.com/"
         + f"{release}/current/{release}-server-cloudimg-{arch}-root.tar.xz"
