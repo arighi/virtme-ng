@@ -6,6 +6,7 @@
 import argparse
 import re
 import os
+import platform
 import sys
 import socket
 import shutil
@@ -564,6 +565,20 @@ def create_root(destdir, arch, release):
     os.chdir(prevdir)
 
 
+def get_host_arch():
+    """Translate host architecture to the corresponding virtme-ng arch name."""
+    arch = platform.machine()
+    arch_map = {
+        'x86_64': 'amd64',
+        'aarch64': 'arm64',
+        'armv7l': 'armhf',
+        'ppc64le': 'ppc64el',
+        'riscv64': 'riscv64',
+        's390x': 's390x',
+    }
+    return arch_map.get(arch, None)
+
+
 class KernelSource:
     """Main class that implement actions to perform on a kernel source directory."""
 
@@ -829,7 +844,7 @@ class KernelSource:
 
     def _get_virtme_root(self, args):
         if args.root is not None:
-            create_root(args.root, args.arch or "amd64", args.root_release)
+            create_root(args.root, args.arch or get_host_arch(), args.root_release)
             self.virtme_param["root"] = f"--root {args.root}"
         else:
             self.virtme_param["root"] = ""
@@ -880,7 +895,7 @@ class KernelSource:
             # repository.
             if re.match(r'^v\d+(\.\d+)*(-rc\d+)?$', args.run):
                 if args.arch is None:
-                    arch = 'amd64'
+                    arch = get_host_arch()
                 else:
                     arch = args.arch
                 try:
