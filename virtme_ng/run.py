@@ -868,12 +868,12 @@ class KernelSource:
     def _get_virtme_rodir(self, args):
         self.virtme_param["rodir"] = ""
         for item in args.rodir:
-            self.virtme_param["rodir"] += "--rodir " + item
+            self.virtme_param["rodir"] += f"--rodir {item} "
 
     def _get_virtme_rwdir(self, args):
         self.virtme_param["rwdir"] = ""
         for item in args.rwdir:
-            self.virtme_param["rwdir"] += "--rwdir " + item
+            self.virtme_param["rwdir"] += f"--rwdir {item} "
 
     def _get_virtme_overlay_rwdir(self, args):
         # Set default overlays if rootfs is mounted in read-only mode.
