@@ -15,7 +15,7 @@ from typing import List
 
 import re
 import subprocess
-import os
+import platform
 import itertools
 from . import util
 
@@ -29,7 +29,7 @@ def resolve_dep(modalias, root=None, kver=None, moddir=None):
     args += ["-C", "/var/empty"]
     if root is not None:
         args += ["-d", root]
-    if kver is not None and kver != os.uname().release:
+    if kver is not None and kver != platform.release():
         # If booting the loaded kernel, skip -S.  This helps certain
         # buggy modprobe versions that don't support -S.
         args += ["-S", kver]

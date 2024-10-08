@@ -26,7 +26,7 @@ from pathlib import Path
 
 import argcomplete
 
-from virtme.util import SilentError, uname, get_username
+from virtme.util import SilentError, get_username
 from virtme_ng.utils import CONF_FILE, spinner_decorator
 from virtme_ng.mainline import KernelDownloader
 from virtme_ng.version import VERSION
@@ -112,7 +112,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "-r",
         action="store",
         nargs="?",
-        const=uname.release,
+        const=platform.release(),
         default=None,
         help="Run a specified kernel; "
         "--run can accept one of the following arguments: 1) nothing (in this "

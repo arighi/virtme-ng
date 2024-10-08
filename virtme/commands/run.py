@@ -11,6 +11,7 @@ import atexit
 import argparse
 import tempfile
 import os
+import platform
 import errno
 import fcntl
 import sys
@@ -29,7 +30,7 @@ from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
 from .. import resources
-from ..util import SilentError, uname, get_username, find_binary_or_raise
+from ..util import SilentError, get_username, find_binary_or_raise
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -46,7 +47,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--installed-kernel",
         action="store",
         nargs="?",
-        const=uname.release,
+        const=platform.release(),
         default=None,
         metavar="VERSION",
         help="[Deprecated] use --kimg instead.",
@@ -56,7 +57,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--kimg",
         action="store",
         nargs="?",
-        const=uname.release,
+        const=platform.release(),
         default=None,
         help="Use specified kernel image or an installed kernel version. "
         + "If no argument is specified the running kernel will be used.",
@@ -201,7 +202,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--arch",
         action="store",
         metavar="ARCHITECTURE",
-        default=uname.machine,
+        default=platform.machine(),
         help="Guest architecture",
     )
     g.add_argument(
@@ -841,7 +842,7 @@ def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)
-    is_native = args.arch == uname.machine
+    is_native = args.arch == platform.machine()
 
     qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
     qemu.probe()

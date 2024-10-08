@@ -12,8 +12,6 @@ import shutil
 import getpass
 import itertools
 
-uname = os.uname()
-
 
 class SilentError(Exception):
     pass
