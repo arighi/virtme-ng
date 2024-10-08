@@ -256,9 +256,7 @@ class Arch_aarch64(Arch):
     def __init__(self):
         Arch.__init__(self, "aarch64")
 
-        self.qemuname = "aarch64"
         self.linuxname = "arm64"
-        self.gccname = "aarch64"
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -336,9 +334,7 @@ class Arch_riscv64(Arch):
         Arch.__init__(self, "riscv64")
 
         self.defconfig_target = "defconfig"
-        self.qemuname = "riscv64"
         self.linuxname = "riscv"
-        self.gccname = "riscv64"
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -365,9 +361,7 @@ class Arch_sparc64(Arch):
         Arch.__init__(self, "sparc64")
 
         self.defconfig_target = "sparc64_defconfig"
-        self.qemuname = "sparc64"
         self.linuxname = "sparc"
-        self.gccname = "sparc64"
 
     @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):
@@ -386,9 +380,7 @@ class Arch_s390x(Arch):
     def __init__(self):
         Arch.__init__(self, "s390x")
 
-        self.qemuname = "s390x"
         self.linuxname = "s390"
-        self.gccname = "s390x"
 
     @staticmethod
     def virtio_dev_type(virtiotype):
