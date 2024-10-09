@@ -911,7 +911,7 @@ class KernelSource:
                 self.virtme_param["kdir"] = "--kdir ./"
 
     def _get_virtme_mods(self, args):
-        if args.skip_modules:
+        if args.skip_modules or platform.system() != "Linux":
             self.virtme_param["mods"] = "--mods none"
         else:
             self.virtme_param["mods"] = "--mods auto"

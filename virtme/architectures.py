@@ -253,10 +253,12 @@ class Arch_arm(Arch):
 
 
 class Arch_aarch64(Arch):
-    def __init__(self):
-        Arch.__init__(self, "aarch64")
+    def __init__(self, name):
+        Arch.__init__(self, name)
 
+        self.qemuname = "aarch64"
         self.linuxname = "arm64"
+        self.gccname = "aarch64"
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -266,7 +268,7 @@ class Arch_aarch64(Arch):
     def qemuargs(is_native, use_kvm, use_gpu):
         ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
 
-        if is_native:
+        if is_native and use_kvm:
             ret.extend(["-M", "virt,gic-version=host"])
             ret.extend(["-cpu", "host"])
         else:
@@ -422,7 +424,8 @@ ARCHES = {
         Arch_x86("x86_64"),
         Arch_x86("i386"),
         Arch_arm(),
-        Arch_aarch64(),
+        Arch_aarch64("aarch64"),
+        Arch_aarch64("arm64"),
         Arch_ppc("ppc64"),
         Arch_ppc("ppc64le"),
         Arch_riscv64(),
