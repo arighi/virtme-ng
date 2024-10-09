@@ -79,18 +79,19 @@ To install virtme-ng from source you can clone this git repository and build a
 standalone virtme-ng running the following commands:
 ```
  $ git clone --recurse-submodules https://github.com/arighi/virtme-ng.git
- $ BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt .
+ $ BUILD_VIRTME_NG_INIT=1 pip3 install .
 ```
 
 If you are in Debian/Ubuntu you may need to install the following packages to
 build virtme-ng from source properly:
 ```
- $ sudo apt install python3-pip python3-argcomplete flake8 pylint \
-   cargo rustc qemu-system-x86
+ $ sudo apt install python3-pip flake8 pylint cargo rustc qemu-system-x86
 ```
 
-In recent versions of pip3 you may need to specify `--break-system-packages` to
-properly install virtme-ng in your system from source.
+If you'd prefer to use `uv`:
+```
+ $ BUILD_VIRTME_NG_INIT=1 uv tool install .
+```
 
 * Run from source
 

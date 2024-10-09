@@ -23,12 +23,8 @@ from subprocess import (
 )
 from select import select
 from pathlib import Path
-try:
-    from argcomplete import autocomplete
-except ModuleNotFoundError:
-    def autocomplete(*args, **kwargs):
-        # pylint: disable=unused-argument
-        pass
+
+import argcomplete
 
 from virtme.util import SilentError, uname, get_username
 from virtme_ng.utils import CONF_FILE, spinner_decorator
@@ -79,6 +75,7 @@ def make_parser():
     """Main virtme-ng command line parser."""
 
     parser = argparse.ArgumentParser(
+        prog="vng",
         formatter_class=argparse.RawTextHelpFormatter,
         description="Build and run kernels inside a virtualized snapshot of your live system",
         epilog="""\
@@ -1245,7 +1242,7 @@ def dump(kern_source, args):
 
 def do_it() -> int:
     """Main body."""
-    autocomplete(_ARGPARSER)
+    argcomplete.autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
 
     kern_source = KernelSource()

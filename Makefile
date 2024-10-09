@@ -11,8 +11,8 @@ init:
 install: install_from_source
 install_from_source:
 	@echo "Version: $(GIT_DESCRIBE)"
-	BUILD_VIRTME_NG_INIT=1 pip3 install --verbose -r requirements.txt $(INSTALL_ARGS) .
+	BUILD_VIRTME_NG_INIT=1 pip3 install --verbose $(INSTALL_ARGS) .
 
 install_only_top:
 	@echo "Version: $(GIT_DESCRIBE)"
-	BUILD_VIRTME_NG_INIT=0 pip3 install --verbose -r requirements.txt $(INSTALL_ARGS) .
+	BUILD_VIRTME_NG_INIT=0 pip3 install --verbose $(INSTALL_ARGS) .
