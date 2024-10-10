@@ -6,6 +6,7 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import os
+import platform
 import re
 import shutil
 import subprocess
@@ -23,7 +24,7 @@ class Qemu:
 
         if not qemubin:
             qemubin = shutil.which("qemu-system-%s" % arch)
-            if qemubin is None and arch == os.uname().machine:
+            if qemubin is None and arch == platform.machine():
                 qemubin = shutil.which("qemu-kvm")
             if qemubin is None:
                 raise ValueError("cannot find qemu for %s" % arch)

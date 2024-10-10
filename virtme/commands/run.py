@@ -11,6 +11,7 @@ import atexit
 import argparse
 import tempfile
 import os
+import platform
 import errno
 import fcntl
 import sys
@@ -29,7 +30,7 @@ from .. import mkinitramfs
 from .. import qemu_helpers
 from .. import architectures
 from .. import resources
-from ..util import SilentError, uname, get_username, find_binary_or_raise
+from ..util import SilentError, get_username, find_binary_or_raise
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -46,7 +47,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--installed-kernel",
         action="store",
         nargs="?",
-        const=uname.release,
+        const=platform.release(),
         default=None,
         metavar="VERSION",
         help="[Deprecated] use --kimg instead.",
@@ -56,7 +57,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--kimg",
         action="store",
         nargs="?",
-        const=uname.release,
+        const=platform.release(),
         default=None,
         help="Use specified kernel image or an installed kernel version. "
         + "If no argument is specified the running kernel will be used.",
@@ -74,7 +75,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--mods",
         action="store",
         choices=["none", "use", "auto"],
-        default="use",
+        required=True,
         help="Setup loadable kernel modules inside a compiled kernel source directory "
         + "(used in conjunction with --kdir); "
         + "none: ignore kernel modules, use: asks user to refresh virtme's kernel modules directory, "
@@ -201,7 +202,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--arch",
         action="store",
         metavar="ARCHITECTURE",
-        default=uname.machine,
+        default=platform.machine(),
         help="Guest architecture",
     )
     g.add_argument(
@@ -841,7 +842,7 @@ def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)
-    is_native = args.arch == uname.machine
+    is_native = args.arch == platform.machine()
 
     qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
     qemu.probe()
@@ -888,9 +889,12 @@ def do_it() -> int:
     # Propagate /proc/sys/fs/nr_open from the host to the guest, otherwise we
     # may see some EPERM errors, because certain applications/settings may
     # expect to be able to use a higher limit of the max number of open files.
-    with open('/proc/sys/fs/nr_open', 'r', encoding="utf-8") as file:
-        nr_open = file.readline().strip()
-        kernelargs.append(f"nr_open={nr_open}")
+    try:
+        with open('/proc/sys/fs/nr_open', 'r', encoding="utf-8") as file:
+            nr_open = file.readline().strip()
+            kernelargs.append(f"nr_open={nr_open}")
+    except FileNotFoundError:
+        pass
 
     # Parse NUMA settings.
     if args.numa:
@@ -1074,8 +1078,11 @@ def do_it() -> int:
 
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)
-    if is_native and kvm_ok:
-        qemuargs.extend(["-machine", "accel=kvm:tcg"])
+    if is_native:
+        if kvm_ok:
+            qemuargs.extend(["-machine", "accel=kvm:tcg"])
+        elif platform.system() == "Darwin":
+            qemuargs.extend(["-machine", "accel=hvf"])
 
     # Add architecture-specific options
     qemuargs.extend(arch.qemuargs(is_native, kvm_ok, args.nvgpu is not None))

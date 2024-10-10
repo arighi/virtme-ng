@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import platform
 import sys
 import sysconfig
 from subprocess import check_call
@@ -38,10 +39,22 @@ class BuildPy(build_py):
         print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
         # Build virtme-ng-init
         if build_virtme_ng_init:
-            check_call(["make", "init"])
+            cwd = "virtme_ng_init"
+            root = "../virtme/guest"
+            args = ["cargo", "install", "--path", ".", "--root", root]
+            if platform.system() == "Darwin":
+                machine = platform.machine()
+                if machine == "arm64":
+                    machine = "aarch64"
+                target = f"{machine}-unknown-linux-musl"
+                args.extend([
+                    "--target", target,
+                    "--config", f"target.{target}.linker = \"rust-lld\"",
+                ])
+            check_call(args, cwd="virtme_ng_init")
             check_call(
-                ["strip", "-s", "../virtme/guest/bin/virtme-ng-init"],
-                cwd="virtme_ng_init",
+                ["strip", os.path.join(root, "bin", "virtme-ng-init")],
+                cwd=cwd,
             )
 
         # Run the rest of virtme-ng build
