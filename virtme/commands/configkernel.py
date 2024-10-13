@@ -10,12 +10,13 @@ from typing import Optional
 import sys
 import argparse
 import os
+import platform
 import shlex
 import shutil
 import subprocess
 import multiprocessing
 from .. import architectures
-from ..util import SilentError, uname
+from ..util import SilentError
 
 
 def make_parser():
@@ -27,7 +28,7 @@ def make_parser():
         "--arch",
         action="store",
         metavar="ARCHITECTURE",
-        default=uname.machine,
+        default=platform.machine(),
         help="Target architecture",
     )
 
@@ -285,6 +286,7 @@ def do_it():
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)
+    is_native = args.arch == platform.machine()
 
     custom_conf = []
     if args.custom:
@@ -325,7 +327,7 @@ def do_it():
     if args.cross_compile != "":
         cross_compile_prefix = args.cross_compile
 
-    if shutil.which(f"{cross_compile_prefix}-gcc") and arch.gccname != uname.machine:
+    if not is_native and shutil.which(f"{cross_compile_prefix}-gcc"):
         gccname = shlex.quote(f"{cross_compile_prefix}-gcc")
         archargs.append(f"CROSS_COMPILE={gccname}")
 
