@@ -91,7 +91,7 @@ setup(
     name="virtme-ng",
     version=VERSION,
     author="Andrea Righi",
-    author_email="andrea.righi@canonical.com",
+    author_email="arighi@nvidia.com",
     description="Build and run a kernel inside a virtualized snapshot of your live system",
     url="https://github.com/arighi/virtme-ng",
     license="GPLv2",

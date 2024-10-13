@@ -525,7 +525,7 @@ Additional resources
 Credits
 =======
 
-virtme-ng is written by Andrea Righi <andrea.righi@canonical.com>
+virtme-ng is written by Andrea Righi <arighi@nvidia.com>
 
 virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 ([web][korg-web] | [git][korg-git]).
