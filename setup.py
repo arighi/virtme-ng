@@ -2,9 +2,10 @@
 
 import os
 import platform
+import subprocess
 import sys
 import sysconfig
-from subprocess import check_call
+from argcomplete import shell_integration
 from build_manpages import build_manpages, get_build_py_cmd, get_install_cmd
 from setuptools import setup
 from setuptools.command.build_py import build_py
@@ -28,7 +29,7 @@ build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
 # Make sure virtme-ng-init submodule has been cloned
 if build_virtme_ng_init and not os.path.exists("virtme_ng_init/Cargo.toml"):
     sys.stderr.write("WARNING: virtme-ng-init submodule not available, trying to clone it\n")
-    check_call("git submodule update --init --recursive", shell=True)
+    subprocess.check_call("git submodule update --init --recursive", shell=True)
 
 # Always include standard site-packages to PYTHONPATH
 os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
@@ -51,11 +52,17 @@ class BuildPy(build_py):
                     "--target", target,
                     "--config", f"target.{target}.linker = \"rust-lld\"",
                 ])
-            check_call(args, cwd="virtme_ng_init")
-            check_call(
+            subprocess.check_call(args, cwd="virtme_ng_init")
+            subprocess.check_call(
                 ["strip", os.path.join(root, "bin", "virtme-ng-init")],
                 cwd=cwd,
             )
+
+        # Generate bash autocompletion scripts
+        with open("virtme-ng-prompt", "w", encoding="utf-8") as f:
+            f.write(shell_integration.shellcode(["virtme-ng"]))
+        with open("vng-prompt", "w", encoding="utf-8") as f:
+            f.write(shell_integration.shellcode(["vng"]))
 
         # Run the rest of virtme-ng build
         build_py.run(self)
@@ -98,6 +105,8 @@ if build_virtme_ng_init:
 
 data_files = [
     ("/etc", ["cfg/virtme-ng.conf"]),
+    ("/usr/share/bash-completion/completions", ["virtme-ng-prompt", "vng-prompt"]),
+    ("/usr/share/man/man1", ["man/vng.1"]),
 ]
 
 setup(
@@ -137,6 +146,7 @@ setup(
     },
     packages=packages,
     package_data={"virtme.guest": package_files},
+    data_files=data_files,
     scripts=[
         "bin/virtme-prep-kdir-mods",
     ],
