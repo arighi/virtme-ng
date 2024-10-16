@@ -4,9 +4,10 @@ import os
 import platform
 import sys
 import sysconfig
-from subprocess import check_call
-from build_manpages import build_manpages, get_build_py_cmd, get_install_cmd
-from setuptools import setup
+from glob import glob
+from shutil import which
+from subprocess import check_call, CalledProcessError
+from setuptools import setup, Command
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
 from virtme_ng.version import get_version_string
@@ -34,6 +35,56 @@ if build_virtme_ng_init and not os.path.exists("virtme_ng_init/Cargo.toml"):
 os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
 
 
+def is_arm_32bit():
+    arch = platform.machine()
+    return arch.startswith("arm") and platform.architecture()[0] == "32bit"
+
+
+def parse_requirements(filename):
+    with open(filename, 'r', encoding="utf-8") as file:
+        lines = file.readlines()
+    return [line.strip() for line in lines if line.strip() and not line.startswith('#')]
+
+
+class LintCommand(Command):
+    description = "Run coding style checks"
+    user_options = []
+
+    def initialize_options(self):
+        pass
+
+    def finalize_options(self):
+        pass
+
+    def run(self):
+        try:
+            for cmd in ("flake8", "pylint"):
+                command = [cmd]
+                for pattern in (
+                    "vng",
+                    "*.py",
+                    "virtme/*.py",
+                    "virtme/*/*.py",
+                    "virtme_ng/*.py",
+                ):
+                    command += glob(pattern)
+                check_call(command)
+        except CalledProcessError:
+            sys.exit(1)
+
+
+man_command = f"""
+argparse-manpage \
+  --pyfile ./virtme_ng/run.py --function make_parser \
+  --prog vng --version v{VERSION} \
+  --author "virtme-ng is written by Andrea Righi <arighi@nvidia.com>" \
+  --author "Based on virtme by Andy Lutomirski <luto@kernel.org>" \
+  --project-name virtme-ng --manual-title virtme-ng \
+  --description "Quickly run kernels inside a virtualized snapshot of your live system" \
+  --url https://github.com/arighi/virtme-ng > vng.1
+"""
+
+
 class BuildPy(build_py):
     def run(self):
         print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
@@ -56,6 +107,23 @@ class BuildPy(build_py):
                 ["strip", os.path.join(root, "bin", "virtme-ng-init")],
                 cwd=cwd,
             )
+        # Generate manpage
+        if which('argparse-manpage'):
+            env = os.environ.copy()
+            env["PYTHONPATH"] = os.path.dirname(os.path.abspath(__file__))
+            check_call(man_command, shell=True, env=env)
+
+        # Generate bash autocompletion scripts
+        completion_command = ''
+        if which("register-python-argcomplete"):
+            completion_command = "register-python-argcomplete"
+        elif which("register-python-argcomplete3"):
+            completion_command = "register-python-argcomplete3"
+        else:
+            print("ERROR: 'register-python-argcomplete' or 'register-python-argcomplete3' not found.")
+            sys.exit(1)
+        check_call(completion_command + ' virtme-ng > virtme-ng-prompt', shell=True)
+        check_call(completion_command + ' vng > vng-prompt', shell=True)
 
         # Run the rest of virtme-ng build
         build_py.run(self)
@@ -98,7 +166,12 @@ if build_virtme_ng_init:
 
 data_files = [
     ("/etc", ["cfg/virtme-ng.conf"]),
+    ("/usr/share/bash-completion/completions", ["virtme-ng-prompt"]),
+    ("/usr/share/bash-completion/completions", ["vng-prompt"]),
 ]
+
+if which('argparse-manpage'):
+    data_files.append(("/usr/share/man/man1", ["vng.1"]))
 
 setup(
     name="virtme-ng",
@@ -106,20 +179,13 @@ setup(
     author="Andrea Righi",
     author_email="arighi@nvidia.com",
     description="Build and run a kernel inside a virtualized snapshot of your live system",
-    url="https://github.com/arighi/virtme-ng",
+    url="https://git.launchpad.net/~arighi/+git/virtme-ng",
     license="GPLv2",
     long_description=open(
         os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="utf-8"
     ).read(),
     long_description_content_type="text/markdown",
-    install_requires=[
-        'argcomplete',
-        'requests',
-        # `pkg_resources` is removed in python 3.12, moved to setuptools.
-        #
-        # TODO: replace pkg_resources with importlib. # pylint: disable=fixme
-        'setuptools',
-    ],
+    install_requires=parse_requirements('requirements.txt'),
     entry_points={
         "console_scripts": [
             "vng = virtme_ng.run:main",
@@ -130,13 +196,13 @@ setup(
         ]
     },
     cmdclass={
-        "build_manpages": build_manpages,
-        "build_py": get_build_py_cmd(BuildPy),
-        "install": get_install_cmd(),
+        "build_py": BuildPy,
         "egg_info": EggInfo,
+        "lint": LintCommand,
     },
     packages=packages,
     package_data={"virtme.guest": package_files},
+    data_files=data_files,
     scripts=[
         "bin/virtme-prep-kdir-mods",
     ],

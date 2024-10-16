@@ -1,0 +1,5 @@
+argcomplete
+argparse-manpage
+requests
+setuptools
+
