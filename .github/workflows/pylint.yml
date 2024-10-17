@@ -11,17 +11,26 @@ jobs:
       matrix:
         python-version: ["3.8", "3.9", "3.10"]
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
     - name: Set up Python ${{ matrix.python-version }}
-      uses: actions/setup-python@v3
+      uses: actions/setup-python@v5
       with:
         python-version: ${{ matrix.python-version }}
     - name: Install dependencies
       run: |
+        set -euxo pipefail
+
         python -m pip install --upgrade pip
-        pip install -r requirements.txt
-        pip install pylint
-        pip install flake8
+
+        # Both build and runtime deps. This is the price of using pip.
+        pip install 'argparse-manpage[setuptools]' argcomplete requests
+
+        pip install  pylint flake8
     - name: Analysing the code with pylint
       run: |
-        python setup.py lint
+        set -euxo pipefail
+
+        pylint vng '**/*.py'
+
+        flake8 vng
+        find . -name '*.py' | xargs flake8

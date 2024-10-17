@@ -1,0 +1,22 @@
+[build-system]
+requires = [
+  "argparse-manpage[setuptools]",
+  "setuptools",
+
+  # Runtime dependencies, needed to generate manpages.
+  "argcomplete",
+  "requests",
+]
+
+[tool.build_manpages]
+manpages = [
+  """\
+  man/vng.1\
+  :pyfile=virtme_ng/run.py\
+  :function=make_parser\
+  :author=virtme-ng is written by Andrea Righi <arighi@nvidia.com>\
+  :author=Based on virtme by Andy Lutomirski <luto@kernel.org>\
+  :manual_title=virtme-ng\
+  :description=Quickly run kernels inside a virtualized snapshot of your live system\
+  """,
+]
