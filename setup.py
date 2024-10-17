@@ -77,7 +77,7 @@ man_command = f"""
 argparse-manpage \
   --pyfile ./virtme_ng/run.py --function make_parser \
   --prog vng --version v{VERSION} \
-  --author "virtme-ng is written by Andrea Righi <andrea.righi@canonical.com>" \
+  --author "virtme-ng is written by Andrea Righi <arighi@nvidia.com>" \
   --author "Based on virtme by Andy Lutomirski <luto@kernel.org>" \
   --project-name virtme-ng --manual-title virtme-ng \
   --description "Quickly run kernels inside a virtualized snapshot of your live system" \
