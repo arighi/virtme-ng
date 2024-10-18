@@ -6,7 +6,10 @@ import subprocess
 import sys
 import sysconfig
 from argcomplete import shell_integration
-from build_manpages import build_manpages, get_build_py_cmd, get_install_cmd
+try:
+    from build_manpages import build_manpages, get_build_py_cmd, get_install_cmd
+except ModuleNotFoundError:
+    build_manpages = None
 from setuptools import setup
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
@@ -106,8 +109,18 @@ if build_virtme_ng_init:
 data_files = [
     ("/etc", ["cfg/virtme-ng.conf"]),
     ("/usr/share/bash-completion/completions", ["virtme-ng-prompt", "vng-prompt"]),
-    ("/usr/share/man/man1", ["man/vng.1"]),
 ]
+if build_manpages:
+    data_files.append(("/usr/share/man/man1", ["man/vng.1"]))
+
+cmdclass = {
+        "egg_info": EggInfo,
+        "build_py": BuildPy,
+    }
+if build_manpages:
+    cmdclass["build_manpages"] = build_manpages
+    cmdclass["build_py"] = get_build_py_cmd(BuildPy)
+    cmdclass["install"] = get_install_cmd()
 
 setup(
     name="virtme-ng",
@@ -138,12 +151,7 @@ setup(
             "virtme-mkinitramfs = virtme.commands.mkinitramfs:main",
         ]
     },
-    cmdclass={
-        "build_manpages": build_manpages,
-        "build_py": get_build_py_cmd(BuildPy),
-        "install": get_install_cmd(),
-        "egg_info": EggInfo,
-    },
+    cmdclass=cmdclass,
     packages=packages,
     package_data={"virtme.guest": package_files},
     data_files=data_files,
