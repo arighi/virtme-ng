@@ -342,6 +342,14 @@ fn generate_sudoers() -> io::Result<()> {
     Ok(())
 }
 
+// The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
+// run on rootless users just create a dummy directory and bind mount it in the same place.
+fn generate_lvm() -> io::Result<()> {
+    utils::do_mkdir("/run/tmp/lvm");
+    utils::do_mount("/run/tmp/lvm", "/etc/lvm/", "", libc::MS_BIND as usize, "");
+    Ok(())
+}
+
 fn generate_hosts() -> io::Result<()> {
     if let Ok(hostname) = env::var("virtme_hostname") {
         std::fs::copy("/etc/hosts", "/run/tmp/hosts")?;
@@ -366,6 +374,7 @@ fn override_system_files() {
     generate_shadow().ok();
     generate_sudoers().ok();
     generate_hosts().ok();
+    generate_lvm().ok();
 }
 
 fn set_cwd() {
