@@ -125,6 +125,11 @@ fi
 sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /run/tmp/shadow
 mount --bind /run/tmp/shadow /etc/shadow &
 
+# The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
+# run on rootless users just create a dummy directory and bind mount it in the same place.
+mkdir /run/tmp/lvm
+mount --bind /run/tmp/lvm /etc/lvm
+
 # Find udevd
 if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
     udevd=/usr/lib/systemd/systemd-udevd
