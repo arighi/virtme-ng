@@ -351,7 +351,7 @@ Examples
    # apt update
    # echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
    # apt install --yes git qemu-kvm udev iproute2 busybox-static \
-     coreutils python3-requests libvirt-clients kbd kmod file rsync zstd virtiofsd
+     coreutils python3-requests python3-argcomplete libvirt-clients kbd kmod file rsync zstd virtiofsd
    # git clone --recursive https://github.com/arighi/virtme-ng.git
    # ./virtme-ng/vng -r v6.6 -- uname -r
    6.6.0-060600-generic
