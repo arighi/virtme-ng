@@ -673,10 +673,15 @@ fn get_network_handle(
     }));
 }
 
-fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
-    let mut vec = Vec::new();
+fn setup_network_lo() -> Option<thread::JoinHandle<()>> {
+    return Some(thread::spawn(move || {
+        utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
+    }));
+}
 
-    utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
+fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
+    let mut vec = vec![setup_network_lo()];
+
     let cmdline = std::fs::read_to_string("/proc/cmdline").unwrap();
     if cmdline.contains("virtme.dhcp") {
         if let Some(guest_tools_dir) = get_guest_tools_dir() {
