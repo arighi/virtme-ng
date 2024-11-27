@@ -203,11 +203,13 @@ fn poweroff() {
     unsafe {
         libc::sync();
     }
-    if let Err(err) = reboot::reboot(reboot::RebootMode::RB_POWER_OFF) {
-        log!("error powering off: {}", err);
-        exit(1);
+    match reboot::reboot(reboot::RebootMode::RB_POWER_OFF) {
+        Ok(_) => exit(0),
+        Err(err) => {
+            log!("error powering off: {}", err);
+            exit(1);
+        }
     }
-    exit(0);
 }
 
 fn configure_environment() {
