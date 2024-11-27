@@ -121,8 +121,7 @@ def make_parser() -> argparse.ArgumentParser:
         action="append",
         const="user",
         nargs="?",
-        choices=["user", "bridge", "loop"],
-        help="Enable basic network access.",
+        help="Enable basic network access: user, bridge(=<br>), loop.",
     )
     g.add_argument(
         "--balloon",
@@ -1338,8 +1337,12 @@ def do_it() -> int:
             if net == "user":
                 qemuargs.extend(["-netdev", "user,id=n%d" % index])
                 extend_dhcp = True
-            elif net == "bridge":
-                qemuargs.extend(["-netdev", "bridge,id=n%d,br=virbr0" % index])
+            elif net == "bridge" or net.startswith("bridge="):
+                if len(net) > 7 and net[6] == '=':
+                    bridge = net[7:]
+                else:
+                    bridge = "virbr0"
+                qemuargs.extend(["-netdev", "bridge,id=n%d,br=%s" % (index, bridge)])
                 extend_dhcp = True
             elif net == "loop":
                 hubid = index
@@ -1348,7 +1351,7 @@ def do_it() -> int:
                 qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
                 qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
             else:
-                assert False
+                arg_fail("--net: invalid choice: '%s' (choose from user, bridge(=<br>), loop)" % net)
             index += 1
         if extend_dhcp:
             kernelargs.extend(["virtme.dhcp"])

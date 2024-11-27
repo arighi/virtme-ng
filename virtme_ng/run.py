@@ -349,8 +349,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--network",
         "-n",
         action="append",
-        choices=['user', 'bridge', 'loop'],
-        help="Enable network access",
+        help="Enable network access: user, bridge(=<br>), loop",
     )
 
     parser.add_argument(
