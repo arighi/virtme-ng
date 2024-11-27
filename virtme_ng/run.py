@@ -353,6 +353,13 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--net-mac-address",
+        action="store",
+        help="The MAC address to assign to the NIC interface, e.g. 52:54:00:12:34:56. "
+        + "The last octet will be incremented for the next network devices.",
+    )
+
+    parser.add_argument(
         "--disk",
         "-D",
         action="append",
@@ -934,6 +941,12 @@ class KernelSource:
         else:
             self.virtme_param["network"] = ""
 
+    def _get_virtme_net_mac_address(self, args):
+        if args.net_mac_address is not None:
+            self.virtme_param["net_mac_address"] = "--net-mac-address " + args.net_mac_address
+        else:
+            self.virtme_param["net_mac_address"] = ""
+
     def _get_virtme_disk(self, args):
         if args.disk is not None:
             disk_str = ""
@@ -1088,6 +1101,7 @@ class KernelSource:
         self._get_virtme_no_virtme_ng_init(args)
         self._get_virtme_mods(args)
         self._get_virtme_network(args)
+        self._get_virtme_net_mac_address(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_disable_microvm(args)
@@ -1126,6 +1140,7 @@ class KernelSource:
             + f'{self.virtme_param["no_virtme_ng_init"]} '
             + f'{self.virtme_param["mods"]} '
             + f'{self.virtme_param["network"]} '
+            + f'{self.virtme_param["net_mac_address"]} '
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
             + f'{self.virtme_param["disable_microvm"]} '
