@@ -203,11 +203,13 @@ fn poweroff() {
     unsafe {
         libc::sync();
     }
-    if let Err(err) = reboot::reboot(reboot::RebootMode::RB_POWER_OFF) {
-        log!("error powering off: {}", err);
-        exit(1);
+    match reboot::reboot(reboot::RebootMode::RB_POWER_OFF) {
+        Ok(_) => exit(0),
+        Err(err) => {
+            log!("error powering off: {}", err);
+            exit(1);
+        }
     }
-    exit(0);
 }
 
 fn configure_environment() {
@@ -616,7 +618,9 @@ fn get_guest_tools_dir() -> Option<String> {
     )
 }
 
-fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String> {
+fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<Option<String>> {
+    let mut vec = Vec::new();
+
     // .flatten() ignores lines with reading errors
     for entry in entries.flatten() {
         let path = entry.path();
@@ -626,20 +630,21 @@ fn _get_network_device_from_entries(entries: std::fs::ReadDir) -> Option<String>
         if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
             // .flatten() ignores lines with reading errors
             if let Some(entry) = net_entries.flatten().next() {
-                let path = entry.path().file_name()?.to_string_lossy().to_string();
-                return Some(path);
+                if let Some(fname) = entry.path().file_name() {
+                    vec.push(Some(fname.to_string_lossy().to_string()));
+                }
             }
         }
     }
-    None
+    vec
 }
 
-fn get_network_device() -> Option<String> {
+fn get_network_devices() -> Vec<Option<String>> {
     let virtio_net_dir = "/sys/bus/virtio/drivers/virtio_net";
     loop {
         match std::fs::read_dir(virtio_net_dir) {
             Ok(entries) => {
-                return _get_network_device_from_entries(entries);
+                return _get_network_devices_from_entries(entries);
             }
             Err(_) => {
                 // Wait a bit to make sure virtio-net is properly registered in the system.
@@ -649,31 +654,48 @@ fn get_network_device() -> Option<String> {
     }
 }
 
-fn setup_network() -> Option<thread::JoinHandle<()>> {
-    utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
-    let cmdline = std::fs::read_to_string("/proc/cmdline").ok()?;
+fn get_network_handle(
+    network_dev: Option<String>,
+    guest_tools_dir: Option<String>,
+) -> Option<thread::JoinHandle<()>> {
+    let network_dev_str = network_dev.unwrap();
+    log!("setting up network device {}", network_dev_str);
+    return Some(thread::spawn(move || {
+        let args = [
+            "udhcpc",
+            "-i",
+            &network_dev_str,
+            "-n",
+            "-q",
+            "-f",
+            "-s",
+            &format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap()),
+        ];
+        utils::run_cmd("busybox", &args);
+    }));
+}
+
+fn setup_network_lo() -> Option<thread::JoinHandle<()>> {
+    return Some(thread::spawn(move || {
+        utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
+    }));
+}
+
+fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
+    let mut vec = vec![setup_network_lo()];
+
+    let cmdline = std::fs::read_to_string("/proc/cmdline").unwrap();
     if cmdline.contains("virtme.dhcp") {
         if let Some(guest_tools_dir) = get_guest_tools_dir() {
-            if let Some(network_dev) = get_network_device() {
-                log!("setting up network device {}", network_dev);
-                let handle = thread::spawn(move || {
-                    let args = [
-                        "udhcpc",
-                        "-i",
-                        &network_dev,
-                        "-n",
-                        "-q",
-                        "-f",
-                        "-s",
-                        &format!("{}/virtme-udhcpc-script", guest_tools_dir),
-                    ];
-                    utils::run_cmd("busybox", &args);
-                });
-                return Some(handle);
-            }
+            get_network_devices().into_iter().for_each(|network_dev| {
+                vec.push(get_network_handle(
+                    network_dev,
+                    Some(guest_tools_dir.to_owned()),
+                ));
+            });
         }
     }
-    None
+    vec
 }
 
 fn extract_user_script(virtme_script: &str) -> Option<String> {
@@ -1040,7 +1062,8 @@ fn main() {
     run_systemd_tmpfiles();
 
     // Service initialization (some services can be parallelized here).
-    let handles = vec![run_udevd(), setup_network(), Some(run_misc_services())];
+    let mut handles = vec![run_udevd(), Some(run_misc_services())];
+    handles.append(&mut setup_network());
 
     // Wait for the completion of the detached services.
     for handle in handles.into_iter().flatten() {
