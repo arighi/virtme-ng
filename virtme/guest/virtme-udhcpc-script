@@ -10,7 +10,9 @@ if [[ "$1" == "deconfig" ]]; then
     ip addr flush dev "$interface"
 elif [[ "$1" == "bound" ]]; then
     ip addr add "$ip/$mask" dev "$interface"
-    ip route add default via "$router" dev "$interface"
+    if [[ -n "$router" ]]; then
+        ip route add default via "$router" dev "$interface"
+    fi
     if [[ -n "$dns" ]]; then
 	# A lot of systems will have /etc/resolv.conf symlinked to
 	# /run/NetworkManager/something_or_other. Debian symlinks to /run/resolvconf.
