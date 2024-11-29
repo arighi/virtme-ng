@@ -1023,6 +1023,28 @@ fn run_snapd() {
     }
 }
 
+fn extract_vsock_exec(cmdline: &str) -> Option<String> {
+    let start_marker = "virtme.vsockexec=`";
+    let end_marker = '`';
+
+    let (_before, remaining) = cmdline.split_once(start_marker)?;
+    let (encoded_cmd, _after) = remaining.split_once(end_marker)?;
+    Some(encoded_cmd.to_string())
+}
+
+fn setup_socat_console() {
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
+        if let Some(exec) = extract_vsock_exec(&cmdline) {
+            thread::spawn(move || {
+                let from = "VSOCK-LISTEN:1024,reuseaddr,fork";
+                let to = format!("EXEC:\"{}\",pty,stderr,setsid,sigint,sane,echo=0", exec);
+                let args = vec![from, &to];
+                utils::run_cmd("socat", &args);
+            });
+        }
+    }
+}
+
 fn run_misc_services() -> thread::JoinHandle<()> {
     thread::spawn(|| {
         symlink_fds();
@@ -1060,6 +1082,9 @@ fn main() {
     mount_sys_filesystems();
     mount_kernel_modules();
     run_systemd_tmpfiles();
+
+    // Service running in the background for later
+    setup_socat_console();
 
     // Service initialization (some services can be parallelized here).
     let mut handles = vec![run_udevd(), Some(run_misc_services())];
