@@ -124,6 +124,13 @@ def make_parser() -> argparse.ArgumentParser:
         help="Enable basic network access: user, bridge(=<br>), loop.",
     )
     g.add_argument(
+        "--net-mac-address",
+        action="store",
+        default=None,
+        help="The MAC address to assign to the NIC interface, e.g. 52:54:00:12:34:56. "
+        + "The last octet will be incremented for the next network devices.",
+    )
+    g.add_argument(
         "--balloon",
         action="store_true",
         help="Allow the host to ask the guest to release memory.",
@@ -1329,11 +1336,23 @@ def do_it() -> int:
         if video_args:
             qemuargs.extend(video_args)
 
+    def get_net_mac(index):
+        if args.net_mac_address is None:
+            return ""
+
+        mac = args.net_mac_address.split(':')
+        try:
+            mac[5] = "%02x" % ((int(mac[5], 16) + index) % 256)
+        except (ValueError, IndexError):
+            arg_fail("--net-mac-address: invalid MAC address: '%s'" % args.net_mac_address)
+        return ",mac=" + ":".join(mac)
+
     if args.net:
         extend_dhcp = False
         index = 0
         for net in args.net:
-            qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
+            qemuargs.extend(["-device", "%s,netdev=n%d%s" %
+                            (arch.virtio_dev_type("net"), index, get_net_mac(index))])
             if net == "user":
                 qemuargs.extend(["-netdev", "user,id=n%d" % index])
                 extend_dhcp = True
@@ -1348,7 +1367,8 @@ def do_it() -> int:
                 hubid = index
                 qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
                 index += 1
-                qemuargs.extend(["-device", "%s,netdev=n%d" % (arch.virtio_dev_type("net"), index)])
+                qemuargs.extend(["-device", "%s,netdev=n%d%s" %
+                                (arch.virtio_dev_type("net"), index, get_net_mac(index))])
                 qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
             else:
                 arg_fail("--net: invalid choice: '%s' (choose from user, bridge(=<br>), loop)" % net)
