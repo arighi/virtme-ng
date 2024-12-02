@@ -354,24 +354,6 @@ Examples
    $ vng --vsock-connect
 ```
 
- - Connect to a remote shell with proper dimensions, env vars, and using 'Fish':
-```
-   # Start the vng instance with vsock support:
-   $ vng --vsock "${PWD}/console.sh"
-
-   # In a separate terminal run the following commands:
-   $ read -r rows columns <<< "$(stty size)"
-   $ cat <<-EOF > console.sh
-         #! /bin/bash
-         stty rows ${rows} columns ${columns}
-         cd "\${virtme_chdir}"
-         HOME=${HOME}
-         fish  # use use zsh, tmux, byobu, screen, etc.
-     EOF
-   $ chmod +x console.sh
-   $ vng --vsock-connect
-```
-
  - Run virtme-ng inside a docker container:
 ```
    $ docker run -it --privileged ubuntu:23.10 /bin/bash

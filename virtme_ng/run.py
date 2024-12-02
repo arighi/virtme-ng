@@ -362,15 +362,17 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--vsock",
         action="store",
-        const="bash -i",
         nargs="?",
+        metavar="COMMAND",
+        const="",
         help="Enable a VSock to communicate from the host to the device. "
-        + "An argument can be optionally specified to start a different shell.",
+        + "An argument can be optionally specified to start a different command.",
     )
 
     parser.add_argument(
         "--vsock-cid",
         action="store",
+        metavar="CID",
         type=int,
         help="CID for the VSock.",
     )
