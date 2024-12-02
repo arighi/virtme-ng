@@ -149,8 +149,12 @@ def make_parser() -> argparse.ArgumentParser:
     )
     g.add_argument(
         "--vsock-connect",
-        action="store_true",
-        help="Connect to a VM using VSock.",
+        action="store",
+        nargs="?",
+        metavar="COMMAND",
+        const="",
+        help="Connect to a VM using VSock. "
+        + "An argument can be optionally specified to launch this command instead of a prompt.",
     )
     g.add_argument(
         "--balloon",
@@ -872,13 +876,13 @@ def do_it() -> int:
     vsock_script_path = os.path.join(tempfile.gettempdir(), "virtme-vsock",
                                      f"{args.vsock_cid}.sh")
 
-    if args.vsock_connect:
-        # Note: we could accept arguments passed to --vsock-connect to run a
-        # specific command, and return, without requiring an interactive tty.
+    if args.vsock_connect is not None:
         try:
             (cols, rows) = os.get_terminal_size()
         except OSError:
             cols, rows = (80, 24)
+
+        cmd = args.vsock_connect if args.vsock_connect else 'su ${virtme_user:-root}'
 
         with open(vsock_script_path, 'w', encoding="utf-8") as file:
             print((
@@ -886,7 +890,7 @@ def do_it() -> int:
                 f'stty rows {rows} cols {cols} iutf8 echo\n'
                 'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
                 'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
-                'exec su ${virtme_user:-root}'
+                f'exec {cmd}'
             ), file=file)
         os.chmod(vsock_script_path, 0o755)
 
