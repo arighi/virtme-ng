@@ -1036,6 +1036,19 @@ fn setup_socat_console() {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if let Some(exec) = extract_vsock_exec(&cmdline) {
             thread::spawn(move || {
+                log!("setting up vsock proxy executing {}", exec);
+                let key = "virtme_vsockmount";
+                if let Ok(path) = env::var(&key) {
+                    utils::do_mkdir(&path);
+                    utils::do_mount(
+                        &key.replace('_', "."),
+                        &path,
+                        "9p",
+                        0,
+                        "version=9p2000.L,trans=virtio,access=any",
+                    );
+                }
+
                 let from = "VSOCK-LISTEN:1024,reuseaddr,fork";
                 let to = format!("EXEC:\"{}\",pty,stderr,setsid,sigint,sane,echo=0", exec);
                 let args = vec![from, &to];
