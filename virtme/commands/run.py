@@ -887,10 +887,13 @@ def do_it() -> int:
         with open(vsock_script_path, 'w', encoding="utf-8") as file:
             print((
                 '#! /bin/bash\n'
+                'main() {\n'
                 f'stty rows {rows} cols {cols} iutf8 echo\n'
                 'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
                 'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
-                f'exec {cmd}'
+                f'exec {cmd}\n'
+                '}\n'
+                'main'  # use a function to avoid issues when the script is modified
             ), file=file)
         os.chmod(vsock_script_path, 0o755)
 
