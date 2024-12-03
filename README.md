@@ -345,6 +345,33 @@ Examples
    # vmlinux available in the system.
 ```
 
+ - Connect to a simple remote shell:
+```
+   # Start the vng instance with vsock support:
+   $ vng --vsock
+
+   # In a separate terminal run the following command to connect to a remote shell:
+   $ vng --vsock-connect
+```
+
+ - Connect to a remote shell with proper dimensions, env vars, and using 'Fish':
+```
+   # Start the vng instance with vsock support:
+   $ vng --vsock "${PWD}/console.sh"
+
+   # In a separate terminal run the following commands:
+   $ read -r rows columns <<< "$(stty size)"
+   $ cat <<-EOF > console.sh
+         #! /bin/bash
+         stty rows ${rows} columns ${columns}
+         cd "\${virtme_chdir}"
+         HOME=${HOME}
+         fish  # use use zsh, tmux, byobu, screen, etc.
+     EOF
+   $ chmod +x console.sh
+   $ vng --vsock-connect
+```
+
  - Run virtme-ng inside a docker container:
 ```
    $ docker run -it --privileged ubuntu:23.10 /bin/bash
@@ -449,7 +476,7 @@ Troubleshooting
   $ groups | grep "kvm\|libvirt"
 ```
 
- - When using `--net bridge` to create a bridged network in the guest you
+ - When using `--network bridge` to create a bridged network in the guest you
    may get the following error:
 ```
   ...

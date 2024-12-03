@@ -159,6 +159,9 @@ _GENERIC_CONFIG = [
     "CONFIG_ZONE_DEVICE=y",
     "CONFIG_FUSE_FS=y",
     "CONFIG_VIRTIO_FS=y",
+    "##: vsock support",
+    "CONFIG_VSOCKETS=y",
+    "CONFIG_VIRTIO_VSOCKETS=y",
 ]
 
 _GENERIC_CONFIG_OPTIONAL = [

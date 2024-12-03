@@ -275,6 +275,12 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
     fi
 fi
 
+vsock_exec=$(sed -ne "s/.*virtme.vsockexec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
+if [[ -n "${vsock_exec}" ]]; then
+    socat "VSOCK-LISTEN:1024,reuseaddr,fork" \
+          "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &
+fi
+
 user_cmd=$(sed -ne "s/.*virtme.exec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
 if [[ -n "${user_cmd}" ]]; then
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||

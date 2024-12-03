@@ -131,6 +131,25 @@ def make_parser() -> argparse.ArgumentParser:
         + "The last octet will be incremented for the next network devices.",
     )
     g.add_argument(
+        "--vsock",
+        action="store",
+        default=None,
+        help="Enable a VSock to communicate from the host to the device and "
+        + "execute the specified command.",
+    )
+    g.add_argument(
+        "--vsock-cid",
+        action="store",
+        type=int,
+        default=3,
+        help="CID for the VSock.",
+    )
+    g.add_argument(
+        "--vsock-connect",
+        action="store_true",
+        help="Connect to a VM using VSock.",
+    )
+    g.add_argument(
         "--balloon",
         action="store_true",
         help="Allow the host to ask the guest to release memory.",
@@ -847,6 +866,13 @@ _RWDIR_RE = re.compile("^(%s)(?:=(%s))?$" % (_SAFE_PATH_PATTERN, _SAFE_PATH_PATT
 def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
+    if args.vsock_connect:
+        tty = os.ttyname(sys.stdin.fileno())
+        command = ['socat', f'file:{tty},raw,echo=0',
+                   f'VSOCK-CONNECT:{args.vsock_cid}:1024']
+        os.execvp('socat', command)
+        sys.exit(0)
+
     arch = architectures.get(args.arch)
     is_native = args.arch == platform.machine()
 
@@ -1382,6 +1408,10 @@ def do_it() -> int:
                 "biosdevname=0",
             ]
         )
+
+    if args.vsock:
+        kernelargs.extend([f"virtme.vsockexec=`{args.vsock}`"])
+        qemuargs.extend(["-device", "vhost-vsock-pci,guest-cid=%d" % args.vsock_cid])
 
     if args.pwd:
         rel_pwd = os.path.relpath(os.getcwd(), args.root)

@@ -360,6 +360,28 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--vsock",
+        action="store",
+        const="bash -i",
+        nargs="?",
+        help="Enable a VSock to communicate from the host to the device. "
+        + "An argument can be optionally specified to start a different shell.",
+    )
+
+    parser.add_argument(
+        "--vsock-cid",
+        action="store",
+        type=int,
+        help="CID for the VSock.",
+    )
+
+    parser.add_argument(
+        "--vsock-connect",
+        action="store_true",
+        help="Connect to a VM using VSock.",
+    )
+
+    parser.add_argument(
         "--disk",
         "-D",
         action="append",
@@ -947,6 +969,24 @@ class KernelSource:
         else:
             self.virtme_param["net_mac_address"] = ""
 
+    def _get_virtme_vsock(self, args):
+        if args.vsock is not None:
+            self.virtme_param["vsock"] = "--vsock '" + args.vsock + "'"
+        else:
+            self.virtme_param["vsock"] = ""
+
+    def _get_virtme_vsock_cid(self, args):
+        if args.vsock_cid is not None:
+            self.virtme_param["vsock_cid"] = "--vsock-cid " + str(args.vsock_cid)
+        else:
+            self.virtme_param["vsock_cid"] = ""
+
+    def _get_virtme_vsock_connect(self, args):
+        if args.vsock_connect:
+            self.virtme_param["vsock_connect"] = "--vsock-connect"
+        else:
+            self.virtme_param["vsock_connect"] = ""
+
     def _get_virtme_disk(self, args):
         if args.disk is not None:
             disk_str = ""
@@ -1102,6 +1142,9 @@ class KernelSource:
         self._get_virtme_mods(args)
         self._get_virtme_network(args)
         self._get_virtme_net_mac_address(args)
+        self._get_virtme_vsock(args)
+        self._get_virtme_vsock_cid(args)
+        self._get_virtme_vsock_connect(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_disable_microvm(args)
@@ -1141,6 +1184,9 @@ class KernelSource:
             + f'{self.virtme_param["mods"]} '
             + f'{self.virtme_param["network"]} '
             + f'{self.virtme_param["net_mac_address"]} '
+            + f'{self.virtme_param["vsock"]} '
+            + f'{self.virtme_param["vsock_cid"]} '
+            + f'{self.virtme_param["vsock_connect"]} '
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
             + f'{self.virtme_param["disable_microvm"]} '
