@@ -277,6 +277,10 @@ fi
 
 vsock_exec=$(sed -ne "s/.*virtme.vsockexec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
 if [[ -n "${vsock_exec}" ]]; then
+    if [[ -n "${virtme_vsockmount}" ]]; then
+        mkdir -p "${virtme_vsockmount}"
+        mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.vsockmount" "${virtme_vsockmount}"
+    fi
     socat "VSOCK-LISTEN:1024,reuseaddr,fork" \
           "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &
 fi

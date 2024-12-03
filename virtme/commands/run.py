@@ -133,21 +133,28 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument(
         "--vsock",
         action="store",
-        default=None,
-        help="Enable a VSock to communicate from the host to the device and "
-        + "execute the specified command.",
+        nargs="?",
+        metavar="COMMAND",
+        const="",
+        help="Enable a VSock to communicate from the host to the device. "
+        + "An argument can be optionally specified to start a different command.",
     )
     g.add_argument(
         "--vsock-cid",
         action="store",
+        metavar="CID",
         type=int,
         default=3,
         help="CID for the VSock.",
     )
     g.add_argument(
         "--vsock-connect",
-        action="store_true",
-        help="Connect to a VM using VSock.",
+        action="store",
+        nargs="?",
+        metavar="COMMAND",
+        const="",
+        help="Connect to a VM using VSock. "
+        + "An argument can be optionally specified to launch this command instead of a prompt.",
     )
     g.add_argument(
         "--balloon",
@@ -866,7 +873,30 @@ _RWDIR_RE = re.compile("^(%s)(?:=(%s))?$" % (_SAFE_PATH_PATTERN, _SAFE_PATH_PATT
 def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
-    if args.vsock_connect:
+    vsock_script_path = os.path.join(tempfile.gettempdir(), "virtme-vsock",
+                                     f"{args.vsock_cid}.sh")
+
+    if args.vsock_connect is not None:
+        try:
+            (cols, rows) = os.get_terminal_size()
+        except OSError:
+            cols, rows = (80, 24)
+
+        cmd = args.vsock_connect if args.vsock_connect else 'su ${virtme_user:-root}'
+
+        with open(vsock_script_path, 'w', encoding="utf-8") as file:
+            print((
+                '#! /bin/bash\n'
+                'main() {\n'
+                f'stty rows {rows} cols {cols} iutf8 echo\n'
+                'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
+                'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
+                f'exec {cmd}\n'
+                '}\n'
+                'main'  # use a function to avoid issues when the script is modified
+            ), file=file)
+        os.chmod(vsock_script_path, 0o755)
+
         tty = os.ttyname(sys.stdin.fileno())
         command = ['socat', f'file:{tty},raw,echo=0',
                    f'VSOCK-CONNECT:{args.vsock_cid}:1024']
@@ -1409,8 +1439,34 @@ def do_it() -> int:
             ]
         )
 
-    if args.vsock:
-        kernelargs.extend([f"virtme.vsockexec=`{args.vsock}`"])
+    def cleanup_vsock_script():
+        os.unlink(vsock_script_path)
+
+    if args.vsock is not None:
+        if os.path.exists(vsock_script_path):
+            arg_fail("vsock: '%s' file exists: " % vsock_script_path
+                     + "another VM is running with the same --vsock-cid? "
+                     + "If not, remove this file.")
+
+        # create an empty file that can be populated later on
+        vsock_script_dir = os.path.dirname(vsock_script_path)
+        os.makedirs(vsock_script_dir, exist_ok=True)
+        open(vsock_script_path, 'w', encoding="utf-8").close()
+        atexit.register(cleanup_vsock_script)
+
+        if args.vsock:
+            vsock_exec = args.vsock
+        else:
+            vsock_exec = vsock_script_path
+            if args.root != "/":
+                virtfs_config = VirtFSConfig(
+                    path=vsock_script_dir,
+                    mount_tag="virtme.vsockmount",
+                )
+                export_virtfs(qemu, arch, qemuargs, virtfs_config)
+                kernelargs.append("virtme_vsockmount=%s" % vsock_script_dir)
+
+        kernelargs.extend([f"virtme.vsockexec=`{vsock_exec}`"])
         qemuargs.extend(["-device", "vhost-vsock-pci,guest-cid=%d" % args.vsock_cid])
 
     if args.pwd:
