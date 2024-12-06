@@ -887,10 +887,18 @@ def do_it() -> int:
             socat_in = '-'
         socat_out = f'VSOCK-CONNECT:{args.vsock_cid}:1024'
 
-        cmd = ''
+        # use 'su' only if needed: another use, or to get a prompt
+        cmd = 'if [ "${virtme_user:-root}" != "root" ]; then\n' + \
+              '  exec su ${virtme_user}'
         if args.vsock_connect:
             exec_escaped = args.vsock_connect.replace('"', '\\"')
-            cmd = f' -c "{exec_escaped}"'
+            cmd += f' -c "{exec_escaped}"' + \
+                   '\nelse\n' + \
+                   f'  {args.vsock_connect}\n'
+        else:
+            cmd += '\nelse\n' + \
+                   '  exec su\n'
+        cmd += 'fi'
 
         with open(vsock_script_path, 'w', encoding="utf-8") as file:
             print((
@@ -899,7 +907,7 @@ def do_it() -> int:
                 f'{stty}\n'
                 'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
                 'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
-                'exec su ${virtme_user}' f'{cmd}\n'
+                f'{cmd}\n'
                 '}\n'
                 'main'  # use a function to avoid issues when the script is modified
             ), file=file)
