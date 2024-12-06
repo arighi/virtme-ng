@@ -887,9 +887,11 @@ def do_it() -> int:
             socat_in = '-'
         socat_out = f'VSOCK-CONNECT:{args.vsock_cid}:1024'
 
+        user = args.user if args.user else '${virtme_user:-root}'
+
         # use 'su' only if needed: another use, or to get a prompt
-        cmd = 'if [ "${virtme_user:-root}" != "root" ]; then\n' + \
-              '  exec su ${virtme_user}'
+        cmd = f'if [ "{user}" != "root" ]; then\n' + \
+              f'  exec su "{user}"'
         if args.vsock_connect:
             exec_escaped = args.vsock_connect.replace('"', '\\"')
             cmd += f' -c "{exec_escaped}"' + \
@@ -905,7 +907,7 @@ def do_it() -> int:
                 '#! /bin/bash\n'
                 'main() {\n'
                 f'{stty}\n'
-                'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
+                f'HOME=$(getent passwd "{user}" | cut -d: -f6)\n'
                 'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
                 f'{cmd}\n'
                 '}\n'
