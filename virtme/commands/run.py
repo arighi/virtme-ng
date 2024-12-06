@@ -889,6 +889,13 @@ def do_it() -> int:
 
         user = args.user if args.user else '${virtme_user:-root}'
 
+        if args.pwd:
+            cwd = os.path.relpath(os.getcwd(), args.root)
+        elif args.cwd is not None:
+            cwd = os.path.relpath(args.cwd, args.root)
+        else:
+            cwd = '${virtme_chdir:+"${virtme_chdir}"}'
+
         # use 'su' only if needed: another use, or to get a prompt
         cmd = f'if [ "{user}" != "root" ]; then\n' + \
               f'  exec su "{user}"'
@@ -908,7 +915,7 @@ def do_it() -> int:
                 'main() {\n'
                 f'{stty}\n'
                 f'HOME=$(getent passwd "{user}" | cut -d: -f6)\n'
-                'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
+                f'cd {cwd}\n'
                 f'{cmd}\n'
                 '}\n'
                 'main'  # use a function to avoid issues when the script is modified
