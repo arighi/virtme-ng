@@ -1498,7 +1498,7 @@ def do_it() -> int:
             return 1
         kernelargs.append("virtme_chdir=%s" % rel_cwd)
 
-    if args.user:
+    if args.user and args.user != "root":
         kernelargs.append("virtme_user=%s" % args.user)
 
     if args.nvgpu:
