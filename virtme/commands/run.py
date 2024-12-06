@@ -878,9 +878,14 @@ def do_it() -> int:
 
     if args.vsock_connect is not None:
         try:
+            # with tty support
             (cols, rows) = os.get_terminal_size()
+            stty = f'stty rows {rows} cols {cols} iutf8 echo'
+            socat_in = f'file:{os.ttyname(sys.stdin.fileno())},raw,echo=0'
         except OSError:
-            cols, rows = (80, 24)
+            stty = ''
+            socat_in = '-'
+        socat_out = f'VSOCK-CONNECT:{args.vsock_cid}:1024'
 
         cmd = args.vsock_connect if args.vsock_connect else 'su ${virtme_user:-root}'
 
@@ -888,7 +893,7 @@ def do_it() -> int:
             print((
                 '#! /bin/bash\n'
                 'main() {\n'
-                f'stty rows {rows} cols {cols} iutf8 echo\n'
+                f'{stty}\n'
                 'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
                 'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
                 f'exec {cmd}\n'
@@ -897,10 +902,7 @@ def do_it() -> int:
             ), file=file)
         os.chmod(vsock_script_path, 0o755)
 
-        tty = os.ttyname(sys.stdin.fileno())
-        command = ['socat', f'file:{tty},raw,echo=0',
-                   f'VSOCK-CONNECT:{args.vsock_cid}:1024']
-        os.execvp('socat', command)
+        os.execvp('socat', ['socat', socat_in, socat_out])
         sys.exit(0)
 
     arch = architectures.get(args.arch)
