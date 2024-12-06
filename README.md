@@ -345,7 +345,7 @@ Examples
    # vmlinux available in the system.
 ```
 
- - Connect to a simple remote shell:
+ - Connect to a simple remote shell (`socat` is required):
 ```
    # Start the vng instance with vsock support:
    $ vng --vsock

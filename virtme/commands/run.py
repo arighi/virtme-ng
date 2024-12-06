@@ -136,7 +136,7 @@ def make_parser() -> argparse.ArgumentParser:
         nargs="?",
         metavar="COMMAND",
         const="",
-        help="Enable a VSock to communicate from the host to the device. "
+        help="Enable a VSock to communicate from the host to the device, 'socat' is required. "
         + "An argument can be optionally specified to start a different command.",
     )
     g.add_argument(
