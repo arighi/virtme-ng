@@ -365,7 +365,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         nargs="?",
         metavar="COMMAND",
         const="",
-        help="Enable a VSock to communicate from the host to the device. "
+        help="Enable a VSock to communicate from the host to the device, 'socat' is required. "
         + "An argument can be optionally specified to start a different command.",
     )
 
@@ -852,16 +852,14 @@ class KernelSource:
         # sessions is current user.
         #
         # NOTE: graphic sessions are considered interactive.
+        self.virtme_param["user"] = ""
         if args.exec and not args.graphics:
             self.virtme_param["user"] = ""
         else:
             self.virtme_param["user"] = "--user " + get_username()
         # Override default user, if specified by the --user argument.
         if args.user is not None:
-            if args.user != "root":
-                self.virtme_param["user"] = "--user " + args.user
-            else:
-                self.virtme_param["user"] = ""
+            self.virtme_param["user"] = "--user " + args.user
 
     def _get_virtme_arch(self, args):
         if args.arch is not None:

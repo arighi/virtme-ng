@@ -136,7 +136,7 @@ def make_parser() -> argparse.ArgumentParser:
         nargs="?",
         metavar="COMMAND",
         const="",
-        help="Enable a VSock to communicate from the host to the device. "
+        help="Enable a VSock to communicate from the host to the device, 'socat' is required. "
         + "An argument can be optionally specified to start a different command.",
     )
     g.add_argument(
@@ -878,29 +878,51 @@ def do_it() -> int:
 
     if args.vsock_connect is not None:
         try:
+            # with tty support
             (cols, rows) = os.get_terminal_size()
+            stty = f'stty rows {rows} cols {cols} iutf8 echo'
+            socat_in = f'file:{os.ttyname(sys.stdin.fileno())},raw,echo=0'
         except OSError:
-            cols, rows = (80, 24)
+            stty = ''
+            socat_in = '-'
+        socat_out = f'VSOCK-CONNECT:{args.vsock_cid}:1024'
 
-        cmd = args.vsock_connect if args.vsock_connect else 'su ${virtme_user:-root}'
+        user = args.user if args.user else '${virtme_user:-root}'
+
+        if args.pwd:
+            cwd = os.path.relpath(os.getcwd(), args.root)
+        elif args.cwd is not None:
+            cwd = os.path.relpath(args.cwd, args.root)
+        else:
+            cwd = '${virtme_chdir:+"${virtme_chdir}"}'
+
+        # use 'su' only if needed: another use, or to get a prompt
+        cmd = f'if [ "{user}" != "root" ]; then\n' + \
+              f'  exec su "{user}"'
+        if args.vsock_connect:
+            exec_escaped = args.vsock_connect.replace('"', '\\"')
+            cmd += f' -c "{exec_escaped}"' + \
+                   '\nelse\n' + \
+                   f'  {args.vsock_connect}\n'
+        else:
+            cmd += '\nelse\n' + \
+                   '  exec su\n'
+        cmd += 'fi'
 
         with open(vsock_script_path, 'w', encoding="utf-8") as file:
             print((
                 '#! /bin/bash\n'
                 'main() {\n'
-                f'stty rows {rows} cols {cols} iutf8 echo\n'
-                'HOME=$(getent passwd ${virtme_user:-root} | cut -d: -f6)\n'
-                'cd ${virtme_chdir:+"${virtme_chdir}"}\n'
-                f'exec {cmd}\n'
+                f'{stty}\n'
+                f'HOME=$(getent passwd "{user}" | cut -d: -f6)\n'
+                f'cd {cwd}\n'
+                f'{cmd}\n'
                 '}\n'
                 'main'  # use a function to avoid issues when the script is modified
             ), file=file)
         os.chmod(vsock_script_path, 0o755)
 
-        tty = os.ttyname(sys.stdin.fileno())
-        command = ['socat', f'file:{tty},raw,echo=0',
-                   f'VSOCK-CONNECT:{args.vsock_cid}:1024']
-        os.execvp('socat', command)
+        os.execvp('socat', ['socat', socat_in, socat_out])
         sys.exit(0)
 
     arch = architectures.get(args.arch)
@@ -1485,7 +1507,7 @@ def do_it() -> int:
             return 1
         kernelargs.append("virtme_chdir=%s" % rel_cwd)
 
-    if args.user:
+    if args.user and args.user != "root":
         kernelargs.append("virtme_user=%s" % args.user)
 
     if args.nvgpu:
