@@ -360,34 +360,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--vsock",
-        action="store",
-        nargs="?",
-        metavar="COMMAND",
-        const="",
-        help="Enable a VSock to communicate from the host to the device, 'socat' is required. "
-        + "An argument can be optionally specified to start a different command.",
-    )
-
-    parser.add_argument(
-        "--vsock-cid",
-        action="store",
-        metavar="CID",
-        type=int,
-        help="CID for the VSock.",
-    )
-
-    parser.add_argument(
-        "--vsock-connect",
-        action="store",
-        nargs="?",
-        metavar="COMMAND",
-        const="",
-        help="Connect to a VM using VSock. "
-        + "An argument can be optionally specified to launch this command instead of a prompt.",
-    )
-
-    parser.add_argument(
         "--disk",
         "-D",
         action="append",
@@ -504,6 +476,44 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         metavar="[GPU PCI Address]",
         help="Add a passthrough NVIDIA GPU",
     )
+
+    g_remote = parser.add_argument_group(title="Remote Console")
+    cli_srv_choices = ["console"]
+
+    g_remote.add_argument(
+        "--server",
+        action="store",
+        const=cli_srv_choices[0],
+        nargs="?",
+        choices=cli_srv_choices,
+        help="Enable a server to communicate later from the host to the device using '--client'. "
+        + "By default, a simple console will be offered using a VSOCK connection, and 'socat' for the proxy."
+    )
+
+    g_remote.add_argument(
+        "--client",
+        action="store",
+        const=cli_srv_choices[0],
+        nargs="?",
+        choices=cli_srv_choices,
+        help="Connect to a VM launched with the '--server' option for a remote control.",
+    )
+
+    g_remote.add_argument(
+        "--port",
+        action="store",
+        type=int,
+        help="Unique port to communicate with a VM.",
+    )
+
+    g_remote.add_argument(
+        "--remote-cmd",
+        action="store",
+        metavar="COMMAND",
+        help="To start in the VM a different command than the default one (--server), "
+        + "or to launch this command instead of a prompt (--client).",
+    )
+
     return parser
 
 
@@ -973,23 +983,29 @@ class KernelSource:
         else:
             self.virtme_param["net_mac_address"] = ""
 
-    def _get_virtme_vsock(self, args):
-        if args.vsock is not None:
-            self.virtme_param["vsock"] = "--vsock '" + args.vsock + "'"
+    def _get_virtme_server(self, args):
+        if args.server is not None:
+            self.virtme_param["server"] = "--server " + args.server
         else:
-            self.virtme_param["vsock"] = ""
+            self.virtme_param["server"] = ""
 
-    def _get_virtme_vsock_cid(self, args):
-        if args.vsock_cid is not None:
-            self.virtme_param["vsock_cid"] = "--vsock-cid " + str(args.vsock_cid)
+    def _get_virtme_client(self, args):
+        if args.client is not None:
+            self.virtme_param["client"] = "--client " + args.client
         else:
-            self.virtme_param["vsock_cid"] = ""
+            self.virtme_param["client"] = ""
 
-    def _get_virtme_vsock_connect(self, args):
-        if args.vsock_connect is not None:
-            self.virtme_param["vsock_connect"] = "--vsock-connect '" + args.vsock_connect + "'"
+    def _get_virtme_port(self, args):
+        if args.port is not None:
+            self.virtme_param["port"] = "--port " + str(args.port)
         else:
-            self.virtme_param["vsock_connect"] = ""
+            self.virtme_param["port"] = ""
+
+    def _get_virtme_remote_cmd(self, args):
+        if args.remote_cmd is not None:
+            self.virtme_param["remote_cmd"] = "--remote-cmd '" + args.remote_cmd + "'"
+        else:
+            self.virtme_param["remote_cmd"] = ""
 
     def _get_virtme_disk(self, args):
         if args.disk is not None:
@@ -1146,9 +1162,10 @@ class KernelSource:
         self._get_virtme_mods(args)
         self._get_virtme_network(args)
         self._get_virtme_net_mac_address(args)
-        self._get_virtme_vsock(args)
-        self._get_virtme_vsock_cid(args)
-        self._get_virtme_vsock_connect(args)
+        self._get_virtme_server(args)
+        self._get_virtme_client(args)
+        self._get_virtme_port(args)
+        self._get_virtme_remote_cmd(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_disable_microvm(args)
@@ -1188,9 +1205,10 @@ class KernelSource:
             + f'{self.virtme_param["mods"]} '
             + f'{self.virtme_param["network"]} '
             + f'{self.virtme_param["net_mac_address"]} '
-            + f'{self.virtme_param["vsock"]} '
-            + f'{self.virtme_param["vsock_cid"]} '
-            + f'{self.virtme_param["vsock_connect"]} '
+            + f'{self.virtme_param["server"]} '
+            + f'{self.virtme_param["client"]} '
+            + f'{self.virtme_param["port"]} '
+            + f'{self.virtme_param["remote_cmd"]} '
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
             + f'{self.virtme_param["disable_microvm"]} '

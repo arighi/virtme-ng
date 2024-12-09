@@ -345,13 +345,13 @@ Examples
    # vmlinux available in the system.
 ```
 
- - Connect to a simple remote shell (`socat` is required):
+ - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
 ```
-   # Start the vng instance with vsock support:
-   $ vng --vsock
+   # Start the vng instance with server support:
+   $ vng --server
 
    # In a separate terminal run the following command to connect to a remote shell:
-   $ vng --vsock-connect
+   $ vng --client
 ```
 
  - Run virtme-ng inside a docker container:
