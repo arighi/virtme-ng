@@ -924,7 +924,10 @@ def console_client(args):
         ), file=file)
     os.chmod(console_script_path, 0o755)
 
-    os.execvp('socat', ['socat', socat_in, socat_out])
+    if args.dry_run:
+        print('socat', socat_in, socat_out)
+    else:
+        os.execvp('socat', ['socat', socat_in, socat_out])
 
 
 def console_server(args, qemu, arch, qemuargs, kernelargs):
