@@ -346,7 +346,7 @@ def make_parser() -> argparse.ArgumentParser:
         "--port",
         action="store",
         type=int,
-        default=3,
+        default=2222,
         help="Unique port to communicate with a VM.",
     )
     g.add_argument(
