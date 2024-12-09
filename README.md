@@ -129,6 +129,9 @@ Requirements
  * Optionally, you may need virtiofsd 1.7.0 (or higher) for better filesystem
    performance inside the virtme-ng guests.
 
+ * Optionally, you may need `socat` for the `--server` and `--client` options,
+   and the host's kernel should support VSOCK (`CONFIG_VHOST_VSOCK`).
+
 Examples
 ========
 
