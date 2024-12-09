@@ -968,6 +968,9 @@ def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
     if args.client is not None:
+        if args.server is not None:
+            arg_fail('--client cannot be used with --server.')
+
         console_client(args)
         sys.exit(0)
 
