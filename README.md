@@ -129,6 +129,9 @@ Requirements
  * Optionally, you may need virtiofsd 1.7.0 (or higher) for better filesystem
    performance inside the virtme-ng guests.
 
+ * Optionally, you may need `socat` for the `--server` and `--client` options,
+   and the host's kernel should support VSOCK (`CONFIG_VHOST_VSOCK`).
+
 Examples
 ========
 
@@ -345,13 +348,13 @@ Examples
    # vmlinux available in the system.
 ```
 
- - Connect to a simple remote shell (`socat` is required):
+ - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
 ```
-   # Start the vng instance with vsock support:
-   $ vng --vsock
+   # Start the vng instance with server support:
+   $ vng --server
 
    # In a separate terminal run the following command to connect to a remote shell:
-   $ vng --vsock-connect
+   $ vng --client
 ```
 
  - Run virtme-ng inside a docker container:
