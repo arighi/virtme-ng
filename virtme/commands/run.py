@@ -170,6 +170,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="Create NUMA nodes in the guest.",
     )
     g.add_argument(
+        "--numa-distance",
+        action="append",
+        default=None,
+        help="Define a distance between two NUMA nodes in the guest (src=ID,dst=ID,val=NUM).",
+    )
+    g.add_argument(
         "--cpus", action="store", default=None, help="Set guest cpu and qemu -smp flag."
     )
     g.add_argument(
@@ -1040,6 +1046,12 @@ def do_it() -> int:
             qemuargs.extend([
                 "-object", f"memory-backend-memfd,id=mem{i},size={size},share=on",
                 "-numa", f"node,memdev=mem{i}{cpus}"
+            ])
+
+    if args.numa_distance:
+        for arg in args.numa_distance:
+            qemuargs.extend([
+                "-numa", f"dist,{arg}"
             ])
 
     if args.snaps:

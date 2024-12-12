@@ -286,6 +286,37 @@ Examples
      1:  20  10
 ```
 
+ - Run the current kernel creating 4 NUMA nodes of 1GB each and assign
+   different distance costs between the NUMA nodes to simulate non-uniform
+   memory access:
+```
+   $ vng -r --cpu 8 -m 4G \
+   >     --numa 1G,cpus=0-1 --numa 1G,cpus=2-3 \
+   >     --numa 1G,cpus=4-5 --numa 1G,cpus=6-7 \
+   >     --numa-distance 0,1=51 --numa-distance 0,2=31 --numa-distance 0,3=41 \
+   >     --numa-distance 1,2=21 --numa-distance 1,3=61 \
+   >     --numa-distance 2,3=11 -- numactl -H
+   available: 4 nodes (0-3)
+   node 0 cpus: 0 1
+   node 0 size: 1006 MB
+   node 0 free: 974 MB
+   node 1 cpus: 2 3
+   node 1 size: 953 MB
+   node 1 free: 919 MB
+   node 2 cpus: 4 5
+   node 2 size: 943 MB
+   node 2 free: 894 MB
+   node 3 cpus: 6 7
+   node 3 size: 1006 MB
+   node 3 free: 965 MB
+   node distances:
+   node     0    1    2    3
+      0:   10   51   31   41
+      1:   51   10   21   61
+      2:   31   21   10   11
+      3:   41   61   11   10
+```
+
  - Run `glxgears` inside a kernel recompiled in the current directory:
 ```
    $ vng -g -- glxgears
