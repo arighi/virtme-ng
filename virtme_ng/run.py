@@ -340,6 +340,15 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--numa-distance",
+        metavar="SRC,DST=VAL",
+        action="append",
+        help="Set a distance of VAL between NUMA node SRC_NODE and DST_NODE. "
+        + "Use this option multiple times to define multiple distances between NUMA nodes. "
+        + "This option is used only together with --numa."
+    )
+
+    parser.add_argument(
         "--balloon",
         action="store_true",
         help="Allow the host to ask the guest to release memory",
@@ -1084,6 +1093,25 @@ class KernelSource:
         else:
             self.virtme_param["numa"] = ""
 
+    def _get_virtme_numa_distance(self, args):
+        if args.numa_distance is not None:
+            if not args.numa:
+                arg_fail("error: --numa-distance can be used only with --numa", show_usage=False)
+            numa_dist_str = ""
+            for arg in args.numa_distance:
+                try:
+                    nodes = arg.split('=')
+                    src, dst = nodes[0].split(',')
+                    val = nodes[1]
+                    numa_dist_str += f" --numa-distance src={src},dst={dst},val={val}"
+                except ValueError:
+                    err_msg = f"error: invalid distance '{arg}', " + \
+                               "NUMA distance string must be in the format SRC,DST=VAL"
+                    arg_fail(err_msg, show_usage=False)
+            self.virtme_param["numa_distance"] = numa_dist_str
+        else:
+            self.virtme_param["numa_distance"] = ""
+
     def _get_virtme_balloon(self, args):
         if args.balloon:
             self.virtme_param["balloon"] = "--balloon"
@@ -1178,6 +1206,7 @@ class KernelSource:
         self._get_virtme_cpus(args)
         self._get_virtme_memory(args)
         self._get_virtme_numa(args)
+        self._get_virtme_numa_distance(args)
         self._get_virtme_balloon(args)
         self._get_virtme_gdb(args)
         self._get_virtme_snaps(args)
@@ -1221,6 +1250,7 @@ class KernelSource:
             + f'{self.virtme_param["cpus"]} '
             + f'{self.virtme_param["memory"]} '
             + f'{self.virtme_param["numa"]} '
+            + f'{self.virtme_param["numa_distance"]} '
             + f'{self.virtme_param["balloon"]} '
             + f'{self.virtme_param["gdb"]} '
             + f'{self.virtme_param["snaps"]} '
