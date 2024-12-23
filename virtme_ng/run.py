@@ -487,32 +487,46 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     g_remote = parser.add_argument_group(title="Remote Console")
-    cli_srv_choices = ["console", "ssh"]
 
     g_remote.add_argument(
-        "--server",
+        "--console",
         action="store",
-        const=cli_srv_choices[0],
         nargs="?",
-        choices=cli_srv_choices,
-        help="Enable a server to communicate later from the host to the device using '--client'. "
+        type=int,
+        const=2222,
+        metavar="PORT",
+        help="Enable a server to communicate later from the host using '--console-client'. "
         + "By default, a simple console will be offered using a VSOCK connection, and 'socat' for the proxy."
     )
 
     g_remote.add_argument(
-        "--client",
+        "--console-client",
         action="store",
-        const=cli_srv_choices[0],
         nargs="?",
-        choices=cli_srv_choices,
-        help="Connect to a VM launched with the '--server' option for a remote control.",
+        type=int,
+        const=2222,
+        metavar="PORT",
+        help="Connect to a VM launched with the '--console' option for a remote control.",
     )
 
     g_remote.add_argument(
-        "--port",
+        "--ssh",
         action="store",
+        nargs="?",
         type=int,
-        help="Unique port to communicate with a VM.",
+        const=2222,
+        metavar="PORT",
+        help="Enable SSH server to communicate later from the host to using '--ssh-client'."
+    )
+
+    g_remote.add_argument(
+        "--ssh-client",
+        action="store",
+        nargs="?",
+        type=int,
+        const=2222,
+        metavar="PORT",
+        help="Connect to a VM launched with the '--ssh' option for a remote control.",
     )
 
     g_remote.add_argument(
@@ -992,23 +1006,44 @@ class KernelSource:
         else:
             self.virtme_param["net_mac_address"] = ""
 
-    def _get_virtme_server(self, args):
-        if args.server is not None:
-            self.virtme_param["server"] = "--server " + args.server
+    def _get_virtme_console(self, args):
+        if args.console is not None:
+            self.virtme_param["console"] = f"--server console --port {args.console}"
         else:
-            self.virtme_param["server"] = ""
+            self.virtme_param["console"] = ""
 
-    def _get_virtme_client(self, args):
-        if args.client is not None:
-            self.virtme_param["client"] = "--client " + args.client
-        else:
-            self.virtme_param["client"] = ""
+    def _get_virtme_console_client(self, args):
+        if args.console is not None and args.console_client is not None:
+            arg_fail('--console cannot be used with --console-client', show_usage=False)
 
-    def _get_virtme_port(self, args):
-        if args.port is not None:
-            self.virtme_param["port"] = "--port " + str(args.port)
+        if args.console_client is not None:
+            self.virtme_param["console_client"] = f"--client console --port {args.console_client}"
         else:
-            self.virtme_param["port"] = ""
+            self.virtme_param["console_client"] = ""
+
+    def _get_virtme_ssh(self, args):
+        if args.console is not None and args.ssh is not None:
+            arg_fail('--console cannot be used with --ssh', show_usage=False)
+
+        if args.ssh is not None:
+            self.virtme_param["ssh"] = f"--server ssh --port {args.ssh}"
+        else:
+            self.virtme_param["ssh"] = ""
+
+    def _get_virtme_ssh_client(self, args):
+        if args.console_client is not None and args.ssh_client is not None:
+            arg_fail('--console-client cannot be used with --ssh-client', show_usage=False)
+
+        if args.ssh is not None and args.ssh_client is not None:
+            arg_fail('--ssh cannot be used with --ssh-client', show_usage=False)
+
+        if args.console is not None and args.ssh_client is not None:
+            arg_fail('--console cannot be used with --ssh-client', show_usage=False)
+
+        if args.ssh_client is not None:
+            self.virtme_param["ssh_client"] = f"--client ssh --port {args.ssh_client}"
+        else:
+            self.virtme_param["ssh_client"] = ""
 
     def _get_virtme_remote_cmd(self, args):
         if args.remote_cmd is not None:
@@ -1190,9 +1225,10 @@ class KernelSource:
         self._get_virtme_mods(args)
         self._get_virtme_network(args)
         self._get_virtme_net_mac_address(args)
-        self._get_virtme_server(args)
-        self._get_virtme_client(args)
-        self._get_virtme_port(args)
+        self._get_virtme_console(args)
+        self._get_virtme_console_client(args)
+        self._get_virtme_ssh(args)
+        self._get_virtme_ssh_client(args)
         self._get_virtme_remote_cmd(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
@@ -1234,9 +1270,10 @@ class KernelSource:
             + f'{self.virtme_param["mods"]} '
             + f'{self.virtme_param["network"]} '
             + f'{self.virtme_param["net_mac_address"]} '
-            + f'{self.virtme_param["server"]} '
-            + f'{self.virtme_param["client"]} '
-            + f'{self.virtme_param["port"]} '
+            + f'{self.virtme_param["console"]} '
+            + f'{self.virtme_param["console_client"]} '
+            + f'{self.virtme_param["ssh"]} '
+            + f'{self.virtme_param["ssh_client"]} '
             + f'{self.virtme_param["remote_cmd"]} '
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
