@@ -82,24 +82,24 @@ if ! grep -q devtmpfs /proc/mounts; then
 fi
 
 # Setup rw tmpfs directories
-[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/ &
-[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/ &
+[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
+[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
 
 # Additional rw dirs used by systemd
-[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog &
-[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables &
-[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines &
-[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private &
-[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache &
+[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
+[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
+[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
+[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
+[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
 
 # Additional rw dirs required by apt (if present)
-[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt &
+[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
 
 # Additional rw dirs required by snapd (if present)
-[ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie &
+[ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie
 
 # Hide additional sudo settings
-[ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo &
+[ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo
 
 # Fix up /etc a little bit
 touch /run/tmp/fstab
@@ -115,7 +115,7 @@ fi
 if [ -d /var/lib/dpkg ]; then
     lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
     for file in "${lock_files[@]}"; do
-	[ -e $file ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file" &
+	[ -e $file ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
     done
 fi
 
@@ -123,21 +123,12 @@ fi
 # in the system
 (umask 0644 && touch /run/tmp/shadow)
 sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /run/tmp/shadow
-mount --bind /run/tmp/shadow /etc/shadow &
+mount --bind /run/tmp/shadow /etc/shadow
 
 # The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
 # run on rootless users just create a dummy directory and bind mount it in the same place.
 mkdir /run/tmp/lvm
 mount --bind /run/tmp/lvm /etc/lvm
-
-# Find udevd
-if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
-    udevd=/usr/lib/systemd/systemd-udevd
-elif [[ -x /lib/systemd/systemd-udevd ]]; then
-    udevd=/lib/systemd/systemd-udevd
-else
-    udevd=`which udevd`
-fi
 
 for tag in "${!virtme_initmount@}"; do
     if [[ ! -d "${!tag}" ]]; then
@@ -158,34 +149,10 @@ log "basic initialization done"
 tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
     log "running systemd-tmpfiles"
     systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
-} &
+}
 
 # Make dbus work (if tmpfiles wasn't there or didn't create the directory).
 install -d /run/dbus
-
-# Try to get udevd to coldplug everything.
-if [[ -n "$udevd" ]]; then
-    if [[ -e '/sys/kernel/uevent_helper' ]]; then
-       # This kills boot performance.
-       log "you have CONFIG_UEVENT_HELPER on; turn it off"
-       echo '' >/sys/kernel/uevent_helper
-    fi
-    log "starting udevd"
-    cmd="$udevd --daemon --resolve-names=never"
-    if grep -q "quiet" /proc/cmdline; then
-        $cmd >/dev/null 2>&1
-    else
-        $cmd
-    fi
-    log "triggering udev coldplug"
-    udevadm trigger --type=subsystems --action=add  >/dev/null 2>&1
-    udevadm trigger --type=devices --action=add  >/dev/null 2>&1
-    log "waiting for udev to settle"
-    udevadm settle
-    log "udev is done"
-else
-    log "udevd not found"
-fi
 
 # Set up useful things in /sys, assuming our kernel supports it.
 mount -t configfs configfs /sys/kernel/config &>/dev/null
@@ -214,6 +181,37 @@ fi
 mkdir -p -m 0755 /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
+
+# Find udevd
+if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
+    udevd=/usr/lib/systemd/systemd-udevd
+elif [[ -x /lib/systemd/systemd-udevd ]]; then
+    udevd=/lib/systemd/systemd-udevd
+else
+    udevd=`which udevd`
+fi
+
+# Try to get udevd to coldplug everything.
+if [[ -n "$udevd" ]]; then
+    if [[ -e '/sys/kernel/uevent_helper' ]]; then
+       # This kills boot performance.
+       log "you have CONFIG_UEVENT_HELPER on; turn it off"
+       echo '' >/sys/kernel/uevent_helper
+    fi
+    log "starting udevd"
+    udev_out=$($udevd --daemon --resolve-names=never 2>&1)
+    if ! grep -q "quiet" /proc/cmdline; then
+        log "udev: $udev_out"
+    fi
+    log "triggering udev coldplug"
+    udevadm trigger --type=subsystems --action=add  >/dev/null 2>&1
+    udevadm trigger --type=devices --action=add  >/dev/null 2>&1
+    log "waiting for udev to settle"
+    udevadm settle
+    log "udev is done"
+else
+    log "udevd not found"
+fi
 
 # Install /proc/self/fd symlinks into /dev if not already present
 declare -r -A fdlinks=(["/dev/fd"]="/proc/self/fd"
