@@ -988,6 +988,16 @@ fn setup_user_session() {
     run_user_session(consdev.as_str(), uid);
 }
 
+fn run_sshd() {
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
+        if cmdline.contains("virtme.ssh") {
+            if let Some(guest_tools_dir) = get_guest_tools_dir() {
+                utils::run_cmd(format!("{}/virtme-sshd-script", guest_tools_dir), &[]);
+            }
+        }
+    }
+}
+
 fn run_snapd() {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if cmdline.contains("virtme.snapd") {
@@ -1064,6 +1074,7 @@ fn run_misc_services() -> thread::JoinHandle<()> {
         mount_virtme_initmounts();
         fix_packaging_files();
         override_system_files();
+        run_sshd();
         run_snapd();
     })
 }
