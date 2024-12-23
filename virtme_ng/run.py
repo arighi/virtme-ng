@@ -487,7 +487,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     g_remote = parser.add_argument_group(title="Remote Console")
-    cli_srv_choices = ["console"]
+    cli_srv_choices = ["console", "ssh"]
 
     g_remote.add_argument(
         "--server",

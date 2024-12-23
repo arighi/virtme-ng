@@ -1,0 +1,39 @@
+#!/bin/bash
+#
+# Initialize ssh server for remote connections (option `--server ssh`)
+
+if [ -z "${virtme_ssh_user}" ]; then
+    echo "ssh: virtme_ssh_user is not defined" >&2
+    exit 1
+fi
+
+SSH_HOME=$(getent passwd "${virtme_ssh_user}" | cut -d: -f6)
+if [ ! -e "${SSH_HOME}" ]; then
+    # Setup an arbitrary ssh location, just to be able to start sshd.
+    SSH_HOME=/run/ssh
+fi
+
+# Update authorized_keys by adding the user's public keys, but only if the
+# changes are confined to the guest (no modifications made to the host).
+#
+# Overwriting authorized_keys is considered safe only when the guest rootfs
+# is mounted as read-only, with an overlayfs on top to handle writes within
+# the guest environment (`--rw` not specified as argument).
+if grep ' / ' /proc/mounts | grep -q ' ro,'; then
+    cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_HOME}/.ssh/authorized_keys" 2>/dev/null
+    chown "${virtme_ssh_user}" "${SSH_HOME}/.ssh/authorized_keys" 2>/dev/null
+fi
+
+# Generate ssh host keys (if they don't exist already).
+CACHE_DIR=${SSH_HOME}/.cache/virtme-ng/.ssh
+mkdir -p "${CACHE_DIR}/etc/ssh"
+ssh-keygen -A -f "${CACHE_DIR}"
+ARGS=()
+for key in "${CACHE_DIR}"/etc/ssh/ssh_host_*_key; do
+    ARGS+=(-h "${key}")
+done
+
+# Start sshd.
+mkdir -p /run/sshd
+rm -f /var/run/nologin
+/usr/sbin/sshd "${ARGS[@]}"

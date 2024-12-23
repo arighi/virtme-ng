@@ -388,6 +388,27 @@ Examples
    $ vng --client
 ```
 
+ - Enable ssh in the vng guest:
+```
+   # Start the vng instance with ssh server support:
+   $ vng --server ssh
+
+   # Connect to the vng guest from the host via ssh:
+   $ vng --client ssh
+```
+
+ - Generate some results inside the vng guest and copy them back to the
+   host using scp:
+```
+   # Start the vng instance with SSH server support:
+   arighi@host~> vng --server ssh
+   ...
+   arighi@virtme-ng~> ./run.sh > result.txt
+
+   # In another terminal, copy result.txt from the guest to the host using scp:
+   arighi@gpd3~> scp -P 2222 localhost:~/result.txt .
+```
+
  - Run virtme-ng inside a docker container:
 ```
    $ docker run -it --privileged ubuntu:23.10 /bin/bash

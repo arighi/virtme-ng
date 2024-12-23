@@ -98,6 +98,7 @@ packages = [
 package_files = [
     "virtme-init",
     "virtme-udhcpc-script",
+    "virtme-sshd-script",
     "virtme-snapd-script",
     "virtme-sound-script",
 ]

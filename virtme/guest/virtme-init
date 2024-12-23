@@ -257,6 +257,10 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     wait
 fi
 
+if cat /proc/cmdline |grep -q -E '(^| )virtme.ssh($| )'; then
+    $(dirname $0)/virtme-sshd-script
+fi
+
 if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
     # If snapd is present in the system try to start it, to properly support snaps.
     snapd_bin="/usr/lib/snapd/snapd";
