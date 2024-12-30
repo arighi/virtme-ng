@@ -18,10 +18,12 @@ fi
 #
 # Overwriting authorized_keys is considered safe only when the guest rootfs
 # is mounted as read-only, with an overlayfs on top to handle writes within
-# the guest environment (`--rw` not specified as argument).
-if grep ' / ' /proc/mounts | grep -q ' ro,'; then
-    cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_HOME}/.ssh/authorized_keys" 2>/dev/null
-    chown "${virtme_ssh_user}" "${SSH_HOME}/.ssh/authorized_keys" 2>/dev/null
+# the guest environment (e.g. `--rw` or `--rwdir` not specified as argument).
+OVERLAYFS="794c7630" # OVERLAYFS_SUPER_MAGIC in include/uapi/linux/magic.h
+SSH_AUTH_KEYS="${SSH_HOME}/.ssh/authorized_keys"
+if [ "$(stat -f -c "%t" "${SSH_AUTH_KEYS}")" = "${OVERLAYFS}" ]; then
+    cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_AUTH_KEYS}" 2>/dev/null
+    chown "${virtme_ssh_user}" "${SSH_AUTH_KEYS}" 2>/dev/null
 fi
 
 # Generate ssh host keys (if they don't exist already).
