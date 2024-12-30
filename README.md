@@ -129,8 +129,12 @@ Requirements
  * Optionally, you may need virtiofsd 1.7.0 (or higher) for better filesystem
    performance inside the virtme-ng guests.
 
- * Optionally, you may need `socat` for the `--server` and `--client` options,
-   and the host's kernel should support VSOCK (`CONFIG_VHOST_VSOCK`).
+ * Optionally, you may need `socat` for the `--console` and
+   `--console-client` options, and the host's kernel should support VSOCK
+   (`CONFIG_VHOST_VSOCK`).
+
+ * Optionally, you may need `sshd` installed for the `--ssh` and
+   `--ssh-client` options.
 
 Examples
 ========
@@ -382,10 +386,31 @@ Examples
  - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
 ```
    # Start the vng instance with server support:
-   $ vng --server
+   $ vng --console
 
    # In a separate terminal run the following command to connect to a remote shell:
-   $ vng --client
+   $ vng --console-client
+```
+
+ - Enable ssh in the vng guest:
+```
+   # Start the vng instance with ssh server support:
+   $ vng --ssh
+
+   # Connect to the vng guest from the host via ssh:
+   $ vng --ssh-client
+```
+
+ - Generate some results inside the vng guest and copy them back to the
+   host using scp:
+```
+   # Start the vng instance with SSH server support:
+   arighi@host~> vng --ssh
+   ...
+   arighi@virtme-ng~> ./run.sh > result.txt
+
+   # In another terminal, copy result.txt from the guest to the host using scp:
+   arighi@gpd3~> scp -P 2222 localhost:~/result.txt .
 ```
 
  - Run virtme-ng inside a docker container:

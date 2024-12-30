@@ -24,6 +24,7 @@ import termios
 from shutil import which
 from time import sleep
 from base64 import b64encode
+from virtme_ng.utils import CACHE_DIR
 from .. import virtmods
 from .. import modfinder
 from .. import mkinitramfs
@@ -330,7 +331,7 @@ def make_parser() -> argparse.ArgumentParser:
     )
 
     g = parser.add_argument_group(title="Remote Console")
-    cli_srv_choices = ["console"]
+    cli_srv_choices = ["console", "ssh"]
     g.add_argument(
         "--server",
         action="store",
@@ -968,6 +969,42 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
     qemuargs.extend(["-device", "vhost-vsock-pci,guest-cid=%d" % args.port])
 
 
+def ssh_client(args):
+    if args.remote_cmd is not None:
+        exec_escaped = args.remote_cmd.replace('"', '\\"')
+        remote_cmd = ["bash", "-c", exec_escaped]
+    else:
+        remote_cmd = []
+
+    cmd = ["ssh", "-p", str(args.port), "localhost"] + remote_cmd
+
+    if args.dry_run:
+        print(" ".join(cmd))
+    else:
+        os.execvp("ssh", cmd)
+
+
+def ssh_server(args, arch, qemuargs, kernelargs):
+    # Check if we need to generate the ssh host keys for the guest.
+    ssh_key_dir = f"{CACHE_DIR}/.ssh"
+    os.makedirs(f"{ssh_key_dir}/etc/ssh", exist_ok=True)
+    os.system(f"ssh-keygen -A -f {ssh_key_dir}")
+
+    # Implicitly enable dhcp to automatically get an IP on the network
+    # interface and prevent interface renaming.
+    kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+
+    # Tell virtme-ng-init / virtme-init to start sshd and use the current
+    # username keys/credentials.
+    username = get_username()
+    kernelargs.extend(["virtme.ssh"])
+    kernelargs.extend([f"virtme_ssh_user={username}"])
+
+    # Setup a port forward network interface for the guest.
+    qemuargs.extend(["-device", "%s,netdev=ssh" % (arch.virtio_dev_type("net"))])
+    qemuargs.extend(["-netdev", "user,id=ssh,hostfwd=tcp::%d-:22" % args.port])
+
+
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
 _RWDIR_RE = re.compile("^(%s)(?:=(%s))?$" % (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
@@ -980,7 +1017,10 @@ def do_it() -> int:
         if args.server is not None:
             arg_fail('--client cannot be used with --server.')
 
-        console_client(args)
+        if args.client == 'console':
+            console_client(args)
+        elif args.client == 'ssh':
+            ssh_client(args)
         sys.exit(0)
 
     arch = architectures.get(args.arch)
@@ -1526,7 +1566,10 @@ def do_it() -> int:
         )
 
     if args.server is not None:
-        console_server(args, qemu, arch, qemuargs, kernelargs)
+        if args.server == "console":
+            console_server(args, qemu, arch, qemuargs, kernelargs)
+        elif args.server == "ssh":
+            ssh_server(args, arch, qemuargs, kernelargs)
 
     if args.pwd:
         rel_pwd = os.path.relpath(os.getcwd(), args.root)
