@@ -7,7 +7,7 @@ import os
 from subprocess import check_output, DEVNULL, CalledProcessError
 import pkg_resources
 
-PKG_VERSION = "1.31"
+PKG_VERSION = "1.32"
 
 
 def get_package_version():
