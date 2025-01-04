@@ -1002,7 +1002,7 @@ def ssh_server(args, arch, qemuargs, kernelargs):
 
     # Setup a port forward network interface for the guest.
     qemuargs.extend(["-device", "%s,netdev=ssh" % (arch.virtio_dev_type("net"))])
-    qemuargs.extend(["-netdev", "user,id=ssh,hostfwd=tcp::%d-:22" % args.port])
+    qemuargs.extend(["-netdev", "user,id=ssh,hostfwd=tcp:127.0.0.1:%d-:22" % args.port])
 
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
