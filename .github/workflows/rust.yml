@@ -2,6 +2,8 @@ name: Rust
 
 on:
   push:
+    branches:
+      - main
   pull_request:
 
 env:
@@ -11,6 +13,10 @@ jobs:
   build:
 
     runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: ./virtme_ng_init
 
     steps:
     - uses: actions/checkout@v3
