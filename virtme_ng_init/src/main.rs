@@ -975,7 +975,8 @@ fn setup_user_session() {
         Some(console) => console,
         None => {
             log!("failed to determine console");
-            Command::new("bash").arg("-l").exec();
+            let err = Command::new("bash").arg("-l").exec();
+            log!("failed to exec bash: {}", err);
             return;
         }
     };
