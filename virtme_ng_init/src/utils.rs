@@ -14,7 +14,7 @@ use std::io::{self, Write};
 use std::os::unix::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
-use users::get_user_by_name;
+use uzers::get_user_by_name;
 
 macro_rules! log {
     ($($arg:tt)*) => {
