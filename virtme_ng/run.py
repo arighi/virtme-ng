@@ -23,6 +23,7 @@ from subprocess import (
 )
 from select import select
 from pathlib import Path
+import shlex
 
 import argcomplete
 
@@ -876,7 +877,7 @@ class KernelSource:
         if args.envs:
             args.exec = " ".join(args.envs)
         if args.exec is not None:
-            self.virtme_param["exec"] = f'--script-sh "{args.exec}"'
+            self.virtme_param["exec"] = f'--script-sh {shlex.quote(args.exec)}'
         else:
             self.virtme_param["exec"] = ""
 
