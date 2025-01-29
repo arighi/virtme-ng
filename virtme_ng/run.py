@@ -1048,7 +1048,7 @@ class KernelSource:
 
     def _get_virtme_remote_cmd(self, args):
         if args.remote_cmd is not None:
-            self.virtme_param["remote_cmd"] = "--remote-cmd '" + args.remote_cmd + "'"
+            self.virtme_param["remote_cmd"] = f"--remote-cmd {shlex.quote(args.remote_cmd)}"
         else:
             self.virtme_param["remote_cmd"] = ""
 
