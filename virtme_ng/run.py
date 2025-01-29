@@ -553,6 +553,13 @@ def arg_fail(message, show_usage=True):
 
 
 ARCH_MAPPING = {
+    "amd64": {
+        "qemu_name": "x86_64",
+        "linux_name": "x86_64",
+        "cross_compile": "x86_64-linux-gnu-",
+        "kernel_target": "bzImage",
+        "kernel_image": "bzImage",
+    },
     "arm64": {
         "qemu_name": "aarch64",
         "linux_name": "arm64",
