@@ -1282,25 +1282,28 @@ def do_it() -> int:
     if args.graphics is None and not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
 
-        if args.verbose:
-            # Check if we have permission to access the current stderr.
-            if not can_access_file("/proc/self/fd/2"):
-                print(
-                    "ERROR: not a valid pts, try to run vng inside tmux or screen",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-            # Redirect kernel messages to stderr, creating a separate console
+        # Redirect kernel errors to stderr, creating a separate console.
+        #
+        # If we don't have access to stderr via procfs (for example when
+        # running inside a container), print a warning and implicitly
+        # suppress the kernel errors redirection.
+        if can_access_file("/proc/self/fd/2"):
             qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
             kernelargs.extend(["console=hvc0"])
+        else:
+            print(
+                "WARNING: unable to write kernel messages, try to run vng with a valid PTS "
+                "(e.g., inside tmux or screen)",
+                file=sys.stderr,
+            )
 
-            # Unfortunately we can't use hvc0 to redirect early console
-            # messages to stderr, so just send them to the main console, in
-            # this way we don't lose early printk's in verbose mode and we can
-            # catch potential boot issues.
+        # Unfortunately we can't use hvc0 to redirect early console
+        # messages to stderr, so just send them to the main console, in
+        # this way we don't lose early printk's in verbose mode and we can
+        # catch potential boot issues.
+        if args.verbose:
             kernelargs.extend(arch.earlyconsole_args())
 
         qemuargs.extend(["-chardev", "stdio,id=console,signal=off,mux=on"])
@@ -1407,7 +1410,8 @@ def do_it() -> int:
            not can_access_file("/proc/self/fd/1") or \
            not can_access_file("/proc/self/fd/2"):
             print(
-                "ERROR: not a valid pts, try to run vng inside tmux or screen",
+                "ERROR: not a valid pts, try to run vng with a valid PTS "
+                "(e.g., inside tmux or screen)",
                 file=sys.stderr,
             )
             sys.exit(1)
@@ -1671,11 +1675,11 @@ def do_it() -> int:
         )
         initrdpath = None
 
-    if not args.verbose:
-        kernelargs.append("quiet")
-        kernelargs.append("loglevel=0")
-    else:
+    if args.verbose:
         kernelargs.append("debug")
+    else:
+        kernelargs.append("quiet")
+        kernelargs.append("loglevel=1")
 
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
