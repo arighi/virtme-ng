@@ -881,8 +881,14 @@ class KernelSource:
             self.virtme_param["name"] = "--name " + socket.gethostname()
 
     def _get_virtme_exec(self, args):
-        if args.envs:
-            args.exec = " ".join(args.envs)
+        envs = []
+        for var in args.envs:
+            if var.startswith("O="):
+                self.virtme_param["kdir"] = "--kdir ./" + var[2:]
+            else:
+                envs.append(var)
+        if envs:
+            args.exec = " ".join(envs)
         if args.exec is not None:
             self.virtme_param["exec"] = f'--script-sh {shlex.quote(args.exec)}'
         else:
@@ -976,12 +982,8 @@ class KernelSource:
                     sys.exit(1)
             else:
                 self.virtme_param["kdir"] = "--kimg " + args.run
-        else:
-            for var in args.envs:
-                if var.startswith("O="):
-                    self.virtme_param["kdir"] = "--kdir ./" + var[2:]
-            if self.virtme_param.get("kdir") is None:
-                self.virtme_param["kdir"] = "--kdir ./"
+        elif self.virtme_param.get("kdir") is None:
+            self.virtme_param["kdir"] = "--kdir ./"
 
     def _get_virtme_mods(self, args):
         if args.skip_modules or platform.system() != "Linux":
