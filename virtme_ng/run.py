@@ -983,7 +983,10 @@ class KernelSource:
             else:
                 self.virtme_param["kdir"] = "--kimg " + args.run
         elif self.virtme_param.get("kdir") is None:
-            self.virtme_param["kdir"] = "--kdir ./"
+            kbuild_dir = os.environ.get("KBUILD_OUTPUT")
+            if kbuild_dir is None or not os.path.isdir(kbuild_dir):
+                kbuild_dir = "./"
+            self.virtme_param["kdir"] = "--kdir " + kbuild_dir
 
     def _get_virtme_mods(self, args):
         if args.skip_modules or platform.system() != "Linux":

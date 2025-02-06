@@ -364,8 +364,8 @@ def do_it():
     makef = "Makefile"
 
     # Check if KBUILD_OUTPUT is defined and if it's a directory
-    config_dir = os.environ.get("KBUILD_OUTPUT", "")
-    if config_dir and os.path.isdir(config_dir):
+    config_dir = os.environ.get("KBUILD_OUTPUT")
+    if config_dir is not None and os.path.isdir(config_dir):
         config = os.path.join(config_dir, config)
         makef = os.path.join(config_dir, makef)
 
