@@ -884,7 +884,7 @@ class KernelSource:
         envs = []
         for var in args.envs:
             if var.startswith("O="):
-                self.virtme_param["kdir"] = "--kdir ./" + var[2:]
+                self.virtme_param["kdir"] = "--kdir " + var[2:]
             else:
                 envs.append(var)
         if envs:
