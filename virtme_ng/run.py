@@ -1202,13 +1202,13 @@ class KernelSource:
 
     def _get_virtme_qemu_opts(self, args):
         qemu_args = ""
-        if args.qemu_opts is not None:
-            qemu_args += " ".join(args.qemu_opts)
         if args.debug:
             # Enable vmcoreinfo (required by drgn memory dumps)
             qemu_args += "-device vmcoreinfo "
             # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
             qemu_args += "-s -qmp tcp:localhost:3636,server,nowait "
+        if args.qemu_opts is not None:
+            qemu_args += " ".join(args.qemu_opts)
         if qemu_args != "":
             self.virtme_param["qemu_opts"] = "--qemu-opts " + qemu_args
         else:
