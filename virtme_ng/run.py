@@ -1200,6 +1200,12 @@ class KernelSource:
             cpus = args.cpus
         self.virtme_param["cpus"] = f"--cpus {cpus}"
 
+    def _get_virtme_nvgpu(self, args):
+        if args.nvgpu is not None:
+            self.virtme_param["nvgpu"] = f"--nvgpu 'vfio-pci,host={args.nvgpu}'"
+        else:
+            self.virtme_param["nvgpu"] = ""
+
     def _get_virtme_qemu_opts(self, args):
         qemu_args = ""
         if args.qemu_opts is not None:
@@ -1213,12 +1219,6 @@ class KernelSource:
             self.virtme_param["qemu_opts"] = "--qemu-opts " + qemu_args
         else:
             self.virtme_param["qemu_opts"] = ""
-
-    def _get_virtme_nvgpu(self, args):
-        if args.nvgpu is not None:
-            self.virtme_param["nvgpu"] = f"--nvgpu 'vfio-pci,host={args.nvgpu}'"
-        else:
-            self.virtme_param["nvgpu"] = ""
 
     def run(self, args):
         """Execute a kernel inside virtme-ng."""
@@ -1260,9 +1260,9 @@ class KernelSource:
         self._get_virtme_gdb(args)
         self._get_virtme_snaps(args)
         self._get_virtme_busybox(args)
+        self._get_virtme_nvgpu(args)
         self._get_virtme_qemu(args)
         self._get_virtme_qemu_opts(args)
-        self._get_virtme_nvgpu(args)
 
         # Start VM using virtme-run
         cmd = (
@@ -1305,9 +1305,10 @@ class KernelSource:
             + f'{self.virtme_param["gdb"]} '
             + f'{self.virtme_param["snaps"]} '
             + f'{self.virtme_param["busybox"]} '
+            + f'{self.virtme_param["nvgpu"]} '
             + f'{self.virtme_param["qemu"]} '
             + f'{self.virtme_param["qemu_opts"]} '
-            + f'{self.virtme_param["nvgpu"]} '
+            # Important: qemu_opts has to be the last one
         )
         check_call(cmd, shell=True)
 
