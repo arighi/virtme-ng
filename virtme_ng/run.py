@@ -455,7 +455,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--arch",
         action="store",
         help="Generate and test a kernel for a specific architecture "
-        "(default is host architecture)",
+        "(default is host architecture ; if set, to be used with --root)",
     )
 
     parser.add_argument(
@@ -596,6 +596,7 @@ ARCH_MAPPING = {
         "kernel_target": "Image",
         "kernel_image": "Image",
     },
+    # adding a new arch? Please also update get_host_arch().
 }
 
 MAKE_COMMAND = "make LOCALVERSION=-virtme"
@@ -911,7 +912,13 @@ class KernelSource:
     def _get_virtme_arch(self, args):
         if args.arch is not None:
             if args.arch not in ARCH_MAPPING:
-                arg_fail(f"unsupported architecture: {args.arch}")
+                arg_fail(
+                    f"unsupported architecture ({args.arch}), "
+                    f"available: {' '.join(ARCH_MAPPING)}",
+                    show_usage=False
+                )
+            if args.root is None and get_host_arch() != args.arch:
+                arg_fail("--arch used without --root")
             if "max-cpus" in ARCH_MAPPING[args.arch]:
                 self.cpus = ARCH_MAPPING[args.arch]["max-cpus"]
             self.virtme_param["arch"] = "--arch " + ARCH_MAPPING[args.arch]["qemu_name"]
