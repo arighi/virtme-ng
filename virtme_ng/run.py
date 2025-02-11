@@ -427,7 +427,8 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--qemu-opts",
         "-o",
-        action="append",
+        nargs=argparse.REMAINDER,
+        metavar="OPTS...",
         help="Additional arguments for QEMU (can be used multiple times)"
         " or bundled together: --qemu-opts='...'",
     )
