@@ -464,7 +464,7 @@ fn mount_virtme_overlays() {
             utils::do_mkdir(upperdir);
             utils::do_mkdir(workdir);
             let result = utils::do_mount_check(&key, &path, "overlay", 0, mnt_opts);
-            if let Err(_) = result {
+            if result.is_err() {
                 // Old kernels don't support xino=on|off, re-try without this option.
                 let mnt_opts = &format!(
                     "lowerdir={},upperdir={},workdir={}",
@@ -800,7 +800,7 @@ fn setup_user_script(uid: u32) {
 
 fn setup_root_home() {
     // Set up a basic environment (unless virtme-ng is running as root on the host)
-    if let Err(_) = env::var("virtme_root_user") {
+    if env::var("virtme_root_user").is_err() {
         utils::do_mkdir("/run/tmp/roothome");
         utils::do_mount("/run/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
         env::set_var("HOME", "/run/tmp/roothome");
