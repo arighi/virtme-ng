@@ -220,6 +220,21 @@ Examples
    $ vng --build --arch arm64 --root /opt/chroot/arm64/
 ```
 
+ - Build the kernel using a separate build directory, and run it, in verbose:
+```
+   $ mkdir -p .virtme/build
+   $ vng O=.virtme/build --build --verbose
+   $ vng O=.virtme/build --verbose
+```
+
+ - Accelerate the kernel rebuilds using CCache (if installed):
+```
+   $ PATH="/usr/lib/ccache:${PATH}" \
+       KBUILD_BUILD_TIMESTAMP=0 \
+       vng --build
+   # or export the two variables before, see 'man ccache' for more details
+```
+
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
 ```
