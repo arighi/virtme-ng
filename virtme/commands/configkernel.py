@@ -365,7 +365,12 @@ def do_it():
 
     # Check if KBUILD_OUTPUT is defined and if it's a directory
     config_dir = os.environ.get("KBUILD_OUTPUT")
-    if config_dir is not None and os.path.isdir(config_dir):
+    if config_dir is not None:
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except Exception as exc:
+            print(f"Error: invalid directory for KBUILD_OUTPUT: {config_dir}")
+            raise SilentError() from exc
         config = os.path.join(config_dir, config)
         makef = os.path.join(config_dir, makef)
 
