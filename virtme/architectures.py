@@ -417,6 +417,10 @@ class Arch_s390x(Arch):
     def qemu_serial_console_args():
         return ["-device", "sclpconsole,chardev=console"]
 
+    @staticmethod
+    def earlyconsole_args() -> List[str]:
+        return ["earlyprintk=sclp"]
+
     def img_name(self) -> List[str]:
         return ["vmlinuz", "image"]
 
