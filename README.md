@@ -227,6 +227,14 @@ Examples
    $ vng O=.virtme/build --verbose
 ```
 
+ - Accelerate the kernel rebuilds using CCache (if installed):
+```
+   $ PATH="/usr/lib/ccache:${PATH}" \
+       KBUILD_BUILD_TIMESTAMP=0 \
+       vng --build
+   # or export the two variables before, see 'man ccache' for more details
+```
+
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
 ```
