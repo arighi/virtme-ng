@@ -220,6 +220,13 @@ Examples
    $ vng --build --arch arm64 --root /opt/chroot/arm64/
 ```
 
+ - Build the kernel using a separate build directory, and run it, in verbose:
+```
+   $ mkdir -p .virtme/build
+   $ vng O=.virtme/build --build --verbose
+   $ vng O=.virtme/build --verbose
+```
+
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
 ```
