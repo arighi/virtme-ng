@@ -410,6 +410,10 @@ class Arch_s390x(Arch):
         return ["CONFIG_MARCH_Z900=y"]
 
     @staticmethod
+    def serial_console_args() -> List[str]:
+        return ["ttysclp0"]
+
+    @staticmethod
     def qemu_serial_console_args():
         return ["-device", "sclpconsole,chardev=console"]
 
