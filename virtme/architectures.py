@@ -414,7 +414,7 @@ class Arch_s390x(Arch):
         return ["-device", "sclpconsole,chardev=console"]
 
     def img_name(self) -> List[str]:
-        return ["image"]
+        return ["vmlinuz", "image"]
 
 
 ARCHES = {
