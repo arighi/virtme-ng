@@ -249,6 +249,10 @@ fi
 mount --bind "$tmpfile" "$real_sudoers"
 
 if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
+    # Make sure all GIDs are allowed to create raw ICMP sockets (this
+    # allows to run ping as regular user).
+    echo "0 2147483647" > /proc/sys/net/ipv4/ping_group_range
+
     # udev is liable to rename the interface out from under us.
     for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
         virtme_net=$(basename "${d}")

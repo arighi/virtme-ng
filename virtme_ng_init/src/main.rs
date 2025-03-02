@@ -686,6 +686,15 @@ fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
 
     let cmdline = std::fs::read_to_string("/proc/cmdline").unwrap();
     if cmdline.contains("virtme.dhcp") {
+        // Make sure all GIDs are allowed to create raw ICMP sockets (this allows to run ping as
+        // regular user).
+        if let Ok(mut file) = OpenOptions::new()
+            .write(true)
+            .open("/proc/sys/net/ipv4/ping_group_range")
+        {
+            let _ = file.write_all("0 2147483647".as_bytes());
+        }
+
         if let Some(guest_tools_dir) = get_guest_tools_dir() {
             get_network_devices().into_iter().for_each(|network_dev| {
                 vec.push(get_network_handle(
