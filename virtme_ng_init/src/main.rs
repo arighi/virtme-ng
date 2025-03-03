@@ -930,6 +930,9 @@ fn run_user_gui(tty_fd: libc::c_int) {
         // directly here so we may need extra permissions on the tty devices.
         utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
 
+        // Clean up any previous X11 state.
+        utils::run_cmd("bash", &["-c", &"rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
+
         // Start xinit directly.
         storage = format!("su {} -c 'xinit /run/tmp/.xinitrc'", user);
         args.push(&storage);

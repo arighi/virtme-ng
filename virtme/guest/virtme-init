@@ -444,6 +444,9 @@ if [[ -n "${virtme_graphics}" ]]; then
         pre_exec_cmd=""
     fi
 
+    # Clean up any previous X11 state.
+    rm -f /tmp/.X11*/* /tmp/.X11-lock
+
     # Create a .xinitrc to start the requested graphical application.
     xinit_rc=/run/tmp/.xinitrc
     echo -e "${pre_exec_cmd}\nexec /run/tmp/.virtme-script" > ${xinit_rc}
