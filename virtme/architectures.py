@@ -64,6 +64,10 @@ class Arch:
         return []
 
     @staticmethod
+    def qemu_vmcoreinfo_args() -> List[str]:
+        return ["-device", "vmcoreinfo"]
+
+    @staticmethod
     def qemu_serial_console_args() -> List[str]:
         # We should be using the new-style -device serialdev,chardev=xyz,
         # but many architecture-specific serial devices don't support that.
@@ -420,6 +424,10 @@ class Arch_s390x(Arch):
     @staticmethod
     def earlyconsole_args() -> List[str]:
         return ["earlyprintk=sclp"]
+
+    @staticmethod
+    def qemu_vmcoreinfo_args() -> List[str]:
+        return []
 
     def img_name(self) -> List[str]:
         return ["vmlinuz", "image"]

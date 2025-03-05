@@ -142,6 +142,11 @@ def make_parser() -> argparse.ArgumentParser:
         help="Enable audio device (if the architecture supports it).",
     )
     g.add_argument(
+        "--vmcoreinfo",
+        action="store_true",
+        help="Enable vmcoreinfo device (if the architecture supports it).",
+    )
+    g.add_argument(
         "--snaps", action="store_true", help="Allow to execute snaps inside virtme-ng"
     )
     g.add_argument(
@@ -1719,6 +1724,9 @@ def do_it() -> int:
         qemuargs.extend(["-initrd", initrdpath])
     if kernel.dtb is not None:
         qemuargs.extend(["-dtb", kernel.dtb])
+
+    if args.vmcoreinfo is True:
+        qemuargs.extend(arch.qemu_vmcoreinfo_args())
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)

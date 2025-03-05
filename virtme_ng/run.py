@@ -1096,6 +1096,13 @@ class KernelSource:
         else:
             self.virtme_param["sound"] = ""
 
+    def _get_virtme_vmcoreinfo(self, args):
+        if args.debug:
+            # Enable vmcoreinfo (required by drgn memory dumps)
+            self.virtme_param["vmcoreinfo"] = "--vmcoreinfo"
+        else:
+            self.virtme_param["vmcoreinfo"] = ""
+
     def _get_virtme_disable_microvm(self, args):
         # Automatically disable microvm in debug mode, since it seems to
         # produce incomplete memory dumps.
@@ -1226,8 +1233,6 @@ class KernelSource:
     def _get_virtme_qemu_opts(self, args):
         qemu_args = ""
         if args.debug:
-            # Enable vmcoreinfo (required by drgn memory dumps)
-            qemu_args += "-device vmcoreinfo "
             # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
             qemu_args += "-s -qmp tcp:localhost:3636,server,nowait "
         if args.qemu_opts is not None:
@@ -1262,6 +1267,7 @@ class KernelSource:
         self._get_virtme_remote_cmd(args)
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
+        self._get_virtme_vmcoreinfo(args)
         self._get_virtme_disable_microvm(args)
         self._get_virtme_disable_monitor(args)
         self._get_virtme_disable_kvm(args)
@@ -1308,6 +1314,7 @@ class KernelSource:
             + f'{self.virtme_param["remote_cmd"]} '
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
+            + f'{self.virtme_param["vmcoreinfo"]} '
             + f'{self.virtme_param["disable_microvm"]} '
             + f'{self.virtme_param["disable_monitor"]} '
             + f'{self.virtme_param["disable_kvm"]} '
