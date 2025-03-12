@@ -37,6 +37,12 @@ if build_virtme_ng_init and not os.path.exists("virtme_ng_init/Cargo.toml"):
 # Always include standard site-packages to PYTHONPATH
 os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
 
+# Produce static Rust binaries.
+#
+# This is required to use the same virtme-ng-init across different root
+# filesystems (when `--root DIR` is used).
+os.environ["RUSTFLAGS"] = "-C target-feature=+crt-static " + os.environ.get("RUSTFLAGS", "")
+
 
 class BuildPy(build_py):
     def run(self):
