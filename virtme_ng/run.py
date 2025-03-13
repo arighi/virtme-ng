@@ -286,6 +286,10 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
+    )
+
+    parser.add_argument(
         "--cwd",
         action="store",
         help="Change guest working directory "
@@ -1050,6 +1054,12 @@ class KernelSource:
         else:
             self.virtme_param["ssh"] = ""
 
+    def _get_virtme_disable_monitor(self, args):
+        if args.disable_monitor:
+            self.virtme_param["disable_monitor"] = "--disable-monitor"
+        else:
+            self.virtme_param["disable_monitor"] = ""
+
     def _get_virtme_ssh_client(self, args):
         if args.console_client is not None and args.ssh_client is not None:
             arg_fail('--console-client cannot be used with --ssh-client', show_usage=False)
@@ -1253,6 +1263,7 @@ class KernelSource:
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_disable_microvm(args)
+        self._get_virtme_disable_monitor(args)
         self._get_virtme_disable_kvm(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
@@ -1298,6 +1309,7 @@ class KernelSource:
             + f'{self.virtme_param["disk"]} '
             + f'{self.virtme_param["sound"]} '
             + f'{self.virtme_param["disable_microvm"]} '
+            + f'{self.virtme_param["disable_monitor"]} '
             + f'{self.virtme_param["disable_kvm"]} '
             + f'{self.virtme_param["force_9p"]} '
             + f'{self.virtme_param["force_initramfs"]} '

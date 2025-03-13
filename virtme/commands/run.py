@@ -294,6 +294,11 @@ def make_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
     )
+    g.add_argument(
+        "--disable-monitor",
+        action="store_true",
+        help="Disable QEMU STDIO monitor"
+    )
 
     g = parser.add_argument_group(
         title="Guest userspace configuration"
@@ -1306,9 +1311,17 @@ def do_it() -> int:
         if args.verbose:
             kernelargs.extend(arch.earlyconsole_args())
 
-        qemuargs.extend(["-chardev", "stdio,id=console,signal=off,mux=on"])
+        qemuargs.extend(
+            [
+                "-chardev",
+                "stdio,id=console,signal=off,mux={}".format(
+                    "off" if args.disable_monitor else "on"
+                ),
+            ]
+        )
         qemuargs.extend(["-serial", "chardev:console"])
-        qemuargs.extend(["-mon", "chardev=console"])
+        if not args.disable_monitor:
+            qemuargs.extend(["-mon", "chardev=console"])
 
         kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
 
