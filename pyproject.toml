@@ -1,3 +1,6 @@
+[project]
+requires-python = ">=3.8"
+
 [build-system]
 requires = [
   "argparse-manpage[setuptools]",
