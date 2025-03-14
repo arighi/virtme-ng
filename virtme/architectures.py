@@ -76,8 +76,8 @@ class Arch:
     def kimg_path(self) -> str:
         return "arch/%s/boot/bzImage" % self.linuxname
 
-    def img_name(self) -> str:
-        return "vmlinuz"
+    def img_name(self) -> List[str]:
+        return ["vmlinuz"]
 
     @staticmethod
     def dtb_path() -> Optional[str]:
@@ -327,8 +327,8 @@ class Arch_ppc(Arch):
         # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
         return "vmlinux"
 
-    def img_name(self) -> str:
-        return "vmlinux"
+    def img_name(self) -> List[str]:
+        return ["vmlinux"]
 
 
 class Arch_riscv64(Arch):
@@ -413,8 +413,8 @@ class Arch_s390x(Arch):
     def qemu_serial_console_args():
         return ["-device", "sclpconsole,chardev=console"]
 
-    def img_name(self) -> str:
-        return "image"
+    def img_name(self) -> List[str]:
+        return ["image"]
 
 
 ARCHES = {

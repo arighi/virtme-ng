@@ -492,13 +492,20 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 args.kimg = None
 
     if args.kimg is not None:
-        img_name = arch.img_name()
-
-        # Try to resolve kimg as a kernel version first, then check if a file
-        # is provided.
-        kimg = "/usr/lib/modules/{}/{}".format(args.kimg, img_name)
-        if not os.path.exists(kimg):
+        img_name = None
+        for img_name_to_test in arch.img_name():
+            # Try to resolve kimg as a kernel version first, then check if a file
+            # is provided.
+            img_name = img_name_to_test
+            kimg = "/usr/lib/modules/{}/{}".format(args.kimg, img_name)
+            if os.path.exists(kimg):
+                break
             kimg = "/boot/{}-{}".format(img_name, args.kimg)
+            if os.path.exists(kimg):
+                break
+        else:
+            img_name = None
+            kimg = args.kimg
             if not os.path.exists(kimg):
                 kimg = args.kimg
                 if not os.path.exists(kimg):
