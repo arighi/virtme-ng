@@ -64,6 +64,10 @@ class Arch:
         return []
 
     @staticmethod
+    def qemu_vmcoreinfo_args() -> List[str]:
+        return ["-device", "vmcoreinfo"]
+
+    @staticmethod
     def qemu_serial_console_args() -> List[str]:
         # We should be using the new-style -device serialdev,chardev=xyz,
         # but many architecture-specific serial devices don't support that.
@@ -76,8 +80,8 @@ class Arch:
     def kimg_path(self) -> str:
         return "arch/%s/boot/bzImage" % self.linuxname
 
-    def img_name(self) -> str:
-        return "vmlinuz"
+    def img_name(self) -> List[str]:
+        return ["vmlinuz"]
 
     @staticmethod
     def dtb_path() -> Optional[str]:
@@ -327,8 +331,8 @@ class Arch_ppc(Arch):
         # Apparently SLOF (QEMU's bundled firmware?) can't boot a zImage.
         return "vmlinux"
 
-    def img_name(self) -> str:
-        return "vmlinux"
+    def img_name(self) -> List[str]:
+        return ["vmlinux"]
 
 
 class Arch_riscv64(Arch):
@@ -410,11 +414,23 @@ class Arch_s390x(Arch):
         return ["CONFIG_MARCH_Z900=y"]
 
     @staticmethod
+    def serial_console_args() -> List[str]:
+        return ["ttysclp0"]
+
+    @staticmethod
     def qemu_serial_console_args():
         return ["-device", "sclpconsole,chardev=console"]
 
-    def img_name(self) -> str:
-        return "image"
+    @staticmethod
+    def earlyconsole_args() -> List[str]:
+        return ["earlyprintk=sclp"]
+
+    @staticmethod
+    def qemu_vmcoreinfo_args() -> List[str]:
+        return []
+
+    def img_name(self) -> List[str]:
+        return ["vmlinuz", "image"]
 
 
 ARCHES = {

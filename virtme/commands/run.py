@@ -142,6 +142,11 @@ def make_parser() -> argparse.ArgumentParser:
         help="Enable audio device (if the architecture supports it).",
     )
     g.add_argument(
+        "--vmcoreinfo",
+        action="store_true",
+        help="Enable vmcoreinfo device (if the architecture supports it).",
+    )
+    g.add_argument(
         "--snaps", action="store_true", help="Allow to execute snaps inside virtme-ng"
     )
     g.add_argument(
@@ -424,7 +429,7 @@ def get_rootfs_from_kernel_path(path):
     return os.path.abspath(path)
 
 
-def get_kernel_version(img_name, path):
+def get_kernel_version(path, img_name: Optional[str] = None):
     if not os.path.exists(path):
         arg_fail(
             "kernel file %s does not exist, try --build to build the kernel" % path
@@ -456,7 +461,7 @@ def get_kernel_version(img_name, path):
 
     # The version detection fails s390x using file or strings tools, so check
     # if the file itself contains the version number.
-    if img_name:
+    if img_name is not None:
         match = re.search(fr"{img_name}-(\S{{3,}})", path)
         if match:
             return match.group(1)
@@ -492,18 +497,25 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 args.kimg = None
 
     if args.kimg is not None:
-        img_name = arch.img_name()
-
-        # Try to resolve kimg as a kernel version first, then check if a file
-        # is provided.
-        kimg = "/usr/lib/modules/%s/%s" % (args.kimg, img_name)
-        if not os.path.exists(kimg):
-            kimg = "/boot/%s-%s" % (img_name, args.kimg)
+        img_name = None
+        for img_name_to_test in arch.img_name():
+            # Try to resolve kimg as a kernel version first, then check if a file
+            # is provided.
+            img_name = img_name_to_test
+            kimg = "/usr/lib/modules/{}/{}".format(args.kimg, img_name)
+            if os.path.exists(kimg):
+                break
+            kimg = "/boot/{}-{}".format(img_name, args.kimg)
+            if os.path.exists(kimg):
+                break
+        else:
+            img_name = None
+            kimg = args.kimg
             if not os.path.exists(kimg):
                 kimg = args.kimg
                 if not os.path.exists(kimg):
                     arg_fail("%s does not exist" % args.kimg)
-        kver = get_kernel_version(img_name, kimg)
+        kver = get_kernel_version(kimg, img_name)
         if kver is None:
             # Unable to detect kernel version, try to boot without
             # automatically detecting modules.
@@ -550,7 +562,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
         # Run get_kernel_version to check at least if the kernel image exist.
-        kernel.version = get_kernel_version(None, kimg)
+        kernel.version = get_kernel_version(kimg)
         kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, ".virtme_mods")
         mod_file = os.path.join(args.kdir, "modules.order")
@@ -1712,6 +1724,9 @@ def do_it() -> int:
         qemuargs.extend(["-initrd", initrdpath])
     if kernel.dtb is not None:
         qemuargs.extend(["-dtb", kernel.dtb])
+
+    if args.vmcoreinfo is True:
+        qemuargs.extend(arch.qemu_vmcoreinfo_args())
 
     # Handle --qemu-opt(s)
     qemuargs.extend(args.qemu_opt)
