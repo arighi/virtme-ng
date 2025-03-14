@@ -21,7 +21,7 @@ VERSION = get_version_string()
 # Source .config if it exists (where we can potentially defined config/build
 # options)
 if os.path.exists(".config"):
-    with open(".config", "r", encoding="utf-8") as config_file:
+    with open(".config", encoding="utf-8") as config_file:
         for line in config_file:
             key, value = line.strip().split("=")
             os.environ[key] = value
@@ -138,7 +138,7 @@ setup(
     url="https://github.com/arighi/virtme-ng",
     license="GPLv2",
     long_description=open(
-        os.path.join(os.path.dirname(__file__), "README.md"), "r", encoding="utf-8"
+        os.path.join(os.path.dirname(__file__), "README.md"), encoding="utf-8"
     ).read(),
     long_description_content_type="text/markdown",
     install_requires=[

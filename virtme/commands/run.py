@@ -411,7 +411,7 @@ class Kernel:
         if os.path.isfile(cfgfile):
             self.config = {}
             regex = re.compile("^(CONFIG_[A-Z0-9_]+)=([ymn])$")
-            with open(cfgfile, "r", encoding="utf-8") as fd:
+            with open(cfgfile, encoding="utf-8") as fd:
                 for line in fd:
                     m = regex.match(line.strip())
                     if m:
@@ -635,7 +635,7 @@ class VirtioFS:
         # Make sure to kill virtiofsd instances that are still potentially running
         if self.pid is not None:
             try:
-                with open(self.pid, "r", encoding="utf-8") as fd:
+                with open(self.pid, encoding="utf-8") as fd:
                     pid = int(fd.read().strip())
                     os.kill(pid, signal.SIGTERM)
             except (FileNotFoundError, ValueError, OSError):
@@ -1024,7 +1024,7 @@ def ssh_server(args, arch, qemuargs, kernelargs):
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
-_RWDIR_RE = re.compile("^(%s)(?:=(%s))?$" % (_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
+_RWDIR_RE = re.compile("^({safe_path})(?:=({safe_path}))?$".format(safe_path=_SAFE_PATH_PATTERN))
 
 
 def do_it() -> int:
@@ -1089,7 +1089,7 @@ def do_it() -> int:
     # may see some EPERM errors, because certain applications/settings may
     # expect to be able to use a higher limit of the max number of open files.
     try:
-        with open('/proc/sys/fs/nr_open', 'r', encoding="utf-8") as file:
+        with open('/proc/sys/fs/nr_open', encoding="utf-8") as file:
             nr_open = file.readline().strip()
             kernelargs.append(f"nr_open={nr_open}")
     except FileNotFoundError:
@@ -1244,7 +1244,7 @@ def do_it() -> int:
     ):
         m = _RWDIR_RE.match(dirarg)
         if not m:
-            arg_fail("invalid --%s parameter %r" % (dirtype, dirarg))
+            arg_fail("invalid --{} parameter {!r}".format(dirtype, dirarg))
         if m.group(2) is not None:
             guestpath = m.group(1)
             hostpath = m.group(2)
@@ -1382,7 +1382,7 @@ def do_it() -> int:
             qemuargs.extend(
                 [
                     "-drive",
-                    "if=none,id=%s,file=%s" % (driveid, fn),
+                    "if=none,id={},file={}".format(driveid, fn),
                     "-device",
                     "%s,drive=%s,serial=%s"
                     % (arch.virtio_dev_type("blk"), driveid, name),
@@ -1398,7 +1398,7 @@ def do_it() -> int:
             qemuargs.extend(
                 [
                     "-drive",
-                    "if=none,id=%s,file=%s" % (driveid, fn),
+                    "if=none,id={},file={}".format(driveid, fn),
                     "-device",
                     "scsi-hd,drive=%s,vendor=virtme,product=disk,serial=%s"
                     % (driveid, name),
@@ -1414,7 +1414,7 @@ def do_it() -> int:
         if ret_path is None:
             return None
         try:
-            with open(ret_path, 'r', encoding="utf-8") as file:
+            with open(ret_path, encoding="utf-8") as file:
                 number_str = file.read().strip()
                 if number_str.isdigit():
                     return int(number_str)

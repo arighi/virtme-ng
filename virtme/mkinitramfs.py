@@ -103,7 +103,7 @@ def install_modules(cw, modfiles):
                 cw.write_file(name=modpath.encode("ascii"), body=f, mode=0o644)
 
     script = _LOGFUNC + "\n".join(
-        "log 'loading %s...'; insmod %s" % (os.path.basename(p), shlex.quote(p))
+        "log 'loading {}...'; insmod {}".format(os.path.basename(p), shlex.quote(p))
         for p in paths
     )
     cw.write_file(name=b"modules/load_all.sh", body=script.encode("ascii"), mode=0o644)
