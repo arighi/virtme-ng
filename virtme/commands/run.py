@@ -424,7 +424,7 @@ def get_rootfs_from_kernel_path(path):
     return os.path.abspath(path)
 
 
-def get_kernel_version(img_name, path):
+def get_kernel_version(path, img_name: Optional[str] = None):
     if not os.path.exists(path):
         arg_fail(
             "kernel file %s does not exist, try --build to build the kernel" % path
@@ -456,7 +456,7 @@ def get_kernel_version(img_name, path):
 
     # The version detection fails s390x using file or strings tools, so check
     # if the file itself contains the version number.
-    if img_name:
+    if img_name is not None:
         match = re.search(fr"{img_name}-(\S{{3,}})", path)
         if match:
             return match.group(1)
@@ -496,14 +496,14 @@ def find_kernel_and_mods(arch, args) -> Kernel:
 
         # Try to resolve kimg as a kernel version first, then check if a file
         # is provided.
-        kimg = "/usr/lib/modules/%s/%s" % (args.kimg, img_name)
+        kimg = "/usr/lib/modules/{}/{}".format(args.kimg, img_name)
         if not os.path.exists(kimg):
-            kimg = "/boot/%s-%s" % (img_name, args.kimg)
+            kimg = "/boot/{}-{}".format(img_name, args.kimg)
             if not os.path.exists(kimg):
                 kimg = args.kimg
                 if not os.path.exists(kimg):
                     arg_fail("%s does not exist" % args.kimg)
-        kver = get_kernel_version(img_name, kimg)
+        kver = get_kernel_version(kimg, img_name)
         if kver is None:
             # Unable to detect kernel version, try to boot without
             # automatically detecting modules.
@@ -550,7 +550,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
         # Run get_kernel_version to check at least if the kernel image exist.
-        kernel.version = get_kernel_version(None, kimg)
+        kernel.version = get_kernel_version(kimg)
         kernel.kimg = kimg
         virtme_mods = os.path.join(args.kdir, ".virtme_mods")
         mod_file = os.path.join(args.kdir, "modules.order")
