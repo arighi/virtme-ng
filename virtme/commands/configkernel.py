@@ -294,7 +294,7 @@ def do_it():
     custom_conf = []
     if args.custom:
         for conf_chunk in args.custom:
-            with open(conf_chunk, "r", encoding="utf-8") as fd:
+            with open(conf_chunk, encoding="utf-8") as fd:
                 custom_conf += fd.readlines()
 
     if args.verbose:

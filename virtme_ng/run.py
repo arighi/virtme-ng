@@ -664,7 +664,7 @@ class KernelSource:
         conf_path = self.get_conf_file_path()
         self.default_opts = []
         if conf_path is not None:
-            with open(conf_path, "r", encoding="utf-8") as conf_fd:
+            with open(conf_path, encoding="utf-8") as conf_fd:
                 conf_data = json.loads(conf_fd.read())
                 if "default_opts" in conf_data:
                     self.default_opts = conf_data["default_opts"]
@@ -1348,7 +1348,7 @@ class KernelSource:
             sys.exit(1)
         if args.verbose:
             sys.stdout.write(data.decode("utf-8"))
-        sock.send('{ "execute": "qmp_capabilities" }\r'.encode("utf-8"))
+        sock.send(b'{ "execute": "qmp_capabilities" }\r')
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
