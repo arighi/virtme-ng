@@ -1024,7 +1024,7 @@ def ssh_server(args, arch, qemuargs, kernelargs):
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
-_RWDIR_RE = re.compile("^({})(?:=({}))?$".format(_SAFE_PATH_PATTERN, _SAFE_PATH_PATTERN))
+_RWDIR_RE = re.compile("^({safe_path})(?:=({safe_path}))?$".format(safe_path=_SAFE_PATH_PATTERN))
 
 
 def do_it() -> int:
