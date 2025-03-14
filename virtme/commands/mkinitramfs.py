@@ -1,3 +1,4 @@
+#!/usr/bin/env python3
 # -*- mode: python -*-
 # virtme-mkinitramfs: Generate an initramfs image for virtme
 # Copyright © 2014 Andy Lutomirski
