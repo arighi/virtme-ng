@@ -1,4 +1,6 @@
 [project]
+name = "virtme-ng"
+dynamic = ["version", "license", "authors", "dependencies", "readme", "description", "classifiers", "scripts"]
 requires-python = ">=3.8"
 
 [build-system]
