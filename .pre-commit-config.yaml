@@ -4,6 +4,7 @@ repos:
     rev: v5.0.0
     hooks:
       - id: end-of-file-fixer
+        exclude: 'DCO-1\.1\.txt'
       - id: trailing-whitespace
       - id: check-merge-conflict
       - id: mixed-line-ending
