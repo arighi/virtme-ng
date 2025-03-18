@@ -497,11 +497,9 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 args.kimg = None
 
     if args.kimg is not None:
-        img_name = None
-        for img_name_to_test in arch.img_name():
+        for img_name in arch.img_name():
             # Try to resolve kimg as a kernel version first, then check if a file
             # is provided.
-            img_name = img_name_to_test
             kimg = "/usr/lib/modules/{}/{}".format(args.kimg, img_name)
             if os.path.exists(kimg):
                 break
@@ -509,24 +507,27 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             if os.path.exists(kimg):
                 break
         else:
-            img_name = None
             kimg = args.kimg
             if not os.path.exists(kimg):
-                kimg = args.kimg
-                if not os.path.exists(kimg):
-                    arg_fail("%s does not exist" % args.kimg)
-        kver = get_kernel_version(kimg, img_name)
-        if kver is None:
+                arg_fail("%s does not exist" % args.kimg)
+
+        # The for loop is a workaround for s390x to detect the version number
+        # from the filename.
+        for img_name in arch.img_name():
+            kver = get_kernel_version(kimg, img_name)
+            if kver is not None:
+                break
+        else:
             # Unable to detect kernel version, try to boot without
             # automatically detecting modules.
+            kver = None
             args.mods = "none"
             sys.stderr.write(
                 "warning: failed to retrieve kernel version from: "
                 + kimg
                 + " (modules may not work)\n"
             )
-        else:
-            kernel.version = kver
+        kernel.version = kver
         kernel.kimg = kimg
         if args.mods == "none":
             kernel.modfiles = []
