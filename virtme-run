@@ -12,6 +12,7 @@
 # NOTE: this command is deprecated, please use vng instead.
 
 import sys
+
 from virtme.commands import run
 
 sys.exit(run.main())

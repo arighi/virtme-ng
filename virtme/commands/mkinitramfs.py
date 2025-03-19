@@ -6,11 +6,10 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-import sys
 import argparse
-from .. import modfinder
-from .. import virtmods
-from .. import mkinitramfs
+import sys
+
+from .. import mkinitramfs, modfinder, virtmods
 
 
 def make_parser():

@@ -32,9 +32,7 @@ class Qemu:
             if not os.path.isfile(qemubin):
                 raise ValueError(f'specified qemu binary "{qemubin}" does not exist')
             if not os.access(qemubin, os.X_OK):
-                raise ValueError(
-                    f'specified qemu binary "{qemubin}" is not executable'
-                )
+                raise ValueError(f'specified qemu binary "{qemubin}" is not executable')
 
         self.qemubin = qemubin
         self.version = None

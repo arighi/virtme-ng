@@ -4,7 +4,8 @@
 """virtme-ng version"""
 
 import os
-from subprocess import check_output, DEVNULL, CalledProcessError
+from subprocess import DEVNULL, CalledProcessError, check_output
+
 import pkg_resources
 
 PKG_VERSION = "1.33"

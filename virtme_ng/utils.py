@@ -4,6 +4,7 @@
 """virtme-ng: configuration path."""
 
 from pathlib import Path
+
 from virtme_ng.spinner import Spinner
 
 CACHE_DIR = Path(Path.home(), ".cache", "virtme-ng")

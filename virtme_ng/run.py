@@ -4,32 +4,32 @@
 """virtme-ng: main command-line frontend."""
 
 import argparse
-import re
+import json
 import os
 import platform
-import sys
-import socket
+import re
+import shlex
 import shutil
-import json
 import signal
+import socket
+import sys
 import tempfile
+from pathlib import Path
+from select import select
 from subprocess import (
-    check_call,
-    check_output,
-    Popen,
     DEVNULL,
     PIPE,
     CalledProcessError,
+    Popen,
+    check_call,
+    check_output,
 )
-from select import select
-from pathlib import Path
-import shlex
 
 import argcomplete
 
 from virtme.util import SilentError, get_username
-from virtme_ng.utils import CONF_FILE, spinner_decorator
 from virtme_ng.mainline import KernelDownloader
+from virtme_ng.utils import CONF_FILE, spinner_decorator
 from virtme_ng.version import VERSION
 
 
@@ -240,7 +240,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--name",
         action="store",
         default="virtme-ng",
-        help="Set guest hostname and qemu -name flag"
+        help="Set guest hostname and qemu -name flag",
     )
 
     parser.add_argument(
@@ -282,7 +282,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--disable-kvm",
         action="store_true",
-        help='Avoid using hardware virtualization / KVM',
+        help="Avoid using hardware virtualization / KVM",
     )
 
     parser.add_argument(
@@ -341,7 +341,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         help="Create a NUMA node in the guest. "
         + "Use this option multiple times to create more NUMA nodes. "
         + "The total memory size assigned to NUMA nodes must match the guest memory size (specified with --memory/-m). "
-        + "This option implicitly disables the microvm architecture."
+        + "This option implicitly disables the microvm architecture.",
     )
 
     parser.add_argument(
@@ -350,7 +350,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="append",
         help="Set a distance of VAL between NUMA node SRC_NODE and DST_NODE. "
         + "Use this option multiple times to define multiple distances between NUMA nodes. "
-        + "This option is used only together with --numa."
+        + "This option is used only together with --numa.",
     )
 
     parser.add_argument(
@@ -463,9 +463,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--cross-compile",
-        action="store",
-        help="Set cross-compile prefix"
+        "--cross-compile", action="store", help="Set cross-compile prefix"
     )
 
     parser.add_argument(
@@ -501,7 +499,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         const=2222,
         metavar="PORT",
         help="Enable a server to communicate later from the host using '--console-client'. "
-        + "By default, a simple console will be offered using a VSOCK connection, and 'socat' for the proxy."
+        + "By default, a simple console will be offered using a VSOCK connection, and 'socat' for the proxy.",
     )
 
     g_remote.add_argument(
@@ -521,7 +519,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         type=int,
         const=2222,
         metavar="PORT",
-        help="Enable SSH server to communicate later from the host to using '--ssh-client'."
+        help="Enable SSH server to communicate later from the host to using '--ssh-client'.",
     )
 
     g_remote.add_argument(
@@ -629,7 +627,9 @@ def create_root(destdir, arch, release):
             if release == "n/a":
                 raise ValueError("unknown release")
         except (CalledProcessError, ValueError):
-            print("Unknown release, try specifying an Ubuntu release with --root-release")
+            print(
+                "Unknown release, try specifying an Ubuntu release with --root-release"
+            )
             sys.exit(1)
     url = (
         "https://cloud-images.ubuntu.com/"
@@ -646,12 +646,12 @@ def get_host_arch():
     """Translate host architecture to the corresponding virtme-ng arch name."""
     arch = platform.machine()
     arch_map = {
-        'x86_64': 'amd64',
-        'aarch64': 'arm64',
-        'armv7l': 'armhf',
-        'ppc64le': 'ppc64el',
-        'riscv64': 'riscv64',
-        's390x': 's390x',
+        "x86_64": "amd64",
+        "aarch64": "arm64",
+        "armv7l": "armhf",
+        "ppc64le": "ppc64el",
+        "riscv64": "riscv64",
+        "s390x": "s390x",
     }
     return arch_map.get(arch, None)
 
@@ -895,7 +895,7 @@ class KernelSource:
         if envs:
             args.exec = " ".join(envs)
         if args.exec is not None:
-            self.virtme_param["exec"] = f'--script-sh {shlex.quote(args.exec)}'
+            self.virtme_param["exec"] = f"--script-sh {shlex.quote(args.exec)}"
         else:
             self.virtme_param["exec"] = ""
 
@@ -919,7 +919,7 @@ class KernelSource:
                 arg_fail(
                     f"unsupported architecture ({args.arch}), "
                     f"available: {' '.join(ARCH_MAPPING)}",
-                    show_usage=False
+                    show_usage=False,
                 )
             if args.root is None and get_host_arch() != args.arch:
                 arg_fail("--arch used without --root")
@@ -969,7 +969,16 @@ class KernelSource:
         else:
             self.virtme_param["overlay_rwdir"] = " ".join(
                 f"--overlay-rwdir {d}"
-                for d in ("/etc", "/lib", "/home", "/opt", "/srv", "/usr", "/var", "/tmp")
+                for d in (
+                    "/etc",
+                    "/lib",
+                    "/home",
+                    "/opt",
+                    "/srv",
+                    "/usr",
+                    "/var",
+                    "/tmp",
+                )
             )
         # Add user-specified overlays.
         for item in args.overlay_rwdir:
@@ -980,13 +989,15 @@ class KernelSource:
             # If an upstream version is specified (using an upstream tag) fetch
             # and run the corresponding kernel from the Ubuntu mainline
             # repository.
-            if re.match(r'^v\d+(\.\d+)*(-rc\d+)?$', args.run):
+            if re.match(r"^v\d+(\.\d+)*(-rc\d+)?$", args.run):
                 if args.arch is None:
                     arch = get_host_arch()
                 else:
                     arch = args.arch
                 try:
-                    mainline = KernelDownloader(args.run, arch=arch, verbose=args.verbose)
+                    mainline = KernelDownloader(
+                        args.run, arch=arch, verbose=args.verbose
+                    )
                     self.virtme_param["kdir"] = "--kimg " + mainline.target
                 except FileNotFoundError as exc:
                     sys.stderr.write(str(exc) + "\n")
@@ -1026,7 +1037,9 @@ class KernelSource:
 
     def _get_virtme_net_mac_address(self, args):
         if args.net_mac_address is not None:
-            self.virtme_param["net_mac_address"] = "--net-mac-address " + args.net_mac_address
+            self.virtme_param["net_mac_address"] = (
+                "--net-mac-address " + args.net_mac_address
+            )
         else:
             self.virtme_param["net_mac_address"] = ""
 
@@ -1038,16 +1051,18 @@ class KernelSource:
 
     def _get_virtme_console_client(self, args):
         if args.console is not None and args.console_client is not None:
-            arg_fail('--console cannot be used with --console-client', show_usage=False)
+            arg_fail("--console cannot be used with --console-client", show_usage=False)
 
         if args.console_client is not None:
-            self.virtme_param["console_client"] = f"--client console --port {args.console_client}"
+            self.virtme_param["console_client"] = (
+                f"--client console --port {args.console_client}"
+            )
         else:
             self.virtme_param["console_client"] = ""
 
     def _get_virtme_ssh(self, args):
         if args.console is not None and args.ssh is not None:
-            arg_fail('--console cannot be used with --ssh', show_usage=False)
+            arg_fail("--console cannot be used with --ssh", show_usage=False)
 
         if args.ssh is not None:
             self.virtme_param["ssh"] = f"--server ssh --port {args.ssh}"
@@ -1062,13 +1077,15 @@ class KernelSource:
 
     def _get_virtme_ssh_client(self, args):
         if args.console_client is not None and args.ssh_client is not None:
-            arg_fail('--console-client cannot be used with --ssh-client', show_usage=False)
+            arg_fail(
+                "--console-client cannot be used with --ssh-client", show_usage=False
+            )
 
         if args.ssh is not None and args.ssh_client is not None:
-            arg_fail('--ssh cannot be used with --ssh-client', show_usage=False)
+            arg_fail("--ssh cannot be used with --ssh-client", show_usage=False)
 
         if args.console is not None and args.ssh_client is not None:
-            arg_fail('--console cannot be used with --ssh-client', show_usage=False)
+            arg_fail("--console cannot be used with --ssh-client", show_usage=False)
 
         if args.ssh_client is not None:
             self.virtme_param["ssh_client"] = f"--client ssh --port {args.ssh_client}"
@@ -1077,7 +1094,9 @@ class KernelSource:
 
     def _get_virtme_remote_cmd(self, args):
         if args.remote_cmd is not None:
-            self.virtme_param["remote_cmd"] = f"--remote-cmd {shlex.quote(args.remote_cmd)}"
+            self.virtme_param["remote_cmd"] = (
+                f"--remote-cmd {shlex.quote(args.remote_cmd)}"
+            )
         else:
             self.virtme_param["remote_cmd"] = ""
 
@@ -1131,7 +1150,7 @@ class KernelSource:
 
     def _get_virtme_graphics(self, args):
         if args.graphics:
-            self.virtme_param["graphics"] = '--graphics'
+            self.virtme_param["graphics"] = "--graphics"
         else:
             self.virtme_param["graphics"] = ""
 
@@ -1168,17 +1187,22 @@ class KernelSource:
     def _get_virtme_numa_distance(self, args):
         if args.numa_distance is not None:
             if not args.numa:
-                arg_fail("error: --numa-distance can be used only with --numa", show_usage=False)
+                arg_fail(
+                    "error: --numa-distance can be used only with --numa",
+                    show_usage=False,
+                )
             numa_dist_str = ""
             for arg in args.numa_distance:
                 try:
-                    nodes = arg.split('=')
-                    src, dst = nodes[0].split(',')
+                    nodes = arg.split("=")
+                    src, dst = nodes[0].split(",")
                     val = nodes[1]
                     numa_dist_str += f" --numa-distance src={src},dst={dst},val={val}"
                 except ValueError:
-                    err_msg = f"error: invalid distance '{arg}', " + \
-                               "NUMA distance string must be in the format SRC,DST=VAL"
+                    err_msg = (
+                        f"error: invalid distance '{arg}', "
+                        + "NUMA distance string must be in the format SRC,DST=VAL"
+                    )
                     arg_fail(err_msg, show_usage=False)
             self.virtme_param["numa_distance"] = numa_dist_str
         else:
@@ -1192,8 +1216,10 @@ class KernelSource:
 
     def _get_virtme_gdb(self, args):
         if args.gdb:
+
             def signal_handler(_signum, _frame):
                 pass  # No action needed for SIGINT in child (gdb will handle)
+
             signal.signal(signal.SIGINT, signal_handler)
             self.virtme_param["gdb"] = "--gdb"
         else:
@@ -1291,49 +1317,49 @@ class KernelSource:
         # Start VM using virtme-run
         cmd = (
             "virtme-run "
-            + f'{self.virtme_param["name"]} '
-            + f'{self.virtme_param["exec"]} '
-            + f'{self.virtme_param["user"]} '
-            + f'{self.virtme_param["arch"]} '
-            + f'{self.virtme_param["root"]} '
-            + f'{self.virtme_param["rw"]} '
-            + f'{self.virtme_param["rodir"]} '
-            + f'{self.virtme_param["rwdir"]} '
-            + f'{self.virtme_param["overlay_rwdir"]} '
-            + f'{self.virtme_param["cwd"]} '
-            + f'{self.virtme_param["kdir"]} '
-            + f'{self.virtme_param["dry_run"]} '
-            + f'{self.virtme_param["no_virtme_ng_init"]} '
-            + f'{self.virtme_param["mods"]} '
-            + f'{self.virtme_param["network"]} '
-            + f'{self.virtme_param["net_mac_address"]} '
-            + f'{self.virtme_param["console"]} '
-            + f'{self.virtme_param["console_client"]} '
-            + f'{self.virtme_param["ssh"]} '
-            + f'{self.virtme_param["ssh_client"]} '
-            + f'{self.virtme_param["remote_cmd"]} '
-            + f'{self.virtme_param["disk"]} '
-            + f'{self.virtme_param["sound"]} '
-            + f'{self.virtme_param["vmcoreinfo"]} '
-            + f'{self.virtme_param["disable_microvm"]} '
-            + f'{self.virtme_param["disable_monitor"]} '
-            + f'{self.virtme_param["disable_kvm"]} '
-            + f'{self.virtme_param["force_9p"]} '
-            + f'{self.virtme_param["force_initramfs"]} '
-            + f'{self.virtme_param["graphics"]} '
-            + f'{self.virtme_param["verbose"]} '
-            + f'{self.virtme_param["append"]} '
-            + f'{self.virtme_param["cpus"]} '
-            + f'{self.virtme_param["memory"]} '
-            + f'{self.virtme_param["numa"]} '
-            + f'{self.virtme_param["numa_distance"]} '
-            + f'{self.virtme_param["balloon"]} '
-            + f'{self.virtme_param["gdb"]} '
-            + f'{self.virtme_param["snaps"]} '
-            + f'{self.virtme_param["busybox"]} '
-            + f'{self.virtme_param["nvgpu"]} '
-            + f'{self.virtme_param["qemu"]} '
-            + f'{self.virtme_param["qemu_opts"]} '
+            + f"{self.virtme_param['name']} "
+            + f"{self.virtme_param['exec']} "
+            + f"{self.virtme_param['user']} "
+            + f"{self.virtme_param['arch']} "
+            + f"{self.virtme_param['root']} "
+            + f"{self.virtme_param['rw']} "
+            + f"{self.virtme_param['rodir']} "
+            + f"{self.virtme_param['rwdir']} "
+            + f"{self.virtme_param['overlay_rwdir']} "
+            + f"{self.virtme_param['cwd']} "
+            + f"{self.virtme_param['kdir']} "
+            + f"{self.virtme_param['dry_run']} "
+            + f"{self.virtme_param['no_virtme_ng_init']} "
+            + f"{self.virtme_param['mods']} "
+            + f"{self.virtme_param['network']} "
+            + f"{self.virtme_param['net_mac_address']} "
+            + f"{self.virtme_param['console']} "
+            + f"{self.virtme_param['console_client']} "
+            + f"{self.virtme_param['ssh']} "
+            + f"{self.virtme_param['ssh_client']} "
+            + f"{self.virtme_param['remote_cmd']} "
+            + f"{self.virtme_param['disk']} "
+            + f"{self.virtme_param['sound']} "
+            + f"{self.virtme_param['vmcoreinfo']} "
+            + f"{self.virtme_param['disable_microvm']} "
+            + f"{self.virtme_param['disable_monitor']} "
+            + f"{self.virtme_param['disable_kvm']} "
+            + f"{self.virtme_param['force_9p']} "
+            + f"{self.virtme_param['force_initramfs']} "
+            + f"{self.virtme_param['graphics']} "
+            + f"{self.virtme_param['verbose']} "
+            + f"{self.virtme_param['append']} "
+            + f"{self.virtme_param['cpus']} "
+            + f"{self.virtme_param['memory']} "
+            + f"{self.virtme_param['numa']} "
+            + f"{self.virtme_param['numa_distance']} "
+            + f"{self.virtme_param['balloon']} "
+            + f"{self.virtme_param['gdb']} "
+            + f"{self.virtme_param['snaps']} "
+            + f"{self.virtme_param['busybox']} "
+            + f"{self.virtme_param['nvgpu']} "
+            + f"{self.virtme_param['qemu']} "
+            + f"{self.virtme_param['qemu_opts']} "
             # Important: qemu_opts has to be the last one
         )
         check_call(cmd, shell=True)
