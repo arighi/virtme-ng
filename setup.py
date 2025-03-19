@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import os
+import pathlib
 import platform
 import subprocess
 import sys
@@ -42,6 +43,11 @@ os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
 # This is required to use the same virtme-ng-init across different root
 # filesystems (when `--root DIR` is used).
 os.environ["RUSTFLAGS"] = "-C target-feature=+crt-static " + os.environ.get("RUSTFLAGS", "")
+
+# Generate Rust version file
+version_rs_path = pathlib.Path("virtme_ng_init/src/version.rs")
+version_rs_path.parent.mkdir(parents=True, exist_ok=True)
+version_rs_path.write_text(f'pub const VERSION: &str = "{VERSION}";\n')
 
 
 class BuildPy(build_py):
