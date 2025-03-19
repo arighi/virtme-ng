@@ -34,4 +34,6 @@ select = [
     "UP",
     # flake8-bugbear
     "B",
+    # isort
+    "I",
 ]
