@@ -17,5 +17,6 @@ debian/virtme-ng.postinst.debhelper
 debian/virtme-ng.prerm.debhelper
 debian/virtme-ng.substvars
 virtme_ng_init/target
+virtme_ng_init/target/version.rs
 virtme/guest/.crate*
 virtme/guest/bin

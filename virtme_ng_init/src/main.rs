@@ -192,9 +192,22 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
 
 const USER_SCRIPT: &str = "/run/tmp/.virtme-script";
 
+mod version {
+    include!("../target/version.rs");
+}
+use crate::version::VERSION;
+
+fn print_build_info() {
+    log!("Build Information:");
+    log!("  Package Name: {}", env!("CARGO_PKG_NAME"));
+    log!("  Package Version: {}", VERSION);
+    log!("  Manifest Directory: {}", env!("CARGO_MANIFEST_DIR"));
+}
+
 fn check_init_pid() {
     if id() != 1 {
         log!("must be run as PID 1");
+        print_build_info();
         exit(1);
     }
 }
@@ -1101,7 +1114,8 @@ fn print_logo() {
      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
                                                 |___/"#;
     println!("{}", logo.trim_start_matches('\n'));
-    println!("   kernel version: {}", get_kernel_version(true));
+    println!("   version: {}", VERSION);
+    println!("   kernel:  {}", get_kernel_version(true));
     println!("   (CTRL+d to exit)\n");
 }
 
