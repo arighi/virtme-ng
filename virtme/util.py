@@ -64,5 +64,5 @@ def find_binary_or_raise(
 ) -> str:
     ret = find_binary(names, root=root, use_path=use_path)
     if ret is None:
-        raise RuntimeError("Could not find %r" % names)
+        raise RuntimeError(f"Could not find {names!r}")
     return ret

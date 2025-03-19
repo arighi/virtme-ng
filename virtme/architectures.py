@@ -33,7 +33,7 @@ class Arch:
     def virtio_dev_type(virtiotype) -> str:
         # Return a full name for a virtio device.  It would be
         # nice if QEMU abstracted this away, but it doesn't.
-        return "virtio-%s-pci" % virtiotype
+        return f"virtio-{virtiotype}-pci"
 
     @staticmethod
     def vhost_dev_type() -> str:
@@ -78,7 +78,7 @@ class Arch:
         return []
 
     def kimg_path(self) -> str:
-        return "arch/%s/boot/bzImage" % self.linuxname
+        return f"arch/{self.linuxname}/boot/bzImage"
 
     def img_name(self) -> List[str]:
         return ["vmlinuz"]
@@ -99,7 +99,7 @@ class Arch_x86(Arch):
         Arch.__init__(self, name)
 
         self.linuxname = "x86"
-        self.defconfig_target = "%s_defconfig" % name
+        self.defconfig_target = f"{name}_defconfig"
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -174,7 +174,7 @@ class Arch_x86(Arch):
 class Arch_microvm(Arch_x86):
     @staticmethod
     def virtio_dev_type(virtiotype):
-        return "virtio-%s-device" % virtiotype
+        return f"virtio-{virtiotype}-device"
 
     @staticmethod
     def vhost_dev_type() -> str:
@@ -234,7 +234,7 @@ class Arch_arm(Arch):
 
     @staticmethod
     def virtio_dev_type(virtiotype):
-        return "virtio-%s-device" % virtiotype
+        return f"virtio-{virtiotype}-device"
 
     @staticmethod
     def earlyconsole_args():
@@ -287,7 +287,7 @@ class Arch_aarch64(Arch):
 
     @staticmethod
     def virtio_dev_type(virtiotype):
-        return "virtio-%s-device" % virtiotype
+        return f"virtio-{virtiotype}-device"
 
     @staticmethod
     def earlyconsole_args():
@@ -390,7 +390,7 @@ class Arch_s390x(Arch):
 
     @staticmethod
     def virtio_dev_type(virtiotype):
-        return "virtio-%s-ccw" % virtiotype
+        return f"virtio-{virtiotype}-ccw"
 
     @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):

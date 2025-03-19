@@ -90,10 +90,6 @@ class EggInfo(egg_info):
         egg_info.run(self)
 
 
-if sys.version_info < (3, 8):
-    print("virtme-ng requires Python 3.8 or higher")
-    sys.exit(1)
-
 packages = [
     "virtme_ng",
     "virtme",

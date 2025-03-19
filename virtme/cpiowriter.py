@@ -87,7 +87,7 @@ class CpioWriter:
             0,
         ]
 
-        hdr = ("070701" + "".join("%08X" % f for f in fields)).encode("ascii")
+        hdr = ("070701" + "".join(f"{f:08X}" for f in fields)).encode("ascii")
 
         self.__write(hdr)
         self.__write(name)
