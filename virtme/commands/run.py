@@ -1257,7 +1257,7 @@ def do_it() -> int:
             arg_fail(f"error: cannot access {hostpath} on the host")
         # Guest path must be defined inside one of the overlays
         guest_path_ok = False
-        for i, d in enumerate(args.overlay_rwdir):
+        for d in args.overlay_rwdir:
             if os.path.exists(guestpath) or is_subpath(guestpath, d):
                 guest_path_ok = True
                 break
