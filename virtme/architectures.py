@@ -393,12 +393,20 @@ class Arch_s390x(Arch):
         self.linuxname = "s390"
 
     @staticmethod
+    def virtiofs_support() -> bool:
+        return True
+
+    @staticmethod
     def numa_support() -> bool:
         return False
 
     @staticmethod
     def virtio_dev_type(virtiotype):
         return f"virtio-{virtiotype}-ccw"
+
+    @staticmethod
+    def vhost_dev_type() -> str:
+        return "vhost-user-fs-ccw"
 
     @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):
