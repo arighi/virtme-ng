@@ -23,6 +23,10 @@ class Arch:
         return False
 
     @staticmethod
+    def numa_support() -> bool:
+        return True
+
+    @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu) -> List[str]:
         _ = is_native
         _ = use_kvm
@@ -387,6 +391,10 @@ class Arch_s390x(Arch):
         Arch.__init__(self, "s390x")
 
         self.linuxname = "s390"
+
+    @staticmethod
+    def numa_support() -> bool:
+        return False
 
     @staticmethod
     def virtio_dev_type(virtiotype):
