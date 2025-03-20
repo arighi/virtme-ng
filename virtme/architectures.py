@@ -399,6 +399,9 @@ class Arch_s390x(Arch):
         # Ask for the latest version of s390-ccw
         ret.extend(["-M", "s390-ccw-virtio"])
 
+        if is_native and use_kvm:
+            ret.extend(["-cpu", "host"])
+
         # To be able to configure a console, we need to get rid of the
         # default console
         ret.extend(["-nodefaults"])
