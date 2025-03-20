@@ -10,6 +10,7 @@
 import os
 import shutil
 import subprocess
+
 import pkg_resources
 
 
@@ -26,7 +27,7 @@ def find_guest_tools():
 def find_script(name) -> str:
     # If we're running out of a source checkout, we can find scripts in the
     # 'bin' directory.
-    fn = pkg_resources.resource_filename(__name__, "../bin/%s" % name)
+    fn = pkg_resources.resource_filename(__name__, f"../bin/{name}")
     if os.path.isfile(fn):
         return fn
 
@@ -36,7 +37,7 @@ def find_script(name) -> str:
         return guess
 
     # No luck.  This is somewhat surprising.
-    raise FileNotFoundError("could not find script %s" % name)
+    raise FileNotFoundError(f"could not find script {name}")
 
 
 def run_script(name, **kwargs) -> None:

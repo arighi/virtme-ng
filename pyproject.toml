@@ -25,3 +25,15 @@ manpages = [
   :description=Quickly run kernels inside a virtualized snapshot of your live system\
   """,
 ]
+
+[tool.ruff.lint]
+select = [
+    # Pyflakes
+    "F",
+    # pyupgrade
+    "UP",
+    # flake8-bugbear
+    "B",
+    # isort
+    "I",
+]

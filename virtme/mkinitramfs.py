@@ -5,14 +5,13 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-from typing import List, Dict, Optional
-
 import io
 import os
-import tempfile
 import shlex
-from . import cpiowriter
-from . import util
+import tempfile
+from typing import Dict, List, Optional
+
+from . import cpiowriter, util
 
 
 def make_base_layout(cw):
@@ -57,7 +56,7 @@ def install_busybox(cw, config):
         "cp",
         "cat",
     ):
-        cw.symlink(b"busybox", ("bin/%s" % tool).encode("ascii"))
+        cw.symlink(b"busybox", (f"bin/{tool}").encode("ascii"))
 
     cw.mkdir(b"bin/real_progs", mode=0o755)
 
@@ -92,9 +91,9 @@ def install_modules(cw, modfiles):
     paths = []
     with tempfile.TemporaryDirectory() as tmpdirname:
         for mod in modfiles:
-            if mod.endswith('.zst'):
+            if mod.endswith(".zst"):
                 mod_file = os.path.basename(mod)
-                uncompressed_mod = tmpdirname + '/' + os.path.splitext(mod_file)[0]
+                uncompressed_mod = tmpdirname + "/" + os.path.splitext(mod_file)[0]
                 os.system(f"zstd -d < {mod} > {uncompressed_mod}")
                 mod = uncompressed_mod
             with open(mod, "rb") as f:
@@ -103,7 +102,7 @@ def install_modules(cw, modfiles):
                 cw.write_file(name=modpath.encode("ascii"), body=f, mode=0o644)
 
     script = _LOGFUNC + "\n".join(
-        "log 'loading {}...'; insmod {}".format(os.path.basename(p), shlex.quote(p))
+        f"log 'loading {os.path.basename(p)}...'; insmod {shlex.quote(p)}"
         for p in paths
     )
     cw.write_file(name=b"modules/load_all.sh", body=script.encode("ascii"), mode=0o644)

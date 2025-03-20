@@ -5,12 +5,11 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-from typing import Optional, Sequence
-
-import os
-import shutil
 import getpass
 import itertools
+import os
+import shutil
+from typing import Optional, Sequence
 
 
 class SilentError(Exception):
@@ -64,5 +63,5 @@ def find_binary_or_raise(
 ) -> str:
     ret = find_binary(names, root=root, use_path=use_path)
     if ret is None:
-        raise RuntimeError("Could not find %r" % names)
+        raise RuntimeError(f"Could not find {names!r}")
     return ret

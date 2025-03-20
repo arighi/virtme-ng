@@ -23,18 +23,16 @@ class Qemu:
         self.cannot_overmount_virtfs = None
 
         if not qemubin:
-            qemubin = shutil.which("qemu-system-%s" % arch)
+            qemubin = shutil.which(f"qemu-system-{arch}")
             if qemubin is None and arch == platform.machine():
                 qemubin = shutil.which("qemu-kvm")
             if qemubin is None:
-                raise ValueError("cannot find qemu for %s" % arch)
+                raise ValueError(f"cannot find qemu for {arch}")
         else:
             if not os.path.isfile(qemubin):
-                raise ValueError('specified qemu binary "%s" does not exist' % qemubin)
+                raise ValueError(f'specified qemu binary "{qemubin}" does not exist')
             if not os.access(qemubin, os.X_OK):
-                raise ValueError(
-                    'specified qemu binary "%s" is not executable' % qemubin
-                )
+                raise ValueError(f'specified qemu binary "{qemubin}" is not executable')
 
         self.qemubin = qemubin
         self.version = None

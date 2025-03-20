@@ -7,6 +7,7 @@
 
 import os
 import sys
+
 os.environ["__VNG_LOCAL"] = "1"
 from virtme_ng import run  # noqa: E402
 
@@ -15,9 +16,9 @@ from virtme_ng import run  # noqa: E402
 # source directory, without necessarily installing virtme-ng in the system.
 def update_path():
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    current_path = os.environ.get('PATH', '')
-    new_path = f'{script_dir}:{current_path}'
-    os.environ['PATH'] = new_path
+    current_path = os.environ.get("PATH", "")
+    new_path = f"{script_dir}:{current_path}"
+    os.environ["PATH"] = new_path
 
 
 update_path()

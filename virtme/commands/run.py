@@ -5,33 +5,29 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-from typing import Any, Optional, List, NoReturn, Dict, Tuple
-
-import atexit
 import argparse
-import tempfile
-import os
-import platform
+import atexit
 import errno
 import fcntl
-import sys
-import shlex
-import re
 import itertools
-import subprocess
+import os
+import platform
+import re
+import shlex
 import signal
+import subprocess
+import sys
+import tempfile
 import termios
+from base64 import b64encode
 from shutil import which
 from time import sleep
-from base64 import b64encode
+from typing import Any, Dict, List, NoReturn, Optional, Tuple
+
 from virtme_ng.utils import CACHE_DIR
-from .. import virtmods
-from .. import modfinder
-from .. import mkinitramfs
-from .. import qemu_helpers
-from .. import architectures
-from .. import resources
-from ..util import SilentError, get_username, find_binary_or_raise
+
+from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
+from ..util import SilentError, find_binary_or_raise, get_username
 
 
 def make_parser() -> argparse.ArgumentParser:
@@ -266,7 +262,7 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument(
         "--disable-kvm",
         action="store_true",
-        help='Avoid using hardware virtualization / KVM',
+        help="Avoid using hardware virtualization / KVM",
     )
     g.add_argument(
         "--force-initramfs",
@@ -300,9 +296,7 @@ def make_parser() -> argparse.ArgumentParser:
         help="Fallback to the bash virtme-init (useful for debugging/development)",
     )
     g.add_argument(
-        "--disable-monitor",
-        action="store_true",
-        help="Disable QEMU STDIO monitor"
+        "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
     )
 
     g = parser.add_argument_group(
@@ -349,7 +343,7 @@ def make_parser() -> argparse.ArgumentParser:
         nargs="?",
         choices=cli_srv_choices,
         help="Enable a server to communicate later from the host to the device using '--client'. "
-        + "By default, a simple console will be offered using a VSOCK connection, and 'socat' for the proxy."
+        + "By default, a simple console will be offered using a VSOCK connection, and 'socat' for the proxy.",
     )
     g.add_argument(
         "--client",
@@ -396,7 +390,15 @@ def has_memory_suffix(string):
 
 
 class Kernel:
-    __slots__ = ["kimg", "version", "dtb", "modfiles", "moddir", "use_root_mods", "config"]
+    __slots__ = [
+        "kimg",
+        "version",
+        "dtb",
+        "modfiles",
+        "moddir",
+        "use_root_mods",
+        "config",
+    ]
 
     kimg: str
     version: str
@@ -431,11 +433,9 @@ def get_rootfs_from_kernel_path(path):
 
 def get_kernel_version(path, img_name: Optional[str] = None):
     if not os.path.exists(path):
-        arg_fail(
-            "kernel file %s does not exist, try --build to build the kernel" % path
-        )
+        arg_fail(f"kernel file {path} does not exist, try --build to build the kernel")
     if not os.access(path, os.R_OK):
-        arg_fail("unable to access %s (check for read permissions)" % path)
+        arg_fail(f"unable to access {path} (check for read permissions)")
     try:
         result = subprocess.run(
             ["file", path], capture_output=True, text=True, check=False
@@ -462,7 +462,7 @@ def get_kernel_version(path, img_name: Optional[str] = None):
     # The version detection fails s390x using file or strings tools, so check
     # if the file itself contains the version number.
     if img_name is not None:
-        match = re.search(fr"{img_name}-(\S{{3,}})", path)
+        match = re.search(rf"{img_name}-(\S{{3,}})", path)
         if match:
             return match.group(1)
 
@@ -500,16 +500,16 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         for img_name in arch.img_name():
             # Try to resolve kimg as a kernel version first, then check if a file
             # is provided.
-            kimg = "/usr/lib/modules/{}/{}".format(args.kimg, img_name)
+            kimg = f"/usr/lib/modules/{args.kimg}/{img_name}"
             if os.path.exists(kimg):
                 break
-            kimg = "/boot/{}-{}".format(img_name, args.kimg)
+            kimg = f"/boot/{img_name}-{args.kimg}"
             if os.path.exists(kimg):
                 break
         else:
             kimg = args.kimg
             if not os.path.exists(kimg):
-                arg_fail("%s does not exist" % args.kimg)
+                arg_fail(f"{args.kimg} does not exist")
 
         # The for loop is a workaround for s390x to detect the version number
         # from the filename.
@@ -538,7 +538,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             # If we are using the entire host filesystem or if we are using
             # a chroot (via --root) we don't have to do anything special action
             # the modules, just rely on /lib/modules in the target rootfs.
-            if root_dir == "/" or args.root != '/':
+            if root_dir == "/" or args.root != "/":
                 kernel.use_root_mods = True
             kernel.moddir = f"{root_dir}/lib/modules/{kver}"
             if not os.path.exists(kernel.moddir):
@@ -712,8 +712,8 @@ class VirtioFS:
         else:
             stderr = ""
         os.system(
-            f"{virtiofsd_path} --syslog --no-announce-submounts " +
-            f"--socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} &"
+            f"{virtiofsd_path} --syslog --no-announce-submounts "
+            + f"--socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} &"
         )
         max_attempts = 5
         check_duration = 0.1
@@ -726,7 +726,9 @@ class VirtioFS:
             check_duration *= 2
         else:
             if verbose:
-                sys.stderr.write("virtme-run: failed to start virtiofsd, fallback to 9p")
+                sys.stderr.write(
+                    "virtme-run: failed to start virtiofsd, fallback to 9p"
+                )
             return False
         return True
 
@@ -755,11 +757,13 @@ def export_virtiofs(
         return False
 
     # Adjust qemu options to use virtiofsd
-    fsid = "virtfs%d" % len(qemuargs)
+    fsid = f"virtfs{len(qemuargs)}"
     vhost_dev_type = arch.vhost_dev_type()
 
     qemuargs.extend(["-chardev", f"socket,id=char{fsid},path={virtio_fs.sock}"])
-    qemuargs.extend(["-device", f"{vhost_dev_type},chardev=char{fsid},tag={config.mount_tag}"])
+    qemuargs.extend(
+        ["-device", f"{vhost_dev_type},chardev=char{fsid},tag={config.mount_tag}"]
+    )
 
     memory = config.memory if config.memory is not None else "128M"
     if memory == 0:
@@ -787,12 +791,11 @@ def export_virtfs(
 ) -> None:
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
     # that isn't a valid QEMU identifier.
-    fsid = "virtfs%d" % len(qemuargs)
+    fsid = f"virtfs{len(qemuargs)}"
     qemuargs.extend(
         [
             "-fsdev",
-            "local,id=%s,path=%s,security_model=%s%s%s"
-            % (
+            "local,id={},path={},security_model={}{}{}".format(
                 fsid,
                 qemu.quote_optarg(config.path),
                 config.security_model,
@@ -804,8 +807,9 @@ def export_virtfs(
     qemuargs.extend(
         [
             "-device",
-            "%s,fsdev=%s,mount_tag=%s"
-            % (arch.virtio_dev_type("9p"), fsid, qemu.quote_optarg(config.mount_tag)),
+            "{},fsdev={},mount_tag={}".format(
+                arch.virtio_dev_type("9p"), fsid, qemu.quote_optarg(config.mount_tag)
+            ),
         ]
     )
 
@@ -815,7 +819,7 @@ def quote_karg(arg: str) -> str:
         raise ValueError("cannot quote '\"' in kernel args")
 
     if " " in arg:
-        return '"%s"' % arg
+        return f'"{arg}"'
     return arg
 
 
@@ -823,12 +827,12 @@ def quote_karg(arg: str) -> str:
 def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
     namefile = arg.split("=", 1)
     if len(namefile) != 2:
-        arg_fail("invalid argument to %s" % func)
+        arg_fail(f"invalid argument to {func}")
     name, fn = namefile
     if "=" in fn or "," in fn:
-        arg_fail("%s filenames cannot contain '=' or ','" % (func))
+        arg_fail(f"{func} filenames cannot contain '=' or ','")
     if "=" in name or "," in name:
-        arg_fail("%s device names cannot contain '=' or ','" % (func))
+        arg_fail(f"{func} device names cannot contain '=' or ','")
 
     return name, fn
 
@@ -852,7 +856,12 @@ def can_use_kvm(args):
 
 
 def can_use_microvm(args):
-    return not args.disable_microvm and not args.numa and args.arch == "x86_64" and can_use_kvm(args)
+    return (
+        not args.disable_microvm
+        and not args.numa
+        and args.arch == "x86_64"
+        and can_use_kvm(args)
+    )
 
 
 def has_read_acl(username, file_path):
@@ -906,14 +915,14 @@ def console_client(args):
     try:
         # with tty support
         (cols, rows) = os.get_terminal_size()
-        stty = f'stty rows {rows} cols {cols} iutf8 echo'
-        socat_in = f'file:{os.ttyname(sys.stdin.fileno())},raw,echo=0'
+        stty = f"stty rows {rows} cols {cols} iutf8 echo"
+        socat_in = f"file:{os.ttyname(sys.stdin.fileno())},raw,echo=0"
     except OSError:
-        stty = ''
-        socat_in = '-'
-    socat_out = f'VSOCK-CONNECT:{args.port}:1024'
+        stty = ""
+        socat_in = "-"
+    socat_out = f"VSOCK-CONNECT:{args.port}:1024"
 
-    user = args.user if args.user else '${virtme_user:-root}'
+    user = args.user if args.user else "${virtme_user:-root}"
 
     if args.pwd:
         cwd = os.path.relpath(os.getcwd(), args.root)
@@ -923,44 +932,45 @@ def console_client(args):
         cwd = '${virtme_chdir:+"${virtme_chdir}"}'
 
     # use 'su' only if needed: another use, or to get a prompt
-    cmd = f'if [ "{user}" != "root" ]; then\n' + \
-          f'  exec su "{user}"'
+    cmd = f'if [ "{user}" != "root" ]; then\n' + f'  exec su "{user}"'
     if args.remote_cmd is not None:
         exec_escaped = args.remote_cmd.replace('"', '\\"')
-        cmd += f' -c "{exec_escaped}"' + \
-               '\nelse\n' + \
-               f'  {args.remote_cmd}\n'
+        cmd += f' -c "{exec_escaped}"' + "\nelse\n" + f"  {args.remote_cmd}\n"
     else:
-        cmd += '\nelse\n' + \
-                '  exec su\n'
-    cmd += 'fi'
+        cmd += "\nelse\n" + "  exec su\n"
+    cmd += "fi"
 
     console_script_path = get_console_path(args.port)
-    with open(console_script_path, 'w', encoding="utf-8") as file:
-        print((
-            '#! /bin/bash\n'
-            'main() {\n'
-            f'{stty}\n'
-            f'HOME=$(getent passwd "{user}" | cut -d: -f6)\n'
-            f'cd {cwd}\n'
-            f'{cmd}\n'
-            '}\n'
-            'main'  # use a function to avoid issues when the script is modified
-        ), file=file)
+    with open(console_script_path, "w", encoding="utf-8") as file:
+        print(
+            (
+                "#! /bin/bash\n"
+                "main() {\n"
+                f"{stty}\n"
+                f'HOME=$(getent passwd "{user}" | cut -d: -f6)\n'
+                f"cd {cwd}\n"
+                f"{cmd}\n"
+                "}\n"
+                "main"  # use a function to avoid issues when the script is modified
+            ),
+            file=file,
+        )
     os.chmod(console_script_path, 0o755)
 
     if args.dry_run:
-        print('socat', socat_in, socat_out)
+        print("socat", socat_in, socat_out)
     else:
-        os.execvp('socat', ['socat', socat_in, socat_out])
+        os.execvp("socat", ["socat", socat_in, socat_out])
 
 
 def console_server(args, qemu, arch, qemuargs, kernelargs):
     console_script_path = get_console_path(args.port)
     if os.path.exists(console_script_path):
-        arg_fail("console: '%s' file exists: " % console_script_path
-                 + "another VM is running with the same --port? "
-                 + "If not, remove this file.")
+        arg_fail(
+            f"console: '{console_script_path}' file exists: "
+            + "another VM is running with the same --port? "
+            + "If not, remove this file."
+        )
 
     def cleanup_console_script():
         os.unlink(console_script_path)
@@ -968,7 +978,7 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
     # create an empty file that can be populated later on
     console_script_dir = os.path.dirname(console_script_path)
     os.makedirs(console_script_dir, exist_ok=True)
-    open(console_script_path, 'w', encoding="utf-8").close()
+    open(console_script_path, "w", encoding="utf-8").close()
     atexit.register(cleanup_console_script)
 
     if args.remote_cmd is not None:
@@ -981,10 +991,10 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
                 mount_tag="virtme.vsockmount",
             )
             export_virtfs(qemu, arch, qemuargs, virtfs_config)
-            kernelargs.append("virtme_vsockmount=%s" % console_script_dir)
+            kernelargs.append(f"virtme_vsockmount={console_script_dir}")
 
     kernelargs.extend([f"virtme.vsockexec=`{console_exec}`"])
-    qemuargs.extend(["-device", "vhost-vsock-pci,guest-cid=%d" % args.port])
+    qemuargs.extend(["-device", f"vhost-vsock-pci,guest-cid={args.port}"])
 
 
 def ssh_client(args):
@@ -1019,13 +1029,13 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     kernelargs.extend([f"virtme_ssh_user={username}"])
 
     # Setup a port forward network interface for the guest.
-    qemuargs.extend(["-device", "%s,netdev=ssh" % (arch.virtio_dev_type("net"))])
-    qemuargs.extend(["-netdev", "user,id=ssh,hostfwd=tcp:127.0.0.1:%d-:22" % args.port])
+    qemuargs.extend(["-device", "{},netdev=ssh".format(arch.virtio_dev_type("net"))])
+    qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
 
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
 _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
-_RWDIR_RE = re.compile("^({safe_path})(?:=({safe_path}))?$".format(safe_path=_SAFE_PATH_PATTERN))
+_RWDIR_RE = re.compile(f"^({_SAFE_PATH_PATTERN})(?:=({_SAFE_PATH_PATTERN}))?$")
 
 
 def do_it() -> int:
@@ -1033,11 +1043,11 @@ def do_it() -> int:
 
     if args.client is not None:
         if args.server is not None:
-            arg_fail('--client cannot be used with --server.')
+            arg_fail("--client cannot be used with --server.")
 
-        if args.client == 'console':
+        if args.client == "console":
             console_client(args)
-        elif args.client == 'ssh':
+        elif args.client == "ssh":
             ssh_client(args)
         sys.exit(0)
 
@@ -1063,13 +1073,13 @@ def do_it() -> int:
     if args.gdb:
         if kernel.version:
             print(f"kernel version = {kernel.version}")
-        vmlinux = ''
+        vmlinux = ""
         if os.path.exists("vmlinux"):
             vmlinux = "vmlinux"
         elif os.path.exists(f"/usr/lib/debug/boot/vmlinux-{kernel.version}"):
             vmlinux = f"/usr/lib/debug/boot/vmlinux-{kernel.version}"
-        command = ['gdb', '-q', '-ex', 'target remote localhost:1234', vmlinux]
-        os.execvp('gdb', command)
+        command = ["gdb", "-q", "-ex", "target remote localhost:1234", vmlinux]
+        os.execvp("gdb", command)
         sys.exit(0)
 
     qemuargs: List[str] = [qemu.qemubin]
@@ -1078,7 +1088,7 @@ def do_it() -> int:
     # Put the '-name' flag first so it's easily visible in ps, top, etc.
     if args.name:
         qemuargs.extend(["-name", args.name])
-        kernelargs.append("virtme_hostname=%s" % args.name)
+        kernelargs.append(f"virtme_hostname={args.name}")
 
     if args.memory:
         # If no memory suffix is specified, assume it's MB.
@@ -1090,7 +1100,7 @@ def do_it() -> int:
     # may see some EPERM errors, because certain applications/settings may
     # expect to be able to use a higher limit of the max number of open files.
     try:
-        with open('/proc/sys/fs/nr_open', encoding="utf-8") as file:
+        with open("/proc/sys/fs/nr_open", encoding="utf-8") as file:
             nr_open = file.readline().strip()
             kernelargs.append(f"nr_open={nr_open}")
     except FileNotFoundError:
@@ -1101,16 +1111,18 @@ def do_it() -> int:
         for i, numa in enumerate(args.numa, start=1):
             size, cpus = numa.split(",", 1) if "," in numa else (numa, None)
             cpus = f",{cpus}" if cpus else ""
-            qemuargs.extend([
-                "-object", f"memory-backend-memfd,id=mem{i},size={size},share=on",
-                "-numa", f"node,memdev=mem{i}{cpus}"
-            ])
+            qemuargs.extend(
+                [
+                    "-object",
+                    f"memory-backend-memfd,id=mem{i},size={size},share=on",
+                    "-numa",
+                    f"node,memdev=mem{i}{cpus}",
+                ]
+            )
 
     if args.numa_distance:
         for arg in args.numa_distance:
-            qemuargs.extend([
-                "-numa", f"dist,{arg}"
-            ])
+            qemuargs.extend(["-numa", f"dist,{arg}"])
 
     if args.snaps:
         if args.root == "/":
@@ -1231,8 +1243,7 @@ def do_it() -> int:
             # This allows symlinks within the module directory to resolve
             # correctly in the guest.
             kernelargs.append(
-                "virtme_link_mods=/%s"
-                % qemu.quote_optarg(os.path.relpath(kernel.moddir, args.root))
+                f"virtme_link_mods=/{qemu.quote_optarg(os.path.relpath(kernel.moddir, args.root))}"
             )
     else:
         # No modules are available.  virtme-init will hide /lib/modules/KVER
@@ -1245,7 +1256,7 @@ def do_it() -> int:
     ):
         m = _RWDIR_RE.match(dirarg)
         if not m:
-            arg_fail("invalid --{} parameter {!r}".format(dirtype, dirarg))
+            arg_fail(f"invalid --{dirtype} parameter {dirarg!r}")
         if m.group(2) is not None:
             guestpath = m.group(1)
             hostpath = m.group(2)
@@ -1253,34 +1264,36 @@ def do_it() -> int:
             hostpath = m.group(1)
             guestpath = os.path.relpath(hostpath, args.root)
             if guestpath.startswith(".."):
-                arg_fail("%r is not inside the root" % hostpath)
+                arg_fail(f"{hostpath!r} is not inside the root")
 
         # Check if paths are accessible both on the host and the guest.
         if not os.path.exists(hostpath):
             arg_fail(f"error: cannot access {hostpath} on the host")
         # Guest path must be defined inside one of the overlays
         guest_path_ok = False
-        for i, d in enumerate(args.overlay_rwdir):
+        for d in args.overlay_rwdir:
             if os.path.exists(guestpath) or is_subpath(guestpath, d):
                 guest_path_ok = True
                 break
         if not guest_path_ok:
-            arg_fail(f"error: cannot initialize {guestpath} inside the guest " +
-                     "(path must be defined inside a valid overlay)")
+            arg_fail(
+                f"error: cannot initialize {guestpath} inside the guest "
+                + "(path must be defined inside a valid overlay)"
+            )
 
         idx = mount_index
         mount_index += 1
-        tag = "virtme.initmount%d" % idx
+        tag = f"virtme.initmount{idx}"
         virtfs_config = VirtFSConfig(
             path=hostpath,
             mount_tag=tag,
             readonly=(dirtype != "rwdir"),
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
-        kernelargs.append("virtme_initmount%d=%s" % (idx, guestpath))
+        kernelargs.append(f"virtme_initmount{idx}={guestpath}")
 
     for i, d in enumerate(args.overlay_rwdir):
-        kernelargs.append("virtme_rw_overlay%d=%s" % (i, d))
+        kernelargs.append(f"virtme_rw_overlay{i}={d}")
 
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)
@@ -1336,7 +1349,9 @@ def do_it() -> int:
         if not args.disable_monitor:
             qemuargs.extend(["-mon", "chardev=console"])
 
-        kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
+        kernelargs.extend(
+            ["virtme_console=" + arg for arg in arch.serial_console_args()]
+        )
 
         if args.nvgpu is None:
             qemuargs.extend(arch.qemu_nodisplay_args())
@@ -1353,8 +1368,7 @@ def do_it() -> int:
             terminal_size = os.get_terminal_size()
             kernelargs.extend(
                 [
-                    "virtme_stty_con=rows %d cols %d iutf8"
-                    % (terminal_size.lines, terminal_size.columns)
+                    f"virtme_stty_con=rows {terminal_size.lines} cols {terminal_size.columns} iutf8"
                 ]
             )
         except OSError as e:
@@ -1364,45 +1378,47 @@ def do_it() -> int:
 
         # Propagate the terminal type
         if "TERM" in os.environ:
-            kernelargs.extend(["TERM=%s" % os.environ["TERM"]])
+            kernelargs.extend(["TERM={}".format(os.environ["TERM"])])
 
     if args.sound:
         qemuargs.extend(arch.qemu_sound_args())
         kernelargs.extend(["virtme.sound"])
 
     if args.balloon:
-        qemuargs.extend(["-device", "%s,id=balloon0" % arch.virtio_dev_type("balloon")])
+        qemuargs.extend(
+            ["-device", "{},id=balloon0".format(arch.virtio_dev_type("balloon"))]
+        )
 
     if args.cpus:
         qemuargs.extend(["-smp", args.cpus])
 
     if args.blk_disk:
         for i, d in enumerate(args.blk_disk):
-            driveid = "blk-disk%d" % i
+            driveid = f"blk-disk{i}"
             name, fn = sanitize_disk_args("--blk-disk", d)
             qemuargs.extend(
                 [
                     "-drive",
-                    "if=none,id={},file={}".format(driveid, fn),
+                    f"if=none,id={driveid},file={fn}",
                     "-device",
-                    "%s,drive=%s,serial=%s"
-                    % (arch.virtio_dev_type("blk"), driveid, name),
+                    "{},drive={},serial={}".format(
+                        arch.virtio_dev_type("blk"), driveid, name
+                    ),
                 ]
             )
 
     if args.disk:
-        qemuargs.extend(["-device", "%s,id=scsi" % arch.virtio_dev_type("scsi")])
+        qemuargs.extend(["-device", "{},id=scsi".format(arch.virtio_dev_type("scsi"))])
 
         for i, d in enumerate(args.disk):
-            driveid = "disk%d" % i
+            driveid = f"disk{i}"
             name, fn = sanitize_disk_args("--disk", d)
             qemuargs.extend(
                 [
                     "-drive",
-                    "if=none,id={},file={}".format(driveid, fn),
+                    f"if=none,id={driveid},file={fn}",
                     "-device",
-                    "scsi-hd,drive=%s,vendor=virtme,product=disk,serial=%s"
-                    % (driveid, name),
+                    f"scsi-hd,drive={driveid},vendor=virtme,product=disk,serial={name}",
                 ]
             )
 
@@ -1432,9 +1448,11 @@ def do_it() -> int:
                 qemuargs.extend(arch.qemu_nodisplay_nvgpu_args())
 
         # Check if we can redirect stdin/stdout/stderr.
-        if not can_access_file("/proc/self/fd/0") or \
-           not can_access_file("/proc/self/fd/1") or \
-           not can_access_file("/proc/self/fd/2"):
+        if (
+            not can_access_file("/proc/self/fd/0")
+            or not can_access_file("/proc/self/fd/1")
+            or not can_access_file("/proc/self/fd/2")
+        ):
             print(
                 "ERROR: not a valid pts, try to run vng with a valid PTS "
                 "(e.g., inside tmux or screen)",
@@ -1511,7 +1529,7 @@ def do_it() -> int:
         for oldfd, mode in ((0, os.O_RDONLY), (1, os.O_WRONLY), (2, os.O_WRONLY)):
             if os.isatty(oldfd):
                 try:
-                    newfd = os.open("/proc/self/fd/%d" % oldfd, mode)
+                    newfd = os.open(f"/proc/self/fd/{oldfd}", mode)
                 except OSError:
                     pass
                 else:
@@ -1535,7 +1553,9 @@ def do_it() -> int:
     if args.script_sh is not None:
         _, ret_path = tempfile.mkstemp(prefix="virtme_ret")
         atexit.register(cleanup_script_retcode)
-        do_script(args.script_sh, ret_path=ret_path, show_boot_console=args.show_boot_console)
+        do_script(
+            args.script_sh, ret_path=ret_path, show_boot_console=args.show_boot_console
+        )
 
     if args.script_exec is not None:
         do_script(
@@ -1552,38 +1572,54 @@ def do_it() -> int:
         if args.net_mac_address is None:
             return ""
 
-        mac = args.net_mac_address.split(':')
+        mac = args.net_mac_address.split(":")
         try:
             mac[5] = "%02x" % ((int(mac[5], 16) + index) % 256)
         except (ValueError, IndexError):
-            arg_fail("--net-mac-address: invalid MAC address: '%s'" % args.net_mac_address)
+            arg_fail(
+                f"--net-mac-address: invalid MAC address: '{args.net_mac_address}'"
+            )
         return ",mac=" + ":".join(mac)
 
     if args.net:
         extend_dhcp = False
         index = 0
         for net in args.net:
-            qemuargs.extend(["-device", "%s,netdev=n%d%s" %
-                            (arch.virtio_dev_type("net"), index, get_net_mac(index))])
+            qemuargs.extend(
+                [
+                    "-device",
+                    "{},netdev=n{}{}".format(
+                        arch.virtio_dev_type("net"), index, get_net_mac(index)
+                    ),
+                ]
+            )
             if net == "user":
-                qemuargs.extend(["-netdev", "user,id=n%d" % index])
+                qemuargs.extend(["-netdev", f"user,id=n{index}"])
                 extend_dhcp = True
             elif net == "bridge" or net.startswith("bridge="):
-                if len(net) > 7 and net[6] == '=':
+                if len(net) > 7 and net[6] == "=":
                     bridge = net[7:]
                 else:
                     bridge = "virbr0"
-                qemuargs.extend(["-netdev", "bridge,id=n%d,br=%s" % (index, bridge)])
+                qemuargs.extend(["-netdev", f"bridge,id=n{index},br={bridge}"])
                 extend_dhcp = True
             elif net == "loop":
                 hubid = index
-                qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
+                qemuargs.extend(["-netdev", f"hubport,id=n{index},hubid={hubid}"])
                 index += 1
-                qemuargs.extend(["-device", "%s,netdev=n%d%s" %
-                                (arch.virtio_dev_type("net"), index, get_net_mac(index))])
-                qemuargs.extend(["-netdev", "hubport,id=n%d,hubid=%d" % (index, hubid)])
+                qemuargs.extend(
+                    [
+                        "-device",
+                        "{},netdev=n{}{}".format(
+                            arch.virtio_dev_type("net"), index, get_net_mac(index)
+                        ),
+                    ]
+                )
+                qemuargs.extend(["-netdev", f"hubport,id=n{index},hubid={hubid}"])
             else:
-                arg_fail("--net: invalid choice: '%s' (choose from user, bridge(=<br>), loop)" % net)
+                arg_fail(
+                    f"--net: invalid choice: '{net}' (choose from user, bridge(=<br>), loop)"
+                )
             index += 1
         if extend_dhcp:
             kernelargs.extend(["virtme.dhcp"])
@@ -1606,7 +1642,7 @@ def do_it() -> int:
         if rel_pwd.startswith(".."):
             print("current working directory is not contained in the root")
             return 1
-        kernelargs.append("virtme_chdir=%s" % rel_pwd)
+        kernelargs.append(f"virtme_chdir={rel_pwd}")
 
     if args.cwd is not None:
         if args.pwd:
@@ -1615,10 +1651,10 @@ def do_it() -> int:
         if rel_cwd.startswith(".."):
             print("specified working directory is not contained in the root")
             return 1
-        kernelargs.append("virtme_chdir=%s" % rel_cwd)
+        kernelargs.append(f"virtme_chdir={rel_cwd}")
 
     if args.user and args.user != "root":
-        kernelargs.append("virtme_user=%s" % args.user)
+        kernelargs.append(f"virtme_user={args.user}")
 
     if args.nvgpu:
         qemuargs.extend(["-device", args.nvgpu])
@@ -1668,7 +1704,7 @@ def do_it() -> int:
             initrdpath = args.save_initramfs
         else:
             fcntl.fcntl(initramfsfd, fcntl.F_SETFD, 0)
-            initrdpath = "/proc/self/fd/%d" % initramfsfd
+            initrdpath = f"/proc/self/fd/{initramfsfd}"
     else:
         if args.save_initramfs is not None:
             print(

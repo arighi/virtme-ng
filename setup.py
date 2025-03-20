@@ -5,7 +5,9 @@ import platform
 import subprocess
 import sys
 import sysconfig
+
 from argcomplete import shell_integration
+
 try:
     from build_manpages import build_manpages, get_build_py_cmd, get_install_cmd
 except ModuleNotFoundError:
@@ -13,6 +15,7 @@ except ModuleNotFoundError:
 from setuptools import setup
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
+
 from virtme_ng.version import get_version_string
 
 os.environ["__VNG_LOCAL"] = "1"
@@ -31,17 +34,21 @@ build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
 
 # Make sure virtme-ng-init submodule has been cloned
 if build_virtme_ng_init and not os.path.exists("virtme_ng_init/Cargo.toml"):
-    sys.stderr.write("WARNING: virtme-ng-init submodule not available, trying to clone it\n")
+    sys.stderr.write(
+        "WARNING: virtme-ng-init submodule not available, trying to clone it\n"
+    )
     subprocess.check_call("git submodule update --init --recursive", shell=True)
 
 # Always include standard site-packages to PYTHONPATH
-os.environ['PYTHONPATH'] = sysconfig.get_paths()['purelib']
+os.environ["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
 
 # Produce static Rust binaries.
 #
 # This is required to use the same virtme-ng-init across different root
 # filesystems (when `--root DIR` is used).
-os.environ["RUSTFLAGS"] = "-C target-feature=+crt-static " + os.environ.get("RUSTFLAGS", "")
+os.environ["RUSTFLAGS"] = "-C target-feature=+crt-static " + os.environ.get(
+    "RUSTFLAGS", ""
+)
 
 
 class BuildPy(build_py):
@@ -57,10 +64,14 @@ class BuildPy(build_py):
                 if machine == "arm64":
                     machine = "aarch64"
                 target = f"{machine}-unknown-linux-musl"
-                args.extend([
-                    "--target", target,
-                    "--config", f"target.{target}.linker = \"rust-lld\"",
-                ])
+                args.extend(
+                    [
+                        "--target",
+                        target,
+                        "--config",
+                        f'target.{target}.linker = "rust-lld"',
+                    ]
+                )
             subprocess.check_call(args, cwd="virtme_ng_init")
             subprocess.check_call(
                 ["strip", os.path.join(root, "bin", "virtme-ng-init")],
@@ -85,14 +96,12 @@ class EggInfo(egg_info):
             os.mkdir(guest_bin_dir)
 
         # Install guest binaries
-        if (build_virtme_ng_init and not os.path.exists("virtme/guest/bin/virtme-ng-init")):
+        if build_virtme_ng_init and not os.path.exists(
+            "virtme/guest/bin/virtme-ng-init"
+        ):
             self.run_command("build")
         egg_info.run(self)
 
-
-if sys.version_info < (3, 8):
-    print("virtme-ng requires Python 3.8 or higher")
-    sys.exit(1)
 
 packages = [
     "virtme_ng",
@@ -121,9 +130,9 @@ if build_manpages:
     data_files.append(("/usr/share/man/man1", ["man/vng.1"]))
 
 cmdclass = {
-        "egg_info": EggInfo,
-        "build_py": BuildPy,
-    }
+    "egg_info": EggInfo,
+    "build_py": BuildPy,
+}
 if build_manpages:
     cmdclass["build_manpages"] = build_manpages
     cmdclass["build_py"] = get_build_py_cmd(BuildPy)
@@ -142,12 +151,12 @@ setup(
     ).read(),
     long_description_content_type="text/markdown",
     install_requires=[
-        'argcomplete',
-        'requests',
+        "argcomplete",
+        "requests",
         # `pkg_resources` is removed in python 3.12, moved to setuptools.
         #
         # TODO: replace pkg_resources with importlib. # pylint: disable=fixme
-        'setuptools',
+        "setuptools",
     ],
     entry_points={
         "console_scripts": [

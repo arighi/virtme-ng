@@ -11,12 +11,12 @@ sort of hotplug.  Instead it generates a topological order and loads
 everything.  The idea is to require very few modules.
 """
 
-from typing import List
-
+import itertools
+import platform
 import re
 import subprocess
-import platform
-import itertools
+from typing import List
+
 from . import util
 
 _INSMOD_RE = re.compile("insmod (.*[^ ]) *$")

@@ -4,7 +4,8 @@
 """virtme-ng version"""
 
 import os
-from subprocess import check_output, DEVNULL, CalledProcessError
+from subprocess import DEVNULL, CalledProcessError, check_output
+
 import pkg_resources
 
 PKG_VERSION = "1.33"
@@ -34,7 +35,7 @@ def get_version_string():
         # Otherwise fallback to the static version defined in PKG_VERSION.
         version = (
             check_output(
-                "cd %s && [ -e ../.git ] && git describe --long --dirty" % os.path.dirname(__file__),
+                f"cd {os.path.dirname(__file__)} && [ -e ../.git ] && git describe --long --dirty",
                 shell=True,
                 stderr=DEVNULL,
             )
