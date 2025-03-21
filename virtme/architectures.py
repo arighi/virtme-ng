@@ -418,6 +418,9 @@ class Arch_s390x(Arch):
         if is_native and use_kvm:
             ret.extend(["-cpu", "host"])
 
+        # Add a watchdog. This is useful for testing.
+        ret.extend(["-device", "diag288,id=watchdog0"])
+
         # To be able to configure a console, we need to get rid of the
         # default console
         ret.extend(["-nodefaults"])
@@ -430,7 +433,7 @@ class Arch_s390x(Arch):
 
     @staticmethod
     def config_base():
-        return ["CONFIG_MARCH_Z900=y"]
+        return ["CONFIG_MARCH_Z900=y", "CONFIG_DIAG288_WATCHDOG=y"]
 
     @staticmethod
     def serial_console_args() -> List[str]:
