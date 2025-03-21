@@ -770,7 +770,10 @@ def export_virtiofs(
         return True
 
     qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
-    qemuargs.extend(["-numa", "node,memdev=mem"])
+    if arch.numa_support():
+        qemuargs.extend(["-numa", "node,memdev=mem"])
+    else:
+        qemuargs.extend(["-machine", "memory-backend=mem"])
 
     return True
 
