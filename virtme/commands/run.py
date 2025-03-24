@@ -758,7 +758,7 @@ def export_virtiofs(
 
     # Adjust qemu options to use virtiofsd
     fsid = f"virtfs{len(qemuargs)}"
-    vhost_dev_type = arch.vhost_dev_type()
+    vhost_dev_type = arch.vhost_dev_type("user-fs")
 
     qemuargs.extend(["-chardev", f"socket,id=char{fsid},path={virtio_fs.sock}"])
     qemuargs.extend(
@@ -997,7 +997,9 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
             kernelargs.append(f"virtme_vsockmount={console_script_dir}")
 
     kernelargs.extend([f"virtme.vsockexec=`{console_exec}`"])
-    qemuargs.extend(["-device", f"vhost-vsock-pci,guest-cid={args.port}"])
+    qemuargs.extend(
+        ["-device", f"{arch.vhost_dev_type('vsock')},guest-cid={args.port}"]
+    )
 
 
 def ssh_client(args):
