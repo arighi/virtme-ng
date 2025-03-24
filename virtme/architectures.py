@@ -23,6 +23,10 @@ class Arch:
         return False
 
     @staticmethod
+    def numa_support() -> bool:
+        return True
+
+    @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu) -> List[str]:
         _ = is_native
         _ = use_kvm
@@ -389,8 +393,20 @@ class Arch_s390x(Arch):
         self.linuxname = "s390"
 
     @staticmethod
+    def virtiofs_support() -> bool:
+        return True
+
+    @staticmethod
+    def numa_support() -> bool:
+        return False
+
+    @staticmethod
     def virtio_dev_type(virtiotype):
         return f"virtio-{virtiotype}-ccw"
+
+    @staticmethod
+    def vhost_dev_type() -> str:
+        return "vhost-user-fs-ccw"
 
     @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):
@@ -398,6 +414,12 @@ class Arch_s390x(Arch):
 
         # Ask for the latest version of s390-ccw
         ret.extend(["-M", "s390-ccw-virtio"])
+
+        if is_native and use_kvm:
+            ret.extend(["-cpu", "host"])
+
+        # Add a watchdog. This is useful for testing.
+        ret.extend(["-device", "diag288,id=watchdog0"])
 
         # To be able to configure a console, we need to get rid of the
         # default console
@@ -411,7 +433,7 @@ class Arch_s390x(Arch):
 
     @staticmethod
     def config_base():
-        return ["CONFIG_MARCH_Z900=y"]
+        return ["CONFIG_MARCH_Z900=y", "CONFIG_DIAG288_WATCHDOG=y"]
 
     @staticmethod
     def serial_console_args() -> List[str]:
