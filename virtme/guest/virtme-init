@@ -139,7 +139,7 @@ for tag in "${!virtme_initmount@}"; do
 done
 
 if [[ -n "${virtme_chdir}" ]]; then
-    cd -- "${virtme_chdir}"
+    cd -- "${virtme_chdir}" || exit
 fi
 
 log "basic initialization done"
