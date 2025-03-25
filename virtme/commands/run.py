@@ -1010,7 +1010,7 @@ def ssh_client(args):
     cmd = ["ssh", "-p", str(args.port), "localhost"] + remote_cmd
 
     if args.dry_run:
-        print(" ".join(cmd))
+        print(shlex.join(cmd))
     else:
         os.execvp("ssh", cmd)
 

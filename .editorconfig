@@ -1,0 +1,38 @@
+# Check https://editorconfig.org for details
+
+root = true
+
+[*]
+end_of_line = lf
+insert_final_newline = true
+charset = utf-8
+indent_style = space
+tab_width = 4
+trim_trailing_whitespace = true
+
+[*.sh]
+shell_variant = bash  # used by `shfmt`
+indent_style = space
+indent_size = 4
+
+# Supported by `shfmt`, but not official EditorConfig specification. See
+# https://github.com/mvdan/sh/commit/7f96e7d84a265f4d1005b96493422cde800bf9d1
+# for details.
+[[shell]]
+indent_style = space
+indent_size = 4
+space_redirects = true
+
+[*.y{a,}ml]
+indent_style = space
+indent_size = 2
+
+[*.py]
+indent_style = space
+indent_size = 4
+
+[{Makefile,*.mak}]
+indent_style = tab
+
+[{COMMIT_EDITMSG,EDIT_DESCRIPTION}]
+max_line_length = 72

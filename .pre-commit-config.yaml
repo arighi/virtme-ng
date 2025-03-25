@@ -16,3 +16,16 @@ repos:
       - id: ruff
         args: [--fix]
       - id: ruff-format
+  - repo: local
+    hooks:
+      - id: shellcheck
+        name: ShellCheck
+        entry: shellcheck
+        language: system
+        types: [shell]
+      - id: shellfmt
+        name: shellfmt
+        entry: shfmt
+        language: system
+        args: [-w]
+        types: [shell]
