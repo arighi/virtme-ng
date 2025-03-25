@@ -46,4 +46,4 @@ for key in "${CACHE_DIR}"/etc/ssh/ssh_host_*_key; do
     ARGS+=(-h "${key}")
 done
 
-/usr/sbin/sshd -f "${SSH_CONFIG}" "${ARGS[@]}"
+/usr/sbin/sshd "${ARGS[@]}"
