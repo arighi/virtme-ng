@@ -35,7 +35,7 @@ for tag in "${!virtme_rw_overlay@}"; do
 done
 
 # Setup kernel modules
-kver="`uname -r`"
+kver="$(uname -r)"
 
 # Make sure to always have /lib/modules, otherwise we won't be able to
 # configure kmod support properly (this can happen in some container
@@ -57,19 +57,20 @@ fi
 
 # Adjust max limit of open files
 if [[ -n "${nr_open}" ]]; then
-    echo ${nr_open} > /proc/sys/fs/nr_open
+    printf -- '%s\n' "${nr_open}" > /proc/sys/fs/nr_open
 fi
 
 # devtmpfs might be automounted; if not, mount it.
 if ! grep -q devtmpfs /proc/mounts; then
     # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
     if [[ -c /dev/null ]]; then
-	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
-	    &>/dev/null
+	    mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
+	        &>/dev/null
     else
-	mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+	    mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
     fi
 
+    # shellcheck disable=SC2181
     if (( $? != 0 )); then
 	# The running kernel doesn't have devtmpfs.  Use regular tmpfs.
 	mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
@@ -115,7 +116,7 @@ fi
 if [ -d /var/lib/dpkg ]; then
     lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
     for file in "${lock_files[@]}"; do
-	[ -e $file ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
+	[ -e "$file" ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
     done
 fi
 
@@ -146,10 +147,10 @@ log "basic initialization done"
 ######## The remainder of this script is a very simple init (PID 1) ########
 
 # Does the system use systemd-tmpfiles?
-tmpfiles=`which systemd-tmpfiles 2>/dev/null` && {
+if command -v systemd-tmpfiles &>/dev/null; then
     log "running systemd-tmpfiles"
     systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
-}
+fi
 
 # Make dbus work (if tmpfiles wasn't there or didn't create the directory).
 install -d /run/dbus
@@ -164,7 +165,7 @@ mount -t securityfs securityfs /sys/kernel/security &>/dev/null
 #
 # If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
 # behavior and mount the legacy cgroup v1 layout.
-if cat /proc/cmdline |grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )'; then
+if grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )' /proc/cmdline; then
     mount -t tmpfs cgroup /sys/fs/cgroup
     sybsys=(cpu cpuacct blkio memory devices pids)
     for s in "${sybsys[@]}"; do
@@ -188,7 +189,7 @@ if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
 elif [[ -x /lib/systemd/systemd-udevd ]]; then
     udevd=/lib/systemd/systemd-udevd
 else
-    udevd=`which udevd`
+    udevd=$(which udevd)
 fi
 
 # Try to get udevd to coldplug everything.
@@ -236,11 +237,11 @@ real_sudoers=/etc/sudoers
 if [ ! -e ${real_sudoers} ]; then
     touch ${real_sudoers}
 fi
-tmpfile="`mktemp --tmpdir=/run/tmp`"
-echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > $tmpfile
-echo "root ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
+tmpfile="$(mktemp --tmpdir=/run/tmp)"
+echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > "$tmpfile"
+echo "root ALL = (ALL) NOPASSWD: ALL" >> "$tmpfile"
 if [[ -n "${virtme_user}" ]]; then
-    echo "${virtme_user} ALL = (ALL) NOPASSWD: ALL" >> $tmpfile
+    printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
 fi
 chmod 440 "$tmpfile"
 if [ ! -f "$real_sudoers" ]; then
@@ -248,7 +249,7 @@ touch "$real_sudoers"
 fi
 mount --bind "$tmpfile" "$real_sudoers"
 
-if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
+if grep -q -E '(^| )virtme.dhcp($| )' /proc/cmdline; then
     # Make sure all GIDs are allowed to create raw ICMP sockets (this
     # allows to run ping as regular user).
     echo "0 2147483647" > /proc/sys/net/ipv4/ping_group_range
@@ -256,22 +257,22 @@ if cat /proc/cmdline |grep -q -E '(^| )virtme.dhcp($| )'; then
     # udev is liable to rename the interface out from under us.
     for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
         virtme_net=$(basename "${d}")
-        busybox udhcpc -i "$virtme_net" -n -q -f -s "$(dirname $0)/virtme-udhcpc-script" &
+        busybox udhcpc -i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script" &
     done
     wait
 fi
 
-if cat /proc/cmdline |grep -q -E '(^| )virtme.ssh($| )'; then
-    $(dirname $0)/virtme-sshd-script
+if grep -q -E '(^| )virtme.ssh($| )' /proc/cmdline; then
+    "$(dirname -- "$0")"/virtme-sshd-script
 fi
 
-if cat /proc/cmdline |grep -q -E '(^| )virtme.snapd($| )'; then
+if grep -q -E '(^| )virtme.snapd($| )' /proc/cmdline; then
     # If snapd is present in the system try to start it, to properly support snaps.
     snapd_bin="/usr/lib/snapd/snapd";
     if [ -e "$snapd_bin" ]; then
         snapd_state="/var/lib/snapd/state.json"
         if [ -e "$snapd_state" ]; then
-	    $(dirname $0)/virtme-snapd-script
+	    "$(dirname -- "$0")"/virtme-snapd-script
             $snapd_bin >/dev/null 2>&1 </dev/null &
             snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
             if [ -e $snapd_apparmor_bin ]; then
@@ -305,7 +306,7 @@ if [[ -n "${user_cmd}" ]]; then
 
     # Set proper ownership on the virtio-ports devices
     if [[ -n "${virtme_user}" ]]; then
-        chown ${virtme_user}                    \
+        chown -- "${virtme_user}"                    \
             /dev/virtio-ports/virtme.stdin      \
             /dev/virtio-ports/virtme.stdout     \
             /dev/virtio-ports/virtme.stderr     \
@@ -313,7 +314,7 @@ if [[ -n "${user_cmd}" ]]; then
             /dev/virtio-ports/virtme.dev_stderr
 
         if [ -e /dev/virtio-ports/virtme.ret ]; then
-            chown ${virtme_user}                \
+            chown -- "${virtme_user}"                \
                 /dev/virtio-ports/virtme.ret
         fi
     fi
@@ -334,18 +335,18 @@ if [[ -n "${user_cmd}" ]]; then
     ln -s /dev/virtio-ports/virtme.dev_stderr /dev/stderr
 
     # Decode shell command (base64) and dump it to a script
-    echo $user_cmd | base64 -d > /run/tmp/.virtme-script
+    printf -- '%s\n' "$user_cmd" | base64 -d > /run/tmp/.virtme-script
 
-    if [[ ! -n "${virtme_graphics}" ]]; then
+    if [[ -z "${virtme_graphics}" ]]; then
         # Start the script
         log 'starting script'
         if [[ -n "${virtme_user}" ]]; then
             chmod +x /run/tmp/.virtme-script
-            setsid su ${virtme_user} -c /run/tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
+            setsid su - "${virtme_user}" -c /run/tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
         else
             setsid bash /run/tmp/.virtme-script </dev/virtio-ports/virtme.stdin >/dev/virtio-ports/virtme.stdout 2>/dev/virtio-ports/virtme.stderr
         fi
-	ret=$?
+	    ret=$?
         log "script returned {$ret}"
 
         # Channel exit code to the host.
@@ -364,14 +365,14 @@ fi
 if [[ -n "${virtme_console}" ]]; then
     consdev=${virtme_console}
 else
-    consdev="`grep ' ... (.C' /proc/consoles  |cut -d' ' -f1`"
+    consdev="$(grep ' ... (.C' /proc/consoles  |cut -d' ' -f1)"
 fi
 if [[ -z "$consdev" ]]; then
     log "can't deduce console device"
     exec bash --login  # At least try to be helpful
 fi
 if [[ -n "${virtme_user}" ]]; then
-    chown ${virtme_user} /dev/${consdev}
+    chown -- "${virtme_user}" /dev/"${consdev}"
 fi
 
 deallocvt
@@ -391,11 +392,13 @@ if [[ ! -e "/dev/$consdev" ]]; then
 fi
 
 # Redirect current stdout/stderr to consdev
-exec 1>/dev/${consdev}
+exec 1> "/dev/${consdev}"
 exec 2>&1
 
 # Parameters that start with virtme_ shouldn't pollute the environment
-for p in "${!virtme_@}"; do export -n "$p"; done
+for p in "${!virtme_@}"; do
+    export -n -- "${p?}";
+done
 
 # Welcome message
 echo "          _      _                                    "
@@ -409,7 +412,7 @@ echo "   (CTRL+d to exit)"
 echo ""
 
 # Set up a basic environment (unless virtme-ng is running as root on the host)
-if [[ ! -n "${virtme_root_user}" ]]; then
+if [[ -z "${virtme_root_user}" ]]; then
     install -d -m 0755 /run/tmp/roothome
     export HOME=/run/tmp/roothome
     mount --bind /run/tmp/roothome /root
@@ -420,10 +423,15 @@ fi
 # $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
 # non-essential runtime files and other file objects (such as sockets, named
 # pipes, ...) should be stored.
-export XDG_RUNTIME_DIR=/run/user/$(id -u ${virtme_user})
-mkdir -p $XDG_RUNTIME_DIR
 if [[ -n "${virtme_user}" ]]; then
-    chown ${virtme_user} $XDG_RUNTIME_DIR
+    XDG_RUNTIME_DIR=/run/user/"$(id -u -- "${virtme_user}")"
+else
+    XDG_RUNTIME_DIR=/run/user/"$(id -u)"
+fi
+export XDG_RUNTIME_DIR
+mkdir -p "$XDG_RUNTIME_DIR"
+if [[ -n "${virtme_user}" ]]; then
+    chown -- "${virtme_user}" "$XDG_RUNTIME_DIR"
 fi
 
 # Bring up a functioning shell on the console.  This is a bit magical:
@@ -434,12 +442,13 @@ fi
 # setsid binary or the system call, I don't know).
 if [[ -n "${virtme_stty_con}" ]]; then
     # Program the console sensibly
+    # shellcheck disable=SC2086  # The parameter is a white space separated array
     stty ${virtme_stty_con} <"/dev/$consdev"
 fi
 if [[ -n "${virtme_graphics}" ]]; then
     # Check if we need to enable the sound system.
-    if cat /proc/cmdline |grep -q -E '(^| )virtme.sound($| )'; then
-        pre_exec_cmd="$(dirname $0)/virtme-sound-script"
+    if grep -q -E '(^| )virtme.sound($| )' /proc/cmdline; then
+        pre_exec_cmd="$(dirname -- "$0")/virtme-sound-script"
     else
         pre_exec_cmd=""
     fi
@@ -452,18 +461,18 @@ if [[ -n "${virtme_graphics}" ]]; then
     echo -e "${pre_exec_cmd}\nexec /run/tmp/.virtme-script" > ${xinit_rc}
     chmod +x /run/tmp/.virtme-script
     if [[ -n "${virtme_user}" ]]; then
-        chown ${virtme_user} ${xinit_rc}
+        chown -- "${virtme_user}" ${xinit_rc}
         # Try to fix permissions on the virtual consoles, we are starting X
         # directly here so we may need extra permissions on the tty devices.
-        chown ${virtme_user} /dev/char/*
-        setsid bash -c "su ${virtme_user} -c 'xinit ${xinit_rc}'" 0<>"/dev/$consdev" 1>&0 2>&0
+        chown -- "${virtme_user}" /dev/char/*
+        setsid bash -c "su - ${virtme_user} -c 'xinit ${xinit_rc}'" 0<>"/dev/$consdev" 1>&0 2>&0
     else
         setsid bash -c "xinit ${xinit_rc}" 0<>"/dev/$consdev" 1>&0 2>&0
     fi
     # Drop to console if the graphical app failed.
 fi
 if [[ -n "${virtme_user}" ]]; then
-    setsid bash -c "su ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
+    setsid bash -c "su - ${virtme_user}" 0<>"/dev/$consdev" 1>&0 2>&0
 else
     setsid bash 0<>"/dev/$consdev" 1>&0 2>&0
 fi

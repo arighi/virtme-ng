@@ -7,7 +7,7 @@ if [ -n "$(which pipewire)" ]; then
     pipewire-pulse &
 
     # Wait for pulseaudio backend to be up and running.
-    for i in $(seq 1 5); do
+    for _ in $(seq 1 5); do
         pactl info && break
         sleep 1
     done
