@@ -179,7 +179,8 @@ else
 fi
 
 # Set up filesystems that live in /dev
-mkdir -p -m 0755 /dev/shm /dev/pts
+# shellcheck disable=SC2174  # Use -p to ignore errors if the directories already exist
+mkdir -p -m 0755 /dev /dev/shm /dev/pts
 mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
 mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
 
