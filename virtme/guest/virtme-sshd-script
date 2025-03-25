@@ -20,9 +20,9 @@ fi
 # user's public keys.
 CACHE_DIR=${SSH_HOME}/.cache/virtme-ng/.ssh
 SSH_AUTH_KEYS="${CACHE_DIR}/authorized_keys"
-cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_AUTH_KEYS}" 2>/dev/null
-chown "${virtme_ssh_user}" "${SSH_AUTH_KEYS}" 2>/dev/null
-chmod 600 "${SSH_AUTH_KEYS}" 2>/dev/null
+cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_AUTH_KEYS}" 2> /dev/null
+chown "${virtme_ssh_user}" "${SSH_AUTH_KEYS}" 2> /dev/null
+chmod 600 "${SSH_AUTH_KEYS}" 2> /dev/null
 
 # Generate ssh host keys (if they don't exist already).
 mkdir -p "${CACHE_DIR}/etc/ssh"
