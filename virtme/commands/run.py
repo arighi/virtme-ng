@@ -1002,8 +1002,8 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
 
 def ssh_client(args):
     if args.remote_cmd is not None:
-        exec_escaped = args.remote_cmd.replace('"', '\\"')
-        remote_cmd = ["bash", "-c", exec_escaped]
+        exec_escaped = shlex.quote(args.remote_cmd)
+        remote_cmd = ["--", "bash", "-c", exec_escaped]
     else:
         remote_cmd = []
 
