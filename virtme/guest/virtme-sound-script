@@ -1,6 +1,6 @@
 #!/bin/bash
 
-if [ -n "$(which pipewire)" ]; then
+if [ -n "$(command -v pipewire)" ]; then
     # Start audio system services.
     pipewire &
     wireplumber &
@@ -17,10 +17,10 @@ if [ -n "$(which pipewire)" ]; then
     pactl load-module module-null-sink sink_name=Virtme
     pactl load-module module-loopback sink=Virtme
     pactl load-module module-loopback sink=Virtme
-elif [ -n "$(which pulseaudio)" ]; then
+elif [ -n "$(command -v pulseaudio)" ]; then
     echo "WARNING: pulseaudio subsystem not supported yet"
     exit 1
-elif [ -n "$(which jackd)" ]; then
+elif [ -n "$(command -v jackd)" ]; then
     echo "WARNING: jack subsystem not supported yet"
     exit 1
 else

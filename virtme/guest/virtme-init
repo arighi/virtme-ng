@@ -190,7 +190,7 @@ if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
 elif [[ -x /lib/systemd/systemd-udevd ]]; then
     udevd=/lib/systemd/systemd-udevd
 else
-    udevd=$(which udevd)
+    udevd=$(command -v udevd)
 fi
 
 # Try to get udevd to coldplug everything.
