@@ -23,3 +23,9 @@ repos:
         entry: shellcheck
         language: system
         types: [shell]
+      - id: shellfmt
+        name: shellfmt
+        entry: shfmt
+        language: system
+        args: [-w]
+        types: [shell]
