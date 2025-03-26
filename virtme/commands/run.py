@@ -24,7 +24,10 @@ from shutil import which
 from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
-from virtme_ng.utils import CACHE_DIR
+from virtme_ng.utils import (
+    SSH_DIR,
+    VIRTME_SSH_KNOWN_HOSTS,
+)
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
 from ..util import SilentError, find_binary_or_raise, get_username
@@ -1009,7 +1012,14 @@ def ssh_client(args):
     else:
         remote_cmd = []
 
-    cmd = ["ssh", "-p", str(args.port), "localhost"] + remote_cmd
+    cmd = [
+        "ssh",
+        "-p",
+        str(args.port),
+        "-o",
+        f"UserKnownHostsFile={VIRTME_SSH_KNOWN_HOSTS}",
+        "localhost",
+    ] + remote_cmd
 
     if args.dry_run:
         print(shlex.join(cmd))
@@ -1018,24 +1028,31 @@ def ssh_client(args):
 
 
 def ssh_server(args, arch, qemuargs, kernelargs):
-    # Check if we need to generate the ssh host keys for the guest.
-    ssh_key_dir = f"{CACHE_DIR}/.ssh"
-    os.makedirs(f"{ssh_key_dir}/etc/ssh", exist_ok=True)
-    os.system(f"ssh-keygen -A -f {ssh_key_dir}")
-
-    # Implicitly enable dhcp to automatically get an IP on the network
-    # interface and prevent interface renaming.
-    kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+    # Check if we need to generate the SSH host keys for the guest.
+    SSH_ETC_SSH_DIR = SSH_DIR.joinpath("etc", "ssh")
+    SSH_ETC_SSH_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
+    subprocess.check_call(["ssh-keygen", "-A", "-f", f"{SSH_DIR}"])
 
     # Tell virtme-ng-init / virtme-init to start sshd and use the current
     # username keys/credentials.
     username = get_username()
+    # Implicitly enable dhcp to automatically get an IP on the network
+    # interface and prevent interface renaming.
+    kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+    # Setup a port forward network interface for the guest.
+    qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
+    qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
+    ssh_destination = "localhost"
+
     kernelargs.extend(["virtme.ssh"])
     kernelargs.extend([f"virtme_ssh_user={username}"])
-
-    # Setup a port forward network interface for the guest.
-    qemuargs.extend(["-device", "{},netdev=ssh".format(arch.virtio_dev_type("net"))])
-    qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
+    with open(VIRTME_SSH_KNOWN_HOSTS, "w", encoding="utf-8") as f:
+        for path in SSH_ETC_SSH_DIR.glob("*.pub"):
+            pub_key_data = path.open().read()
+            pub_key_data_without_user_and_system = " ".join(
+                pub_key_data.split(" ")[:-1]
+            )
+            f.write(f"{ssh_destination} {pub_key_data_without_user_and_system}\n")
 
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
