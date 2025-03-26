@@ -25,7 +25,9 @@ from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 from virtme_ng.utils import (
+    SSH_CONF_FILE,
     SSH_DIR,
+    VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_KNOWN_HOSTS,
 )
 
@@ -1012,15 +1014,7 @@ def ssh_client(args):
     else:
         remote_cmd = []
 
-    cmd = [
-        "ssh",
-        "-p",
-        str(args.port),
-        "-o",
-        f"UserKnownHostsFile={VIRTME_SSH_KNOWN_HOSTS}",
-        "localhost",
-    ] + remote_cmd
-
+    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}", VIRTME_SSH_DESTINATION_NAME] + remote_cmd
     if args.dry_run:
         print(shlex.join(cmd))
     else:
@@ -1043,6 +1037,7 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
     qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
     ssh_destination = "localhost"
+    ssh_conf_options = f"Port {args.port}"
 
     kernelargs.extend(["virtme.ssh"])
     kernelargs.extend([f"virtme_ssh_user={username}"])
@@ -1053,6 +1048,14 @@ def ssh_server(args, arch, qemuargs, kernelargs):
                 pub_key_data.split(" ")[:-1]
             )
             f.write(f"{ssh_destination} {pub_key_data_without_user_and_system}\n")
+
+    with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
+        f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}
+    CheckHostIP no
+    UserKnownHostsFile {VIRTME_SSH_KNOWN_HOSTS}
+    Hostname {ssh_destination}
+    {ssh_conf_options}
+""")
 
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
