@@ -7,6 +7,7 @@
 
 import argparse
 import atexit
+import binascii
 import errno
 import fcntl
 import itertools
@@ -15,6 +16,8 @@ import platform
 import re
 import shlex
 import signal
+import socket
+import struct
 import subprocess
 import sys
 import tempfile
@@ -276,6 +279,11 @@ def make_parser() -> argparse.ArgumentParser:
     )
     g.add_argument(
         "--force-9p", action="store_true", help="Use legacy 9p filesystem as rootfs"
+    )
+    g.add_argument(
+        "--force-tcp",
+        action="store_true",
+        help="Use TCP for the SSH connection to the guest",
     )
     g.add_argument(
         "--dry-run",
@@ -863,6 +871,18 @@ def can_use_kvm(args):
     return can_access_file("/dev/kvm")
 
 
+def all_tools_available(tools: List[str]) -> bool:
+    return all(map(lambda tool: which(tool) is not None, tools))
+
+
+def can_use_ssh_over_vsock(args) -> bool:
+    return (
+        not args.force_tcp
+        and all_tools_available(["socat", "setsid", "systemd-socket-activate"])
+        and can_access_file("/dev/vhost-vsock")
+    )
+
+
 def can_use_microvm(args):
     return (
         not args.disable_microvm
@@ -1007,6 +1027,23 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
     )
 
 
+def generic_vsock_addr(cid: int, port: int) -> str:
+    """Generate socat's generic AF_VSOCK socket address
+
+    For more information take a look at
+    http://www.dest-unreach.org/socat/doc/socat-genericsocket.html
+
+    Args:
+       cid: CID number
+       port: Port number
+
+    """
+    addr_family = socket.AF_VSOCK
+    addr = binascii.hexlify(struct.pack("=HIII", 0, port, cid, 0))
+    addr_str = str(addr, "ascii")
+    return f"{addr_family}:0:x{addr_str}"
+
+
 def ssh_client(args):
     if args.remote_cmd is not None:
         exec_escaped = shlex.quote(args.remote_cmd)
@@ -1021,7 +1058,7 @@ def ssh_client(args):
         os.execvp("ssh", cmd)
 
 
-def ssh_server(args, arch, qemuargs, kernelargs):
+def ssh_server(args, arch, qemuargs, kernelargs, *, vsock=True):
     # Check if we need to generate the SSH host keys for the guest.
     SSH_ETC_SSH_DIR = SSH_DIR.joinpath("etc", "ssh")
     SSH_ETC_SSH_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
@@ -1030,17 +1067,36 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     # Tell virtme-ng-init / virtme-init to start sshd and use the current
     # username keys/credentials.
     username = get_username()
-    # Implicitly enable dhcp to automatically get an IP on the network
-    # interface and prevent interface renaming.
-    kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
-    # Setup a port forward network interface for the guest.
-    qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
-    qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
-    ssh_destination = "localhost"
-    ssh_conf_options = f"Port {args.port}"
+    if vsock:
+        qemuargs.extend(
+            [
+                "-device",
+                f"{arch.vhost_dev_type('vsock')},guest-cid={args.port}",
+            ]
+        )
+        ssh_channel_type = "vsock"
+        ssh_destination = VIRTME_SSH_DESTINATION_NAME
+        ssh_conf_options = f"ProxyCommand socat STDIO SOCKET-CONNECT:{generic_vsock_addr(cid=args.port, port=22)}"
+    else:
+        # Implicitly enable dhcp to automatically get an IP on the network
+        # interface and prevent interface renaming.
+        kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+        # Setup a port forward network interface for the guest.
+        qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
+        qemuargs.extend(
+            ["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"]
+        )
+        ssh_channel_type = "tcp"
+        ssh_destination = "localhost"
+        ssh_conf_options = f"Port {args.port}"
 
-    kernelargs.extend(["virtme.ssh"])
-    kernelargs.extend([f"virtme_ssh_user={username}"])
+    kernelargs.extend(
+        [
+            "virtme.ssh",
+            f"virtme_ssh_channel={ssh_channel_type}",
+            f"virtme_ssh_user={username}",
+        ]
+    )
     with open(VIRTME_SSH_KNOWN_HOSTS, "w", encoding="utf-8") as f:
         for path in SSH_ETC_SSH_DIR.glob("*.pub"):
             pub_key_data = path.open().read()
@@ -1660,7 +1716,10 @@ def do_it() -> int:
         if args.server == "console":
             console_server(args, qemu, arch, qemuargs, kernelargs)
         elif args.server == "ssh":
-            ssh_server(args, arch, qemuargs, kernelargs)
+            # Turn on vsock if available
+            ssh_server(
+                args, arch, qemuargs, kernelargs, vsock=can_use_ssh_over_vsock(args)
+            )
 
     if args.pwd:
         rel_pwd = os.path.relpath(os.getcwd(), args.root)

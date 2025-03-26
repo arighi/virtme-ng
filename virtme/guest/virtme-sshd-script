@@ -6,6 +6,10 @@ if [ -z "${virtme_ssh_user}" ]; then
     echo "ssh: virtme_ssh_user is not defined" >&2
     exit 1
 fi
+if [ -z "${virtme_ssh_channel}" ]; then
+    echo "ssh: virtme_ssh_channel is not defined" >&2
+    exit 1
+fi
 
 mkdir -p /run/sshd
 rm -f /var/run/nologin
@@ -46,4 +50,17 @@ for key in "${CACHE_DIR}"/etc/ssh/ssh_host_*_key; do
     ARGS+=(-h "${key}")
 done
 
-/usr/sbin/sshd "${ARGS[@]}"
+if [[ "${virtme_ssh_channel}" == "vsock" ]]; then
+    # Make sure vsock (module) is loaded and active, otherwise the '/dev/vsock' device
+    # might not be available.
+    if ! modprobe vsock &> /dev/null; then
+        echo "ssh: vsock module could not be loaded. SSHD cannot be started. Use '--force-tcp' instead to fallback to SSH over TCP." >&2
+        exit 1
+    fi
+    # 4294967295 == U32_MAX == -1
+    declare -r VMADDR_CID_ANY=4294967295
+    # TODO Use something like syslog or journal for the logging
+    setsid --fork -- systemd-socket-activate --accept --listen="vsock:${VMADDR_CID_ANY}:22" --inetd -- /usr/sbin/sshd -i "${ARGS[@]}" &> /dev/null < /dev/null
+else
+    /usr/sbin/sshd "${ARGS[@]}"
+fi

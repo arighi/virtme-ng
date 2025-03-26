@@ -272,6 +272,11 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--force-9p", action="store_true", help="Use legacy 9p filesystem as rootfs"
     )
+    parser.add_argument(
+        "--force-tcp",
+        action="store_true",
+        help="Use TCP for the SSH connection to the guest",
+    )
 
     parser.add_argument(
         "--disable-microvm",
@@ -1136,6 +1141,12 @@ class KernelSource:
         else:
             self.virtme_param["disable_kvm"] = ""
 
+    def _get_virtme_force_tcp(self, args):
+        if args.force_tcp:
+            self.virtme_param["force_tcp"] = "--force-tcp"
+        else:
+            self.virtme_param["force_tcp"] = ""
+
     def _get_virtme_9p(self, args):
         if args.force_9p:
             self.virtme_param["force_9p"] = "--force-9p"
@@ -1297,6 +1308,7 @@ class KernelSource:
         self._get_virtme_disable_microvm(args)
         self._get_virtme_disable_monitor(args)
         self._get_virtme_disable_kvm(args)
+        self._get_virtme_force_tcp(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
@@ -1344,6 +1356,7 @@ class KernelSource:
             + f"{self.virtme_param['disable_microvm']} "
             + f"{self.virtme_param['disable_monitor']} "
             + f"{self.virtme_param['disable_kvm']} "
+            + f"{self.virtme_param['force_tcp']} "
             + f"{self.virtme_param['force_9p']} "
             + f"{self.virtme_param['force_initramfs']} "
             + f"{self.virtme_param['graphics']} "
