@@ -291,6 +291,28 @@ def do_it():
     arch = architectures.get(args.arch)
     is_native = args.arch == platform.machine()
 
+    # Determine if an initial config is present
+    config = ".config"
+    makef = "Makefile"
+
+    # 1st check if KBUILD_OUTPUT is defined and if it's a directory
+    # it might have the .config
+    config_dir = os.environ.get("KBUILD_OUTPUT")
+    if config_dir is not None:
+        try:
+            os.makedirs(config_dir, exist_ok=True)
+        except Exception as exc:
+            print(f"Error: invalid directory for KBUILD_OUTPUT: {config_dir}")
+            raise SilentError() from exc
+        config = os.path.join(config_dir, config)
+        makef = os.path.join(config_dir, makef)
+
+    if os.path.exists(config):
+        if args.no_update:
+            print(f"{config} file exists: no modifications have been done")
+            return 0
+
+    # else we make a fresh config
     custom_conf = []
     if args.custom:
         for conf_chunk in args.custom:
@@ -359,26 +381,7 @@ def do_it():
 
         archargs.append(shlex.quote(var))
 
-    # Determine if an initial config is present
-    config = ".config"
-    makef = "Makefile"
-
-    # Check if KBUILD_OUTPUT is defined and if it's a directory
-    config_dir = os.environ.get("KBUILD_OUTPUT")
-    if config_dir is not None:
-        try:
-            os.makedirs(config_dir, exist_ok=True)
-        except Exception as exc:
-            print(f"Error: invalid directory for KBUILD_OUTPUT: {config_dir}")
-            raise SilentError() from exc
-        config = os.path.join(config_dir, config)
-        makef = os.path.join(config_dir, makef)
-
-    if os.path.exists(config):
-        if args.no_update:
-            print(f"{config} file exists: no modifications have been done")
-            return 0
-    else:
+    if not os.path.exists(config):
         if args.update:
             print(f"Error: {config} file is missing")
             return 1
