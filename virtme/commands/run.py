@@ -1044,14 +1044,18 @@ def generic_vsock_addr(cid: int, port: int) -> str:
     return f"{addr_family}:0:x{addr_str}"
 
 
-def ssh_client(args):
+def ssh_client(args, vsock=True):
+    if vsock:
+        ssh_port = f"ProxyCommand=socat STDIO SOCKET-CONNECT:{generic_vsock_addr(cid=args.port, port=22)}"
+    else:
+        ssh_port = f"Port={args.port}"
     if args.remote_cmd is not None:
         exec_escaped = shlex.quote(args.remote_cmd)
         remote_cmd = ["--", "bash", "-c", exec_escaped]
     else:
         remote_cmd = []
 
-    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}", VIRTME_SSH_DESTINATION_NAME] + remote_cmd
+    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}", "-o", ssh_port, VIRTME_SSH_DESTINATION_NAME] + remote_cmd
     if args.dry_run:
         print(shlex.join(cmd))
     else:
@@ -1076,7 +1080,6 @@ def ssh_server(args, arch, qemuargs, kernelargs, *, vsock=True):
         )
         ssh_channel_type = "vsock"
         ssh_destination = VIRTME_SSH_DESTINATION_NAME
-        ssh_conf_options = f"ProxyCommand socat STDIO SOCKET-CONNECT:{generic_vsock_addr(cid=args.port, port=22)}"
     else:
         # Implicitly enable dhcp to automatically get an IP on the network
         # interface and prevent interface renaming.
@@ -1088,7 +1091,6 @@ def ssh_server(args, arch, qemuargs, kernelargs, *, vsock=True):
         )
         ssh_channel_type = "tcp"
         ssh_destination = "localhost"
-        ssh_conf_options = f"Port {args.port}"
 
     kernelargs.extend(
         [
@@ -1110,7 +1112,6 @@ def ssh_server(args, arch, qemuargs, kernelargs, *, vsock=True):
     CheckHostIP no
     UserKnownHostsFile {VIRTME_SSH_KNOWN_HOSTS}
     Hostname {ssh_destination}
-    {ssh_conf_options}
 """)
 
 
@@ -1129,7 +1130,7 @@ def do_it() -> int:
         if args.client == "console":
             console_client(args)
         elif args.client == "ssh":
-            ssh_client(args)
+            ssh_client(args, vsock=can_use_ssh_over_vsock(args))
         sys.exit(0)
 
     arch = architectures.get(args.arch)
