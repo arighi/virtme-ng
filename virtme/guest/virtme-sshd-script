@@ -32,6 +32,14 @@ chmod 600 "${SSH_AUTH_KEYS}" 2> /dev/null
 mkdir -p "${CACHE_DIR}/etc/ssh"
 ssh-keygen -A -f "${CACHE_DIR}"
 
+# Determine sftp server (to support scp)
+sftp_server=""
+if [ -e /usr/lib/ssh/sftp-server ]; then
+    sftp_server="Subsystem sftp /usr/lib/ssh/sftp-server"
+elif [ -e /usr/lib/openssh/sftp-server ]; then
+    sftp_server="Subsystem sftp /usr/lib/openssh/sftp-server"
+fi
+
 # Generate a minimal sshd config.
 SSH_CONFIG=/run/sshd/sshd_config
 cat << EOF > "${SSH_CONFIG}"
@@ -42,6 +50,7 @@ AuthorizedKeysFile ${SSH_AUTH_KEYS}
 PubkeyAuthentication yes
 UsePAM yes
 PrintMotd no
+${sftp_server}
 EOF
 
 # Start sshd.
