@@ -11,7 +11,6 @@ import errno
 import fcntl
 import itertools
 import os
-import pathlib
 import platform
 import re
 import shlex
@@ -1090,6 +1089,8 @@ def ssh_server(args, arch, qemuargs, kernelargs, *, vsock=True):
                 f"{VIRTME_SSH_DESTINATION_NAME}/* {pub_key_data_without_user_and_system}\n"
             )
 
+    ssh_proxy = resources.find_script("virtme-ssh-proxy")
+
     with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
         f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}*
     CheckHostIP no
@@ -1099,7 +1100,7 @@ Host {VIRTME_SSH_DESTINATION_NAME}
     HostName localhost
 
 Host {VIRTME_SSH_DESTINATION_NAME}/*
-    ProxyCommand {pathlib.Path(__file__).parent.parent.resolve().joinpath("virtme-ssh-proxy")} --port %p %h
+    ProxyCommand "{ssh_proxy}" --port %p %h
     ProxyUseFdpass yes
 """)
 
