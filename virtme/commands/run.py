@@ -11,6 +11,7 @@ import errno
 import fcntl
 import itertools
 import os
+import pathlib
 import platform
 import re
 import shlex
@@ -25,9 +26,11 @@ from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 from virtme_ng.utils import (
+    DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
     SSH_CONF_FILE,
     SSH_DIR,
     VIRTME_SSH_DESTINATION_NAME,
+    VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
     VIRTME_SSH_KNOWN_HOSTS,
 )
 
@@ -372,6 +375,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="To start in the VM a different command than the default one (--server), "
         + "or to launch this command instead of a prompt (--client).",
     )
+    g.add_argument(
+        "--ssh-tcp",
+        action="store_true",
+        help="Use TCP for the SSH connection to the guest",
+    )
+
     return parser
 
 
@@ -863,6 +872,18 @@ def can_use_kvm(args):
     return can_access_file("/dev/kvm")
 
 
+def all_tools_available(tools: List[str]) -> bool:
+    return all(map(lambda tool: which(tool) is not None, tools))
+
+
+def can_use_ssh_over_vsock(ssh_tcp: bool) -> bool:
+    return (
+        not ssh_tcp
+        and all_tools_available(["setsid", "systemd-socket-activate"])
+        and can_access_file("/dev/vhost-vsock")
+    )
+
+
 def can_use_microvm(args):
     return (
         not args.disable_microvm
@@ -1008,7 +1029,10 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
 
 
 def ssh_client(args):
-    ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
+    if can_use_ssh_over_vsock(args.ssh_tcp):
+        ssh_destination = f"{VIRTME_SSH_DESTINATION_NAME}{DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR}{args.port}"
+    else:
+        ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
     if args.remote_cmd is not None:
         exec_escaped = shlex.quote(args.remote_cmd)
         remote_cmd = ["--", "bash", "-c", exec_escaped]
@@ -1031,15 +1055,32 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     # Tell virtme-ng-init / virtme-init to start sshd and use the current
     # username keys/credentials.
     username = get_username()
-    # Implicitly enable dhcp to automatically get an IP on the network
-    # interface and prevent interface renaming.
-    kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
-    # Setup a port forward network interface for the guest.
-    qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
-    qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
+    if can_use_ssh_over_vsock(args.ssh_tcp):
+        qemuargs.extend(
+            [
+                "-device",
+                f"{arch.vhost_dev_type('vsock')},guest-cid={args.port}",
+            ]
+        )
+        ssh_channel_type = "vsock"
+    else:
+        # Implicitly enable dhcp to automatically get an IP on the network
+        # interface and prevent interface renaming.
+        kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+        # Setup a port forward network interface for the guest.
+        qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
+        qemuargs.extend(
+            ["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"]
+        )
+        ssh_channel_type = "tcp"
 
-    kernelargs.extend(["virtme.ssh"])
-    kernelargs.extend([f"virtme_ssh_user={username}"])
+    kernelargs.extend(
+        [
+            "virtme.ssh",
+            f"virtme_ssh_channel={ssh_channel_type}",
+            f"virtme_ssh_user={username}",
+        ]
+    )
     with open(VIRTME_SSH_KNOWN_HOSTS, "w", encoding="utf-8") as f:
         for path in SSH_ETC_SSH_DIR.glob("*.pub"):
             pub_key_data = path.open().read()
@@ -1047,6 +1088,10 @@ def ssh_server(args, arch, qemuargs, kernelargs):
                 pub_key_data.split(" ")[:-1]
             )
             f.write(f"localhost {pub_key_data_without_user_and_system}\n")
+            for separator in VIRTME_SSH_HOSTNAME_CID_SEPARATORS:
+                f.write(
+                    f"{VIRTME_SSH_DESTINATION_NAME}{separator}* {pub_key_data_without_user_and_system}\n"
+                )
 
     with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
         f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}*
@@ -1055,6 +1100,13 @@ def ssh_server(args, arch, qemuargs, kernelargs):
 
 Host {VIRTME_SSH_DESTINATION_NAME}
     HostName localhost
+
+Host""")
+        for sep in VIRTME_SSH_HOSTNAME_CID_SEPARATORS:
+            f.write(f" {VIRTME_SSH_DESTINATION_NAME}{sep}*")
+        f.write(f"""
+    ProxyCommand {pathlib.Path(__file__).parent.parent.resolve().joinpath("virtme-ssh-proxy")} --port %p %h
+    ProxyUseFdpass yes
 """)
 
 
