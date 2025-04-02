@@ -9,6 +9,8 @@ from virtme_ng.spinner import Spinner
 
 CACHE_DIR = Path(Path.home(), ".cache", "virtme-ng")
 SSH_DIR = Path(CACHE_DIR, ".ssh")
+SSH_CONF_FILE = SSH_DIR.joinpath("virtme-ng-ssh.conf")
+VIRTME_SSH_DESTINATION_NAME = "virtme-ng"
 VIRTME_SSH_KNOWN_HOSTS = SSH_DIR.joinpath("known_hosts")
 CONF_PATH = Path(Path.home(), ".config", "virtme-ng")
 CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")

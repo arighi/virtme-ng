@@ -25,7 +25,9 @@ from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 from virtme_ng.utils import (
+    SSH_CONF_FILE,
     SSH_DIR,
+    VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_KNOWN_HOSTS,
 )
 
@@ -1006,21 +1008,14 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
 
 
 def ssh_client(args):
+    ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
     if args.remote_cmd is not None:
         exec_escaped = shlex.quote(args.remote_cmd)
         remote_cmd = ["--", "bash", "-c", exec_escaped]
     else:
         remote_cmd = []
 
-    cmd = [
-        "ssh",
-        "-p",
-        str(args.port),
-        "-o",
-        f"UserKnownHostsFile={VIRTME_SSH_KNOWN_HOSTS}",
-        "localhost",
-    ] + remote_cmd
-
+    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}", ssh_destination] + remote_cmd
     if args.dry_run:
         print(shlex.join(cmd))
     else:
@@ -1052,6 +1047,15 @@ def ssh_server(args, arch, qemuargs, kernelargs):
                 pub_key_data.split(" ")[:-1]
             )
             f.write(f"localhost {pub_key_data_without_user_and_system}\n")
+
+    with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
+        f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}*
+    CheckHostIP no
+    UserKnownHostsFile {VIRTME_SSH_KNOWN_HOSTS}
+
+Host {VIRTME_SSH_DESTINATION_NAME}
+    HostName localhost
+""")
 
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
