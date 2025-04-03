@@ -40,8 +40,8 @@ class Arch:
         return f"virtio-{virtiotype}-pci"
 
     @staticmethod
-    def vhost_dev_type() -> str:
-        return "vhost-user-fs-pci"
+    def vhost_dev_type(vhosttype) -> str:
+        return f"vhost-{vhosttype}-pci"
 
     @staticmethod
     def earlyconsole_args() -> List[str]:
@@ -181,8 +181,8 @@ class Arch_microvm(Arch_x86):
         return f"virtio-{virtiotype}-device"
 
     @staticmethod
-    def vhost_dev_type() -> str:
-        return "vhost-user-fs-device"
+    def vhost_dev_type(vhosttype) -> str:
+        return f"vhost-{vhosttype}-device"
 
     @staticmethod
     def qemu_display_args() -> List[str]:
@@ -405,8 +405,8 @@ class Arch_s390x(Arch):
         return f"virtio-{virtiotype}-ccw"
 
     @staticmethod
-    def vhost_dev_type() -> str:
-        return "vhost-user-fs-ccw"
+    def vhost_dev_type(vhosttype) -> str:
+        return f"vhost-{vhosttype}-ccw"
 
     @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):

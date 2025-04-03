@@ -1,0 +1,55 @@
+#!/usr/bin/env python3
+import argparse
+import array
+import socket
+
+
+def get_hostname_cid(ssh_dst):
+    """Return the hostname and CID
+
+    >>> hostname, cid = get_hostname_cid("virtme-ng/24")
+    >>> hostname
+    'virtme-ng'
+    >>> cid
+    24
+    >>> hostname, cid = get_hostname_cid("virtme/ng/21")
+    >>> hostname
+    'virtme/ng'
+    >>> cid
+    21
+
+    """
+    splitted = ssh_dst.rsplit("/", 1)
+    hostname, cid = splitted[0], int(splitted[1], 10)
+    return (hostname, cid)
+
+
+# See https://docs.python.org/3/library/socket.html#socket.socket.sendmsg
+def send_fds(sock, fds):
+    ancdata = [(socket.SOL_SOCKET, socket.SCM_RIGHTS, array.array("i", fds))]
+    sock.sendmsg(
+        [b"\0"],
+        ancdata,
+        socket.MSG_CMSG_CLOEXEC,
+    )
+
+
+def passfds(cid, port):
+    sock = socket.socket(socket.AF_VSOCK, socket.SOCK_STREAM | socket.SOCK_CLOEXEC, 0)
+    sock.connect((cid, port))
+    return send_fds(socket.socket(fileno=1), [sock.fileno()])
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        prog="virtme-connect",
+    )
+    parser.add_argument("ssh_destination")
+    parser.add_argument("-p", "--port", type=int, default=22)
+    args = parser.parse_args()
+    _hostname, cid = get_hostname_cid(args.ssh_destination)
+    passfds(cid, args.port)
+
+
+if __name__ == "__main__":
+    main()

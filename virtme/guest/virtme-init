@@ -265,7 +265,7 @@ if grep -q -E '(^| )virtme.dhcp($| )' /proc/cmdline; then
 fi
 
 if grep -q -E '(^| )virtme.ssh($| )' /proc/cmdline; then
-    "$(dirname -- "$0")"/virtme-sshd-script
+    "$(dirname -- "$0")"/virtme-sshd-script < /dev/null
 fi
 
 if grep -q -E '(^| )virtme.snapd($| )' /proc/cmdline; then
