@@ -30,7 +30,6 @@ from virtme_ng.utils import (
     SSH_DIR,
     VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
-    VIRTME_SSH_KNOWN_HOSTS,
 )
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
@@ -1080,23 +1079,15 @@ def ssh_server(args, arch, qemuargs, kernelargs):
             f"virtme_ssh_user={username}",
         ]
     )
-    with open(VIRTME_SSH_KNOWN_HOSTS, "w", encoding="utf-8") as f:
-        for path in SSH_ETC_SSH_DIR.glob("*.pub"):
-            pub_key_data = path.open().read()
-            pub_key_data_without_user_and_system = " ".join(
-                pub_key_data.split(" ")[:-1]
-            )
-            f.write(f"localhost {pub_key_data_without_user_and_system}\n")
-            for separator in VIRTME_SSH_HOSTNAME_CID_SEPARATORS:
-                f.write(
-                    f"{VIRTME_SSH_DESTINATION_NAME}{separator}* {pub_key_data_without_user_and_system}\n"
-                )
 
     ssh_proxy = os.path.realpath(resources.find_script("virtme-ssh-proxy"))
     with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
         f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}*
     CheckHostIP no
-    UserKnownHostsFile {VIRTME_SSH_KNOWN_HOSTS}
+
+    # Disable all kinds of host identity checks, since these addresses are generally ephemeral.
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
 
 Host {VIRTME_SSH_DESTINATION_NAME}
     HostName localhost
