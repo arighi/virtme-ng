@@ -19,6 +19,12 @@ from .. import architectures
 from ..util import SilentError
 
 
+def check_file_arg(filepath):
+    if not os.path.isfile(filepath):
+        raise argparse.ArgumentTypeError(f"'{filepath}' is not a valid file.")
+    return filepath
+
+
 def make_parser():
     parser = argparse.ArgumentParser(
         description="Configure a kernel for virtme",
@@ -42,6 +48,7 @@ def make_parser():
     parser.add_argument(
         "--custom",
         action="append",
+        type=check_file_arg,
         metavar="CUSTOM",
         help="Use a custom config snippet file to override specific config options",
     )
