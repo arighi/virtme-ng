@@ -425,7 +425,11 @@ Examples
    arighi@virtme-ng~> ./run.sh > result.txt
 
    # In another terminal, copy result.txt from the guest to the host using scp:
-   arighi@gpd3~> scp -P 2222 localhost:~/result.txt .
+   arighi@host~> scp -F ~/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng,2222:~/result.txt .
+
+   # The SSH command can be printed using this command, and easily adapted later:
+   arighi@host~> vng --ssh-client --dry-run
+   ssh -F /home/arighi/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng,2222
 ```
 
  - Run virtme-ng inside a docker container:
