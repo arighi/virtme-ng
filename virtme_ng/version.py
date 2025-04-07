@@ -6,15 +6,15 @@
 import os
 from subprocess import DEVNULL, CalledProcessError, check_output
 
-import pkg_resources
+from importlib.metadata import version, PackageNotFoundError
 
 PKG_VERSION = "1.33"
 
 
 def get_package_version():
     try:
-        return pkg_resources.get_distribution("virtme-ng").version
-    except pkg_resources.DistributionNotFound:
+        return version("virtme-ng")
+    except PackageNotFoundError:
         return PKG_VERSION
 
 
