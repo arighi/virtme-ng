@@ -7,18 +7,17 @@
 
 """Helpers to find virtme's guest tools and host scripts."""
 
-import os
 import shutil
 import subprocess
 
-import pkg_resources
+from importlib import resources as importlib_resources
 
 
 def find_guest_tools():
     """Return the path of the guest tools installed with the running virtme."""
 
-    if pkg_resources.resource_isdir(__name__, "guest"):
-        return pkg_resources.resource_filename(__name__, "guest")
+    if importlib_resources.files(__name__).joinpath("guest").is_dir():
+        return str(importlib_resources.files(__name__) / "guest")
 
     # No luck.  This is somewhat surprising.
     return None
@@ -27,9 +26,9 @@ def find_guest_tools():
 def find_script(name) -> str:
     # If we're running out of a source checkout, we can find scripts in the
     # 'bin' directory.
-    fn = pkg_resources.resource_filename(__name__, f"../bin/{name}")
-    if os.path.isfile(fn):
-        return fn
+    fn = importlib_resources.files(__name__) / "../bin" / name
+    if fn.is_file():
+        return str(fn)
 
     # Otherwise assume we're actually installed and in PATH.
     guess = shutil.which(name)

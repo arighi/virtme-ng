@@ -154,9 +154,6 @@ setup(
     install_requires=[
         "argcomplete",
         "requests",
-        # `pkg_resources` is removed in python 3.12, moved to setuptools.
-        #
-        # TODO: replace pkg_resources with importlib. # pylint: disable=fixme
         "setuptools",
     ],
     entry_points={
