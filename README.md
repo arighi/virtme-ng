@@ -430,6 +430,10 @@ Examples
    # The SSH command can be printed using this command, and easily adapted later:
    arighi@host~> vng --ssh-client --dry-run
    ssh -F /home/arighi/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng,2222
+
+   # With systemd >= 256, it is possible to use the 'vsock/<CID>' hostname directly:
+   arighi@host~> ssh vsock/2222
+   arighi@virtme-ng~>
 ```
 
  - Run virtme-ng inside a docker container:
