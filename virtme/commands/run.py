@@ -448,12 +448,14 @@ def get_kernel_version(path, img_name: Optional[str] = None):
         arg_fail(f"kernel file {path} does not exist, try --build to build the kernel")
     if not os.access(path, os.R_OK):
         arg_fail(f"unable to access {path} (check for read permissions)")
+
+    version_pattern = r"\S{3,}"
     try:
         result = subprocess.run(
             ["file", path], capture_output=True, text=True, check=False
         )
         for item in result.stdout.split(", "):
-            match = re.search(r"^[vV]ersion (\S{3,})", item)
+            match = re.search(rf"^[vV]ersion ({version_pattern})", item)
             if match:
                 kernel_version = match.group(1)
                 return kernel_version
@@ -466,7 +468,7 @@ def get_kernel_version(path, img_name: Optional[str] = None):
     result = subprocess.run(
         ["strings", path], capture_output=True, text=True, check=False
     )
-    match = re.search(r"Linux version (\S{3,})", result.stdout)
+    match = re.search(rf"Linux version ({version_pattern})", result.stdout)
     if match:
         kernel_version = match.group(1)
         return kernel_version
@@ -474,7 +476,7 @@ def get_kernel_version(path, img_name: Optional[str] = None):
     # The version detection fails s390x using file or strings tools, so check
     # if the file itself contains the version number.
     if img_name is not None:
-        match = re.search(rf"{img_name}-(\S{{3,}})", path)
+        match = re.search(rf"{img_name}-({version_pattern})", path)
         if match:
             return match.group(1)
 
