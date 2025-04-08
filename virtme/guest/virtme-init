@@ -44,10 +44,10 @@ if [[ ! -d /lib/modules ]]; then
     mkdir -p /lib/modules
 fi
 
-if [[ -n "$virtme_root_mods" ]]; then
+if [[ -n $virtme_root_mods ]]; then
     # /lib/modules is already set up
     true
-elif [[ -n "$virtme_link_mods" ]]; then
+elif [[ -n $virtme_link_mods ]]; then
     mount -n -t tmpfs none /lib/modules
     ln -s "$virtme_link_mods" "/lib/modules/$kver"
 elif [[ -d "/lib/modules/$kver" ]]; then
@@ -56,7 +56,7 @@ elif [[ -d "/lib/modules/$kver" ]]; then
 fi
 
 # Adjust max limit of open files
-if [[ -n "${nr_open}" ]]; then
+if [[ -n ${nr_open} ]]; then
     printf -- '%s\n' "${nr_open}" > /proc/sys/fs/nr_open
 fi
 
@@ -106,7 +106,7 @@ fi
 touch /run/tmp/fstab
 mount --bind /run/tmp/fstab /etc/fstab
 
-if [[ -n "$virtme_hostname" ]]; then
+if [[ -n $virtme_hostname ]]; then
     cp /etc/hosts /run/tmp/hosts
     printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /run/tmp/hosts
     mount --bind /run/tmp/hosts /etc/hosts
@@ -132,13 +132,13 @@ mkdir /run/tmp/lvm
 mount --bind /run/tmp/lvm /etc/lvm
 
 for tag in "${!virtme_initmount@}"; do
-    if [[ ! -d "${!tag}" ]]; then
+    if [[ ! -d ${!tag} ]]; then
         mkdir -p "${!tag}"
     fi
     mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.initmount${tag:16}" "${!tag}" || exit 1
 done
 
-if [[ -n "${virtme_chdir}" ]]; then
+if [[ -n ${virtme_chdir} ]]; then
     cd -- "${virtme_chdir}" || exit
 fi
 
@@ -194,7 +194,7 @@ else
 fi
 
 # Try to get udevd to coldplug everything.
-if [[ -n "$udevd" ]]; then
+if [[ -n $udevd ]]; then
     if [[ -e '/sys/kernel/uevent_helper' ]]; then
         # This kills boot performance.
         log "you have CONFIG_UEVENT_HELPER on; turn it off"
@@ -223,10 +223,10 @@ declare -r -A fdlinks=(
     ["/dev/stderr"]="/proc/self/fd/2")
 
 for p in "${!fdlinks[@]}"; do
-    [[ -e "$p" ]] || ln -s "${fdlinks[$p]}" "$p"
+    [[ -e $p ]] || ln -s "${fdlinks[$p]}" "$p"
 done
 
-if [[ -n "$virtme_hostname" ]]; then
+if [[ -n $virtme_hostname ]]; then
     log "Setting hostname to $virtme_hostname..."
     hostname "$virtme_hostname"
 fi
@@ -240,9 +240,9 @@ if [ ! -e ${real_sudoers} ]; then
     touch ${real_sudoers}
 fi
 tmpfile="$(mktemp --tmpdir=/run/tmp)"
-echo "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"" > "$tmpfile"
+echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
 echo "root ALL = (ALL) NOPASSWD: ALL" >> "$tmpfile"
-if [[ -n "${virtme_user}" ]]; then
+if [[ -n ${virtme_user} ]]; then
     printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
 fi
 chmod 440 "$tmpfile"
@@ -285,8 +285,8 @@ if grep -q -E '(^| )virtme.snapd($| )' /proc/cmdline; then
 fi
 
 vsock_exec=$(sed -ne "s/.*virtme.vsockexec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
-if [[ -n "${vsock_exec}" ]]; then
-    if [[ -n "${virtme_vsockmount}" ]]; then
+if [[ -n ${vsock_exec} ]]; then
+    if [[ -n ${virtme_vsockmount} ]]; then
         mkdir -p "${virtme_vsockmount}"
         mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.vsockmount" "${virtme_vsockmount}"
     fi
@@ -295,7 +295,7 @@ if [[ -n "${vsock_exec}" ]]; then
 fi
 
 user_cmd=$(sed -ne "s/.*virtme.exec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
-if [[ -n "${user_cmd}" ]]; then
+if [[ -n ${user_cmd} ]]; then
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
         ! -e "/dev/virtio-ports/virtme.stdout" ||
         ! -e "/dev/virtio-ports/virtme.stderr" ||
@@ -307,7 +307,7 @@ if [[ -n "${user_cmd}" ]]; then
     fi
 
     # Set proper ownership on the virtio-ports devices
-    if [[ -n "${virtme_user}" ]]; then
+    if [[ -n ${virtme_user} ]]; then
         chown -- "${virtme_user}" \
             /dev/virtio-ports/virtme.stdin \
             /dev/virtio-ports/virtme.stdout \
@@ -339,10 +339,10 @@ if [[ -n "${user_cmd}" ]]; then
     # Decode shell command (base64) and dump it to a script
     printf -- '%s\n' "$user_cmd" | base64 -d > /run/tmp/.virtme-script
 
-    if [[ -z "${virtme_graphics}" ]]; then
+    if [[ -z ${virtme_graphics} ]]; then
         # Start the script
         log 'starting script'
-        if [[ -n "${virtme_user}" ]]; then
+        if [[ -n ${virtme_user} ]]; then
             chmod +x /run/tmp/.virtme-script
             setsid su - "${virtme_user}" -c /run/tmp/.virtme-script < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
         else
@@ -364,22 +364,22 @@ if [[ -n "${user_cmd}" ]]; then
 fi
 
 # Figure out what the main console is
-if [[ -n "${virtme_console}" ]]; then
+if [[ -n ${virtme_console} ]]; then
     consdev=${virtme_console}
 else
     consdev="$(grep ' ... (.C' /proc/consoles | cut -d' ' -f1)"
 fi
-if [[ -z "$consdev" ]]; then
+if [[ -z $consdev ]]; then
     log "can't deduce console device"
     exec bash --login # At least try to be helpful
 fi
-if [[ -n "${virtme_user}" ]]; then
+if [[ -n ${virtme_user} ]]; then
     chown -- "${virtme_user}" /dev/"${consdev}"
 fi
 
 deallocvt
 
-if [[ "$consdev" == "tty0" ]]; then
+if [[ $consdev == "tty0" ]]; then
     # Create some VTs
     openvt -c 2 -- /bin/bash
     openvt -c 3 -- /bin/bash
@@ -414,7 +414,7 @@ echo "   (CTRL+d to exit)"
 echo ""
 
 # Set up a basic environment (unless virtme-ng is running as root on the host)
-if [[ -z "${virtme_root_user}" ]]; then
+if [[ -z ${virtme_root_user} ]]; then
     install -d -m 0755 /run/tmp/roothome
     export HOME=/run/tmp/roothome
     mount --bind /run/tmp/roothome /root
@@ -425,14 +425,14 @@ fi
 # $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
 # non-essential runtime files and other file objects (such as sockets, named
 # pipes, ...) should be stored.
-if [[ -n "${virtme_user}" ]]; then
+if [[ -n ${virtme_user} ]]; then
     XDG_RUNTIME_DIR=/run/user/"$(id -u -- "${virtme_user}")"
 else
     XDG_RUNTIME_DIR=/run/user/"$(id -u)"
 fi
 export XDG_RUNTIME_DIR
 mkdir -p "$XDG_RUNTIME_DIR"
-if [[ -n "${virtme_user}" ]]; then
+if [[ -n ${virtme_user} ]]; then
     chown -- "${virtme_user}" "$XDG_RUNTIME_DIR"
 fi
 
@@ -442,12 +442,12 @@ fi
 # be a controlling terminal.  We are also not a member of a session.
 # Init apparently can't setsid (whether that's a limitation of the
 # setsid binary or the system call, I don't know).
-if [[ -n "${virtme_stty_con}" ]]; then
+if [[ -n ${virtme_stty_con} ]]; then
     # Program the console sensibly
     # shellcheck disable=SC2086  # The parameter is a white space separated array
     stty ${virtme_stty_con} < "/dev/$consdev"
 fi
-if [[ -n "${virtme_graphics}" ]]; then
+if [[ -n ${virtme_graphics} ]]; then
     # Check if we need to enable the sound system.
     if grep -q -E '(^| )virtme.sound($| )' /proc/cmdline; then
         pre_exec_cmd="$(dirname -- "$0")/virtme-sound-script"
@@ -462,7 +462,7 @@ if [[ -n "${virtme_graphics}" ]]; then
     xinit_rc=/run/tmp/.xinitrc
     echo -e "${pre_exec_cmd}\nexec /run/tmp/.virtme-script" > ${xinit_rc}
     chmod +x /run/tmp/.virtme-script
-    if [[ -n "${virtme_user}" ]]; then
+    if [[ -n ${virtme_user} ]]; then
         chown -- "${virtme_user}" ${xinit_rc}
         # Try to fix permissions on the virtual consoles, we are starting X
         # directly here so we may need extra permissions on the tty devices.
@@ -473,7 +473,7 @@ if [[ -n "${virtme_graphics}" ]]; then
     fi
     # Drop to console if the graphical app failed.
 fi
-if [[ -n "${virtme_user}" ]]; then
+if [[ -n ${virtme_user} ]]; then
     setsid bash -c "su - ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
 else
     setsid bash 0<> "/dev/$consdev" 1>&0 2>&0

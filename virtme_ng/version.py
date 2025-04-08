@@ -4,9 +4,8 @@
 """virtme-ng version"""
 
 import os
+from importlib.metadata import PackageNotFoundError, version
 from subprocess import DEVNULL, CalledProcessError, check_output
-
-from importlib.metadata import version, PackageNotFoundError
 
 PKG_VERSION = "1.33"
 
