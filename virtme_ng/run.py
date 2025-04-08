@@ -540,6 +540,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         + "or to launch this command instead of a prompt (--client).",
     )
 
+    parser.add_argument(
+        "--ssh-tcp",
+        action="store_true",
+        help="Use TCP for the SSH connection to the guest",
+    )
+
     return parser
 
 
@@ -1136,6 +1142,12 @@ class KernelSource:
         else:
             self.virtme_param["disable_kvm"] = ""
 
+    def _get_virtme_ssh_tcp(self, args):
+        if args.ssh_tcp:
+            self.virtme_param["ssh_tcp"] = "--ssh-tcp"
+        else:
+            self.virtme_param["ssh_tcp"] = ""
+
     def _get_virtme_9p(self, args):
         if args.force_9p:
             self.virtme_param["force_9p"] = "--force-9p"
@@ -1297,6 +1309,7 @@ class KernelSource:
         self._get_virtme_disable_microvm(args)
         self._get_virtme_disable_monitor(args)
         self._get_virtme_disable_kvm(args)
+        self._get_virtme_ssh_tcp(args)
         self._get_virtme_9p(args)
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
@@ -1344,6 +1357,7 @@ class KernelSource:
             + f"{self.virtme_param['disable_microvm']} "
             + f"{self.virtme_param['disable_monitor']} "
             + f"{self.virtme_param['disable_kvm']} "
+            + f"{self.virtme_param['ssh_tcp']} "
             + f"{self.virtme_param['force_9p']} "
             + f"{self.virtme_param['force_initramfs']} "
             + f"{self.virtme_param['graphics']} "

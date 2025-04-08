@@ -114,6 +114,7 @@ package_files = [
     "virtme-init",
     "virtme-udhcpc-script",
     "virtme-sshd-script",
+    "virtme-ssh-proxy",
     "virtme-snapd-script",
     "virtme-sound-script",
 ]
@@ -173,6 +174,7 @@ setup(
     data_files=data_files,
     scripts=[
         "bin/virtme-prep-kdir-mods",
+        "bin/virtme-ssh-proxy",
     ],
     include_package_data=True,
     classifiers=[

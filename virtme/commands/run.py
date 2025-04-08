@@ -24,7 +24,13 @@ from shutil import which
 from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
-from virtme_ng.utils import CACHE_DIR
+from virtme_ng.utils import (
+    DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
+    SSH_CONF_FILE,
+    SSH_DIR,
+    VIRTME_SSH_DESTINATION_NAME,
+    VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
+)
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
 from ..util import SilentError, find_binary_or_raise, get_username
@@ -367,6 +373,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="To start in the VM a different command than the default one (--server), "
         + "or to launch this command instead of a prompt (--client).",
     )
+    g.add_argument(
+        "--ssh-tcp",
+        action="store_true",
+        help="Use TCP for the SSH connection to the guest",
+    )
+
     return parser
 
 
@@ -758,7 +770,7 @@ def export_virtiofs(
 
     # Adjust qemu options to use virtiofsd
     fsid = f"virtfs{len(qemuargs)}"
-    vhost_dev_type = arch.vhost_dev_type()
+    vhost_dev_type = arch.vhost_dev_type("user-fs")
 
     qemuargs.extend(["-chardev", f"socket,id=char{fsid},path={virtio_fs.sock}"])
     qemuargs.extend(
@@ -856,6 +868,18 @@ def can_use_kvm(args):
     if args.disable_kvm:
         return False
     return can_access_file("/dev/kvm")
+
+
+def all_tools_available(tools: List[str]) -> bool:
+    return all(map(lambda tool: which(tool) is not None, tools))
+
+
+def can_use_ssh_over_vsock(ssh_tcp: bool) -> bool:
+    return (
+        not ssh_tcp
+        and all_tools_available(["setsid", "systemd-socket-activate"])
+        and can_access_file("/dev/vhost-vsock")
+    )
 
 
 def can_use_microvm(args):
@@ -997,18 +1021,23 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
             kernelargs.append(f"virtme_vsockmount={console_script_dir}")
 
     kernelargs.extend([f"virtme.vsockexec=`{console_exec}`"])
-    qemuargs.extend(["-device", f"vhost-vsock-pci,guest-cid={args.port}"])
+    qemuargs.extend(
+        ["-device", f"{arch.vhost_dev_type('vsock')},guest-cid={args.port}"]
+    )
 
 
 def ssh_client(args):
+    if can_use_ssh_over_vsock(args.ssh_tcp):
+        ssh_destination = f"{VIRTME_SSH_DESTINATION_NAME}{DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR}{args.port}"
+    else:
+        ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
     if args.remote_cmd is not None:
-        exec_escaped = args.remote_cmd.replace('"', '\\"')
-        remote_cmd = ["bash", "-c", exec_escaped]
+        exec_escaped = shlex.quote(args.remote_cmd)
+        remote_cmd = ["--", "bash", "-c", exec_escaped]
     else:
         remote_cmd = []
 
-    cmd = ["ssh", "-p", str(args.port), "localhost"] + remote_cmd
-
+    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}", ssh_destination] + remote_cmd
     if args.dry_run:
         print(shlex.join(cmd))
     else:
@@ -1016,24 +1045,60 @@ def ssh_client(args):
 
 
 def ssh_server(args, arch, qemuargs, kernelargs):
-    # Check if we need to generate the ssh host keys for the guest.
-    ssh_key_dir = f"{CACHE_DIR}/.ssh"
-    os.makedirs(f"{ssh_key_dir}/etc/ssh", exist_ok=True)
-    os.system(f"ssh-keygen -A -f {ssh_key_dir}")
-
-    # Implicitly enable dhcp to automatically get an IP on the network
-    # interface and prevent interface renaming.
-    kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+    # Check if we need to generate the SSH host keys for the guest.
+    SSH_ETC_SSH_DIR = SSH_DIR.joinpath("etc", "ssh")
+    SSH_ETC_SSH_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
+    subprocess.check_call(["ssh-keygen", "-A", "-f", f"{SSH_DIR}"])
 
     # Tell virtme-ng-init / virtme-init to start sshd and use the current
     # username keys/credentials.
     username = get_username()
-    kernelargs.extend(["virtme.ssh"])
-    kernelargs.extend([f"virtme_ssh_user={username}"])
+    if can_use_ssh_over_vsock(args.ssh_tcp):
+        qemuargs.extend(
+            [
+                "-device",
+                f"{arch.vhost_dev_type('vsock')},guest-cid={args.port}",
+            ]
+        )
+        ssh_channel_type = "vsock"
+    else:
+        # Implicitly enable dhcp to automatically get an IP on the network
+        # interface and prevent interface renaming.
+        kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
+        # Setup a port forward network interface for the guest.
+        qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
+        qemuargs.extend(
+            ["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"]
+        )
+        ssh_channel_type = "tcp"
 
-    # Setup a port forward network interface for the guest.
-    qemuargs.extend(["-device", "{},netdev=ssh".format(arch.virtio_dev_type("net"))])
-    qemuargs.extend(["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"])
+    kernelargs.extend(
+        [
+            "virtme.ssh",
+            f"virtme_ssh_channel={ssh_channel_type}",
+            f"virtme_ssh_user={username}",
+        ]
+    )
+
+    ssh_proxy = os.path.realpath(resources.find_script("virtme-ssh-proxy"))
+    with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
+        f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}*
+    CheckHostIP no
+
+    # Disable all kinds of host identity checks, since these addresses are generally ephemeral.
+    StrictHostKeyChecking no
+    UserKnownHostsFile /dev/null
+
+Host {VIRTME_SSH_DESTINATION_NAME}
+    HostName localhost
+
+Host""")
+        for sep in VIRTME_SSH_HOSTNAME_CID_SEPARATORS:
+            f.write(f" {VIRTME_SSH_DESTINATION_NAME}{sep}*")
+        f.write(f"""
+    ProxyCommand "{ssh_proxy}" --port %p %h
+    ProxyUseFdpass yes
+""")
 
 
 # Allowed characters in mount paths.  We can extend this over time if needed.
