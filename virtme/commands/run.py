@@ -479,6 +479,9 @@ def get_kernel_version(path, img_name: Optional[str] = None):
         match = re.search(rf"{img_name}-({version_pattern})", path)
         if match:
             return match.group(1)
+        match = re.search(rf"/lib/modules/({version_pattern})/{img_name}", path)
+        if match:
+            return match.group(1)
 
     return None
 
