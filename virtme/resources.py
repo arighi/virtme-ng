@@ -9,15 +9,16 @@
 
 import shutil
 import subprocess
-
 from importlib import resources as importlib_resources
+
+import virtme
 
 
 def find_guest_tools():
     """Return the path of the guest tools installed with the running virtme."""
 
-    if importlib_resources.files(__name__).joinpath("guest").is_dir():
-        return str(importlib_resources.files(__name__) / "guest")
+    if importlib_resources.files(virtme).joinpath("guest").is_dir():
+        return str(importlib_resources.files(virtme) / "guest")
 
     # No luck.  This is somewhat surprising.
     return None
@@ -26,7 +27,7 @@ def find_guest_tools():
 def find_script(name) -> str:
     # If we're running out of a source checkout, we can find scripts in the
     # 'bin' directory.
-    fn = importlib_resources.files(__name__) / "../bin" / name
+    fn = importlib_resources.files(virtme) / "../bin" / name
     if fn.is_file():
         return str(fn)
 
