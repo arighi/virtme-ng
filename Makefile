@@ -7,9 +7,6 @@ GIT_DESCRIBE := $(shell git describe --always --long --dirty)
 
 all: init
 
-virtme_ng_init/src/*.rs:
-	git submodule update --init --recursive
-
 virtme/guest/bin/virtme-ng-init: virtme_ng_init/src/*.rs
 	BUILD_VIRTME_NG_INIT=1 python3 setup.py build
 
