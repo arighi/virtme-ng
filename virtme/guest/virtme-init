@@ -20,7 +20,7 @@ mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
 # Mount tmpfs dirs
-mount -t tmpfs run /run/
+mount -t tmpfs -o mode=0755 run /run/
 mkdir /run/tmp
 
 # Setup rw filesystem overlays

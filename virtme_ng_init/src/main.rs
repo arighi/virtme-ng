@@ -64,7 +64,7 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         target: "/run",
         fs_type: "tmpfs",
         flags: 0,
-        fsdata: "",
+        fsdata: "mode=0755",
     },
     MountInfo {
         source: "devtmpfs",

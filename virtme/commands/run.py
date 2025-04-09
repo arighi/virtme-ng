@@ -1042,7 +1042,10 @@ def ssh_client(args):
     else:
         remote_cmd = []
 
-    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}", ssh_destination] + remote_cmd
+    cmd = ["ssh", "-F", f"{SSH_CONF_FILE}"]
+    if args.user:
+        cmd += ["-l", f"{args.user}"]
+    cmd += [ssh_destination] + remote_cmd
     if args.dry_run:
         print(shlex.join(cmd))
     else:
