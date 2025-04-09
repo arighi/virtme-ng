@@ -59,7 +59,7 @@ for key in "${CACHE_DIR}"/etc/ssh/ssh_host_*_key; do
     ARGS+=(-h "${key}")
 done
 
-if [[ "${virtme_ssh_channel}" == "vsock" ]]; then
+if [[ ${virtme_ssh_channel} == "vsock" ]]; then
     # Make sure vsock (module) is loaded and active, otherwise the '/dev/vsock' device
     # might not be available.
     if ! modprobe vsock &> /dev/null; then

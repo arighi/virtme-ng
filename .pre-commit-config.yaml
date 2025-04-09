@@ -11,21 +11,16 @@ repos:
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
   - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.11.0
+    rev: v0.11.4
     hooks:
       - id: ruff
         args: [--fix]
       - id: ruff-format
-  - repo: local
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: v0.10.0.1
     hooks:
       - id: shellcheck
-        name: ShellCheck
-        entry: shellcheck
-        language: system
-        types: [shell]
-      - id: shellfmt
-        name: shellfmt
-        entry: shfmt
-        language: system
-        args: [-w]
-        types: [shell]
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: v3.11.0-1
+    hooks:
+      - id: shfmt

@@ -8,15 +8,15 @@
 # Make ShellCheck and co. happy. See https://udhcp.busybox.net/README.udhcpc
 declare interface ip mask router dns
 
-if [[ "$1" == "deconfig" ]]; then
+if [[ $1 == "deconfig" ]]; then
     ip link set dev "$interface" up
     ip addr flush dev "$interface"
-elif [[ "$1" == "bound" ]]; then
+elif [[ $1 == "bound" ]]; then
     ip addr add "$ip/$mask" dev "$interface"
-    if [[ -n "$router" ]]; then
+    if [[ -n $router ]]; then
         ip route add default via "$router" dev "$interface"
     fi
-    if [[ -n "$dns" ]]; then
+    if [[ -n $dns ]]; then
         # A lot of systems will have /etc/resolv.conf symlinked to
         # /run/NetworkManager/something_or_other. Debian symlinks to /run/resolvconf.
         # Create both directories.
@@ -24,14 +24,14 @@ elif [[ "$1" == "bound" ]]; then
         install -d /run/resolvconf
 
         real_resolv_conf=/etc/resolv.conf
-        if [[ -L "$real_resolv_conf" ]]; then
+        if [[ -L $real_resolv_conf ]]; then
             real_resolv_conf="/$(readlink /etc/resolv.conf)"
             if [[ ! -e $real_resolv_conf ]]; then
                 mkdir -p "$(dirname "$real_resolv_conf")"
                 touch "$real_resolv_conf"
             fi
         fi
-        if [[ -f "$real_resolv_conf" ]]; then
+        if [[ -f $real_resolv_conf ]]; then
             tmpfile="$(mktemp --tmpdir=/tmp)"
             chmod 644 "$tmpfile"
             mount --bind "$tmpfile" "$real_resolv_conf"
