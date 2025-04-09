@@ -11,21 +11,20 @@ if [ -z "${virtme_ssh_channel}" ]; then
     exit 1
 fi
 
-mkdir -p /run/sshd
 rm -f /var/run/nologin
+
+# use an ssh location OUTSIDE of the users home directory to enable sharing
+# of host keys and authorized keys without dubious permission errors
+SSH_DIR=/run/sshd
 
 # use an ssh location INSIDE of the users home directory to communicate pre-
 # created hostkeys and authorized keys
 SSH_HOME="$(getent passwd "${virtme_ssh_user}" | cut -d: -f6)"
 if [ ! -e "${SSH_HOME}" ]; then
     # Setup an arbitrary ssh location, just to be able to start sshd.
-    SSH_HOME=/run/sshd
+    SSH_HOME="${SSH_DIR}"
 fi
 SSH_CACHE="${SSH_HOME}"/.cache/virtme-ng/.ssh
-
-# use an ssh location OUTSIDE of the users home directory to enable sharing
-# of host keys and authorized keys without dubious permission errors
-SSH_DIR=/opt/virtme/sshd
 
 # Generate ssh host keys (if they don't exist already).
 mkdir -p "${SSH_CACHE}"/etc/ssh
