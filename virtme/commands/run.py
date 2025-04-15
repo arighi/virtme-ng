@@ -602,8 +602,16 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         if modmode == "none":
             pass
         elif modmode in ("use", "auto"):
+            if args.root != "/":
+                kernel.use_root_mods = True
+                kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
+                if not os.path.exists(kernel.moddir):
+                    kernel.moddir = f"{args.root}/lib/modules/{kernel.version}"
+                    if not os.path.exists(kernel.moddir):
+                        kernel.modfiles = []
+                        kernel.moddir = None
             # Check if modules.order exists, otherwise fallback to mods=none
-            if os.path.exists(mod_file):
+            elif os.path.exists(mod_file):
                 # Check if virtme's kernel modules directory needs to be updated
                 if not os.path.exists(virtme_mod_file) or is_file_more_recent(
                     mod_file, virtme_mod_file
