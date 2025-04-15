@@ -6,7 +6,13 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import os
-from typing import List, Optional
+import shlex
+import shutil
+import subprocess
+import tempfile
+import textwrap
+from pathlib import Path
+from typing import Any, List, Optional
 
 
 class Arch:
@@ -70,6 +76,22 @@ class Arch:
     @staticmethod
     def qemu_vmcoreinfo_args() -> List[str]:
         return ["-device", "vmcoreinfo"]
+
+    @staticmethod
+    def qemu_confidential_guest_args(
+        is_native: bool, use_kvm: bool, **kwargs
+    ) -> List[str]:
+        raise Exception("Unsupported")
+
+    @staticmethod
+    def qemu_confidential_guest_img_preparation(
+        kernel: Path,
+        cmdline: str,
+        initrd: Optional[Path] = None,
+        dry_run: bool = False,
+        **kwargs,
+    ) -> Optional[Path]:
+        return None
 
     @staticmethod
     def qemu_serial_console_args() -> List[str]:
@@ -450,6 +472,67 @@ class Arch_s390x(Arch):
     @staticmethod
     def qemu_vmcoreinfo_args() -> List[str]:
         return []
+
+    @staticmethod
+    def qemu_confidential_guest_args(
+        is_native: bool, use_kvm: bool, **kwargs
+    ) -> List[str]:
+        if not is_native or not use_kvm:
+            return Exception("TODO Unsupported")
+        return [
+            "-object",
+            "s390-pv-guest,id=pv0",
+            "-machine",
+            "confidential-guest-support=pv0",
+        ]
+
+    @staticmethod
+    def qemu_confidential_guest_img_preparation(
+        kernel: Path,
+        cmdline: str,
+        initrd: Optional[Path] = None,
+        dry_run: bool = False,
+        **kwargs,
+    ) -> Optional[Any]:
+        if "host-key-document" not in kwargs:
+            raise Exception(
+                "virtme-run: At least one host-key-document=$HKD must be specified"
+            )
+        if not shutil.which("pvimg"):
+            raise Exception(
+                "'pvimg' must be installed for the Secure Execution guest image preparation"
+            )
+
+        confidential_guest_args = [
+            f"--{key}={value}" for key, values in kwargs.items() for value in values
+        ]
+        output = tempfile.NamedTemporaryFile(suffix="seimg")
+        prepare_cmd = [
+            "pvimg",
+            "create",
+            f"--kernel={kernel}",
+            f"--output={output.name}",
+            "--no-verify",
+            "--overwrite",
+        ] + confidential_guest_args
+        if initrd is not None:
+            prepare_cmd.append(f"--ramdisk={initrd}")
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(cmdline.encode("ascii"))
+            f.flush()
+            prepare_cmd.append(f"--parmfile={f.name}")
+            if dry_run:
+                print(shlex.join(prepare_cmd))
+            else:
+                result = subprocess.run(
+                    prepare_cmd, stderr=subprocess.PIPE, text=True, close_fds=False
+                )
+                if result.returncode != 0:
+                    raise Exception(
+                        f"virtme-run: Confidential guest preparation command has failed:"
+                        f"\n{textwrap.indent(f'$ {shlex.join(prepare_cmd)}\n{result.stderr}', '  ')}",
+                    )
+        return output
 
     def img_name(self) -> List[str]:
         return ["vmlinuz", "image"]
