@@ -410,6 +410,18 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="store_true",
         help="Use an initramfs even if unnecessary",
     )
+    parser.add_argument(
+        "--confidential-guest",
+        action="store_true",
+        help="Prepare image for confidential guest",
+    )
+    parser.add_argument(
+        "--confidential-guest-args",
+        action="extend",
+        nargs="+",
+        type=str,
+        help="Confidential guest keyword arguments",
+    )
 
     parser.add_argument(
         "--sound",
@@ -1271,6 +1283,19 @@ class KernelSource:
         else:
             self.virtme_param["nvgpu"] = ""
 
+    def _get_virtme_confidential_guest(self, args):
+        if args.confidential_guest:
+            if args.confidential_guest_args is None:
+                arg_fail(
+                    "error: --confidential-guest can be used only with --confidential-guest-args",
+                    show_usage=False,
+                )
+            self.virtme_param["confidential_guest"] = (
+                f"--confidential-guest --confidential-guest-args {shlex.join(args.confidential_guest_args)}"
+            )
+        else:
+            self.virtme_param["confidential_guest"] = ""
+
     def _get_virtme_qemu_opts(self, args):
         qemu_args = ""
         if args.debug:
@@ -1310,6 +1335,7 @@ class KernelSource:
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_vmcoreinfo(args)
+        self._get_virtme_confidential_guest(args)
         self._get_virtme_disable_microvm(args)
         self._get_virtme_disable_monitor(args)
         self._get_virtme_disable_kvm(args)
@@ -1364,6 +1390,7 @@ class KernelSource:
             + f"{self.virtme_param['disable_kvm']} "
             + f"{self.virtme_param['ssh_tcp']} "
             + f"{self.virtme_param['force_9p']} "
+            + f"{self.virtme_param['confidential_guest']} "
             + f"{self.virtme_param['force_initramfs']} "
             + f"{self.virtme_param['graphics']} "
             + f"{self.virtme_param['verbose']} "
