@@ -518,8 +518,8 @@ them in `~/.config/virtme-ng/virtme-ng.conf` under `default_opts` and then
 simply run `vng --build`.
 
 Example (always use an external build server called 'kathleen' and run make
-inside a build chroot called `chroot:lunar-amd64`). To do so, modify the
-`default_opts` sections in `~/.config/virtme-ng/virtme-ng.conf` as following:
+inside a build chroot called `chroot:lunar-amd64`). To do so, add the
+`default_opts` section in `~/.config/virtme-ng/virtme-ng.conf` as following:
 ```
 {
     "default_opts": {
