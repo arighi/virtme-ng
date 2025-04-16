@@ -521,10 +521,12 @@ Example (always use an external build server called 'kathleen' and run make
 inside a build chroot called `chroot:lunar-amd64`). To do so, modify the
 `default_opts` sections in `~/.config/virtme-ng/virtme-ng.conf` as following:
 ```
-    "default_opts" : {
+{
+    "default_opts": {
         "build_host": "kathleen",
         "build_host_exec_prefix": "schroot -c chroot:lunar-amd64 --"
     },
+}
 ```
 
 Now you can simply run `vng --build` to build your kernel from the current
