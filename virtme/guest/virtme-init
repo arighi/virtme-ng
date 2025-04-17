@@ -19,9 +19,11 @@ log() {
 mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-if ! grep -q "run /run" /proc/mounts; then
-    # Mount tmpfs dirs
-    mount -t tmpfs -o mode=0755 run /run/
+if [[ -z $virtme_systemd || $virtme_systemd == '0' ]]; then
+    if ! grep -q "run /run" /proc/mounts; then
+        # Mount tmpfs dirs
+        mount -t tmpfs -o mode=0755 run /run/
+    fi
 fi
 mkdir /run/tmp
 
