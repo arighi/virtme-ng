@@ -15,6 +15,7 @@ VIRTME_SSH_HOSTNAME_CID_SEPARATORS = ("%", "/")
 DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR = VIRTME_SSH_HOSTNAME_CID_SEPARATORS[0]
 CONF_PATH = Path(Path.home(), ".config", "virtme-ng")
 CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
+SERIAL_GETTY_FILE = Path(CACHE_DIR, "serial-getty@.service")
 
 
 def spinner_decorator(message):

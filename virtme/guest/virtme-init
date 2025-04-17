@@ -19,9 +19,12 @@ log() {
 mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-if ! grep -q "run /run" /proc/mounts; then
-    # Mount tmpfs dirs
-    mount -t tmpfs -o mode=0755 run /run/
+if [[ $$ -eq 1 ]]; then
+    # only mount /run if systemd is not the init
+    if ! grep -q "run /run" /proc/mounts; then
+        # Mount tmpfs dirs
+        mount -t tmpfs -o mode=0755 run /run/
+    fi
 fi
 mkdir /run/tmp
 
