@@ -257,6 +257,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--systemd",
+        action="store_true",
+        help="Execute systemd as init (EXPERIMENTAL)",
+    )
+
+    parser.add_argument(
         "--root-release",
         action="store",
         help="Use a target Ubuntu release to create a new chroot (used with --root)",
@@ -942,6 +948,12 @@ class KernelSource:
         else:
             self.virtme_param["root"] = ""
 
+    def _get_virtme_systemd(self, args):
+        if args.systemd:
+            self.virtme_param["systemd"] = "--systemd"
+        else:
+            self.virtme_param["systemd"] = ""
+
     def _get_virtme_rw(self, args):
         if args.rw:
             self.virtme_param["rw"] = "--rw"
@@ -1287,6 +1299,7 @@ class KernelSource:
         self._get_virtme_user(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
+        self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_rodir(args)
         self._get_virtme_rwdir(args)
@@ -1335,6 +1348,7 @@ class KernelSource:
             + f"{self.virtme_param['user']} "
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
+            + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['rodir']} "
             + f"{self.virtme_param['rwdir']} "
