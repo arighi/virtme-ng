@@ -98,6 +98,11 @@ def make_parser() -> argparse.ArgumentParser:
         "--root", action="store", default="/", help="Local path to use as guest root"
     )
     g.add_argument(
+        "--systemd",
+        action="store_true",
+        help="Execute systemd as init, when used along with a separate chroot (--root)",
+    )
+    g.add_argument(
         "--rw",
         action="store_true",
         help="Give the guest read-write access to its root filesystem",
@@ -1301,19 +1306,23 @@ def do_it() -> int:
             mount_tag="virtme.guesttools",
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
+        initsh = [
+            "mount -t tmpfs run /run",
+            "mkdir -p /run/virtme/guesttools",
+            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
+            + "virtme.guesttools /run/virtme/guesttools",
+        ]
+        if args.systemd:
+            kernelargs.append("console=ttyS0")
+            kernelargs.append("virtme_systemd=1")
+            initsh.append("SYSTEMD_UNIT_PATH=/run/virtme/guesttools: exec /sbin/init")
+        else:
+            initsh.append(f"exec /run/virtme/guesttools/{virtme_init_cmd}")
         initcmds = [
             "init=/bin/sh",
             "--",
             "-c",
-            ";".join(
-                [
-                    "mount -t tmpfs run /run",
-                    "mkdir -p /run/virtme/guesttools",
-                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
-                    + "virtme.guesttools /run/virtme/guesttools",
-                    f"exec /run/virtme/guesttools/{virtme_init_cmd}",
-                ]
-            ),
+            ";".join(initsh),
         ]
 
     # Arrange for modules to end up in the right place
@@ -1397,12 +1406,14 @@ def do_it() -> int:
     if args.graphics is None and not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
 
-        # Redirect kernel errors to stderr, creating a separate console.
-        #
-        # If we don't have access to stderr via procfs (for example when
-        # running inside a container), print a warning and implicitly
-        # suppress the kernel errors redirection.
-        if can_access_file("/proc/self/fd/2"):
+        if args.systemd:
+            pass
+        elif can_access_file("/proc/self/fd/2"):
+            # Redirect kernel errors to stderr, creating a separate console.
+            #
+            # If we don't have access to stderr via procfs (for example when
+            # running inside a container), print a warning and implicitly
+            # suppress the kernel errors redirection.
             qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
@@ -1840,6 +1851,13 @@ def do_it() -> int:
     # Load a normal kernel
     qemuargs.extend(["-kernel", kernel.kimg])
     if kernelargs:
+        if args.systemd:
+            with open(
+                f"{guest_tools_path}/virtme-serial-getty.env", "w", encoding="utf-8"
+            ) as f:
+                for arg in kernelargs:
+                    if re.match(r"virtme_.*=", arg):
+                        f.write(f"{arg}\n")
         qemuargs.extend(["-append", " ".join(quote_karg(a) for a in kernelargs)])
     if initrdpath is not None:
         qemuargs.extend(["-initrd", initrdpath])
