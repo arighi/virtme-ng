@@ -288,6 +288,22 @@ Examples
    Linux version 6.7.0-060700rc5-generic (kernel@kathleen) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-7ubuntu1) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #202312102332 SMP PREEMPT_DYNAMIC Sun Dec 10 23:41:31 UTC 2023
 ```
 
+ - Run a kernel within a separate chroot, using its systemd as init:
+```
+   $ vng -r ./fookernel --user root --root ./rootfs/sid --systemd -- systemctl status | head
+   ...
+   ● virtme-ng
+       State: running
+       Units: 221 loaded (incl. loaded aliases)
+        Jobs: 0 queued
+      Failed: 0 units
+       Since: Fri 2025-04-18 14:50:09 UTC; 1s ago
+     systemd: 257.5-2
+     Tainted: unmerged-bin
+      CGroup: /
+              ├─init.scope
+```
+
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
 ```

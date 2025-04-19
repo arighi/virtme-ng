@@ -1,0 +1,8 @@
+[Service]
+EnvironmentFile=/run/virtme/guesttools/virtme-serial-getty.env
+ExecStart=/run/virtme/guesttools/virtme-init
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes

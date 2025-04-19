@@ -15,12 +15,15 @@ log() {
     fi
 }
 
-# Mount procfs and sysfs (needed for stat, sadly)
-mount -t proc -o nosuid,noexec,nodev proc /proc/
-mount -t sysfs -o nosuid,noexec,nodev sys /sys/
+if [[ -z $virtme_systemd ]]; then
+    # Mount procfs and sysfs (needed for stat, sadly)
+    mount -t proc -o nosuid,noexec,nodev proc /proc/
+    mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-# Mount tmpfs dirs
-mount -t tmpfs -o mode=0755 run /run/
+    # Mount tmpfs dirs
+    mount -t tmpfs -o mode=0755 run /run/
+fi
+
 mkdir /run/tmp
 
 # Setup rw filesystem overlays
@@ -60,51 +63,53 @@ if [[ -n ${nr_open} ]]; then
     printf -- '%s\n' "${nr_open}" > /proc/sys/fs/nr_open
 fi
 
-# devtmpfs might be automounted; if not, mount it.
-if ! grep -q devtmpfs /proc/mounts; then
-    # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
-    if [[ -c /dev/null ]]; then
-        mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
-            &> /dev/null
-    else
-        mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+if [[ -z $virtme_systemd ]]; then
+    # devtmpfs might be automounted; if not, mount it.
+    if ! grep -q devtmpfs /proc/mounts; then
+        # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
+        if [[ -c /dev/null ]]; then
+            mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
+                &> /dev/null
+        else
+            mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+        fi
+
+        # shellcheck disable=SC2181
+        if (($? != 0)); then
+            # The running kernel doesn't have devtmpfs.  Use regular tmpfs.
+            mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
+
+            # Make some basic devices first, and let udev handle the rest
+            mknod -m 0666 /dev/null c 1 3
+            mknod -m 0660 /dev/kmsg c 1 11
+            mknod -m 0600 /dev/console c 5 1
+        fi
     fi
 
-    # shellcheck disable=SC2181
-    if (($? != 0)); then
-        # The running kernel doesn't have devtmpfs.  Use regular tmpfs.
-        mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
+    # Setup rw tmpfs directories
+    [ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
+    [ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
 
-        # Make some basic devices first, and let udev handle the rest
-        mknod -m 0666 /dev/null c 1 3
-        mknod -m 0660 /dev/kmsg c 1 11
-        mknod -m 0600 /dev/console c 5 1
-    fi
+    # Additional rw dirs used by systemd
+    [ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
+    [ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
+    [ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
+    [ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
+    [ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
+
+    # Additional rw dirs required by apt (if present)
+    [ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
+
+    # Additional rw dirs required by snapd (if present)
+    [ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie
+
+    # Hide additional sudo settings
+    [ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo
+
+    # Fix up /etc a little bit
+    touch /run/tmp/fstab
+    mount --bind /run/tmp/fstab /etc/fstab
 fi
-
-# Setup rw tmpfs directories
-[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
-[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
-
-# Additional rw dirs used by systemd
-[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
-[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
-[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
-[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
-[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
-
-# Additional rw dirs required by apt (if present)
-[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
-
-# Additional rw dirs required by snapd (if present)
-[ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie
-
-# Hide additional sudo settings
-[ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo
-
-# Fix up /etc a little bit
-touch /run/tmp/fstab
-mount --bind /run/tmp/fstab /etc/fstab
 
 if [[ -n $virtme_hostname ]]; then
     cp /etc/hosts /run/tmp/hosts
@@ -112,24 +117,26 @@ if [[ -n $virtme_hostname ]]; then
     mount --bind /run/tmp/hosts /etc/hosts
 fi
 
-# Fix dpkg if we are on a Debian-based distro
-if [ -d /var/lib/dpkg ]; then
-    lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
-    for file in "${lock_files[@]}"; do
-        [ -e "$file" ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
-    done
+if [[ -z $virtme_systemd ]]; then
+    # Fix dpkg if we are on a Debian-based distro
+    if [ -d /var/lib/dpkg ]; then
+        lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
+        for file in "${lock_files[@]}"; do
+            [ -e "$file" ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
+        done
+    fi
+
+    # Populate dummy entries in /etc/shadow to allow switching to any user defined
+    # in the system
+    (umask 0644 && touch /run/tmp/shadow)
+    sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /run/tmp/shadow
+    mount --bind /run/tmp/shadow /etc/shadow
+
+    # The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
+    # run on rootless users just create a dummy directory and bind mount it in the same place.
+    mkdir /run/tmp/lvm
+    mount --bind /run/tmp/lvm /etc/lvm
 fi
-
-# Populate dummy entries in /etc/shadow to allow switching to any user defined
-# in the system
-(umask 0644 && touch /run/tmp/shadow)
-sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /run/tmp/shadow
-mount --bind /run/tmp/shadow /etc/shadow
-
-# The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
-# run on rootless users just create a dummy directory and bind mount it in the same place.
-mkdir /run/tmp/lvm
-mount --bind /run/tmp/lvm /etc/lvm
 
 for tag in "${!virtme_initmount@}"; do
     if [[ ! -d ${!tag} ]]; then
@@ -146,14 +153,16 @@ log "basic initialization done"
 
 ######## The remainder of this script is a very simple init (PID 1) ########
 
-# Does the system use systemd-tmpfiles?
-if command -v systemd-tmpfiles &> /dev/null; then
-    log "running systemd-tmpfiles"
-    systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
-fi
+if [[ -z $virtme_systemd ]]; then
+    # Does the system use systemd-tmpfiles?
+    if command -v systemd-tmpfiles &> /dev/null; then
+        log "running systemd-tmpfiles"
+        systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
+    fi
 
-# Make dbus work (if tmpfiles wasn't there or didn't create the directory).
-install -d /run/dbus
+    # Make dbus work (if tmpfiles wasn't there or didn't create the directory).
+    install -d /run/dbus
+fi
 
 # Set up useful things in /sys, assuming our kernel supports it.
 mount -t configfs configfs /sys/kernel/config &> /dev/null
@@ -161,58 +170,60 @@ mount -t debugfs debugfs /sys/kernel/debug &> /dev/null
 mount -t tracefs tracefs /sys/kernel/tracing &> /dev/null
 mount -t securityfs securityfs /sys/kernel/security &> /dev/null
 
-# Set up cgroup mount points (mount cgroupv2 hierarchy by default)
-#
-# If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
-# behavior and mount the legacy cgroup v1 layout.
-if grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )' /proc/cmdline; then
-    mount -t tmpfs cgroup /sys/fs/cgroup
-    sybsys=(cpu cpuacct blkio memory devices pids)
-    for s in "${sybsys[@]}"; do
-        mkdir -p "/sys/fs/cgroup/${s}"
-        # Don't treat failure as critical here, since the kernel may not
-        # support all the legacy cgroups.
-        mount -t cgroup "${s}" -o "${s}" "/sys/fs/cgroup/${s}" || true
-    done
-else
-    mount -t cgroup2 cgroup2 /sys/fs/cgroup
-fi
-
-# Set up filesystems that live in /dev
-# shellcheck disable=SC2174  # Use -p to ignore errors if the directories already exist
-mkdir -p -m 0755 /dev /dev/shm /dev/pts
-mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
-mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
-
-# Find udevd
-if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
-    udevd=/usr/lib/systemd/systemd-udevd
-elif [[ -x /lib/systemd/systemd-udevd ]]; then
-    udevd=/lib/systemd/systemd-udevd
-else
-    udevd=$(command -v udevd)
-fi
-
-# Try to get udevd to coldplug everything.
-if [[ -n $udevd ]]; then
-    if [[ -e '/sys/kernel/uevent_helper' ]]; then
-        # This kills boot performance.
-        log "you have CONFIG_UEVENT_HELPER on; turn it off"
-        echo '' > /sys/kernel/uevent_helper
+if [[ -z $virtme_systemd ]]; then
+    # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
+    #
+    # If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
+    # behavior and mount the legacy cgroup v1 layout.
+    if grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )' /proc/cmdline; then
+        mount -t tmpfs cgroup /sys/fs/cgroup
+        sybsys=(cpu cpuacct blkio memory devices pids)
+        for s in "${sybsys[@]}"; do
+            mkdir -p "/sys/fs/cgroup/${s}"
+            # Don't treat failure as critical here, since the kernel may not
+            # support all the legacy cgroups.
+            mount -t cgroup "${s}" -o "${s}" "/sys/fs/cgroup/${s}" || true
+        done
+    else
+        mount -t cgroup2 cgroup2 /sys/fs/cgroup
     fi
-    log "starting udevd"
-    udev_out=$($udevd --daemon --resolve-names=never 2>&1)
-    if ! grep -q "quiet" /proc/cmdline; then
-        log "udev: $udev_out"
+
+    # Set up filesystems that live in /dev
+    # shellcheck disable=SC2174  # Use -p to ignore errors if the directories already exist
+    mkdir -p -m 0755 /dev /dev/shm /dev/pts
+    mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
+    mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
+
+    # Find udevd
+    if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
+        udevd=/usr/lib/systemd/systemd-udevd
+    elif [[ -x /lib/systemd/systemd-udevd ]]; then
+        udevd=/lib/systemd/systemd-udevd
+    else
+        udevd=$(command -v udevd)
     fi
-    log "triggering udev coldplug"
-    udevadm trigger --type=subsystems --action=add > /dev/null 2>&1
-    udevadm trigger --type=devices --action=add > /dev/null 2>&1
-    log "waiting for udev to settle"
-    udevadm settle
-    log "udev is done"
-else
-    log "udevd not found"
+
+    # Try to get udevd to coldplug everything.
+    if [[ -n $udevd ]]; then
+        if [[ -e '/sys/kernel/uevent_helper' ]]; then
+            # This kills boot performance.
+            log "you have CONFIG_UEVENT_HELPER on; turn it off"
+            echo '' > /sys/kernel/uevent_helper
+        fi
+        log "starting udevd"
+        udev_out=$($udevd --daemon --resolve-names=never 2>&1)
+        if ! grep -q "quiet" /proc/cmdline; then
+            log "udev: $udev_out"
+        fi
+        log "triggering udev coldplug"
+        udevadm trigger --type=subsystems --action=add > /dev/null 2>&1
+        udevadm trigger --type=devices --action=add > /dev/null 2>&1
+        log "waiting for udev to settle"
+        udevadm settle
+        log "udev is done"
+    else
+        log "udevd not found"
+    fi
 fi
 
 # Install /proc/self/fd symlinks into /dev if not already present

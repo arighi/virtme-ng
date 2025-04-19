@@ -19,3 +19,4 @@ debian/virtme-ng.substvars
 virtme_ng_init/target
 virtme/guest/.crate*
 virtme/guest/bin
+virtme/guest/virtme-serial-getty.env
