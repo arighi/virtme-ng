@@ -37,6 +37,7 @@ def check_call_cmd(command, quiet=False, dry_run=False):
     if dry_run:
         print(" ".join(command))
         return
+
     with Popen(
         command,
         stdout=PIPE,
@@ -49,20 +50,29 @@ def check_call_cmd(command, quiet=False, dry_run=False):
         stdout_fd = process.stdout.fileno()
         stderr_fd = process.stderr.fileno()
 
+        stdout_open = True
+        stderr_open = True
+
         # Use select to poll for new data in the file descriptors
-        while process.poll() is None:
+        while stdout_open or stderr_open:
             ready_to_read, _, _ = select([stdout_fd, stderr_fd], [], [], 1)
-            for file in ready_to_read:
-                if file == stdout_fd:
+
+            for fd in ready_to_read:
+                if fd == stdout_fd:
                     line = process.stdout.readline().decode()
-                    if line and not quiet:
-                        sys.stdout.write(line)
-                        sys.stdout.flush()
-                if file == stderr_fd:
+                    if line:
+                        if not quiet:
+                            sys.stdout.write(line)
+                            sys.stdout.flush()
+                    else:
+                        stdout_open = False
+                elif fd == stderr_fd:
                     line = process.stderr.readline().decode()
                     if line:
                         sys.stderr.write(line)
                         sys.stderr.flush()
+                    else:
+                        stderr_open = False
 
         # Wait for the process to complete and get the return code
         return_code = process.wait()
