@@ -8,7 +8,7 @@ from typing import Iterable, Optional
 # Supported hostname and CID separators
 #
 # Important: Keep in sync with `VIRTME_SSH_HOSTNAME_CID_SEPARATORS`
-SEPARATORS = (",", "/")
+SEPARATORS = ("%", "/")
 
 # Some exit codes
 SUCCESS = 0
