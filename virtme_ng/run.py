@@ -316,7 +316,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--rodir",
         action="append",
         default=[],
-        help="Supply a read-only directory to the guest."
+        help="Supply a read-only directory to the guest. "
         + "Use --rodir=path or --rodir=guestpath=hostpath",
     )
 
@@ -324,7 +324,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--rwdir",
         action="append",
         default=[],
-        help="Supply a read/write directory to the guest."
+        help="Supply a read/write directory to the guest. "
         + "Use --rwdir=path or --rwdir=guestpath=hostpath",
     )
 
@@ -332,7 +332,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--overlay-rwdir",
         action="append",
         default=[],
-        help="Supply a directory that is r/w to the guest but read-only in the host."
+        help="Supply a directory that is r/w to the guest but read-only in the host. "
         + "Use --overlay-rwdir=path.",
     )
 
