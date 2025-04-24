@@ -952,6 +952,9 @@ def get_console_path(port):
 
 
 def console_client(args):
+    if which("socat") is None:
+        arg_fail("socat tool is required, but not available")
+
     try:
         # with tty support
         (cols, rows) = os.get_terminal_size()
