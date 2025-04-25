@@ -1856,7 +1856,7 @@ def do_it() -> int:
         qemuargs.extend(args.qemu_opts)
 
     if args.show_command:
-        print(" ".join(shlex.quote(a) for a in qemuargs))
+        print(shlex.join(qemuargs))
 
     # Go!
     if not args.dry_run:
