@@ -543,17 +543,17 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     g_remote.add_argument(
+        "--ssh-tcp",
+        action="store_true",
+        help="Use TCP for the SSH connection to the guest",
+    )
+
+    g_remote.add_argument(
         "--remote-cmd",
         action="store",
         metavar="COMMAND",
         help="To start in the VM a different command than the default one (--server), "
         + "or to launch this command instead of a prompt (--client).",
-    )
-
-    parser.add_argument(
-        "--ssh-tcp",
-        action="store_true",
-        help="Use TCP for the SSH connection to the guest",
     )
 
     return parser
