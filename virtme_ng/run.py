@@ -1106,6 +1106,14 @@ class KernelSource:
             self.virtme_param["remote_cmd"] = (
                 f"--remote-cmd {shlex.quote(args.remote_cmd)}"
             )
+        elif args.envs and (
+            args.console_client is not None
+            or args.ssh_client is not None
+            or args.console is not None
+        ):
+            self.virtme_param["remote_cmd"] = (
+                f"--remote-cmd {shlex.quote(shlex.join(args.envs))}"
+            )
         else:
             self.virtme_param["remote_cmd"] = ""
 
