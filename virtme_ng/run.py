@@ -35,7 +35,7 @@ from virtme_ng.version import VERSION
 
 def check_call_cmd(command, quiet=False, dry_run=False):
     if dry_run:
-        print(" ".join(command))
+        print(shlex.join(command))
         return
 
     with Popen(

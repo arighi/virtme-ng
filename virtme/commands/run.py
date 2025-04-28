@@ -1780,11 +1780,9 @@ def do_it() -> int:
         # Set up the initramfs (warning: hack ahead)
         if args.save_initramfs is not None:
             initramfsfile = open(args.save_initramfs, "xb")
-            initramfsfd = initramfsfile.fileno()
         else:
-            initramfsfd, tmpname = tempfile.mkstemp("irfs")
-            os.unlink(tmpname)
-            initramfsfile = os.fdopen(initramfsfd, "r+b")
+            initramfsfile = tempfile.TemporaryFile(suffix="irfs")
+        initramfsfd = initramfsfile.fileno()
         mkinitramfs.mkinitramfs(initramfsfile, config)
         initramfsfile.flush()
         if args.save_initramfs is not None:
@@ -1858,7 +1856,7 @@ def do_it() -> int:
         qemuargs.extend(args.qemu_opts)
 
     if args.show_command:
-        print(" ".join(shlex.quote(a) for a in qemuargs))
+        print(shlex.join(qemuargs))
 
     # Go!
     if not args.dry_run:
