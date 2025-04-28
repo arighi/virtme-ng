@@ -617,8 +617,6 @@ ARCH_MAPPING = {
     # adding a new arch? Please also update get_host_arch().
 }
 
-MAKE_COMMAND = "make LOCALVERSION=-virtme"
-
 REMOTE_BUILD_SCRIPT = """#!/bin/bash
 cd ~/.virtme
 git reset --hard __virtme__
@@ -733,33 +731,30 @@ class KernelSource:
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
-        cmd = "virtme-configkernel --defconfig"
+        cmd = ["virtme-configkernel", "--defconfig"]
         if args.verbose:
-            cmd += " --verbose"
+            cmd.append("--verbose")
         if not args.force and not args.kconfig:
-            cmd += " --no-update"
+            cmd.append("--no-update")
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f"unsupported architecture: {arch}")
             arch = ARCH_MAPPING[arch]["qemu_name"]
-            cmd += f" --arch {arch}"
+            cmd += ["--arch", arch]
         user_config = str(Path.home()) + "/.config/virtme-ng/kernel.config"
         if os.path.exists(user_config):
-            cmd += f" --custom {user_config}"
+            cmd += ["--custom", user_config]
         if args.config:
             for conf in args.config:
-                cmd += f" --custom {conf}"
+                cmd += ["--custom", conf]
         if args.configitem:
             for citem in args.configitem:
-                cmd += f" --configitem {citem}"
+                cmd += ["--configitem", citem]
         # Propagate additional Makefile variables
-        for var in args.envs:
-            cmd += f" {var} "
+        cmd += args.envs
         if args.verbose:
-            print(f"cmd: {cmd}")
-        check_call_cmd(
-            self._format_cmd(cmd), quiet=not args.verbose, dry_run=args.dry_run
-        )
+            print(f"cmd: {shlex.join(cmd)}")
+        check_call_cmd(cmd, quiet=not args.verbose, dry_run=args.dry_run)
 
     def _make_remote(self, args, make_command):
         check_call_cmd(
@@ -874,23 +869,19 @@ class KernelSource:
             target = "bzImage"
             cross_compile = None
             cross_arch = None
-        make_command = MAKE_COMMAND
+        make_command = ["make", "LOCALVERSION=-virtme"]
         if args.compiler:
-            make_command += f" HOSTCC={args.compiler} CC={args.compiler}"
+            make_command += [f"HOSTCC={args.compiler}", f"CC={args.compiler}"]
         if args.skip_modules:
-            make_command += f" {target}"
+            make_command.append(target)
         if cross_compile and cross_arch:
-            make_command += f" CROSS_COMPILE={cross_compile} ARCH={cross_arch}"
+            make_command += [f"CROSS_COMPILE={cross_compile}", f"ARCH={cross_arch}"]
         # Propagate additional Makefile variables
-        for var in args.envs:
-            make_command += f" {var} "
+        make_command += args.envs
+        make_command += ["-j", self.cpus]
         if args.build_host is None:
             # Build the kernel locally
-            check_call_cmd(
-                self._format_cmd(make_command + " -j" + self.cpus),
-                quiet=not args.verbose,
-                dry_run=args.dry_run,
-            )
+            check_call_cmd(make_command, quiet=not args.verbose, dry_run=args.dry_run)
         else:
             # Build the kernel on a remote build host
             self._make_remote(args, make_command)
