@@ -879,6 +879,8 @@ class KernelSource:
         # Propagate additional Makefile variables
         make_command += args.envs
         make_command += ["-j", self.cpus]
+        if args.verbose:
+            print(f"cmd: {shlex.join(make_command)}")
         if args.build_host is None:
             # Build the kernel locally
             check_call_cmd(make_command, quiet=not args.verbose, dry_run=args.dry_run)
