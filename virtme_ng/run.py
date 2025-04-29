@@ -702,7 +702,7 @@ class KernelSource:
         return None
 
     def _format_cmd(self, cmd):
-        return list(filter(None, cmd.split(" ")))
+        return shlex.split(cmd)
 
     def _is_dirty_repo(self):
         cmd = "git --no-optional-locks status -uno --porcelain"
@@ -1187,7 +1187,7 @@ class KernelSource:
         append = []
         if args.append is not None:
             for item in args.append:
-                split_items = item.split()
+                split_items = shlex.split(item)
                 for split_item in split_items:
                     append.append("-a " + split_item)
         if args.debug:
