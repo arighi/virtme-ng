@@ -222,9 +222,15 @@ Examples
 
  - Build the kernel using a separate build directory, and run it, in verbose:
 ```
-   $ mkdir -p .virtme/build
-   $ vng O=.virtme/build --build --verbose
-   $ vng O=.virtme/build --verbose
+   $ export KBUILD_OUTPUT=.virtme/build
+   $ vng --build --verbose
+   $ vng --verbose
+```
+
+ - Same example, but using `O=`:
+```
+   $ vng --build --verbose -- O=.virtme/build
+   $ vng --verbose -- O=.virtme/build
 ```
 
  - Accelerate the kernel rebuilds using CCache (if installed):
