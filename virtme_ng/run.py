@@ -1189,10 +1189,10 @@ class KernelSource:
             for item in args.append:
                 split_items = shlex.split(item)
                 for split_item in split_items:
-                    append.append("-a " + split_item)
+                    append += ["-a", split_item]
         if args.debug:
-            append.append("-a nokaslr")
-        self.virtme_param["append"] = " ".join(append)
+            append += ["-a", "nokaslr"]
+        self.virtme_param["append"] = shlex.join(append)
 
     def _get_virtme_memory(self, args):
         if args.memory is None:
