@@ -869,11 +869,12 @@ class KernelSource:
             target = "bzImage"
             cross_compile = None
             cross_arch = None
-        make_command = ["make", "LOCALVERSION=-virtme"]
-        if args.compiler:
-            make_command += [f"HOSTCC={args.compiler}", f"CC={args.compiler}"]
+        make_command = ["make"]
         if args.skip_modules:
             make_command.append(target)
+        make_command.append("LOCALVERSION=-virtme")
+        if args.compiler:
+            make_command += [f"HOSTCC={args.compiler}", f"CC={args.compiler}"]
         if cross_compile and cross_arch:
             make_command += [f"CROSS_COMPILE={cross_compile}", f"ARCH={cross_arch}"]
         # Propagate additional Makefile variables
