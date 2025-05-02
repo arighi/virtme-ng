@@ -19,9 +19,11 @@ log() {
 mount -t proc -o nosuid,noexec,nodev proc /proc/
 mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-# Mount tmpfs dirs
-mount -t tmpfs -o mode=0755 run /run/
-mkdir /run/tmp
+if ! grep -q "run /run" /proc/mounts; then
+    # Mount tmpfs dirs
+    mount -t tmpfs -o mode=0755 run /run/
+    mkdir /run/tmp
+fi
 
 # Setup rw filesystem overlays
 for tag in "${!virtme_rw_overlay@}"; do
