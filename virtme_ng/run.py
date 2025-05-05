@@ -902,9 +902,13 @@ class KernelSource:
                 self.virtme_param["kdir"] = "--kdir " + var[2:]
             else:
                 envs.append(var)
+
+        if args.exec is not None and envs:
+            arg_fail("--exec and positional arguments are mutually exclusive")
         if envs:
-            args.exec = " ".join(envs)
-        if args.exec is not None:
+            args.exec = envs[0] if len(envs) == 1 else shlex.join(envs)
+
+        if args.exec:
             self.virtme_param["exec"] = f"--script-sh {shlex.quote(args.exec)}"
         else:
             self.virtme_param["exec"] = ""
