@@ -5,10 +5,12 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
+import functools
 import os
 import shlex
 import shutil
 import subprocess
+import sys
 import tempfile
 import textwrap
 from pathlib import Path
@@ -83,12 +85,13 @@ class Arch:
     ) -> List[str]:
         raise Exception("Unsupported")
 
-    @staticmethod
     def qemu_confidential_guest_img_preparation(
+        self,
         kernel: Path,
         cmdline: str,
         initrd: Optional[Path] = None,
         dry_run: bool = False,
+        verbose: bool = False,
         **kwargs,
     ) -> Optional[Path]:
         return None
@@ -409,10 +412,23 @@ class Arch_sparc64(Arch):
 
 
 class Arch_s390x(Arch):
+    PV_DUMP_SUPPORT = 0x8000000000
+
     def __init__(self):
         Arch.__init__(self, "s390x")
 
         self.linuxname = "s390"
+
+    @staticmethod
+    def test_uv_support(value: int) -> bool:
+        with open("/sys/firmware/uv/query/facilities", "rb") as f:
+            data = f.read().decode()
+
+        inst_call_list = data.splitlines()
+        assert len(inst_call_list) == 4
+        inst_call_list_int = list(map(functools.partial(int, base=16), inst_call_list))
+        first_inst_call = inst_call_list_int[0]
+        return first_inst_call & value
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -477,8 +493,19 @@ class Arch_s390x(Arch):
     def qemu_confidential_guest_args(
         is_native: bool, use_kvm: bool, **kwargs
     ) -> List[str]:
-        if not is_native or not use_kvm:
+        try:
+            with open("/sys/firmware/uv/prot_virt_host", "rb") as f:
+                data = f.read().decode()
+        except FileNotFoundError:
             return Exception("TODO Unsupported")
+        else:
+            if int(data) != 1:
+                return Exception(
+                    "Secure Execution is not supported on your system. 'prot_virt=1' missing?"
+                )
+        if not is_native or not use_kvm:
+            return Exception("KVM must be used for Secure Execution")
+
         return [
             "-object",
             "s390-pv-guest,id=pv0",
@@ -486,12 +513,13 @@ class Arch_s390x(Arch):
             "confidential-guest-support=pv0",
         ]
 
-    @staticmethod
     def qemu_confidential_guest_img_preparation(
+        self,
         kernel: Path,
         cmdline: str,
         initrd: Optional[Path] = None,
         dry_run: bool = False,
+        verbose: bool = False,
         **kwargs,
     ) -> Optional[Any]:
         if "host-key-document" not in kwargs:
@@ -506,7 +534,12 @@ class Arch_s390x(Arch):
         confidential_guest_args = [
             f"--{key}={value}" for key, values in kwargs.items() for value in values
         ]
+
         output = tempfile.NamedTemporaryFile(suffix="seimg")
+        if self.test_uv_support(self.PV_DUMP_SUPPORT) and "cck" in kwargs:
+            if verbose:
+                sys.stderr.write(f"virtme: using CCK in '{kwargs.get('cck')[-1]}'\n")
+            confidential_guest_args += ["--enable-dump"]
         prepare_cmd = [
             "pvimg",
             "create",
