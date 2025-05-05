@@ -1402,7 +1402,7 @@ class KernelSource:
             sys.exit(1)
         if args.verbose:
             sys.stdout.write(data.decode("utf-8"))
-        sock.send(b'{ "execute": "qmp_capabilities" }\r')
+        sock.send(json.dumps({"execute": "qmp_capabilities"}).encode("utf-8"))
         data = sock.recv(1024)
         if not data:
             sys.exit(1)
@@ -1410,11 +1410,11 @@ class KernelSource:
             sys.stdout.write(data.decode("utf-8"))
         dump_file = args.dump
         with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
-            msg = (
-                '{"execute":"dump-guest-memory",'
-                '"arguments":{"paging":true,'
-                '"protocol":"file:' + tmp.name + '"}}'
-                "\r"
+            msg = json.dumps(
+                {
+                    "execute": "dump-guest-memory",
+                    "arguments": {"paging": True, "protocol": f"file:{tmp.name}"},
+                }
             )
             if args.verbose:
                 sys.stdout.write(msg + "\n")
