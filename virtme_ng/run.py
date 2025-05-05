@@ -908,7 +908,7 @@ class KernelSource:
         if envs:
             args.exec = envs[0] if len(envs) == 1 else shlex.join(envs)
 
-        if args.exec is not None:
+        if args.exec:
             self.virtme_param["exec"] = f"--script-sh {shlex.quote(args.exec)}"
         else:
             self.virtme_param["exec"] = ""
