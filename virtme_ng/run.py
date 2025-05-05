@@ -906,7 +906,8 @@ class KernelSource:
         if args.exec is not None and envs:
             arg_fail("--exec and positional arguments are mutually exclusive")
         if envs:
-            args.exec = " ".join(envs)
+            args.exec = envs[0] if len(envs) == 1 else shlex.join(envs)
+
         if args.exec is not None:
             self.virtme_param["exec"] = f"--script-sh {shlex.quote(args.exec)}"
         else:
