@@ -902,6 +902,9 @@ class KernelSource:
                 self.virtme_param["kdir"] = "--kdir " + var[2:]
             else:
                 envs.append(var)
+
+        if args.exec is not None and envs:
+            arg_fail("--exec and positional arguments are mutually exclusive")
         if envs:
             args.exec = " ".join(envs)
         if args.exec is not None:
