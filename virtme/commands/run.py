@@ -1877,6 +1877,7 @@ def do_it() -> int:
             cmdline=kernel_cmdline,
             initrd=initrdpath,
             dry_run=args.dry_run,
+            verbose=args.verbose,
             **args.confidential_guest_args,
         )
         if output is not None:

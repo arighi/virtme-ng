@@ -503,6 +503,33 @@ Examples
    Now you can simply run `vng --confidential-guest` to prepare the boot image
    and start a confidential guest using this newly created boot image.
 
+   + Run virtme-ng with confidential dump support (currently only s390x support)
+
+     ```
+     # Specify a confidential dump encryption key, e.g. via the virtme-ng.conf
+       {
+        "default_opts": {
+           "confidential_guest_args": ["host-key-document=/home/user/HKD.crt", "cck=/home/user/cck"]
+       }
+
+     # Start the vng instance in debug mode
+     $ vng --confidential-guest --debug
+
+     # In a separate shell session trigger the memory dump to /tmp/vmcore.img
+     $ vng --dump /tmp/vmcore.img
+
+     # Decrypt the dump on-the-fly (fusermount3 is needed)
+     $ zgetdump --mount /mnt/ --key /home/user/cck /tmp/vmcore.img
+
+     # Use drgn to read 'jiffies' from the memory dump:
+     $ echo "print(prog['jiffies'])" | drgn -q -s vmlinux -c /mnt/dump.elf
+     drgn 0.0.23 (using Python 3.11.6, elfutils 0.189, with libkdumpfile)
+     For help, type help(drgn).
+     >>> import drgn
+     >>> from drgn import NULL, Object, cast, container_of, execscript, offsetof, reinterpret, sizeof
+     >>> from drgn.helpers.common import *
+     >>> from drgn.helpers.linux import *
+     ```
 
 Implementation details
 ======================
