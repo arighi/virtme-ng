@@ -1408,8 +1408,11 @@ class KernelSource:
             sys.exit(1)
         if args.verbose:
             sys.stdout.write(data.decode("utf-8"))
+        assert args.dump is not None
         dump_file = args.dump
-        with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
+        with tempfile.NamedTemporaryFile(
+            delete=True, prefix="tmpvirtmedump_", dir=os.path.dirname(dump_file)
+        ) as tmp:
             msg = json.dumps(
                 {
                     "execute": "dump-guest-memory",
