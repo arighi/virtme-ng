@@ -9,7 +9,6 @@ import os
 import platform
 import re
 import shlex
-import shutil
 import signal
 import socket
 import sys
@@ -1415,7 +1414,10 @@ class KernelSource:
             msg = json.dumps(
                 {
                     "execute": "dump-guest-memory",
-                    "arguments": {"paging": True, "protocol": f"file:{tmp.name}"},
+                    "arguments": {
+                        "paging": True,
+                        "protocol": f"file:{dump_file if dump_file else tmp.name}",
+                    },
                 }
             )
             if args.verbose:
@@ -1429,8 +1431,6 @@ class KernelSource:
             data = sock.recv(1024)
             if args.verbose:
                 sys.stdout.write(data.decode("utf-8"))
-            # Save memory dump to target file
-            shutil.move(tmp.name, dump_file)
 
     def clean(self, args):
         """Clean a local or remote git repository."""
