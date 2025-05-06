@@ -788,7 +788,7 @@ class KernelSource:
             tmp.write(
                 REMOTE_BUILD_SCRIPT.format(
                     args.build_host_exec_prefix or "",
-                    make_command + " -j$(nproc --all)",
+                    shlex.join(make_command) + " -j$(nproc --all)",
                 )
             )
             tmp.flush()
@@ -835,9 +835,7 @@ class KernelSource:
                     ["fakeroot", "debian/rules", "clean"], quiet=not args.verbose
                 )
             check_call_cmd(
-                self._format_cmd(
-                    make_command + f" -j {self.cpus}" + " modules_prepare"
-                ),
+                make_command + ["-j", self.cpus, "modules_prepare"],
                 quiet=not args.verbose,
                 dry_run=args.dry_run,
             )
@@ -871,19 +869,19 @@ class KernelSource:
             cross_arch = None
         make_command = ["make"]
         if args.skip_modules:
-            make_command.append(target)
-        make_command.append("LOCALVERSION=-virtme")
+            make_command += [target]
+        make_command += ["LOCALVERSION=-virtme"]
         if args.compiler:
             make_command += [f"HOSTCC={args.compiler}", f"CC={args.compiler}"]
         if cross_compile and cross_arch:
             make_command += [f"CROSS_COMPILE={cross_compile}", f"ARCH={cross_arch}"]
         # Propagate additional Makefile variables
         make_command += args.envs
-        make_command += ["-j", self.cpus]
-        if args.verbose:
-            print(f"cmd: {shlex.join(make_command)}")
         if args.build_host is None:
             # Build the kernel locally
+            make_command += ["-j", self.cpus]
+            if args.verbose:
+                print(f"cmd: {shlex.join(make_command)}")
             check_call_cmd(make_command, quiet=not args.verbose, dry_run=args.dry_run)
         else:
             # Build the kernel on a remote build host
