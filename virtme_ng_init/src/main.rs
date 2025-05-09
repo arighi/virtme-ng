@@ -193,7 +193,8 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
 const USER_SCRIPT: &str = "/run/tmp/.virtme-script";
 
 fn check_init_pid() {
-    if id() != 1 {
+    let is_systemd: bool = env::var("virtme_systemd").is_ok_and(|x| x == "1");
+    if !is_systemd && id() != 1 {
         log!("must be run as PID 1");
         exit(1);
     }
@@ -413,6 +414,9 @@ fn mount_kernel_filesystems() {
         // Note, get_test_tools_dir() relies on /proc, so that must be mounted
         // prior to /run.
         if mount_info.target == "/run" {
+            if env::var("virtme_systemd").is_ok_and(|x| x == "1") {
+                continue;
+            }
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
                 if guest_tools_dir.starts_with("/run") {
                     log!("/run previously mounted, skipping");
