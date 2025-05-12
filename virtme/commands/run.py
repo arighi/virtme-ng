@@ -32,6 +32,7 @@ from virtme_ng.utils import (
     SSH_DIR,
     VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
+    get_conf,
 )
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
@@ -1311,10 +1312,11 @@ def do_it() -> int:
         kernelargs.append("luks=no")
         # disable auditd so there are no errors if the user lacks `--rw`
         kernelargs.append("audit=off")
-        # disable getty@, since we're forcing the use of serial-getty@
-        kernelargs.append("systemd.mask=getty@")
         kernelargs.extend(
             [f"console={console}" for console in arch.serial_console_args() or []],
+        )
+        kernelargs.extend(
+            [f"systemd.mask={unit}" for unit in get_conf("systemd.masks") or []]
         )
 
     if args.root == "/":

@@ -54,6 +54,10 @@ def get_conf(key_path):
 
     >>> get_conf("default_opts")
     {}
+    >>> get_conf("systemd")
+    {'masks': ["getty@"]}
+    >>> get_conf("systemd.masks")
+    ["getty@"]
     """
     conf_path = get_conf_file_path()
     if conf_path is None:
