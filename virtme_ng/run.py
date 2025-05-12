@@ -29,7 +29,7 @@ import argcomplete
 
 from virtme.util import SilentError, get_username
 from virtme_ng.mainline import KernelDownloader
-from virtme_ng.utils import CONF_FILE, spinner_decorator
+from virtme_ng.utils import get_conf, spinner_decorator
 from virtme_ng.version import VERSION
 
 
@@ -681,31 +681,8 @@ class KernelSource:
 
     def __init__(self):
         self.virtme_param = {}
-        conf_path = self.get_conf_file_path()
-        self.default_opts = []
-        if conf_path is not None:
-            with open(conf_path, encoding="utf-8") as conf_fd:
-                conf_data = json.loads(conf_fd.read())
-                if "default_opts" in conf_data:
-                    self.default_opts = conf_data["default_opts"]
+        self.default_opts = get_conf("default_opts")
         self.cpus = str(os.cpu_count())
-
-    def get_conf_file_path(self):
-        """Return virtme-ng main configuration file path."""
-
-        # First check if there is a config file in the user's home config
-        # directory, then check for a single config file in ~/.virtme-ng.conf and
-        # finally check for /etc/virtme-ng.conf. If none of them exist, report an
-        # error and exit.
-        configs = (
-            CONF_FILE,
-            Path(Path.home(), ".virtme-ng.conf"),
-            Path("/etc", "virtme-ng.conf"),
-        )
-        for conf in configs:
-            if conf.exists():
-                return conf
-        return None
 
     def _format_cmd(self, cmd):
         return shlex.split(cmd)

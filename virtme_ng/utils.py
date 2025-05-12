@@ -3,6 +3,7 @@
 
 """virtme-ng: configuration path."""
 
+import json
 from pathlib import Path
 
 from virtme_ng.spinner import Spinner
@@ -28,3 +29,31 @@ def spinner_decorator(message):
         return wrapper
 
     return decorator
+
+
+def get_conf_file_path():
+    """Return virtme-ng main configuration file path."""
+
+    # First check if there is a config file in the user's home config
+    # directory, then check for a single config file in ~/.virtme-ng.conf and
+    # finally check for /etc/virtme-ng.conf. If none of them exist, report an
+    # error and exit.
+    configs = (
+        CONF_FILE,
+        Path(Path.home(), ".virtme-ng.conf"),
+        Path("/etc", "virtme-ng.conf"),
+    )
+    for conf in configs:
+        if conf.exists():
+            return conf
+    return None
+
+
+def get_conf(name):
+    conf_path = get_conf_file_path()
+    if conf_path is not None:
+        with open(conf_path, encoding="utf-8") as conf_fd:
+            conf_data = json.loads(conf_fd.read())
+            if name in conf_data:
+                return conf_data[name]
+    return []
