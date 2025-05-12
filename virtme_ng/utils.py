@@ -49,11 +49,30 @@ def get_conf_file_path():
     return None
 
 
-def get_conf(name):
+def get_conf(key_path):
+    """Return a configured value for a key_path, which might be nested
+
+    >>> get_conf("default_opts")
+    {}
+    >>> get_conf("systemd")
+    {'masks': ['/usr/lib/systemd/system-generators/systemd-fstab-generator',
+               '/usr/lib/systemd/system-generators/systemd-cryptsetup-generator']}
+    >>> get_conf("systemd.masks")
+    ["/usr/lib/systemd/system-generators/systemd-fstab-generator",
+     "/usr/lib/systemd/system-generators/systemd-cryptsetup-generator"]
+    """
     conf_path = get_conf_file_path()
-    if conf_path is not None:
-        with open(conf_path, encoding="utf-8") as conf_fd:
-            conf_data = json.loads(conf_fd.read())
-            if name in conf_data:
-                return conf_data[name]
-    return []
+    if conf_path is None:
+        return None
+
+    keys = key_path.split(".")
+
+    with open(conf_path, encoding="utf-8") as conf_fd:
+        conf = json.loads(conf_fd.read())
+        try:
+            for key in keys:
+                conf = conf[key]
+            return conf
+        except (KeyError, TypeError):
+            print(f"WARNING: Key {key_path} not found in {conf_path}.")
+            return []
