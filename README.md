@@ -599,10 +599,12 @@ Troubleshooting
    try to disable apparmor, adding `--append="apparmor=0"` to the virtme-ng
    command line.
 
- - Systemd support (`--systemd`) is still experimental, if something does not
-   work for you try adding more bind mounts to /dev/null in "virtme/commands/run.py"
-   (search for virtme_systemd=1). Be aware that you might also need `--user root`,
-   or if you're using your own / as ROOTFS, you need to run vng itself as root.
+ - Systemd support (`--systemd`) is still experimental, be aware that you might
+   also need `--user root`, or if you're using your own / as ROOTFS, you need
+   to run vng itself as root. If something does not work for you, you might
+   need to mask some services. You can see the ones that are masked by default
+   in the `cfg/virtme-ng.conf` file, which can be customized (refer to the
+   "Default options" section).
 
  - Running virtme-ng instances inside docker: in case of failures/issues,
    especially with stdin/stdout/stderr redirections, make sure that you have

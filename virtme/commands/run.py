@@ -32,6 +32,7 @@ from virtme_ng.utils import (
     SSH_DIR,
     VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
+    get_conf,
 )
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
@@ -1307,12 +1308,7 @@ def do_it() -> int:
             " ".join([f"console={console}" for console in arch.serial_console_args()])
         )
         initsh.extend(
-            [
-                "mount --bind /dev/null /usr/lib/systemd/system-generators/systemd-fstab-generator",
-                "mount --bind /dev/null /usr/lib/systemd/system-generators/systemd-cryptsetup-generator",
-                "mount --bind /dev/null /usr/lib/systemd/system/auditd.service",
-                "mount --bind /dev/null /usr/lib/systemd/system/getty@.service",
-            ]
+            [f"mount --bind /dev/null {unit}" for unit in get_conf("systemd.masks")]
         )
 
     if args.root == "/":
