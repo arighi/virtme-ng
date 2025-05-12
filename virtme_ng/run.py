@@ -1397,17 +1397,24 @@ class KernelSource:
         # Use QMP to generate a memory dump
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", 3636))
-        data = sock.recv(1024)
+        sock_f = sock.makefile(encoding="utf-8")
+        data = sock_f.readline()
         if not data:
+            sys.stderr.write("Dump failed")
             sys.exit(1)
         if args.verbose:
-            sys.stdout.write(data.decode("utf-8"))
+            sys.stdout.write(data)
+        # Exit "QEMU capabilities negotiation mode"
         sock.send(json.dumps({"execute": "qmp_capabilities"}).encode("utf-8"))
-        data = sock.recv(1024)
+        data = sock_f.readline()
         if not data:
+            sys.stderr.write("Dump failed")
             sys.exit(1)
         if args.verbose:
-            sys.stdout.write(data.decode("utf-8"))
+            sys.stdout.write(data)
+        if json.loads(data) != {"return": {}}:
+            sys.stderr.write(f"Dump failed:\n{data}")
+            sys.exit(1)
         dump_file = args.dump
         with tempfile.NamedTemporaryFile(
             delete=True, prefix="tmpvirtmedump_", dir=os.path.dirname(dump_file)
@@ -1421,16 +1428,41 @@ class KernelSource:
             if args.verbose:
                 sys.stdout.write(msg + "\n")
             sock.send(msg.encode("utf-8"))
-            data = sock.recv(1024)
-            if not data:
-                sys.exit(1)
-            if args.verbose:
-                sys.stdout.write(data.decode("utf-8"))
-            data = sock.recv(1024)
-            if args.verbose:
-                sys.stdout.write(data.decode("utf-8"))
-            # Save memory dump to target file
-            shutil.move(tmp.name, dump_file)
+            while True:
+                data = sock_f.readline()
+                if not data:
+                    sys.stderr.write("Dump failed")
+                    sys.exit(1)
+                if args.verbose:
+                    sys.stdout.write(data)
+                try:
+                    data_json = json.loads(data)
+                except json.decoder.JSONDecodeError:
+                    sys.stderr.write(f"Dump failed:\n{data}")
+                    sys.exit(1)
+
+                # e.g. {"error": {"class": "GenericError", "desc": "Could not create 'bla.elf': Permission denied"}}
+                if "error" in data_json:
+                    sys.stderr.write(f"Dump failed:\n{data}")
+                    sys.exit(1)
+
+                if data_json.get("event", "") != "DUMP_COMPLETED":
+                    continue
+
+                # Save memory dump to target file
+                shutil.move(tmp.name, dump_file)
+
+                # e.g. {"timestamp": {"seconds": 1747057595, "microseconds": 633224}, "event": "DUMP_COMPLETED", "data":
+                # {"result": {"total": 1073741824, "status": "failed", "completed": 305700864}, "error": "dump: failed
+                # to save memory: No space left on device"}}
+                if "error" in data_json["data"]:
+                    sys.stderr.write(f"Dump failed:\n{data}")
+                    sys.exit(1)
+
+                # We're done, e.g. {"timestamp": {"seconds": 1747057073, "microseconds": 930833}, "event":
+                # "DUMP_COMPLETED", "data": {"result": {"total": 1073741824, "status": "completed", "completed":
+                # 1073741824}}}
+                break
 
     def clean(self, args):
         """Clean a local or remote git repository."""
