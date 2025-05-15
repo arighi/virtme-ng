@@ -410,7 +410,18 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="store_true",
         help="Use an initramfs even if unnecessary",
     )
-
+    parser.add_argument(
+        "--confidential-guest",
+        action="store_true",
+        help="Prepare image for confidential guest",
+    )
+    parser.add_argument(
+        "--confidential-guest-args",
+        action="extend",
+        nargs="+",
+        type=str,
+        help="Confidential guest keyword arguments",
+    )
     parser.add_argument(
         "--sound",
         action="store_true",
@@ -1282,6 +1293,19 @@ class KernelSource:
         else:
             self.virtme_param["nvgpu"] = ""
 
+    def _get_virtme_confidential_guest(self, args):
+        if args.confidential_guest:
+            if args.confidential_guest_args is None:
+                arg_fail(
+                    "error: --confidential-guest can be used only with --confidential-guest-args",
+                    show_usage=False,
+                )
+            self.virtme_param["confidential_guest"] = (
+                f"--confidential-guest --confidential-guest-args {shlex.join(args.confidential_guest_args)}"
+            )
+        else:
+            self.virtme_param["confidential_guest"] = ""
+
     def _get_virtme_qemu_opts(self, args):
         qemu_args = ""
         if args.debug:
@@ -1320,6 +1344,7 @@ class KernelSource:
         self._get_virtme_disk(args)
         self._get_virtme_sound(args)
         self._get_virtme_vmcoreinfo(args)
+        self._get_virtme_confidential_guest(args)
         self._get_virtme_disable_microvm(args)
         self._get_virtme_disable_monitor(args)
         self._get_virtme_disable_kvm(args)
@@ -1373,6 +1398,7 @@ class KernelSource:
             + f"{self.virtme_param['disable_kvm']} "
             + f"{self.virtme_param['ssh_tcp']} "
             + f"{self.virtme_param['force_9p']} "
+            + f"{self.virtme_param['confidential_guest']} "
             + f"{self.virtme_param['force_initramfs']} "
             + f"{self.virtme_param['graphics']} "
             + f"{self.virtme_param['verbose']} "
@@ -1397,38 +1423,73 @@ class KernelSource:
         # Use QMP to generate a memory dump
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.connect(("localhost", 3636))
-        data = sock.recv(1024)
+        sock_f = sock.makefile(encoding="utf-8")
+        data = sock_f.readline()
         if not data:
+            sys.stderr.write("Dump failed")
             sys.exit(1)
         if args.verbose:
-            sys.stdout.write(data.decode("utf-8"))
-        sock.send(b'{ "execute": "qmp_capabilities" }\r')
-        data = sock.recv(1024)
+            sys.stdout.write(data)
+        # Exit "QEMU capabilities negotiation mode"
+        sock.send(json.dumps({"execute": "qmp_capabilities"}).encode("utf-8"))
+        data = sock_f.readline()
         if not data:
+            sys.stderr.write("Dump failed")
             sys.exit(1)
         if args.verbose:
-            sys.stdout.write(data.decode("utf-8"))
+            sys.stdout.write(data)
+        if json.loads(data) != {"return": {}}:
+            sys.stderr.write(f"Dump failed:\n{data}")
+            sys.exit(1)
+        assert args.dump is not None
         dump_file = args.dump
-        with tempfile.NamedTemporaryFile(delete=dump_file is None) as tmp:
-            msg = (
-                '{"execute":"dump-guest-memory",'
-                '"arguments":{"paging":true,'
-                '"protocol":"file:' + tmp.name + '"}}'
-                "\r"
+        with tempfile.NamedTemporaryFile(
+            delete=True, prefix="tmpvirtmedump_", dir=os.path.dirname(dump_file)
+        ) as tmp:
+            msg = json.dumps(
+                {
+                    "execute": "dump-guest-memory",
+                    "arguments": {"paging": True, "protocol": f"file:{tmp.name}"},
+                }
             )
             if args.verbose:
                 sys.stdout.write(msg + "\n")
             sock.send(msg.encode("utf-8"))
-            data = sock.recv(1024)
-            if not data:
-                sys.exit(1)
-            if args.verbose:
-                sys.stdout.write(data.decode("utf-8"))
-            data = sock.recv(1024)
-            if args.verbose:
-                sys.stdout.write(data.decode("utf-8"))
-            # Save memory dump to target file
-            shutil.move(tmp.name, dump_file)
+            while True:
+                data = sock_f.readline()
+                if not data:
+                    sys.stderr.write("Dump failed")
+                    sys.exit(1)
+                if args.verbose:
+                    sys.stdout.write(data)
+                try:
+                    data_json = json.loads(data)
+                except json.decoder.JSONDecodeError:
+                    sys.stderr.write(f"Dump failed:\n{data}")
+                    sys.exit(1)
+
+                # e.g. {"error": {"class": "GenericError", "desc": "Could not create 'bla.elf': Permission denied"}}
+                if "error" in data_json:
+                    sys.stderr.write(f"Dump failed:\n{data}")
+                    sys.exit(1)
+
+                if data_json.get("event", "") != "DUMP_COMPLETED":
+                    continue
+
+                # Save memory dump to target file
+                shutil.move(tmp.name, dump_file)
+
+                # e.g. {"timestamp": {"seconds": 1747057595, "microseconds": 633224}, "event": "DUMP_COMPLETED", "data":
+                # {"result": {"total": 1073741824, "status": "failed", "completed": 305700864}, "error": "dump: failed
+                # to save memory: No space left on device"}}
+                if "error" in data_json["data"]:
+                    sys.stderr.write(f"Dump failed:\n{data}")
+                    sys.exit(1)
+
+                # We're done, e.g. {"timestamp": {"seconds": 1747057073, "microseconds": 930833}, "event":
+                # "DUMP_COMPLETED", "data": {"result": {"total": 1073741824, "status": "completed", "completed":
+                # 1073741824}}}
+                break
 
     def clean(self, args):
         """Clean a local or remote git repository."""
