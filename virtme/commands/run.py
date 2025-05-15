@@ -1189,9 +1189,10 @@ def do_it() -> int:
     try:
         with open("/proc/sys/fs/nr_open", encoding="utf-8") as file:
             nr_open = file.readline().strip()
-            kernelargs.append(f"nr_open={nr_open}")
-    except FileNotFoundError:
+    except (FileNotFoundError, PermissionError):
         pass
+    else:
+        kernelargs.append(f"nr_open={nr_open}")
 
     # Parse NUMA settings.
     if args.numa:
