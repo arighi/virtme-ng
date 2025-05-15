@@ -294,6 +294,22 @@ Examples
    Linux version 6.7.0-060700rc5-generic (kernel@kathleen) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-7ubuntu1) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #202312102332 SMP PREEMPT_DYNAMIC Sun Dec 10 23:41:31 UTC 2023
 ```
 
+ - Run a kernel within a separate chroot, using its systemd as init:
+```
+   $ vng -r ./fookernel --user root --root ./rootfs/sid --user root --systemd -- systemctl status | head
+   ...
+   ● virtme-ng
+       State: running
+       Units: 221 loaded (incl. loaded aliases)
+        Jobs: 0 queued
+      Failed: 0 units
+       Since: Fri 2025-04-18 14:50:09 UTC; 1s ago
+     systemd: 257.5-2
+     Tainted: unmerged-bin
+      CGroup: /
+              ├─init.scope
+```
+
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
 ```
@@ -584,9 +600,17 @@ Troubleshooting
 ```
 
  - Snap support is still experimental and something may not work as expected
-   (keep in mind that virtme-ng will try to run snapd in a bare minimum system
-   environment without systemd), if some snaps are not running try to disable
-   apparmor, adding `--append="apparmor=0"` to the virtme-ng command line.
+   (keep in mind that, by default, virtme-ng will try to run snapd in a bare
+   minimum system environment without systemd), if some snaps are not running
+   try to disable apparmor, adding `--append="apparmor=0"` to the virtme-ng
+   command line.
+
+ - Systemd support (`--systemd`) is still experimental, be aware that you might
+   also need `--user root`, or if you're using your own / as ROOTFS, you need
+   to run vng itself as root. If something does not work for you, you might
+   need to mask some services. You can see the ones that are masked by default
+   in the `cfg/virtme-ng.conf` file, which can be customized (refer to the
+   "Default options" section).
 
  - Running virtme-ng instances inside docker: in case of failures/issues,
    especially with stdin/stdout/stderr redirections, make sure that you have
