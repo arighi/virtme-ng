@@ -103,6 +103,25 @@ virtme-ng command, such as:
  $ ./vng --help
 ```
 
+Configuration
+=============
+
+* You may customize the default configuration by providing one of the
+  following, by order of preference: `$HOME/.config/virtme-ng/virtme-ng.conf`,
+  `$HOME/.virtme-ng.conf` or `/etc/virtme-ng.conf`. As a fallback for any
+  missing values, the default ones will be used.
+
+* The format of the file is JSON. Default values:
+```
+{
+    "default_opts": {},
+    "systemd": {
+        "masks": ["getty@"]
+    }
+}
+```
+
+
 Requirements
 ============
 
@@ -550,12 +569,12 @@ Default options
 Typically, if you always use virtme-ng with an external build server (e.g.,
 `vng --build --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you
 don't always want to specify these options, so instead, you can simply define
-them in `~/.config/virtme-ng/virtme-ng.conf` under `default_opts` and then
-simply run `vng --build`.
+them in your configuration file (refer to the [Configuration](#configuration)
+section) under `default_opts` and then simply run `vng --build`.
 
 Example (always use an external build server called 'kathleen' and run make
 inside a build chroot called `chroot:lunar-amd64`). To do so, add the
-`default_opts` section in `~/.config/virtme-ng/virtme-ng.conf` as following:
+`default_opts` section in your configuration file as following:
 ```
 {
     "default_opts": {
@@ -621,9 +640,10 @@ Troubleshooting
 
  - Systemd support (`--systemd`) is still experimental. If something does not
    work for you, try masking the unit that is freezing, e.g. `--append
-   "systemd.mask=$PROBLEMATIC_UNIT"`. Be aware that you might also need `--user
-   root`, or if you're using your own `/` as ROOTFS, you may need to run vng
-   itself as root.
+   "systemd.mask=$PROBLEMATIC_UNIT"` (refer to the
+   [Configuration](#configuration) section for a more permanent setup). Be
+   aware that you might also need `--user root`, or if you're using your own
+   `/` as ROOTFS, you may need to run vng itself as root.
 
  - Running virtme-ng instances inside docker: in case of failures/issues,
    especially with stdin/stdout/stderr redirections, make sure that you have

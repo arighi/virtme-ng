@@ -14,9 +14,11 @@ SSH_CONF_FILE = SSH_DIR.joinpath("virtme-ng-ssh.conf")
 VIRTME_SSH_DESTINATION_NAME = "virtme-ng"
 VIRTME_SSH_HOSTNAME_CID_SEPARATORS = ("%", "/")
 DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR = VIRTME_SSH_HOSTNAME_CID_SEPARATORS[0]
-SERIAL_GETTY_FILE = Path(CACHE_DIR, "serial-getty@.service")
 CONF_PATH = Path(Path.home(), ".config", "virtme-ng")
 CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
+SERIAL_GETTY_FILE = Path(CACHE_DIR, "serial-getty@.service")
+
+# NOTE: this must stay in sync with README.md
 CONF_DEFAULT = {
     "default_opts": {},
     "systemd": {
