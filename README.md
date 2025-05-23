@@ -103,6 +103,31 @@ virtme-ng command, such as:
  $ ./vng --help
 ```
 
+Configuration
+=============
+
+* You may customize the default configuration by providing one of the
+  following, by order of preference: `$HOME/.config/virtme-ng/virtme-ng.conf`,
+  `$HOME/.virtme-ng.conf` or `/etc/virtme-ng.conf`. If none of these are
+  provided, the default values will be used. As a fallback for any missing
+  value in your file, the default will also be used.
+
+* The format of the file is JSON. Default values:
+```
+{
+    "default_opts": {},
+    "systemd": {
+        "masks": [
+            "/usr/lib/systemd/system-generators/systemd-fstab-generator",
+            "/usr/lib/systemd/system-generators/systemd-cryptsetup-generator",
+            "/usr/lib/systemd/system/auditd.service",
+            "/usr/lib/systemd/system/getty@.service"
+        ]
+    }
+}
+```
+
+
 Requirements
 ============
 
@@ -536,12 +561,12 @@ Default options
 Typically, if you always use virtme-ng with an external build server (e.g.,
 `vng --build --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you
 don't always want to specify these options, so instead, you can simply define
-them in `~/.config/virtme-ng/virtme-ng.conf` under `default_opts` and then
-simply run `vng --build`.
+them in your configuration file (refer to the [Configuration](#configuration)
+section) under `default_opts` and then simply run `vng --build`.
 
 Example (always use an external build server called 'kathleen' and run make
 inside a build chroot called `chroot:lunar-amd64`). To do so, add the
-`default_opts` section in `~/.config/virtme-ng/virtme-ng.conf` as following:
+`default_opts` section in your configuration file as following:
 ```
 {
     "default_opts": {
@@ -608,9 +633,8 @@ Troubleshooting
  - Systemd support (`--systemd`) is still experimental, be aware that you might
    also need `--user root`, or if you're using your own `/` as ROOTFS, you need
    to run vng itself as root. If something does not work for you, you might
-   need to mask some services. You can see the ones that are masked by default
-   in the CONF_DEFAULT definition, which can be customized via configuration file
-   (refer to the "Default options" section).
+   need to mask some services. Refer to the [Configuration](#configuration)
+   section.
 
  - Running virtme-ng instances inside docker: in case of failures/issues,
    especially with stdin/stdout/stderr redirections, make sure that you have
