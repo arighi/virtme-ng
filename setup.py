@@ -124,7 +124,6 @@ if build_virtme_ng_init:
     packages.append("virtme.guest.bin")
 
 data_files = [
-    ("/etc", ["cfg/virtme-ng.conf"]),
     ("/usr/share/bash-completion/completions", ["virtme-ng-prompt", "vng-prompt"]),
 ]
 if build_manpages:

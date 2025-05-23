@@ -192,13 +192,6 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
 
 const USER_SCRIPT: &str = "/run/tmp/.virtme-script";
 
-fn check_init_pid() {
-    if id() != 1 {
-        log!("must be run as PID 1");
-        exit(1);
-    }
-}
-
 fn poweroff() {
     unsafe {
         libc::sync();
@@ -413,6 +406,10 @@ fn mount_kernel_filesystems() {
         // Note, get_test_tools_dir() relies on /proc, so that must be mounted
         // prior to /run.
         if mount_info.target == "/run" {
+            if id() != 1 {
+                // systemd is the current init, skip mounting /run
+                continue;
+            }
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
                 if guest_tools_dir.starts_with("/run") {
                     log!("/run previously mounted, skipping");
@@ -1106,9 +1103,6 @@ fn print_logo() {
 }
 
 fn main() {
-    // Make sure to always run as PID 1.
-    check_init_pid();
-
     // Basic system initialization (order is important here).
     configure_environment();
     configure_hostname();

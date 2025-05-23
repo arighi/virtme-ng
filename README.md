@@ -103,6 +103,31 @@ virtme-ng command, such as:
  $ ./vng --help
 ```
 
+Configuration
+=============
+
+* You may customize the default configuration by providing one of the
+  following, by order of preference: `$HOME/.config/virtme-ng/virtme-ng.conf`,
+  `$HOME/.virtme-ng.conf` or `/etc/virtme-ng.conf`. If none of these are
+  provided, the default values will be used. As a fallback for any missing
+  value in your file, the default will also be used.
+
+* The format of the file is JSON. Default values:
+```
+{
+    "default_opts": {},
+    "systemd": {
+        "masks": [
+            "/usr/lib/systemd/system-generators/systemd-fstab-generator",
+            "/usr/lib/systemd/system-generators/systemd-cryptsetup-generator",
+            "/usr/lib/systemd/system/auditd.service",
+            "/usr/lib/systemd/system/getty@.service"
+        ]
+    }
+}
+```
+
+
 Requirements
 ============
 
@@ -292,6 +317,22 @@ Examples
    DISTRIB_CODENAME=jammy
    DISTRIB_DESCRIPTION="Ubuntu 22.04.3 LTS"
    Linux version 6.7.0-060700rc5-generic (kernel@kathleen) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-7ubuntu1) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #202312102332 SMP PREEMPT_DYNAMIC Sun Dec 10 23:41:31 UTC 2023
+```
+
+ - Run a kernel within a separate chroot, using its systemd as init:
+```
+   $ vng -r ./fookernel --user root --root ./rootfs/sid --user root --systemd -- systemctl status | head
+   ...
+   ● virtme-ng
+       State: running
+       Units: 221 loaded (incl. loaded aliases)
+        Jobs: 0 queued
+      Failed: 0 units
+       Since: Fri 2025-04-18 14:50:09 UTC; 1s ago
+     systemd: 257.5-2
+     Tainted: unmerged-bin
+      CGroup: /
+              ├─init.scope
 ```
 
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
@@ -520,12 +561,12 @@ Default options
 Typically, if you always use virtme-ng with an external build server (e.g.,
 `vng --build --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you
 don't always want to specify these options, so instead, you can simply define
-them in `~/.config/virtme-ng/virtme-ng.conf` under `default_opts` and then
-simply run `vng --build`.
+them in your configuration file (refer to the [Configuration](#configuration)
+section) under `default_opts` and then simply run `vng --build`.
 
 Example (always use an external build server called 'kathleen' and run make
 inside a build chroot called `chroot:lunar-amd64`). To do so, add the
-`default_opts` section in `~/.config/virtme-ng/virtme-ng.conf` as following:
+`default_opts` section in your configuration file as following:
 ```
 {
     "default_opts": {
@@ -584,9 +625,16 @@ Troubleshooting
 ```
 
  - Snap support is still experimental and something may not work as expected
-   (keep in mind that virtme-ng will try to run snapd in a bare minimum system
-   environment without systemd), if some snaps are not running try to disable
-   apparmor, adding `--append="apparmor=0"` to the virtme-ng command line.
+   (keep in mind that, by default, virtme-ng will try to run snapd in a bare
+   minimum system environment without systemd), if some snaps are not running
+   try to disable apparmor, adding `--append="apparmor=0"` to the virtme-ng
+   command line.
+
+ - Systemd support (`--systemd`) is still experimental, be aware that you might
+   also need `--user root`, or if you're using your own `/` as ROOTFS, you need
+   to run vng itself as root. If something does not work for you, you might
+   need to mask some services. Refer to the [Configuration](#configuration)
+   section.
 
  - Running virtme-ng instances inside docker: in case of failures/issues,
    especially with stdin/stdout/stderr redirections, make sure that you have
