@@ -14,9 +14,18 @@ SSH_CONF_FILE = SSH_DIR.joinpath("virtme-ng-ssh.conf")
 VIRTME_SSH_DESTINATION_NAME = "virtme-ng"
 VIRTME_SSH_HOSTNAME_CID_SEPARATORS = ("%", "/")
 DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR = VIRTME_SSH_HOSTNAME_CID_SEPARATORS[0]
+SERIAL_GETTY_FILE = Path(CACHE_DIR, "serial-getty@.service")
 CONF_PATH = Path(Path.home(), ".config", "virtme-ng")
 CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
-SERIAL_GETTY_FILE = Path(CACHE_DIR, "serial-getty@.service")
+CONF_DEFAULT = {
+    "default_opts": {},
+    "systemd": {
+        "masks": [
+            # disable getty@, since we're forcing the use of serial-getty@
+            "getty@"
+        ]
+    },
+}
 
 
 def spinner_decorator(message):
@@ -31,22 +40,24 @@ def spinner_decorator(message):
     return decorator
 
 
-def get_conf_file_path():
-    """Return virtme-ng main configuration file path."""
+def get_conf_obj():
+    """Return virtme-ng main configuration, returning the default if not found."""
 
     # First check if there is a config file in the user's home config
     # directory, then check for a single config file in ~/.virtme-ng.conf and
-    # finally check for /etc/virtme-ng.conf. If none of them exist, report an
-    # error and exit.
-    configs = (
+    # finally check for /etc/virtme-ng.conf. If none of them exist, return the
+    # default configuration.
+    conf_paths = (
         CONF_FILE,
         Path(Path.home(), ".virtme-ng.conf"),
         Path("/etc", "virtme-ng.conf"),
     )
-    for conf in configs:
-        if conf.exists():
-            return conf
-    return None
+    for conf_path in conf_paths:
+        if conf_path.exists():
+            with open(conf_path, encoding="utf-8") as conf_fd:
+                conf = json.loads(conf_fd.read())
+                return conf
+    return CONF_DEFAULT
 
 
 def get_conf(key_path):
@@ -59,18 +70,14 @@ def get_conf(key_path):
     >>> get_conf("systemd.masks")
     ["getty@"]
     """
-    conf_path = get_conf_file_path()
-    if conf_path is None:
-        return None
-
     keys = key_path.split(".")
-
-    with open(conf_path, encoding="utf-8") as conf_fd:
-        conf = json.loads(conf_fd.read())
-        try:
-            for key in keys:
-                conf = conf[key]
-            return conf
-        except (KeyError, TypeError):
-            print(f"WARNING: Key {key_path} not found in {conf_path}.")
-            return []
+    conf = get_conf_obj()
+    try:
+        for key in keys:
+            conf = conf[key]
+        return conf
+    except (KeyError, TypeError):
+        conf = CONF_DEFAULT
+        for key in keys:
+            conf = conf[key]
+        return conf
