@@ -25,11 +25,14 @@ from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
 
 from virtme_ng.utils import (
+    CACHE_DIR,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
+    SERIAL_GETTY_FILE,
     SSH_CONF_FILE,
     SSH_DIR,
     VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
+    get_conf,
 )
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
@@ -96,6 +99,11 @@ def make_parser() -> argparse.ArgumentParser:
     g = parser.add_argument_group(title="Common guest options")
     g.add_argument(
         "--root", action="store", default="/", help="Local path to use as guest root"
+    )
+    g.add_argument(
+        "--systemd",
+        action="store_true",
+        help="Execute systemd as init (EXPERIMENTAL)",
     )
     g.add_argument(
         "--rw",
@@ -1297,28 +1305,59 @@ def do_it() -> int:
     else:
         virtme_init_cmd = "virtme-init"
 
+    if args.systemd:
+        # disable systemd-fstab-generator so boot does not freeze while waiting for disks
+        kernelargs.append("fstab=no")
+        # disable systemd-cryptsetup-generator so it doesn't wait for encrypted disks
+        kernelargs.append("luks=no")
+        # disable auditd so there are no errors if the user lacks `--rw`
+        kernelargs.append("audit=off")
+        kernelargs.extend(
+            [f"console={console}" for console in arch.serial_console_args() or []],
+        )
+        kernelargs.extend(
+            [f"systemd.mask={unit}" for unit in get_conf("systemd.masks") or []]
+        )
+
     if args.root == "/":
-        initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
+        if args.systemd:
+            initcmds = [
+                "init=/bin/sh",
+                "--",
+                "-c",
+                f"SYSTEMD_UNIT_PATH={CACHE_DIR}: exec /sbin/init;",
+            ]
+        else:
+            initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
         virtfs_config = VirtFSConfig(
             path=guest_tools_path,
             mount_tag="virtme.guesttools",
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
-        initcmds = [
-            "init=/bin/sh",
-            "--",
-            "-c",
-            ";".join(
-                [
-                    "mount -t tmpfs run /run",
-                    "mkdir -p /run/virtme/guesttools",
-                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
-                    + "virtme.guesttools /run/virtme/guesttools",
-                    f"exec /run/virtme/guesttools/{virtme_init_cmd}",
-                ]
-            ),
+        initsh = [
+            "mount -t tmpfs run /run",
+            "mkdir -p /run/virtme/guesttools",
+            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
+            + "virtme.guesttools /run/virtme/guesttools",
         ]
+        if args.systemd:
+            virtfs_config = VirtFSConfig(
+                path=str(CACHE_DIR),
+                mount_tag="virtme.cache",
+            )
+            export_virtfs(qemu, arch, qemuargs, virtfs_config)
+            initsh.extend(
+                [
+                    "mkdir -p /run/virtme/cache",
+                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
+                    + "virtme.cache /run/virtme/cache",
+                    "SYSTEMD_UNIT_PATH=/run/virtme/cache: exec /sbin/init",
+                ]
+            )
+        else:
+            initsh.append(f"exec /run/virtme/guesttools/{virtme_init_cmd}")
+        initcmds = ["init=/bin/sh", "--", "-c", "; ".join(initsh)]
 
     # Arrange for modules to end up in the right place
     if kernel.moddir is not None:
@@ -1401,12 +1440,15 @@ def do_it() -> int:
     if args.graphics is None and not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
 
-        # Redirect kernel errors to stderr, creating a separate console.
-        #
-        # If we don't have access to stderr via procfs (for example when
-        # running inside a container), print a warning and implicitly
-        # suppress the kernel errors redirection.
-        if can_access_file("/proc/self/fd/2"):
+        if args.systemd:
+            # Do nothing if `--systemd` is used, since it relies on the serial console
+            pass
+        elif can_access_file("/proc/self/fd/2"):
+            # Redirect kernel errors to stderr, creating a separate console.
+            #
+            # If we don't have access to stderr via procfs (for example when
+            # running inside a container), print a warning and implicitly
+            # suppress the kernel errors redirection.
             qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
@@ -1842,6 +1884,28 @@ def do_it() -> int:
     # Load a normal kernel
     qemuargs.extend(["-kernel", kernel.kimg])
     if kernelargs:
+        if args.systemd:
+            init_environment_vars = []
+            for arg in kernelargs:
+                match = re.match(r"(virtme_.*)=(.*)", arg)
+                if not match:
+                    continue
+                init_environment_vars.append(f"{match.group(1)}={match.group(2)}")
+            os.makedirs(CACHE_DIR, exist_ok=True)
+            with open(SERIAL_GETTY_FILE, "w", encoding="utf-8") as f:
+                f.write(
+                    f"""[Service]
+StandardInput=tty
+StandardOutput=tty
+TTYPath=/dev/%I
+TTYReset=yes
+TTYVHangup=yes
+Environment={shlex.join(init_environment_vars)}"""
+                )
+                if args.root == "/":
+                    f.write(f"\nExecStart={guest_tools_path}/{virtme_init_cmd}")
+                else:
+                    f.write(f"\nExecStart=/run/virtme/guesttools/{virtme_init_cmd}")
         qemuargs.extend(["-append", " ".join(quote_karg(a) for a in kernelargs)])
     if initrdpath is not None:
         qemuargs.extend(["-initrd", initrdpath])

@@ -29,7 +29,7 @@ import argcomplete
 
 from virtme.util import SilentError, get_username
 from virtme_ng.mainline import KernelDownloader
-from virtme_ng.utils import CONF_FILE, spinner_decorator
+from virtme_ng.utils import get_conf, spinner_decorator
 from virtme_ng.version import VERSION
 
 
@@ -556,6 +556,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         + "or to launch this command instead of a prompt (--client).",
     )
 
+    parser.add_argument(
+        "--systemd",
+        action="store_true",
+        help="Execute systemd as init (EXPERIMENTAL)",
+    )
+
     return parser
 
 
@@ -675,31 +681,8 @@ class KernelSource:
 
     def __init__(self):
         self.virtme_param = {}
-        conf_path = self.get_conf_file_path()
-        self.default_opts = []
-        if conf_path is not None:
-            with open(conf_path, encoding="utf-8") as conf_fd:
-                conf_data = json.loads(conf_fd.read())
-                if "default_opts" in conf_data:
-                    self.default_opts = conf_data["default_opts"]
+        self.default_opts = get_conf("default_opts")
         self.cpus = str(os.cpu_count())
-
-    def get_conf_file_path(self):
-        """Return virtme-ng main configuration file path."""
-
-        # First check if there is a config file in the user's home config
-        # directory, then check for a single config file in ~/.virtme-ng.conf and
-        # finally check for /etc/virtme-ng.conf. If none of them exist, report an
-        # error and exit.
-        configs = (
-            CONF_FILE,
-            Path(Path.home(), ".virtme-ng.conf"),
-            Path("/etc", "virtme-ng.conf"),
-        )
-        for conf in configs:
-            if conf.exists():
-                return conf
-        return None
 
     def _format_cmd(self, cmd):
         return shlex.split(cmd)
@@ -947,6 +930,12 @@ class KernelSource:
             self.virtme_param["root"] = f"--root {args.root}"
         else:
             self.virtme_param["root"] = ""
+
+    def _get_virtme_systemd(self, args):
+        if args.systemd:
+            self.virtme_param["systemd"] = "--systemd"
+        else:
+            self.virtme_param["systemd"] = ""
 
     def _get_virtme_rw(self, args):
         if args.rw:
@@ -1301,6 +1290,7 @@ class KernelSource:
         self._get_virtme_user(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
+        self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_rodir(args)
         self._get_virtme_rwdir(args)
@@ -1349,6 +1339,7 @@ class KernelSource:
             + f"{self.virtme_param['user']} "
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
+            + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['rodir']} "
             + f"{self.virtme_param['rwdir']} "
