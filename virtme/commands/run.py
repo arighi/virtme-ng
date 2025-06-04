@@ -937,7 +937,9 @@ def is_statically_linked(binary_path):
     try:
         # Run the 'file' command on the binary and check for the string
         # "statically linked"
-        result = subprocess.check_output(["file", binary_path], universal_newlines=True)
+        result = subprocess.check_output(
+            ["file", "-L", binary_path], universal_newlines=True
+        )
         return "statically linked" in result
     except subprocess.CalledProcessError:
         return False
