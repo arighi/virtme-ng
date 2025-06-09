@@ -145,7 +145,7 @@ setup(
     author_email="arighi@nvidia.com",
     description="Build and run a kernel inside a virtualized snapshot of your live system",
     url="https://github.com/arighi/virtme-ng",
-    license="GPLv2",
+    license="GPL-2.0-only",
     long_description=open(
         os.path.join(os.path.dirname(__file__), "README.md"), encoding="utf-8"
     ).read(),
@@ -177,7 +177,6 @@ setup(
         "Environment :: Console",
         "Intended Audience :: Developers",
         "Intended Audience :: System Administrators",
-        "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
         "Operating System :: POSIX :: Linux",
     ],
     zip_safe=False,
