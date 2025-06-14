@@ -1178,7 +1178,10 @@ def do_it() -> int:
         elif os.path.exists(f"/usr/lib/debug/boot/vmlinux-{kernel.version}"):
             vmlinux = f"/usr/lib/debug/boot/vmlinux-{kernel.version}"
         command = ["gdb", "-q", "-ex", "target remote localhost:1234", vmlinux]
-        os.execvp("gdb", command)
+        if args.dry_run:
+            print(" ".join(command))
+        else:
+            os.execvp("gdb", command)
         sys.exit(0)
 
     qemuargs: List[str] = [qemu.qemubin]
