@@ -1171,12 +1171,17 @@ def do_it() -> int:
         if kernel.version:
             print(f"kernel version = {kernel.version}")
         vmlinux = ""
-        if os.path.exists("vmlinux"):
+        if args.kdir is not None and os.path.exists(f"{args.kdir}/vmlinux"):
+            vmlinux = f"{args.kdir}/vmlinux"
+        elif os.path.exists("vmlinux"):
             vmlinux = "vmlinux"
         elif os.path.exists(f"/usr/lib/debug/boot/vmlinux-{kernel.version}"):
             vmlinux = f"/usr/lib/debug/boot/vmlinux-{kernel.version}"
         command = ["gdb", "-q", "-ex", "target remote localhost:1234", vmlinux]
-        os.execvp("gdb", command)
+        if args.dry_run:
+            print(" ".join(command))
+        else:
+            os.execvp("gdb", command)
         sys.exit(0)
 
     qemuargs: List[str] = [qemu.qemubin]
