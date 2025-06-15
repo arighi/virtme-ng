@@ -1179,7 +1179,7 @@ def do_it() -> int:
             vmlinux = f"/usr/lib/debug/boot/vmlinux-{kernel.version}"
         command = ["gdb", "-q", "-ex", "target remote localhost:1234", vmlinux]
         if args.dry_run:
-            print(" ".join(command))
+            print(shlex.join(command))
         else:
             os.execvp("gdb", command)
         sys.exit(0)
