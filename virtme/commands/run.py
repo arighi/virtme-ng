@@ -940,7 +940,7 @@ def is_statically_linked(binary_path):
         result = subprocess.check_output(
             ["file", "-L", binary_path], universal_newlines=True
         )
-        return "statically linked" in result
+        return "statically linked" in result or "static-pie linked" in result
     except subprocess.CalledProcessError:
         return False
 
