@@ -349,7 +349,7 @@ if [[ -n ${user_cmd} ]]; then
         log 'starting script'
         if [[ -n ${virtme_user} ]]; then
             chmod +x /run/tmp/.virtme-script
-            setsid su - "${virtme_user}" -c /run/tmp/.virtme-script < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
+            setsid su -c /run/tmp/.virtme-script -- "${virtme_user}" < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
         else
             setsid bash /run/tmp/.virtme-script < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
         fi
@@ -472,14 +472,14 @@ if [[ -n ${virtme_graphics} ]]; then
         # Try to fix permissions on the virtual consoles, we are starting X
         # directly here so we may need extra permissions on the tty devices.
         chown -- "${virtme_user}" /dev/char/*
-        setsid bash -c "su - ${virtme_user} -c 'xinit ${xinit_rc}'" 0<> "/dev/$consdev" 1>&0 2>&0
+        setsid bash -c "su -c 'xinit ${xinit_rc}' -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
     else
         setsid bash -c "xinit ${xinit_rc}" 0<> "/dev/$consdev" 1>&0 2>&0
     fi
     # Drop to console if the graphical app failed.
 fi
 if [[ -n ${virtme_user} ]]; then
-    setsid bash -c "su - ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
+    setsid bash -c "su -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
 else
     setsid bash 0<> "/dev/$consdev" 1>&0 2>&0
 fi
