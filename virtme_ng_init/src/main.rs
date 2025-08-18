@@ -750,7 +750,7 @@ fn run_user_script(uid: u32) {
         // Determine if we need to switch to a different user, or if we can run the script as root.
         let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
         let (cmd, args) = if !user.is_empty() {
-            ("su", vec![user.as_str(), "-c", USER_SCRIPT])
+            ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
         } else {
             ("/bin/sh", vec![USER_SCRIPT])
         };
@@ -931,7 +931,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
         utils::run_cmd("bash", &["-c", &"rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
 
         // Start xinit directly.
-        storage = format!("su {} -c 'xinit /run/tmp/.xinitrc'", user);
+        storage = format!("su -c 'xinit /run/tmp/.xinitrc' -- {}", user);
         args.push(&storage);
     } else {
         args.push("xinit /run/tmp/.xinitrc");
@@ -953,7 +953,7 @@ fn run_user_shell(tty_fd: libc::c_int) {
     let storage;
     if let Ok(user) = env::var("virtme_user") {
         args.push("-c");
-        storage = format!("su {}", user);
+        storage = format!("su -- {}", user);
         args.push(&storage);
     }
     print_logo();
