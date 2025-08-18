@@ -3,7 +3,6 @@
 import os
 import platform
 import subprocess
-import sys
 import sysconfig
 
 from argcomplete import shell_integration
@@ -31,13 +30,6 @@ if os.path.exists(".config"):
 
 # Global variables to store custom build options (as env variables)
 build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
-
-# Make sure virtme-ng-init submodule has been cloned
-if build_virtme_ng_init and not os.path.exists("virtme_ng_init/Cargo.toml"):
-    sys.stderr.write(
-        "WARNING: virtme-ng-init submodule not available, trying to clone it\n"
-    )
-    subprocess.check_call("git submodule update --init --recursive", shell=True)
 
 # Always include standard site-packages to PYTHONPATH
 os.environ["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
