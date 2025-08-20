@@ -26,7 +26,7 @@ pub fn log_impl(msg: Arguments<'_>) {
     static PREFIX: &str = "<6>virtme-ng-init: ";
     static LOG_LEVEL: &str = "<6>";
 
-    let mut msg = format!("{}{}", PREFIX, msg);
+    let mut msg = format!("{PREFIX}{msg}");
 
     // Remove all trailing \n
     while msg.ends_with('\n') {
@@ -58,10 +58,9 @@ pub fn get_user_id(username: &str) -> Option<u32> {
 }
 
 pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> std::io::Result<()> {
-    let gid_option = gid.map(|gid| Gid::from_raw(gid));
+    let gid_option = gid.map(Gid::from_raw);
 
-    chown(path, Some(Uid::from_raw(uid)), gid_option)
-        .map_err(|err| io::Error::new(std::io::ErrorKind::Other, err))?;
+    chown(path, Some(Uid::from_raw(uid)), gid_option).map_err(io::Error::other)?;
 
     Ok(())
 }
@@ -73,7 +72,7 @@ pub fn do_mkdir(path: &str) {
 
 pub fn do_unlink(path: &str) {
     match std::fs::remove_file(path) {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(err) => {
             log!("failed to unlink file {}: {}", path, err);
         }
@@ -105,7 +104,7 @@ pub fn create_file(fname: &str, mode: u32, content: &str) -> io::Result<()> {
 
 pub fn do_symlink(src: &str, dst: &str) {
     match fs::symlink(src, dst) {
-        Ok(_) => (),
+        Ok(()) => (),
         Err(err) => {
             log!("failed to create symlink {} -> {}: {}", src, dst, err);
         }

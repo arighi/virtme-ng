@@ -217,7 +217,7 @@ fn get_kernel_version(show_machine: bool) -> String {
     let release = utsname.release().to_string_lossy();
     if show_machine {
         let machine = utsname.machine().to_string_lossy();
-        format!("{} {}", release, machine)
+        format!("{release} {machine}")
     } else {
         release.into_owned()
     }
@@ -233,7 +233,7 @@ fn get_legacy_active_console() -> Option<String> {
             for line in reader.lines().flatten() {
                 if line.chars().nth(27) == Some('C') {
                     let console = line.split(' ').next()?;
-                    return Some(format!("/dev/{}", console));
+                    return Some(format!("/dev/{console}"));
                 }
             }
             None
@@ -247,7 +247,7 @@ fn get_legacy_active_console() -> Option<String> {
 
 fn get_active_console() -> Option<String> {
     if let Ok(console) = env::var("virtme_console") {
-        Some(format!("/dev/{}", console))
+        Some(format!("/dev/{console}"))
     } else {
         get_legacy_active_console()
     }
@@ -308,7 +308,7 @@ fn generate_shadow() -> io::Result<()> {
 
     for line in reader.lines() {
         if let Some((username, _)) = line?.split_once(':') {
-            writeln!(writer, "{}:!:::::::", username)?;
+            writeln!(writer, "{username}:!:::::::")?;
         }
     }
     utils::do_mount(
@@ -327,10 +327,10 @@ fn generate_sudoers() -> io::Result<()> {
     let mut content = "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n".to_string();
     content += "root ALL = (ALL) NOPASSWD: ALL\n";
     if let Ok(user) = env::var("virtme_user") {
-        content += &format!("{} ALL = (ALL) NOPASSWD: ALL\n", user);
+        content += &format!("{user} ALL = (ALL) NOPASSWD: ALL\n");
     }
     if !Path::new("/etc/sudoers").exists() {
-        utils::create_file("/etc/sudoers", 0o0440, "").unwrap_or_else(|_| {});
+        utils::create_file("/etc/sudoers", 0o0440, "").unwrap_or(());
     }
     utils::create_file(fname, 0o0440, &content).ok();
     utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
@@ -348,11 +348,8 @@ fn generate_lvm() -> io::Result<()> {
 fn generate_hosts() -> io::Result<()> {
     if let Ok(hostname) = env::var("virtme_hostname") {
         std::fs::copy("/etc/hosts", "/run/tmp/hosts")?;
-        let mut h = OpenOptions::new()
-            .write(true)
-            .append(true)
-            .open("/run/tmp/hosts")?;
-        writeln!(h, "\n127.0.0.1 {}\n::1 {}", hostname, hostname)?;
+        let mut h = OpenOptions::new().append(true).open("/run/tmp/hosts")?;
+        writeln!(h, "\n127.0.0.1 {hostname}\n::1 {hostname}")?;
         utils::do_mount(
             "/run/tmp/hosts",
             "/etc/hosts",
@@ -389,7 +386,7 @@ fn symlink_fds() {
     ];
 
     // Install /proc/self/fd symlinks into /dev if not already present.
-    for (src, dst) in fd_links.iter() {
+    for (src, dst) in &fd_links {
         if !std::path::Path::new(dst).exists() {
             utils::do_symlink(src, dst);
         }
@@ -423,7 +420,7 @@ fn mount_kernel_filesystems() {
             mount_info.fs_type,
             mount_info.flags,
             mount_info.fsdata,
-        )
+        );
     }
 }
 
@@ -435,7 +432,7 @@ fn mount_cgroupfs() {
         utils::do_mount("cgroup", "/sys/fs/cgroup", "tmpfs", 0, "");
         let subsystems = vec!["cpu", "cpuacct", "blkio", "memory", "devices", "pids"];
         for subsys in &subsystems {
-            let target = format!("/sys/fs/cgroup/{}", subsys);
+            let target = format!("/sys/fs/cgroup/{subsys}");
             utils::do_mkdir(&target);
             // Don't treat failure as critical here, since the kernel may not
             // support all the legacy cgroups.
@@ -450,23 +447,18 @@ fn mount_virtme_overlays() {
     utils::do_mkdir("/run/tmp/");
     for (key, path) in env::vars() {
         if key.starts_with("virtme_rw_overlay") {
-            let dir = &format!("/run/tmp/{}", key);
-            let upperdir = &format!("{}/upper", dir);
-            let workdir = &format!("{}/work", dir);
-            let mnt_opts = &format!(
-                "xino=off,lowerdir={},upperdir={},workdir={}",
-                path, upperdir, workdir
-            );
+            let dir = &format!("/run/tmp/{key}");
+            let upperdir = &format!("{dir}/upper");
+            let workdir = &format!("{dir}/work");
+            let mnt_opts =
+                &format!("xino=off,lowerdir={path},upperdir={upperdir},workdir={workdir}");
             utils::do_mkdir(dir);
             utils::do_mkdir(upperdir);
             utils::do_mkdir(workdir);
             let result = utils::do_mount_check(&key, &path, "overlay", 0, mnt_opts);
             if result.is_err() {
                 // Old kernels don't support xino=on|off, re-try without this option.
-                let mnt_opts = &format!(
-                    "lowerdir={},upperdir={},workdir={}",
-                    path, upperdir, workdir
-                );
+                let mnt_opts = &format!("lowerdir={path},upperdir={upperdir},workdir={workdir}");
                 utils::do_mount(&key, &path, "overlay", 0, mnt_opts);
             }
         }
@@ -490,7 +482,7 @@ fn mount_virtme_initmounts() {
 
 fn mount_kernel_modules() {
     let kver = get_kernel_version(false);
-    let mod_dir = format!("/lib/modules/{}", kver);
+    let mod_dir = format!("/lib/modules/{kver}");
 
     // Make sure to always have /lib/modules, otherwise we won't be able to configure kmod support
     // properly (this can happen in some container environments, such as docker).
@@ -521,7 +513,7 @@ fn mount_sys_filesystems() {
             mount_info.fs_type,
             mount_info.flags,
             mount_info.fsdata,
-        )
+        );
     }
 }
 
@@ -542,7 +534,7 @@ fn fix_dpkg_locks() {
         if fname.is_empty() {
             continue;
         }
-        let src_file = format!("/run/tmp/{}", fname);
+        let src_file = format!("/run/tmp/{fname}");
         utils::create_file(&src_file, 0o0640, "").ok();
         utils::do_mount(&src_file, path, "", libc::MS_BIND as usize, "");
     }
@@ -657,7 +649,7 @@ fn get_network_handle(
 ) -> Option<thread::JoinHandle<()>> {
     let network_dev_str = network_dev.unwrap();
     log!("setting up network device {}", network_dev_str);
-    return Some(thread::spawn(move || {
+    Some(thread::spawn(move || {
         let args = [
             "udhcpc",
             "-i",
@@ -669,13 +661,13 @@ fn get_network_handle(
             &format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap()),
         ];
         utils::run_cmd("busybox", &args);
-    }));
+    }))
 }
 
 fn setup_network_lo() -> Option<thread::JoinHandle<()>> {
-    return Some(thread::spawn(move || {
+    Some(thread::spawn(move || {
         utils::run_cmd("ip", &["link", "set", "dev", "lo", "up"]);
-    }));
+    }))
 }
 
 fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
@@ -693,12 +685,12 @@ fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
         }
 
         if let Some(guest_tools_dir) = get_guest_tools_dir() {
-            get_network_devices().into_iter().for_each(|network_dev| {
+            for network_dev in get_network_devices() {
                 vec.push(get_network_handle(
                     network_dev,
-                    Some(guest_tools_dir.to_owned()),
+                    Some(guest_tools_dir.clone()),
                 ));
-            });
+            }
         }
     }
     vec
@@ -729,7 +721,7 @@ fn run_user_script(uid: u32) {
             ("/dev/virtio-ports/virtme.dev_stdout", "/dev/stdout"),
             ("/dev/virtio-ports/virtme.dev_stderr", "/dev/stderr"),
         ];
-        for (src, dst) in io_files.iter() {
+        for (src, dst) in &io_files {
             if !std::path::Path::new(src).exists() {
                 continue;
             }
@@ -749,10 +741,10 @@ fn run_user_script(uid: u32) {
 
         // Determine if we need to switch to a different user, or if we can run the script as root.
         let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
-        let (cmd, args) = if !user.is_empty() {
-            ("su", vec![user.as_str(), "-c", USER_SCRIPT])
-        } else {
+        let (cmd, args) = if user.is_empty() {
             ("/bin/sh", vec![USER_SCRIPT])
+        } else {
+            ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
         };
         clear_virtme_envs();
         unsafe {
@@ -853,10 +845,10 @@ fn redirect_console(consdev: &str) {
 
 fn configure_terminal(consdev: &str, uid: u32) {
     // Set proper user ownership on the default console device
-    utils::do_chown(&consdev, uid, None).ok();
+    utils::do_chown(consdev, uid, None).ok();
 
     // Redirect stdout/stderr to the new console device.
-    redirect_console(&consdev);
+    redirect_console(consdev);
 
     if let Ok(params) = env::var("virtme_stty_con") {
         let output = Command::new("stty")
@@ -906,14 +898,14 @@ fn run_user_gui(tty_fd: libc::c_int) {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if cmdline.contains("virtme.sound") {
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                pre_exec_cmd = format!("{}/virtme-sound-script", guest_tools_dir);
+                pre_exec_cmd = format!("{guest_tools_dir}/virtme-sound-script");
             }
         }
     }
     if let Err(err) = utils::create_file(
         xinitrc,
         0o0644,
-        &format!("{}\n/bin/bash {}", pre_exec_cmd, USER_SCRIPT),
+        &format!("{pre_exec_cmd}\n/bin/bash {USER_SCRIPT}"),
     ) {
         log!("failed to generate {}: {}", xinitrc, err);
         return;
@@ -925,13 +917,13 @@ fn run_user_gui(tty_fd: libc::c_int) {
     if let Ok(user) = env::var("virtme_user") {
         // Try to fix permissions on the virtual consoles, we are starting X
         // directly here so we may need extra permissions on the tty devices.
-        utils::run_cmd("bash", &["-c", &format!("chown {} /dev/char/*", user)]);
+        utils::run_cmd("bash", &["-c", &format!("chown {user} /dev/char/*")]);
 
         // Clean up any previous X11 state.
-        utils::run_cmd("bash", &["-c", &"rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
+        utils::run_cmd("bash", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
 
         // Start xinit directly.
-        storage = format!("su {} -c 'xinit /run/tmp/.xinitrc'", user);
+        storage = format!("su -c 'xinit /run/tmp/.xinitrc' -- {user}");
         args.push(&storage);
     } else {
         args.push("xinit /run/tmp/.xinitrc");
@@ -942,7 +934,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
 fn init_xdg_runtime_dir(uid: u32) {
     // $XDG_RUNTIME_DIR defines the base directory relative to which user-specific non-essential
     // runtime files and other file objects (such as sockets, named pipes, ...) should be stored.
-    let dir = format!("/run/user/{}", uid);
+    let dir = format!("/run/user/{uid}");
     utils::do_mkdir(&dir);
     utils::do_chown(&dir, uid, None).ok();
     env::set_var("XDG_RUNTIME_DIR", dir);
@@ -953,7 +945,7 @@ fn run_user_shell(tty_fd: libc::c_int) {
     let storage;
     if let Ok(user) = env::var("virtme_user") {
         args.push("-c");
-        storage = format!("su {}", user);
+        storage = format!("su -- {user}");
         args.push(&storage);
     }
     print_logo();
@@ -980,14 +972,13 @@ fn setup_user_session() {
         .and_then(|user| utils::get_user_id(&user))
         .unwrap_or(0);
 
-    let consdev = match get_active_console() {
-        Some(console) => console,
-        None => {
-            log!("failed to determine console");
-            let err = Command::new("bash").arg("-l").exec();
-            log!("failed to exec bash: {}", err);
-            return;
-        }
+    let consdev = if let Some(console) = get_active_console() {
+        console
+    } else {
+        log!("failed to determine console");
+        let err = Command::new("bash").arg("-l").exec();
+        log!("failed to exec bash: {}", err);
+        return;
     };
     configure_terminal(consdev.as_str(), uid);
     init_xdg_runtime_dir(uid);
@@ -1002,7 +993,7 @@ fn run_sshd() {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if cmdline.contains("virtme.ssh") {
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                utils::run_cmd(format!("{}/virtme-sshd-script", guest_tools_dir), &[]);
+                utils::run_cmd(format!("{guest_tools_dir}/virtme-sshd-script"), &[]);
             }
         }
     }
@@ -1021,7 +1012,7 @@ fn run_snapd() {
                 return;
             }
             if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                utils::run_cmd(format!("{}/virtme-snapd-script", guest_tools_dir), &[]);
+                utils::run_cmd(format!("{guest_tools_dir}/virtme-snapd-script"), &[]);
             }
             Command::new(snapd_bin)
                 .stdin(Stdio::null())
@@ -1058,7 +1049,7 @@ fn setup_socat_console() {
             thread::spawn(move || {
                 log!("setting up vsock proxy executing {}", exec);
                 let key = "virtme_vsockmount";
-                if let Ok(path) = env::var(&key) {
+                if let Ok(path) = env::var(key) {
                     utils::do_mkdir(&path);
                     utils::do_mount(
                         &key.replace('_', "."),
@@ -1070,7 +1061,7 @@ fn setup_socat_console() {
                 }
 
                 let from = "VSOCK-LISTEN:1024,reuseaddr,fork";
-                let to = format!("EXEC:\"{}\",pty,stderr,setsid,sigint,sane,echo=0", exec);
+                let to = format!("EXEC:\"{exec}\",pty,stderr,setsid,sigint,sane,echo=0");
                 let args = vec![from, &to];
                 utils::run_cmd("socat", &args);
             });
@@ -1090,13 +1081,13 @@ fn run_misc_services() -> thread::JoinHandle<()> {
 }
 
 fn print_logo() {
-    let logo = r#"
+    let logo = r"
           _      _
    __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
    \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |
     \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |
      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
-                                                |___/"#;
+                                                |___/";
     println!("{}", logo.trim_start_matches('\n'));
     println!("   kernel version: {}", get_kernel_version(true));
     println!("   (CTRL+d to exit)\n");
