@@ -387,7 +387,7 @@ fn symlink_fds() {
 
     // Install /proc/self/fd symlinks into /dev if not already present.
     for (src, dst) in &fd_links {
-        if !std::path::Path::new(dst).exists() {
+        if !Path::new(dst).exists() {
             utils::do_symlink(src, dst);
         }
     }
@@ -706,11 +706,11 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
 }
 
 fn run_user_script(uid: u32) {
-    if !std::path::Path::new("/dev/virtio-ports/virtme.stdin").exists()
-        || !std::path::Path::new("/dev/virtio-ports/virtme.stdout").exists()
-        || !std::path::Path::new("/dev/virtio-ports/virtme.stderr").exists()
-        || !std::path::Path::new("/dev/virtio-ports/virtme.dev_stdout").exists()
-        || !std::path::Path::new("/dev/virtio-ports/virtme.dev_stderr").exists()
+    if !Path::new("/dev/virtio-ports/virtme.stdin").exists()
+        || !Path::new("/dev/virtio-ports/virtme.stdout").exists()
+        || !Path::new("/dev/virtio-ports/virtme.stderr").exists()
+        || !Path::new("/dev/virtio-ports/virtme.dev_stdout").exists()
+        || !Path::new("/dev/virtio-ports/virtme.dev_stderr").exists()
     {
         log!("virtme-init: cannot find script I/O ports; make sure virtio-serial is available",);
     } else {
@@ -722,10 +722,10 @@ fn run_user_script(uid: u32) {
             ("/dev/virtio-ports/virtme.dev_stderr", "/dev/stderr"),
         ];
         for (src, dst) in &io_files {
-            if !std::path::Path::new(src).exists() {
+            if !Path::new(src).exists() {
                 continue;
             }
-            if std::path::Path::new(dst).exists() {
+            if Path::new(dst).exists() {
                 utils::do_unlink(dst);
             }
             utils::do_chown(src, uid, None).ok();
@@ -751,13 +751,13 @@ fn run_user_script(uid: u32) {
             let ret = Command::new(cmd)
                 .args(&args)
                 .pre_exec(move || {
-                    nix::libc::setsid();
+                    libc::setsid();
                     libc::close(libc::STDIN_FILENO);
                     libc::close(libc::STDOUT_FILENO);
                     libc::close(libc::STDERR_FILENO);
                     // Make stdin a controlling tty.
                     let stdin_fd = libc::dup2(tty_in, libc::STDIN_FILENO);
-                    nix::libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
+                    libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
                     libc::dup2(tty_out, libc::STDOUT_FILENO);
                     libc::dup2(tty_err, libc::STDERR_FILENO);
                     Ok(())
@@ -832,12 +832,12 @@ fn redirect_console(consdev: &str) {
 
     let fd = file.into_raw_fd();
 
-    let stdout = std::io::stdout();
+    let stdout = io::stdout();
     let handle = stdout.lock();
     let stdout_fd = handle.as_raw_fd();
     redirect_fd(fd, stdout_fd);
 
-    let stderr = std::io::stderr();
+    let stderr = io::stderr();
     let handle = stderr.lock();
     let stderr_fd = handle.as_raw_fd();
     redirect_fd(fd, stderr_fd);
@@ -853,7 +853,7 @@ fn configure_terminal(consdev: &str, uid: u32) {
     if let Ok(params) = env::var("virtme_stty_con") {
         let output = Command::new("stty")
             .args(params.split_whitespace())
-            .stdin(std::fs::File::open(consdev).unwrap())
+            .stdin(File::open(consdev).unwrap())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
             // Replace the current init process with a shell session.
@@ -865,12 +865,12 @@ fn configure_terminal(consdev: &str, uid: u32) {
 fn detach_from_terminal(tty_fd: libc::c_int) {
     // Detach the process from the controlling terminal
     unsafe {
-        nix::libc::setsid();
+        libc::setsid();
         libc::close(libc::STDIN_FILENO);
         libc::close(libc::STDOUT_FILENO);
         libc::close(libc::STDERR_FILENO);
         let stdin_fd = libc::dup2(tty_fd, libc::STDIN_FILENO);
-        nix::libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
+        libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
         libc::dup2(tty_fd, libc::STDOUT_FILENO);
         libc::dup2(tty_fd, libc::STDERR_FILENO);
     }
