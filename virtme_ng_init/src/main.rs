@@ -229,8 +229,7 @@ fn get_legacy_active_console() -> Option<String> {
         Ok(file) => {
             let reader = BufReader::new(file);
 
-            // .flatten() ignores lines with reading errors
-            for line in reader.lines().flatten() {
+            for line in reader.lines().map_while(Result::ok) {
                 if line.chars().nth(27) == Some('C') {
                     let console = line.split(' ').next()?;
                     return Some(format!("/dev/{console}"));
