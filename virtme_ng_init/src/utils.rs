@@ -57,7 +57,7 @@ pub fn get_user_id(username: &str) -> Option<u32> {
     Some(get_user_by_name(username)?.uid())
 }
 
-pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> std::io::Result<()> {
+pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> io::Result<()> {
     let gid_option = gid.map(Gid::from_raw);
 
     chown(path, Some(Uid::from_raw(uid)), gid_option).map_err(io::Error::other)?;
@@ -80,7 +80,7 @@ pub fn do_unlink(path: &str) {
 }
 
 fn do_touch(path: &str, mode: u32) {
-    fn _do_touch(path: &str, mode: u32) -> std::io::Result<()> {
+    fn _do_touch(path: &str, mode: u32) -> io::Result<()> {
         let file = File::create(path)?;
         let permissions = std::fs::Permissions::from_mode(mode);
         file.set_permissions(permissions)?;

@@ -2,6 +2,18 @@
 name = "virtme-ng-init"
 version = "0.1.0"
 edition = "2021"
+rust-version = "1.75.0"
+
+[lints.rust]
+missing_docs = { level = "deny", priority = 1 }
+missing_debug_implementations = "warn"
+non_ascii_idents = "warn"
+nonstandard-style = "warn"
+trivial_numeric_casts = "warn"
+unstable_features = "warn"
+unused = "warn"
+unused_import_braces = "warn"
+unused_qualifications = "warn"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
