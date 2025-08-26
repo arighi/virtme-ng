@@ -1,4 +1,7 @@
 ---
+ci:
+    skip: [cargo-clippy-fix, cargo-clippy, cargo-check, cargo-fmt]
+
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0
@@ -13,7 +16,7 @@ repos:
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.10
     hooks:
-      - id: ruff
+      - id: ruff-check
         args: [--fix]
       - id: ruff-format
   - repo: https://github.com/shellcheck-py/shellcheck-py
@@ -24,3 +27,42 @@ repos:
     rev: v3.12.0-2
     hooks:
       - id: shfmt
+  - repo: local
+    hooks:
+      - id: cargo-clippy-fix
+        description: Run cargo clippy fix
+        entry: env
+        args: [--chdir=virtme_ng_init, --, cargo, clippy, --fix, --allow-dirty, --allow-staged, --all-targets, --all-features, --]
+        language: system
+        name: cargo-clippy
+        pass_filenames: false
+        require_serial: true
+        types: [rust]
+      - id: cargo-clippy
+        description: Run cargo clippy
+        entry: env
+        # Fail if any warnings are found in the code
+        args: [--chdir=virtme_ng_init, --, cargo, clippy, --all-targets, --all-features, --, --deny, warnings]
+        language: system
+        name: cargo-clippy
+        pass_filenames: false
+        require_serial: true
+        types: [rust]
+      - id: cargo-check
+        description: Run cargo check
+        entry: env
+        args: [--chdir=virtme_ng_init, --, cargo, check, --all-targets, --all-features, --]
+        language: system
+        name: cargo-clippy
+        pass_filenames: false
+        require_serial: true
+        types: [rust]
+      - id: cargo-fmt
+        description: Run cargo fmt
+        entry: env
+        args: [--chdir=virtme_ng_init, --, cargo, fmt, --all, --]
+        language: system
+        name: cargo-fmt
+        pass_filenames: false
+        require_serial: true
+        types: [rust]
