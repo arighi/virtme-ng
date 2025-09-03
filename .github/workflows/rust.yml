@@ -23,16 +23,8 @@ jobs:
     - uses: actions/setup-python@v3
     - uses: pre-commit/action@v3.0.1
       with:
-        extra_args: cargo-clippy-fix --all-files
-    - uses: pre-commit/action@v3.0.1
-      with:
-        extra_args: cargo-clippy --all-files
-    - uses: pre-commit/action@v3.0.1
-      with:
-        extra_args: cargo-check --all-files
-    - uses: pre-commit/action@v3.0.1
-      with:
-        extra_args: cargo-fmt --all-files
+        # To be adapted if the structure changes, e.g. new subdirs.
+        extra_args: --files virtme_ng_init/*/*.rs
     - name: Build
       run: cargo build --verbose
     - name: Run tests

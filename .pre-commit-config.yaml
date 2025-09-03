@@ -34,7 +34,7 @@ repos:
         entry: env
         args: [--chdir=virtme_ng_init, --, cargo, clippy, --fix, --allow-dirty, --allow-staged, --all-targets, --all-features, --]
         language: system
-        name: cargo-clippy
+        name: cargo clippy --fix
         pass_filenames: false
         require_serial: true
         types: [rust]
@@ -44,7 +44,7 @@ repos:
         # Fail if any warnings are found in the code
         args: [--chdir=virtme_ng_init, --, cargo, clippy, --all-targets, --all-features, --, --deny, warnings]
         language: system
-        name: cargo-clippy
+        name: cargo clippy --deny warnings
         pass_filenames: false
         require_serial: true
         types: [rust]
@@ -53,7 +53,7 @@ repos:
         entry: env
         args: [--chdir=virtme_ng_init, --, cargo, check, --all-targets, --all-features, --]
         language: system
-        name: cargo-clippy
+        name: cargo check
         pass_filenames: false
         require_serial: true
         types: [rust]
@@ -62,7 +62,7 @@ repos:
         entry: env
         args: [--chdir=virtme_ng_init, --, cargo, fmt, --all, --]
         language: system
-        name: cargo-fmt
+        name: cargo fmt
         pass_filenames: false
         require_serial: true
         types: [rust]
