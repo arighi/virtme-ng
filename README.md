@@ -700,4 +700,3 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
-[virtme]: https://github.com/amluto/virtme "virtme"
