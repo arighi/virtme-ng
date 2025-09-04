@@ -6,7 +6,7 @@ What is virtme-ng?
 virtme-ng is a tool that allows to easily and quickly recompile and test a
 Linux kernel, starting from the source code.
 
-It allows to recompile the kernel in few minutes (rather than hours), then the
+It allows recompiling the kernel in few minutes (rather than hours), then the
 kernel is automatically started in a virtualized environment that is an exact
 copy-on-write copy of your live system, which means that any changes made to
 the virtualized environment do not affect the host system.
@@ -170,8 +170,8 @@ Configuration
 Examples
 ========
 
- - Build a kernel from a clean local kernel source directory (if a .config is
-   not available virtme-ng will automatically create a minimum .config with
+ - Build a kernel from a clean local kernel source directory (if a `.config` is
+   not available virtme-ng will automatically create a minimum `.config` with
    all the required feature to boot the instance):
 ```
    $ vng -b
@@ -182,7 +182,7 @@ Examples
    $ vng -b -c v6.1-rc3
 ```
 
- - Generate a minimal kernel .config in the current kernel build directory:
+ - Generate a minimal kernel `.config` in the current kernel build directory:
 ```
    $ vng --kconfig
 ```
@@ -427,7 +427,7 @@ Examples
 ```
 
  - Generate a memory dump of a running instance and read 'jiffies' from the
-   memory dump using the drgn debugger:
+   memory dump using the `drgn` debugger:
 ```
    # Start the vng instance in debug mode
    $ vng --debug
@@ -446,7 +446,7 @@ Examples
    >>> (volatile unsigned long)4294675464
 ```
 
- - Attach a gdb session to a running instance started with `--debug`:
+ - Attach a GDB session to a running instance started with `--debug`:
 ```
    # Start the vng instance in debug mode
    $ vng --debug
@@ -474,7 +474,7 @@ Examples
    $ vng --console-client
 ```
 
- - Enable ssh in the vng guest:
+ - Enable SSH in the vng guest:
 ```
    # Start the vng instance with ssh server support:
    $ vng --ssh
@@ -484,7 +484,7 @@ Examples
 ```
 
  - Generate some results inside the vng guest and copy them back to the
-   host using scp:
+   host using SCP:
 ```
    # Start the vng instance with SSH server support:
    arighi@host~> vng --ssh
@@ -517,7 +517,7 @@ Examples
    See also: `.github/workflows/run.yml` as a practical example on how to use
    virtme-ng inside docker.
 
- - Run virtme-ng with gpu passthrough:
+ - Run virtme-ng with GPU passthrough:
 ```
    # Confirm host kernel has VFIO and IOMMU support
    # Check if NVIDIA module is installed on the host
@@ -546,12 +546,12 @@ main command-line interface called `vng`.
 A minimal custom `.config` is automatically generated if not already present
 when `--build` is specified.
 
-It is possible to specify a set of custom configs (.config chunk) in
-`~/.config/virtme-ng/kernel.config`, or using --config chunk-file's
-or --configitem CONFIG_FOO=bar's.  These user-specific settings will
+It is possible to specify a set of custom configs (`.config` chunk) in
+`~/.config/virtme-ng/kernel.config`, or using `--config` chunk-file's
+or `--configitem CONFIG_FOO=bar`'s.  These user-specific settings will
 successively override the default settings.  The final overrides are
 the mandatory config items that are required to boot and test the
-kernel inside qemu, using `virtme-run`.
+kernel inside QEmu, using `virtme-run`.
 
 Then the kernel is compiled either locally or on an external build host (if the
 `--build-host` option is used); once the build is done only the required files
@@ -584,7 +584,7 @@ don't always want to specify these options, so instead, you can simply define
 them in your configuration file (refer to the [Configuration](#configuration)
 section) under `default_opts` and then simply run `vng --build`.
 
-Example (always use an external build server called 'kathleen' and run make
+Example (always use an external build server called `kathleen` and run make
 inside a build chroot called `chroot:lunar-amd64`). To do so, add the
 `default_opts` section in your configuration file as following:
 ```
@@ -628,7 +628,7 @@ Troubleshooting
    available you can specify a different amount of memory using `--memory MB`,
    (this option is passed directly to qemu via `-m`, default is 1G).
 
- - If you're testing a kernel for an architecture different than the host, keep
+ - If you're testing a kernel for an architecture different from the host, keep
    in mind that you need to use also `--root DIR` to use a specific chroot with
    the binaries compatible with the architecture that you're testing.
 
@@ -645,9 +645,9 @@ Troubleshooting
 ```
 
  - Snap support is still experimental and something may not work as expected
-   (keep in mind that, by default, virtme-ng will try to run snapd in a bare
+   (keep in mind that, by default, virtme-ng will try to run `snapd` in a bare
    minimum system environment without systemd), if some snaps are not running
-   try to disable apparmor, adding `--append="apparmor=0"` to the virtme-ng
+   try to disable `apparmor`, adding `--append="apparmor=0"` to the virtme-ng
    command line.
 
  - Systemd support (`--systemd`) is still experimental. If something does not
@@ -665,7 +665,7 @@ Troubleshooting
   $ udevadm trigger --subsystem-match --action=change
 ```
 
- - To mount the legacy cgroup filesystem (v1) layout, add
+ - To mount the legacy CGroup filesystem (v1) layout, add
    `SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1` to the kernel boot options:
 ```
 $ vng -r --append "SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1" -- 'df -T /sys/fs/cgroup/*'
