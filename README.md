@@ -57,33 +57,35 @@ Quick start
 Installation
 ============
 
-* Debian / Ubuntu
+* virtme-ng is packaged in most major distributions:
 
-You can install the latest stable version of virtme-ng via:
+[![Packaging status](https://repology.org/badge/vertical-allrepos/virtme-ng.svg)](https://repology.org/project/virtme-ng/versions)
+
+Note: it might not be the latest stable version containing new features and
+bug-fixes. Do not hesitate to help with the packaging!
+
+* The latest stable version is also published on
+  [pypi](https://pypi.org/project/virtme-ng/):
+
 ```
- $ sudo apt install virtme-ng
+ $ pip install virtme-ng
 ```
 
-* Ubuntu ppa
-
-If you're using Ubuntu, you can install the latest experimental version of
-virtme-ng from ppa:arighi/virtme-ng:
-```
- $ sudo add-apt-repository ppa:arighi/virtme-ng
- $ sudo apt install --yes virtme-ng
-```
+You will need to install the dependences manually, see the
+[Requirements](#requirements) section.
 
 * Install from source
 
-To install virtme-ng from source you can clone this git repository and build a
+To install virtme-ng from source, you can clone this git repository and build a
 standalone virtme-ng running the following commands:
 ```
- $ git clone --recurse-submodules https://github.com/arighi/virtme-ng.git
+ $ git clone https://github.com/arighi/virtme-ng.git
  $ BUILD_VIRTME_NG_INIT=1 pip3 install .
 ```
 
-If you are in Debian/Ubuntu you may need to install the following packages to
-build virtme-ng from source properly:
+There are some extra dependences on top of the ones mentioned in the
+[Requirements](#requirements) section. If you are on Debian/Ubuntu, you may need
+to install the following packages to build virtme-ng from source properly:
 ```
  $ sudo apt install python3-pip flake8 pylint cargo rustc qemu-system-x86
 ```
@@ -690,4 +692,3 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 [korg-web]: https://git.kernel.org/cgit/utils/kernel/virtme/virtme.git "virtme on kernel.org"
 [korg-git]: git://git.kernel.org/pub/scm/utils/kernel/virtme/virtme.git "git address"
 [virtme]: https://github.com/amluto/virtme "virtme"
-[virtme-ng-ppa]: https://launchpad.net/~arighi/+archive/ubuntu/virtme-ng "virtme-ng ppa"
