@@ -138,6 +138,17 @@ Requirements
  * Optionally, you may need `sshd` installed for the `--ssh` and
    `--ssh-client` options.
 
+ * Optionally, if the shell completion is not available (e.g. when installed
+   from pip or from source), you can install `shtab` and run:
+```
+   # Bash
+   $ mkdir -p ~/.local/share/bash-completion/completions/
+   $ shtab --shell=bash -u virtme_ng.run.make_parser > ~/.local/share/bash-completion/completions/vng
+
+   # ZSH
+   $ shtab --shell=zsh  -u virtme_ng.run.make_parser | sudo tee /usr/local/share/zsh/site-functions/_vng >/dev/null
+```
+
 Configuration
 =============
 
