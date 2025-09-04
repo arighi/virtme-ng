@@ -105,25 +105,6 @@ virtme-ng command, such as:
  $ ./vng --help
 ```
 
-Configuration
-=============
-
-* You may customize the default configuration by providing one of the
-  following, by order of preference: `$HOME/.config/virtme-ng/virtme-ng.conf`,
-  `$HOME/.virtme-ng.conf` or `/etc/virtme-ng.conf`. As a fallback for any
-  missing values, the default ones will be used.
-
-* The format of the file is JSON. Default values:
-```
-{
-    "default_opts": {},
-    "systemd": {
-        "masks": ["getty@"]
-    }
-}
-```
-
-
 Requirements
 ============
 
@@ -156,6 +137,24 @@ Requirements
 
  * Optionally, you may need `sshd` installed for the `--ssh` and
    `--ssh-client` options.
+
+Configuration
+=============
+
+* You may customize the default configuration by providing one of the
+  following, by order of preference: `$HOME/.config/virtme-ng/virtme-ng.conf`,
+  `$HOME/.virtme-ng.conf` or `/etc/virtme-ng.conf`. As a fallback for any
+  missing values, the default ones will be used.
+
+* The format of the file is JSON. Default values:
+```
+{
+    "default_opts": {},
+    "systemd": {
+        "masks": ["getty@"]
+    }
+}
+```
 
 Examples
 ========
