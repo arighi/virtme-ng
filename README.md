@@ -29,7 +29,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 Quick start
 ===========
 
-```
+```shell
  $ uname -r
  5.19.0-23-generic
  $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
@@ -59,51 +59,51 @@ Installation
 
 * virtme-ng is packaged in most major distributions:
 
-[![Packaging status](https://repology.org/badge/vertical-allrepos/virtme-ng.svg)](https://repology.org/project/virtme-ng/versions)
+  [![Packaging status](https://repology.org/badge/vertical-allrepos/virtme-ng.svg)](https://repology.org/project/virtme-ng/versions)
 
-Note: it might not be the latest stable version containing new features and
-bug-fixes. Do not hesitate to help with the packaging!
+  Note: it might not be the latest stable version containing new features and
+  bug-fixes. Do not hesitate to help with the packaging!
 
 * The latest stable version is also published on
   [pypi](https://pypi.org/project/virtme-ng/):
 
-```
- $ pip install virtme-ng
-```
+  ```shell
+  $ pip install virtme-ng
+  ```
 
-You will need to install the dependences manually, see the
-[Requirements](#requirements) section.
+  You will need to install the dependences manually, see the
+  [Requirements](#requirements) section.
 
 * Install from source
 
-To install virtme-ng from source, you can clone this git repository and build a
-standalone virtme-ng running the following commands:
-```
- $ git clone https://github.com/arighi/virtme-ng.git
- $ BUILD_VIRTME_NG_INIT=1 pip3 install .
-```
+  To install virtme-ng from source, you can clone this git repository and build
+  a standalone virtme-ng running the following commands:
+  ```shell
+  $ git clone https://github.com/arighi/virtme-ng.git
+  $ BUILD_VIRTME_NG_INIT=1 pip3 install .
+  ```
 
-There are some extra dependences on top of the ones mentioned in the
-[Requirements](#requirements) section. If you are on Debian/Ubuntu, you may need
-to install the following packages to build virtme-ng from source properly:
-```
- $ sudo apt install python3-pip flake8 pylint cargo rustc qemu-system-x86
-```
+  There are some extra dependences on top of the ones mentioned in the
+  [Requirements](#requirements) section. If you are on Debian/Ubuntu, you may
+  need to install the following packages to build virtme-ng from source properly:
+  ```shell
+  $ sudo apt install python3-pip flake8 pylint cargo rustc qemu-system-x86
+  ```
 
-If you'd prefer to use `uv`:
-```
- $ BUILD_VIRTME_NG_INIT=1 uv tool install .
-```
+  If you'd prefer to use `uv`:
+  ```shell
+  $ BUILD_VIRTME_NG_INIT=1 uv tool install .
+  ```
 
 * Run from source
 
-You can also run virtme-ng directly from source, make sure you have all the
-requirements installed (optionally you can build `virtme-ng-init` for a faster
-boot, by running `make`), then from the source directory simply run any
-virtme-ng command, such as:
-```
- $ ./vng --help
-```
+  You can also run virtme-ng directly from source, make sure you have all the
+  requirements installed (optionally you can build `virtme-ng-init` for a faster
+  boot, by running `make`), then from the source directory simply run any
+  virtme-ng command, such as:
+  ```shell
+  $ ./vng --help
+  ```
 
 Requirements
 ============
@@ -140,14 +140,14 @@ Requirements
 
  * Optionally, if the shell completion is not available (e.g. when installed
    from pip or from source), you can install `shtab` and run:
-```
+   ```shell
    # Bash
    $ mkdir -p ~/.local/share/bash-completion/completions/
    $ shtab --shell=bash -u virtme_ng.run.make_parser > ~/.local/share/bash-completion/completions/vng
 
    # ZSH
    $ shtab --shell=zsh  -u virtme_ng.run.make_parser | sudo tee /usr/local/share/zsh/site-functions/_vng >/dev/null
-```
+   ```
 
 Configuration
 =============
@@ -158,14 +158,14 @@ Configuration
   missing values, the default ones will be used.
 
 * The format of the file is JSON. Default values:
-```
-{
-    "default_opts": {},
-    "systemd": {
-        "masks": ["getty@"]
-    }
-}
-```
+  ```json
+  {
+      "default_opts": {},
+      "systemd": {
+          "masks": ["getty@"]
+      }
+  }
+  ```
 
 Examples
 ========
@@ -173,108 +173,108 @@ Examples
  - Build a kernel from a clean local kernel source directory (if a `.config` is
    not available virtme-ng will automatically create a minimum `.config` with
    all the required feature to boot the instance):
-```
+   ```shell
    $ vng -b
-```
+   ```
 
  - Build tag v6.1-rc3 from a local kernel git repository:
-```
+   ```shell
    $ vng -b -c v6.1-rc3
-```
+   ```
 
  - Generate a minimal kernel `.config` in the current kernel build directory:
-```
+   ```shell
    $ vng --kconfig
-```
+   ```
 
  - Run a kernel previously compiled from a local git repository in the current
    working directory:
-```
+   ```shell
    $ vng
-```
+   ```
 
  - Run an interactive virtme-ng session using the same kernel as the host:
-```
+   ```shell
    $ vng -r
-```
+   ```
 
  - Test installed kernel 6.2.0-21-generic kernel
    (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
-```
+   ```shell
    $ vng -r 6.2.0-21-generic
-```
+   ```
 
  - Run a pre-compiled vanilla v6.6 kernel fetched from the Ubuntu mainline
    builds repository (useful to test a specific kernel version directly and
    save a lot of build time):
-```
+   ```shell
    $ vng -r v6.6
-```
+   ```
 
  - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
-```
+   ```shell
    $ mkdir test
    $ cd test
    $ apt download linux-image-6.2.0-1003-lowlatency linux-modules-6.2.0-1003-lowlatency
    $ for d in *.deb; do dpkg -x $d .; done
    $ vng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
-```
+   ```
 
  - Build the tip of the latest kernel on a remote build host called "builder",
    running make inside a specific build chroot (managed remotely by schroot):
-```
+   ```shell
    $ vng --build --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
-```
+   ```
 
  - Run the previously compiled kernel from the current working directory and
    enable networking:
-```
+   ```shell
    $ vng --net user
-```
+   ```
 
  - Run the previously compiled kernel adding an additional virtio-scsi device:
-```
+   ```shell
    $ qemu-img create -f qcow2 /tmp/disk.img 8G
    $ vng --disk /tmp/disk.img
-```
+   ```
 
  - Recompile the kernel passing some env variables to enable Rust support
    (using specific versions of the Rust toolchain binaries):
-```
+   ```shell
    $ vng --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
-```
+   ```
 
  - Build the arm64 kernel (using a separate chroot in /opt/chroot/arm64 as the
    main filesystem):
-```
+   ```shell
    $ vng --build --arch arm64 --root /opt/chroot/arm64/
-```
+   ```
 
  - Build the kernel using a separate build directory, and run it, in verbose:
-```
+   ```shell
    $ export KBUILD_OUTPUT=.virtme/build
    $ vng --build --verbose
    $ vng --verbose
-```
+   ```
 
  - Same example, but using `O=`:
-```
+   ```shell
    $ vng --build --verbose -- O=.virtme/build
    $ vng --verbose -- O=.virtme/build
-```
+   ```
 
  - Accelerate the kernel rebuilds using CCache (if installed):
-```
+   ```shell
    $ PATH="/usr/lib/ccache:${PATH}" \
        KBUILD_BUILD_TIMESTAMP=0 \
        vng --build
    # or export the two variables before, see 'man ccache' for more details
-```
+   ```
 
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
-```
+   ```shell
    $ vng -- uname -r | cowsay
     __________________
    < 6.1.0-rc6-virtme >
@@ -284,13 +284,13 @@ Examples
                (__)\       )\/\
                    ||----w |
                    ||     ||
-```
+   ```
 
  - Run a bunch of parallel virtme-ng instances in a pipeline, with different
    kernels installed in the system, passing each other their stdout/stdin and
    return all the generated output back to the host (also measure the total
    elapsed time):
-```
+   ```shell
    $ time true | \
    > vng -r 5.19.0-38-generic -e "cat && uname -r" | \
    > vng -r 6.2.0-19-generic  -e "cat && uname -r" | \
@@ -312,10 +312,10 @@ Examples
    real    0m2.737s
    user    0m8.425s
    sys     0m8.806s
-```
+   ```
 
  - Run the vanilla v6.7-rc5 kernel with an Ubuntu 22.04 rootfs:
-```
+   ```shell
    $ vng -r v6.7-rc5 --user root --root ./rootfs/22.04 --root-release jammy -- cat /etc/lsb-release /proc/version
    ...
    DISTRIB_ID=Ubuntu
@@ -323,10 +323,10 @@ Examples
    DISTRIB_CODENAME=jammy
    DISTRIB_DESCRIPTION="Ubuntu 22.04.3 LTS"
    Linux version 6.7.0-060700rc5-generic (kernel@kathleen) (x86_64-linux-gnu-gcc-13 (Ubuntu 13.2.0-7ubuntu1) 13.2.0, GNU ld (GNU Binutils for Ubuntu) 2.41) #202312102332 SMP PREEMPT_DYNAMIC Sun Dec 10 23:41:31 UTC 2023
-```
+   ```
 
  - Run with systemd as init:
-```
+   ```shell
    $ sudo vng -r --systemd --exec "systemctl status | head"
    ● virtme-ng
       State: starting
@@ -338,10 +338,10 @@ Examples
    Tainted: unmerged-bin
       CGroup: /
             ├─init.scope
-```
+   ```
 
  - Run with systemd as init in an external rootfs:
-```
+   ```shell
    $ vng -r --systemd --user root --root ./rootfs/sid --exec "systemctl status | head"
    ● virtme-ng
       State: degraded
@@ -353,11 +353,11 @@ Examples
    Tainted: unmerged-bin
       CGroup: /
             ├─init.scope
-```
+   ```
 
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
-```
+   ```shell
    $ vng -r -m 4G --numa 1G,cpus=0-1,cpus=3 --numa 3G,cpus=2,cpus=4-7 -- numactl -H
    available: 2 nodes (0-1)
    node 0 cpus: 0 1 3
@@ -370,12 +370,12 @@ Examples
    node   0   1
      0:  10  20
      1:  20  10
-```
+   ```
 
  - Run the current kernel creating 4 NUMA nodes of 1GB each and assign
    different distance costs between the NUMA nodes to simulate non-uniform
    memory access:
-```
+   ```shell
    $ vng -r --cpu 8 -m 4G \
    >     --numa 1G,cpus=0-1 --numa 1G,cpus=2-3 \
    >     --numa 1G,cpus=4-5 --numa 1G,cpus=6-7 \
@@ -401,34 +401,34 @@ Examples
       1:   51   10   21   61
       2:   31   21   10   11
       3:   41   61   11   10
-```
+   ```
 
  - Run `glxgears` inside a kernel recompiled in the current directory:
-```
+   ```shell
    $ vng -g -- glxgears
 
    (virtme-ng is started in graphical mode)
-```
+   ```
 
  - Execute an `awesome` window manager session with kernel
    6.2.0-1003-lowlatency (installed in the system):
-```
+   ```shell
    $ vng -r 6.2.0-1003-lowlatency -g -- awesome
 
    (virtme-ng is started in graphical mode)
-```
+   ```
 
  - Run the `steam` snap (tested in Ubuntu) inside a virtme-ng instance using
    the 6.2.0-1003-lowlatency kernel:
-```
+   ```shell
    $ vng -r 6.2.0-1003-lowlatency --snaps --net user -g -- /snap/bin/steam
 
    (virtme-ng is started in graphical mode)
-```
+   ```
 
  - Generate a memory dump of a running instance and read 'jiffies' from the
    memory dump using the `drgn` debugger:
-```
+   ```shell
    # Start the vng instance in debug mode
    $ vng --debug
 
@@ -444,10 +444,10 @@ Examples
    >>> from drgn.helpers.common import *
    >>> from drgn.helpers.linux import *
    >>> (volatile unsigned long)4294675464
-```
+   ```
 
  - Attach a GDB session to a running instance started with `--debug`:
-```
+   ```shell
    # Start the vng instance in debug mode
    $ vng --debug
 
@@ -463,29 +463,28 @@ Examples
    # NOTE: a vmlinux must be present in the current working directory in order
    # to resolve symbols, otherwise vng # will automatically search for a
    # vmlinux available in the system.
-```
+   ```
 
  - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
-```
+   ```shell
    # Start the vng instance with server support:
    $ vng --console
 
    # In a separate terminal run the following command to connect to a remote shell:
    $ vng --console-client
-```
+   ```
 
  - Enable SSH in the vng guest:
-```
+   ```shell
    # Start the vng instance with ssh server support:
    $ vng --ssh
 
    # Connect to the vng guest from the host via ssh:
    $ vng --ssh-client
-```
-
+   ```
  - Generate some results inside the vng guest and copy them back to the
    host using SCP:
-```
+   ```shell
    # Start the vng instance with SSH server support:
    arighi@host~> vng --ssh
    ...
@@ -501,10 +500,10 @@ Examples
    # With systemd >= 256, it is possible to use the 'vsock/<CID>' hostname directly:
    arighi@host~> ssh vsock/2222
    arighi@virtme-ng~>
-```
+   ```
 
  - Run virtme-ng inside a docker container:
-```
+   ```shell
    $ docker run -it --privileged ubuntu:23.10 /bin/bash
    # apt update
    # echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
@@ -513,12 +512,12 @@ Examples
    # git clone --recursive https://github.com/arighi/virtme-ng.git
    # ./virtme-ng/vng -r v6.6 -- uname -r
    6.6.0-060600-generic
-```
+   ```
    See also: `.github/workflows/run.yml` as a practical example on how to use
    virtme-ng inside docker.
 
  - Run virtme-ng with GPU passthrough:
-```
+   ```shell
    # Confirm host kernel has VFIO and IOMMU support
    # Check if NVIDIA module is installed on the host
    $ modinfo nvidia
@@ -535,7 +534,7 @@ Examples
    $ sudo modprobe vfio-pci
    # Pass PCI address to virtme-ng
    $ sudo vng --nvgpu "01:00.0" -r linux
-```
+   ```
 
 Implementation details
 ======================
@@ -587,7 +586,7 @@ section) under `default_opts` and then simply run `vng --build`.
 Example (always use an external build server called `kathleen` and run make
 inside a build chroot called `chroot:lunar-amd64`). To do so, add the
 `default_opts` section in your configuration file as following:
-```
+```json
 {
     "default_opts": {
         "build_host": "kathleen",
@@ -605,24 +604,24 @@ Troubleshooting
 
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:
-```
-  $ groups | grep "kvm\|libvirt"
-```
+   ```shell
+   $ groups | grep "kvm\|libvirt"
+   ```
 
  - When using `--network bridge` to create a bridged network in the guest you
    may get the following error:
-```
-  ...
-  failed to create tun device: Operation not permitted
-```
+   ```
+   ...
+   failed to create tun device: Operation not permitted
+   ```
 
    This is because `qemu-bridge-helper` requires `CAP_NET_ADMIN` permissions.
 
    To fix this you need to add `allow all` to `/etc/qemu/bridge.conf` and set
    the `CAP_NET_ADMIN` capability to `qemu-bridge-helper`, as following:
-```
-  $ sudo filecap /usr/lib/qemu/qemu-bridge-helper net_admin
-```
+   ```shell
+   $ sudo filecap /usr/lib/qemu/qemu-bridge-helper net_admin
+   ```
 
  - If the guest fails to start because the host doesn't have enough memory
    available you can specify a different amount of memory using `--memory MB`,
@@ -634,15 +633,15 @@ Troubleshooting
 
    If the chroot doesn't exist in your system virtme-ng will automatically
    create it using the latest daily build Ubuntu cloud image:
-```
-  $ vng --build --arch riscv64 --root ./tmproot
-```
+   ```shell
+   $ vng --build --arch riscv64 --root ./tmproot
+   ```
 
  - If the build on a remote build host is failing unexpectedly you may want to
    try cleaning up the remote git repository, running:
-```
-  $ vng --clean --build-host HOSTNAME
-```
+   ```shell
+   $ vng --clean --build-host HOSTNAME
+   ```
 
  - Snap support is still experimental and something may not work as expected
    (keep in mind that, by default, virtme-ng will try to run `snapd` in a bare
@@ -661,22 +660,22 @@ Troubleshooting
    especially with stdin/stdout/stderr redirections, make sure that you have
    `udev` installed in your docker image and run the following command before
    using `vng`:
-```
-  $ udevadm trigger --subsystem-match --action=change
-```
+   ```shell
+   $ udevadm trigger --subsystem-match --action=change
+   ```
 
  - To mount the legacy CGroup filesystem (v1) layout, add
    `SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1` to the kernel boot options:
-```
-$ vng -r --append "SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1" -- 'df -T /sys/fs/cgroup/*'
-Filesystem     Type   1K-blocks  Used Available Use% Mounted on
-blkio          cgroup         0     0         0    - /sys/fs/cgroup/blkio
-cpu            cgroup         0     0         0    - /sys/fs/cgroup/cpu
-cpuacct        cgroup         0     0         0    - /sys/fs/cgroup/cpuacct
-devices        cgroup         0     0         0    - /sys/fs/cgroup/devices
-memory         cgroup         0     0         0    - /sys/fs/cgroup/memory
-pids           cgroup         0     0         0    - /sys/fs/cgroup/pids
-```
+   ```shell
+   $ vng -r --append "SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1" -- 'df -T /sys/fs/cgroup/*'
+   Filesystem     Type   1K-blocks  Used Available Use% Mounted on
+   blkio          cgroup         0     0         0    - /sys/fs/cgroup/blkio
+   cpu            cgroup         0     0         0    - /sys/fs/cgroup/cpu
+   cpuacct        cgroup         0     0         0    - /sys/fs/cgroup/cpuacct
+   devices        cgroup         0     0         0    - /sys/fs/cgroup/devices
+   memory         cgroup         0     0         0    - /sys/fs/cgroup/memory
+   pids           cgroup         0     0         0    - /sys/fs/cgroup/pids
+   ```
 
 Contributing
 ============
