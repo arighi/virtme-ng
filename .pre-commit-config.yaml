@@ -13,6 +13,9 @@ repos:
       - id: mixed-line-ending
       - id: check-executables-have-shebangs
       - id: check-shebang-scripts-are-executable
+      - id: check-yaml
+      - id: check-json
+      - id: check-toml
   - repo: https://github.com/astral-sh/ruff-pre-commit
     rev: v0.12.11
     hooks:
