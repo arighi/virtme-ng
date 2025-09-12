@@ -80,6 +80,7 @@ Installation
   a standalone virtme-ng running the following commands:
   ```shell
   $ git clone https://github.com/arighi/virtme-ng.git
+  $ cd virtme-ng
   $ BUILD_VIRTME_NG_INIT=1 pip3 install .
   ```
 
