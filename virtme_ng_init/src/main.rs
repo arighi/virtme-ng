@@ -341,6 +341,13 @@ fn generate_sudoers() -> io::Result<()> {
 fn generate_lvm() -> io::Result<()> {
     utils::do_mkdir("/run/tmp/lvm");
     utils::do_mount("/run/tmp/lvm", "/etc/lvm/", "", libc::MS_BIND as usize, "");
+
+    // Create a default lvm.conf file if --systemd was specified
+    if id() != 1 {
+        let args: &[&str] = &["--type", "default", "--file", "/etc/lvm/lvm.conf"];
+        utils::run_cmd("lvmconfig", args);
+    }
+
     Ok(())
 }
 

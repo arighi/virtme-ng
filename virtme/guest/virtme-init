@@ -136,6 +136,14 @@ mount --bind /run/tmp/shadow /etc/shadow
 mkdir /run/tmp/lvm
 mount --bind /run/tmp/lvm /etc/lvm
 
+# Create a default lvm configuration is lvmconfig is available when systemd is enabled
+if [[ $$ -ne 1 ]]; then
+    if command -v lvmconfig &> /dev/null; then
+        log "Creating a default lvm.conf file"
+        lvmconfig --type default > /etc/lvm/lvm.conf
+    fi
+fi
+
 for tag in "${!virtme_initmount@}"; do
     if [[ ! -d ${!tag} ]]; then
         mkdir -p "${!tag}"
