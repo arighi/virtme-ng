@@ -159,11 +159,12 @@ pub fn run_cmd(cmd: impl AsRef<OsStr>, args: &[&str]) {
                 );
             }
         }
-        Err(_) => {
+        Err(e) => {
             log!(
-                "WARNING: failed to run: {:?} {}",
+                "WARNING: failed to run: {:?} {} (error: {})",
                 cmd.as_ref(),
-                args.join(" ")
+                args.join(" "),
+                e
             );
         }
     }
