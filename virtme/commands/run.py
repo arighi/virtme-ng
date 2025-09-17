@@ -746,7 +746,7 @@ class VirtioFS:
             stderr = ""
         os.system(
             f"{virtiofsd_path} --syslog --no-announce-submounts "
-            + f"--socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} &"
+            + f"--socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} -o cache=always &"
         )
         max_attempts = 5
         check_duration = 0.1
