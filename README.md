@@ -537,6 +537,61 @@ Examples
    $ sudo vng --nvgpu "01:00.0" -r linux
    ```
 
+ - Run virtme-ng with confidential guest support (currently only s390x support). **Use this only for test purposes!**
+
+   For [IBM Secure
+   Execution](https://www.ibm.com/docs/en/linux-on-systems?topic=management-secure-execution)
+   the guest boot image/kernel needs to be prepared using at least one so-called
+   host-key document. This document can be passed to the `pvimg create` command
+   by means of the `--confidential-guest-args` option.
+
+   ```
+   vng --confidential-guest --confidential-guest-args 'host-key-document=/home/user/HKD.crt'
+   ```
+
+   As this host-key document does not change that frequently, it makes sense to
+   make use of [`virtme-ng.conf`](#configuration). To do so, modify the
+   `default_opts` sections in `~/.config/virtme-ng/virtme-ng.conf` as following:
+
+   ```
+   {
+       "default_opts": {
+           "confidential_guest_args": ["host-key-document=/home/user/HKD.crt"]
+       },
+   }
+   ```
+
+   Now you can simply run `vng --confidential-guest` to prepare the boot image
+   and start a confidential guest using this newly created boot image.
+
+   + Run virtme-ng with confidential dump support (currently only s390x support)
+
+     ```
+     # Specify a confidential dump encryption key, e.g. via the virtme-ng.conf
+       {
+        "default_opts": {
+           "confidential_guest_args": ["host-key-document=/home/user/HKD.crt", "cck=/home/user/cck"]
+       }
+
+     # Start the vng instance in debug mode
+     $ vng --confidential-guest --debug
+
+     # In a separate shell session trigger the memory dump to /tmp/vmcore.img
+     $ vng --dump /tmp/vmcore.img
+
+     # Decrypt the dump on-the-fly (fusermount3 is needed)
+     $ zgetdump --mount /mnt/ --key /home/user/cck /tmp/vmcore.img
+
+     # Use drgn to read 'jiffies' from the memory dump:
+     $ echo "print(prog['jiffies'])" | drgn -q -s vmlinux -c /mnt/dump.elf
+     drgn 0.0.23 (using Python 3.11.6, elfutils 0.189, with libkdumpfile)
+     For help, type help(drgn).
+     >>> import drgn
+     >>> from drgn import NULL, Object, cast, container_of, execscript, offsetof, reinterpret, sizeof
+     >>> from drgn.helpers.common import *
+     >>> from drgn.helpers.linux import *
+     ```
+
 Implementation details
 ======================
 
