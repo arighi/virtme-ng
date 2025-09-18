@@ -20,6 +20,7 @@ import sys
 import tempfile
 import termios
 from base64 import b64encode
+from pathlib import Path
 from shutil import which
 from time import sleep
 from typing import Any, Dict, List, NoReturn, Optional, Tuple
@@ -451,7 +452,10 @@ def get_rootfs_from_kernel_path(path):
     return os.path.abspath(path)
 
 
-def get_kernel_version(path, img_name: Optional[str] = None):
+def get_kernel_version(orig_path, img_name: Optional[str] = None):
+    # Resolve symlinks first
+    path = Path(orig_path).resolve()
+
     if not os.path.exists(path):
         arg_fail(f"kernel file {path} does not exist, try --build to build the kernel")
     if not os.access(path, os.R_OK):
