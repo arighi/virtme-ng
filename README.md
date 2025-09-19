@@ -678,6 +678,17 @@ Troubleshooting
    pids           cgroup         0     0         0    - /sys/fs/cgroup/pids
    ```
 
+ - If you experience stale file handle errors (ESTALE) in the guest, this
+   may be due to an inode revalidation issue with VirtioFS.
+
+   Applying [#340](https://github.com/arighi/virtme-ng/pull/340) prevents
+   these errors, but host-side file changes may not be immediately visible
+   in the guest. If you observe out-of-sync filesystem issues, you can
+   simply force a resync by invalidating the page cache in the guest:
+   ```shell
+   # echo 3 > /proc/sys/vm/drop_caches
+   ```
+
 Contributing
 ============
 
