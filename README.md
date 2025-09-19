@@ -603,6 +603,12 @@ command when running make.
 Troubleshooting
 ===============
 
+ - If you experience poor performance, check the [Requirements](#requirements)
+   section, maybe some optional tools or services are not available, e.g. KVM
+   support and virtiofsd. Please note that some Linux distributions are
+   currently not shipping `virtme-ng-init` tool, which runs faster than the Bash
+   init script, used as fallback.
+
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:
    ```shell
