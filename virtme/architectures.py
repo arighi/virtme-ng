@@ -122,6 +122,10 @@ class Arch_x86(Arch):
             cpu_str = "host"
             if use_gpu:
                 cpu_str += ",host-phys-bits-limit=0x28"
+            # Enable AMD topology extensions (this should be ignored on
+            # non-AMD CPUs, so it is safe to always enable it).
+            cpu_str += ",topoext=on"
+
             ret.extend(["-cpu", cpu_str])
         else:
             ret.extend(["-machine", "q35"])
@@ -205,9 +209,15 @@ class Arch_microvm(Arch_x86):
         ret.extend(["-M", "microvm,accel=kvm,pcie=on,rtc=on"])
 
         if is_native and use_kvm:
+            cpu_str = "host"
+
+            # Enable AMD topology extensions (this should be ignored on
+            # non-AMD CPUs, so it is safe to always enable it).
+            cpu_str += ",topoext=on"
+
             # If we're likely to use KVM, request a full-featured CPU.
             # (NB: if KVM fails, this will cause problems.  We should probe.)
-            ret.extend(["-cpu", "host"])  # We can't migrate regardless.
+            ret.extend(["-cpu", cpu_str])
 
         return ret
 
