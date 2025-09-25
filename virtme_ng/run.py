@@ -14,6 +14,8 @@ import signal
 import socket
 import sys
 import tempfile
+import threading
+import time
 from pathlib import Path
 from select import select
 from subprocess import (
@@ -174,6 +176,21 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
+    )
+
+    parser.add_argument(
+        "--pin",
+        "-P",
+        nargs="?",
+        const="all",
+        help=(
+            "Pin each QEMU vCPU thread to a distinct host CPU. "
+            "If given without arguments, all host CPUs are used. "
+            "If given with an argument, it must be a list/range of CPUs "
+            "(e.g., 0,1,3-5,9)."
+            "NOTE: only a single virtme-ng guest can be pinned at a time, "
+            "pinning multiple virtme-ng guests is not supported yet."
+        ),
     )
 
     parser.add_argument(
@@ -1286,7 +1303,7 @@ class KernelSource:
 
     def _get_virtme_qemu_opts(self, args):
         qemu_args = ""
-        if args.debug:
+        if args.debug or args.pin:
             # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
             qemu_args += "-s -qmp tcp:localhost:3636,server,nowait "
         if args.qemu_opts is not None:
@@ -1394,6 +1411,8 @@ class KernelSource:
             + f"{self.virtme_param['qemu_opts']} "
             # Important: qemu_opts has to be the last one
         )
+        if args.pin:
+            self.set_affinity(args)
         check_call(cmd, shell=True)
 
     def dump(self, args):
@@ -1467,6 +1486,114 @@ class KernelSource:
                 # "DUMP_COMPLETED", "data": {"result": {"total": 1073741824, "status": "completed", "completed":
                 # 1073741824}}}
                 break
+
+    def _parse_cpu_list(self, expr):
+        """Expand a CPU list expression, i.e., '0,1,3-5,9' into [0,1,3,4,5,9]."""
+        if not expr:
+            return []
+        cpus = []
+        for part in expr.split(","):
+            if "-" in part:
+                start, end = map(int, part.split("-", 1))
+                cpus.extend(range(start, end + 1))
+            else:
+                cpus.append(int(part))
+        return cpus
+
+    def pin_vcpus(self, args):
+        """Pin QEMU vCPU threads to host CPUs in order via QMP."""
+        # Attempt QMP connection to the guest (retry up to 5 times)
+        for attempt in range(5):
+            try:
+                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                # TODO: support multiple vng guests. pylint: disable=W0511
+                sock.connect(("localhost", 3636))
+                sock_f = sock.makefile(encoding="utf-8")
+                break
+            except ConnectionRefusedError:
+                if attempt < 4:
+                    time.sleep(1)
+                else:
+                    sys.stderr.write("QMP connection failed after 5 attempts\n")
+                    sys.exit(1)
+
+        # Read initial QMP greeting message.
+        data = sock_f.readline()
+        if not data:
+            sys.stderr.write("QMP connection failed\n")
+            sys.exit(1)
+
+        # Negotiate capabilities.
+        sock.send(json.dumps({"execute": "qmp_capabilities"}).encode("utf-8"))
+        data = sock_f.readline()
+        if not data:
+            sys.stderr.write("QMP capabilities negotiation failed\n")
+            sys.exit(1)
+        resp = json.loads(data)
+        if resp != {"return": {}}:
+            sys.stderr.write(f"QMP capabilities negotiation failed:\n{data}\n")
+            sys.exit(1)
+
+        # Query vCPUs.
+        sock.send(json.dumps({"execute": "query-cpus-fast"}).encode("utf-8"))
+        data = sock_f.readline()
+        if not data:
+            sys.stderr.write("QMP query-cpus-fast failed\n")
+            sys.exit(1)
+
+        resp = json.loads(data)
+        vcpu_tids = [cpu["thread-id"] for cpu in resp.get("return", [])]
+        if not vcpu_tids:
+            sys.stderr.write("No vCPU threads found\n")
+            sys.exit(1)
+
+        # Determine the subset of physical CPUs.
+        n_host_cpus = os.cpu_count()
+        if n_host_cpus is None:
+            sys.stderr.write("Unable to determine number of host CPUs\n")
+            sys.exit(1)
+
+        if args.pin == "all":
+            allowed_cpus = list(range(n_host_cpus))
+        else:
+            allowed_cpus = self._parse_cpu_list(args.pin)
+            if not allowed_cpus:
+                raise RuntimeError("Invalid CPU list expression for --pin")
+
+        # Santiy checks.
+        if len(allowed_cpus) > n_host_cpus:
+            sys.stderr.write(
+                f"WARNING: not enough host CPUs available ({n_host_cpus}) for {len(vcpu_tids)} vCPUs\n"
+            )
+            sys.exit(1)
+        if len(vcpu_tids) > len(allowed_cpus):
+            sys.stderr.write(
+                f"WARNING: not enough host CPUs allowed ({len(allowed_cpus)}) for {len(vcpu_tids)} vCPUs\n"
+            )
+            sys.exit(1)
+
+        # Pin to the physical CPUs.
+        for cpu, tid in zip(allowed_cpus, vcpu_tids):
+            try:
+                os.sched_setaffinity(tid, {cpu})
+            except PermissionError:
+                sys.stderr.write(
+                    f"Permission denied: cannot set affinity for TID {tid}\n"
+                )
+            except ProcessLookupError:
+                sys.stderr.write(f"TID {tid} does not exist\n")
+
+    def set_affinity(self, args):
+        """Spawn a thread that waits for QEMU and pins vCPUs."""
+
+        def worker():
+            try:
+                self.pin_vcpus(args)
+            except SystemExit:
+                sys.stderr.write("WARNING: Failed to pin vCPUs\n")
+
+        t = threading.Thread(target=worker, daemon=True)
+        t.start()
 
     def clean(self, args):
         """Clean a local or remote git repository."""
