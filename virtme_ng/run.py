@@ -260,6 +260,13 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--shell",
+        metavar="BINARY",
+        action="store",
+        help="Override the default user shell",
+    )
+
+    parser.add_argument(
         "--root",
         action="store",
         help="Pass a specific chroot to use inside the virtualized kernel "
@@ -1177,6 +1184,7 @@ class KernelSource:
 
     def _get_virtme_append(self, args):
         append = []
+
         if args.append is not None:
             for item in args.append:
                 split_items = shlex.split(item)
@@ -1184,6 +1192,11 @@ class KernelSource:
                     append += ["-a", split_item]
         if args.debug:
             append += ["-a", "nokaslr"]
+
+        # Set default user's shell override, if specified.
+        if args.shell is not None:
+            append += ["-a", "virtme_shell=" + args.shell]
+
         self.virtme_param["append"] = shlex.join(append)
 
     def _get_virtme_memory(self, args):

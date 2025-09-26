@@ -947,13 +947,23 @@ fn init_xdg_runtime_dir(uid: u32) {
 }
 
 fn run_user_shell(tty_fd: libc::c_int) {
-    let mut args = vec!["-l"];
-    let storage;
+    let mut args = vec![];
+    let cmd;
+
     if let Ok(user) = env::var("virtme_user") {
+        // Check if a shell override is defined.
+        let virtme_shell = env::var("virtme_shell").ok();
+
+        cmd = if let Some(shell) = virtme_shell {
+            format!("su -s {} -- {}", shell, user)
+        } else {
+            format!("su -- {}", user)
+        };
+
         args.push("-c");
-        storage = format!("su -- {user}");
-        args.push(&storage);
+        args.push(&cmd);
     }
+
     print_logo();
     run_shell(tty_fd, &args);
 }

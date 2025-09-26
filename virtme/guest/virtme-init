@@ -486,8 +486,13 @@ if [[ -n ${virtme_graphics} ]]; then
     fi
     # Drop to console if the graphical app failed.
 fi
+
 if [[ -n ${virtme_user} ]]; then
-    setsid bash -c "su -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
+    shell=""
+    if [[ -n ${virtme_shell} ]]; then
+        shell="-s ${virtme_shell}"
+    fi
+    setsid bash -c "su ${shell} -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
 else
     setsid bash 0<> "/dev/$consdev" 1>&0 2>&0
 fi
