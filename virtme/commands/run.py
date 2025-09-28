@@ -1323,6 +1323,8 @@ def do_it() -> int:
         kernelargs.append("luks=no")
         # disable auditd so there are no errors if the user lacks `--rw`
         kernelargs.append("audit=off")
+        # disable zram-generator: may hang at boot if CONFIG_ZRAM is not enabled
+        kernelargs.append("systemd.zram=0")
         kernelargs.extend(
             [f"console={console}" for console in arch.serial_console_args() or []],
         )
