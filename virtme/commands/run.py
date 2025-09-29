@@ -488,10 +488,10 @@ def get_kernel_version(orig_path, img_name: Optional[str] = None):
     # The version detection fails s390x using file or strings tools, so check
     # if the file itself contains the version number.
     if img_name is not None:
-        match = re.search(rf"{img_name}-({version_pattern})", path)
+        match = re.search(rf"{img_name}-({version_pattern})", str(path))
         if match:
             return match.group(1)
-        match = re.search(rf"/lib/modules/({version_pattern})/{img_name}", path)
+        match = re.search(rf"/lib/modules/({version_pattern})/{img_name}", str(path))
         if match:
             return match.group(1)
 
