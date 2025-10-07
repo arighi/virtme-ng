@@ -729,7 +729,7 @@ class VirtioFS:
                     pass
         return None
 
-    def start(self, path, verbose=True):
+    def start(self, path, verbose=True, cache="always"):
         virtiofsd_path = self._get_virtiofsd_path()
         if virtiofsd_path is None:
             return False
@@ -750,7 +750,8 @@ class VirtioFS:
             stderr = ""
         os.system(
             f"{virtiofsd_path} --syslog --no-announce-submounts "
-            + f"--socket-path {self.sock} --shared-dir {path} --sandbox none {stderr} -o cache=always &"
+            + f"--socket-path {self.sock} --shared-dir {path} "
+            + f"--sandbox none -o cache={cache} {stderr} &"
         )
         max_attempts = 5
         check_duration = 0.1
@@ -771,11 +772,15 @@ class VirtioFS:
 
 
 class VirtioFSConfig:
-    def __init__(self, path: str, mount_tag: str, guest_tools_path=None, memory=None):
+    # allow more than 4 arguments: pylint: disable=R0917
+    def __init__(
+        self, path: str, mount_tag: str, guest_tools_path=None, memory=None, rw=False
+    ):
         self.path = path
         self.mount_tag = mount_tag
         self.guest_tools_path = guest_tools_path
         self.memory = memory
+        self.rw = rw
 
 
 def export_virtiofs(
@@ -787,9 +792,11 @@ def export_virtiofs(
     if not arch.virtiofs_support():
         return False
 
+    cache = "auto" if config.rw else "always"
+
     # Try to start virtiofsd daemon
     virtio_fs = VirtioFS(config.guest_tools_path)
-    ret = virtio_fs.start(config.path, verbose)
+    ret = virtio_fs.start(config.path, verbose, cache)
     if not ret:
         return False
 
@@ -1287,6 +1294,7 @@ def do_it() -> int:
             # the user-defined NUMA node, otherwise create a NUMA node with all
             # the memory.
             memory=0 if args.numa else args.memory,
+            rw=args.rw,
         )
         use_virtiofs = export_virtiofs(
             virt_arch,
