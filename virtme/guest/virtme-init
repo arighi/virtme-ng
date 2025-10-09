@@ -214,7 +214,7 @@ if [[ -n $udevd ]]; then
         echo '' > /sys/kernel/uevent_helper
     fi
     log "starting udevd"
-    udev_out=$($udevd --daemon --resolve-names=never 2>&1)
+    udev_out=$($udevd --daemon 2>&1)
     if ! grep -q "quiet" /proc/cmdline; then
         log "udev: $udev_out"
     fi

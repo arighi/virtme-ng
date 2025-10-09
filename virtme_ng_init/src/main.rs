@@ -586,7 +586,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
     if let Some(udevd_path) = find_udevd() {
         let handle = thread::spawn(move || {
             disable_uevent_helper();
-            let args: &[&str] = &["--daemon", "--resolve-names=never"];
+            let args: &[&str] = &["--daemon"];
             utils::run_cmd(udevd_path, args);
             log!("triggering udev coldplug");
             utils::run_cmd("udevadm", &["trigger", "--type=subsystems", "--action=add"]);
