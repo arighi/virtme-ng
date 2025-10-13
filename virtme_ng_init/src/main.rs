@@ -592,7 +592,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
             utils::run_cmd("udevadm", &["trigger", "--type=subsystems", "--action=add"]);
             utils::run_cmd("udevadm", &["trigger", "--type=devices", "--action=add"]);
             log!("waiting for udev to settle");
-            utils::run_cmd("udevadm", &["settle"]);
+            utils::run_cmd("udevadm", &["settle", "--timeout=300"]);
             log!("udev is done");
         });
         Some(handle)
