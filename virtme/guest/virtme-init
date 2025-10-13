@@ -222,7 +222,7 @@ if [[ -n $udevd ]]; then
     udevadm trigger --type=subsystems --action=add > /dev/null 2>&1
     udevadm trigger --type=devices --action=add > /dev/null 2>&1
     log "waiting for udev to settle"
-    udevadm settle
+    udevadm settle --timeout=300
     log "udev is done"
 else
     log "udevd not found"
