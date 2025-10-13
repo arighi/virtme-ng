@@ -9,7 +9,6 @@ import io
 import os
 import shlex
 import tempfile
-from typing import Dict, List, Optional
 
 from . import cpiowriter, util
 
@@ -164,10 +163,10 @@ class Config:
     __slots__ = ["modfiles", "virtme_data", "virtme_init_path", "busybox", "access"]
 
     def __init__(self):
-        self.modfiles: List[str] = []
-        self.virtme_data: Dict[bytes, bytes] = {}
-        self.virtme_init_path: Optional[str] = None
-        self.busybox: Optional[str] = None
+        self.modfiles: list[str] = []
+        self.virtme_data: dict[bytes, bytes] = {}
+        self.virtme_init_path: str | None = None
+        self.busybox: str | None = None
         self.access = "ro"
 
 
@@ -185,7 +184,7 @@ def mkinitramfs(out, config) -> None:
     cw.write_trailer()
 
 
-def find_busybox(root, is_native) -> Optional[str]:
+def find_busybox(root, is_native) -> str | None:
     return util.find_binary(
         ["busybox-static", "busybox.static", "busybox"], root=root, use_path=is_native
     )

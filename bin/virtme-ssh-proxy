@@ -3,7 +3,7 @@ import argparse
 import array
 import socket
 import sys
-from typing import Iterable, Optional
+from collections.abc import Iterable
 
 # Supported hostname and CID separators
 #
@@ -15,7 +15,7 @@ SUCCESS = 0
 ERROR_USAGE = 2
 
 
-def get_hostname_cid(ssh_dst: str) -> tuple[Optional[str], Optional[int]]:
+def get_hostname_cid(ssh_dst: str) -> tuple[str | None, int | None]:
     """Return the hostname and CID
 
     >>> hostname, cid = get_hostname_cid("virtme-ng/24")

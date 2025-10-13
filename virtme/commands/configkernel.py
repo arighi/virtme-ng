@@ -13,7 +13,6 @@ import shlex
 import shutil
 import subprocess
 import sys
-from typing import Optional
 
 from .. import architectures
 from ..util import SilentError
@@ -372,7 +371,7 @@ def do_it():
     for var in args.envs:
         archargs.append(shlex.quote(var))
 
-    maketarget: Optional[str]
+    maketarget: str | None
 
     updatetarget = ""
     if args.allnoconfig:

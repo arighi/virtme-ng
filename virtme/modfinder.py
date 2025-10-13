@@ -15,7 +15,6 @@ import itertools
 import platform
 import re
 import subprocess
-from typing import List
 
 from . import util
 
@@ -54,7 +53,7 @@ def resolve_dep(modalias, root=None, kver=None, moddir=None):
     return deps
 
 
-def merge_mods(lists) -> List[str]:
+def merge_mods(lists) -> list[str]:
     found: set = set()
     mods = []
     for mod in itertools.chain(*lists):
