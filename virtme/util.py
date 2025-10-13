@@ -9,7 +9,7 @@ import getpass
 import itertools
 import os
 import shutil
-from typing import Optional, Sequence
+from collections.abc import Sequence
 
 
 class SilentError(Exception):
@@ -36,7 +36,7 @@ def check_kernel_repo():
 
 def find_binary(
     names: Sequence[str], root: str = "/", use_path: bool = True
-) -> Optional[str]:
+) -> str | None:
     dirs = [
         os.path.join(*i)
         for i in itertools.product(["usr/local", "usr", ""], ["bin", "sbin"])

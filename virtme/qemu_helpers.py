@@ -10,12 +10,11 @@ import platform
 import re
 import shutil
 import subprocess
-from typing import Optional
 
 
 class Qemu:
     qemubin: str
-    version: Optional[str]
+    version: str | None
 
     def __init__(self, qemubin, arch) -> None:
         self.arch = arch

@@ -1573,7 +1573,7 @@ class KernelSource:
             sys.exit(1)
 
         # Pin to the physical CPUs.
-        for cpu, tid in zip(allowed_cpus, vcpu_tids):
+        for cpu, tid in zip(allowed_cpus, vcpu_tids, strict=False):
             try:
                 os.sched_setaffinity(tid, {cpu})
             except PermissionError:

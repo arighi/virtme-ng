@@ -23,7 +23,7 @@ from base64 import b64encode
 from pathlib import Path
 from shutil import which
 from time import sleep
-from typing import Any, Dict, List, NoReturn, Optional, Tuple
+from typing import Any, NoReturn
 
 from virtme_ng.utils import (
     CACHE_DIR,
@@ -423,11 +423,11 @@ class Kernel:
 
     kimg: str
     version: str
-    dtb: Optional[str]
-    modfiles: List[str]
-    moddir: Optional[str]
+    dtb: str | None
+    modfiles: list[str]
+    moddir: str | None
     use_root_mods: bool
-    config: Optional[Dict[str, str]]
+    config: dict[str, str] | None
 
     def load_config(self, kdir: str) -> None:
         cfgfile = os.path.join(kdir, ".config")
@@ -452,7 +452,7 @@ def get_rootfs_from_kernel_path(path):
     return os.path.abspath(path)
 
 
-def get_kernel_version(orig_path, img_name: Optional[str] = None):
+def get_kernel_version(orig_path, img_name: str | None = None):
     # Resolve symlinks first
     path = Path(orig_path).resolve()
 
@@ -785,7 +785,7 @@ class VirtioFSConfig:
 
 def export_virtiofs(
     arch: architectures.Arch,
-    qemuargs: List[str],
+    qemuargs: list[str],
     config: VirtioFSConfig,
     verbose=False,
 ) -> bool:
@@ -833,7 +833,7 @@ class VirtFSConfig:
 def export_virtfs(
     qemu: qemu_helpers.Qemu,
     arch: architectures.Arch,
-    qemuargs: List[str],
+    qemuargs: list[str],
     config: VirtFSConfig,
 ) -> None:
     # NB: We can't use -virtfs for this, because it can't handle a mount_tag
@@ -871,7 +871,7 @@ def quote_karg(arg: str) -> str:
 
 
 # Validate name=path arguments from --disk and --blk-disk
-def sanitize_disk_args(func: str, arg: str) -> Tuple[str, str]:
+def sanitize_disk_args(func: str, arg: str) -> tuple[str, str]:
     namefile = arg.split("=", 1)
     if len(namefile) != 2:
         arg_fail(f"invalid argument to {func}")
@@ -902,7 +902,7 @@ def can_use_kvm(args):
     return can_access_file("/dev/kvm")
 
 
-def all_tools_available(tools: List[str]) -> bool:
+def all_tools_available(tools: list[str]) -> bool:
     return all(map(lambda tool: which(tool) is not None, tools))
 
 
@@ -1195,7 +1195,7 @@ def do_it() -> int:
             os.execvp("gdb", command)
         sys.exit(0)
 
-    qemuargs: List[str] = [qemu.qemubin]
+    qemuargs: list[str] = [qemu.qemubin]
     kernelargs = []
 
     # Put the '-name' flag first so it's easily visible in ps, top, etc.
@@ -1816,7 +1816,7 @@ def do_it() -> int:
     if os.geteuid() == 0:
         kernelargs.append("virtme_root_user=1")
 
-    initrdpath: Optional[str]
+    initrdpath: str | None
 
     if need_initramfs:
         if args.busybox is not None:
