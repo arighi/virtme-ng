@@ -307,7 +307,7 @@ if [[ -n ${vsock_exec} ]]; then
         "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &
 fi
 
-user_cmd=$(sed -ne "s/.*virtme.exec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
+user_cmd=$(sed -ne "s/.*virtme.exec=\`\([^\`]*\)\`.*/\1/p" /proc/cmdline)
 if [[ -n ${user_cmd} ]]; then
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
         ! -e "/dev/virtio-ports/virtme.stdout" ||
