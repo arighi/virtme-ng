@@ -136,6 +136,12 @@ def make_parser() -> argparse.ArgumentParser:
         help="Enable basic network access: user, bridge(=<br>), loop.",
     )
     g.add_argument(
+        "--no-dhcp",
+        action="store_true",
+        help="Disable DHCP configuration for network interfaces. Applicable only in "
+        + "bridge and user modes.",
+    )
+    g.add_argument(
         "--net-mac-address",
         action="store",
         default=None,
@@ -1746,14 +1752,14 @@ def do_it() -> int:
             )
             if net == "user":
                 qemuargs.extend(["-netdev", f"user,id=n{index}"])
-                extend_dhcp = True
+                extend_dhcp = not args.no_dhcp
             elif net == "bridge" or net.startswith("bridge="):
                 if len(net) > 7 and net[6] == "=":
                     bridge = net[7:]
                 else:
                     bridge = "virbr0"
                 qemuargs.extend(["-netdev", f"bridge,id=n{index},br={bridge}"])
-                extend_dhcp = True
+                extend_dhcp = not args.no_dhcp
             elif net == "loop":
                 hubid = index
                 qemuargs.extend(["-netdev", f"hubport,id=n{index},hubid={hubid}"])
