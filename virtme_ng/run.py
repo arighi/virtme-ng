@@ -403,8 +403,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--no-dhcp",
         action="store_true",
-        help="Disable DHCP configuration for network interfaces. Applicable only in "
-        + "bridge and user modes.",
+        help="Disable DHCP configuration for network interfaces.",
     )
 
     parser.add_argument(

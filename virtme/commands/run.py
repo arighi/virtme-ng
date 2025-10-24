@@ -138,8 +138,7 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument(
         "--no-dhcp",
         action="store_true",
-        help="Disable DHCP configuration for network interfaces. Applicable only in "
-        + "bridge and user modes.",
+        help="Disable DHCP configuration for network interfaces.",
     )
     g.add_argument(
         "--net-mac-address",
@@ -1752,14 +1751,14 @@ def do_it() -> int:
             )
             if net == "user":
                 qemuargs.extend(["-netdev", f"user,id=n{index}"])
-                extend_dhcp = not args.no_dhcp
+                extend_dhcp = True
             elif net == "bridge" or net.startswith("bridge="):
                 if len(net) > 7 and net[6] == "=":
                     bridge = net[7:]
                 else:
                     bridge = "virbr0"
                 qemuargs.extend(["-netdev", f"bridge,id=n{index},br={bridge}"])
-                extend_dhcp = not args.no_dhcp
+                extend_dhcp = True
             elif net == "loop":
                 hubid = index
                 qemuargs.extend(["-netdev", f"hubport,id=n{index},hubid={hubid}"])
@@ -1778,7 +1777,7 @@ def do_it() -> int:
                     f"--net: invalid choice: '{net}' (choose from user, bridge(=<br>), loop)"
                 )
             index += 1
-        if extend_dhcp:
+        if extend_dhcp and not args.no_dhcp:
             kernelargs.extend(["virtme.dhcp"])
         kernelargs.extend(
             [
