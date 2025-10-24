@@ -25,7 +25,7 @@ jobs:
       - uses: actions/checkout@v4
 
       # Run `uname -r` using a vanilla v6.6 kernel
-      - run: ./vng -r v6.6 -- uname -r
+      - run: ./vng -r v6.6 -v -- uname -r
 
       # Build virtme-ng-init
       - run: make
@@ -41,4 +41,4 @@ jobs:
       - name: "Check KVM support"
         run: |
           clocksource="/sys/devices/system/clocksource/clocksource0/current_clocksource"
-          [ "$(./vng -r v6.6 -- cat "${clocksource}")" = "kvm-clock" ]
+          [ "$(./vng -r v6.6 -v -- cat "${clocksource}")" = "kvm-clock" ]
