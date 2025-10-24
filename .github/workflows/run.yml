@@ -27,6 +27,9 @@ jobs:
       # Run `uname -r` using a vanilla v6.6 kernel
       - run: ./vng -r v6.6 -- uname -r
 
+      # Build virtme-ng-init
+      - run: make
+
       # Setup KVM support
       - name: "KVM support"
         run: |
@@ -34,7 +37,7 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
 
-      # Re-run with KVM support
+      # Re-run with KVM support and virtme-ng-init
       - name: "Check KVM support"
         run: |
           clocksource="/sys/devices/system/clocksource/clocksource0/current_clocksource"
