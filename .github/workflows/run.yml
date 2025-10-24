@@ -16,8 +16,12 @@ jobs:
       - run: echo 'debconf debconf/frontend select Noninteractive' | sudo debconf-set-selections
 
       # Install dependencies
-      - run: sudo apt update
-      - run: sudo apt install --yes git qemu-kvm udev iproute2 busybox-static coreutils python3-requests libvirt-clients kbd kmod file rsync zstd udev
+      - run: sudo apt-get update
+      - run: |
+          sudo apt-get install --yes --no-install-recommends \
+             git qemu-kvm udev iproute2 busybox-static coreutils \
+             python3-requests python3-argcomplete libvirt-clients kbd kmod \
+             file rsync zstd virtiofsd
 
       ### END DEPENDENCIES ###
 
