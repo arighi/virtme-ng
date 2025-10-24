@@ -1810,10 +1810,14 @@ def do_it() -> int:
     if args.nvgpu:
         qemuargs.extend(["-device", args.nvgpu])
 
-    # If we are running as root on the host pass this information to the guest
-    # (this can be useful to properly support running virtme-ng instances
-    # inside docker)
-    if os.geteuid() == 0:
+    # If we are running as root on the host, or using root user within an
+    # external root filesystem, pass this information to the guest (this can be
+    # useful to properly support running virtme-ng instances inside docker)
+    if os.geteuid() == 0 or (
+        args.user == "root"
+        and args.root != "/"
+        and os.access(os.path.join(args.root, "root"), os.R_OK | os.W_OK | os.X_OK)
+    ):
         kernelargs.append("virtme_root_user=1")
 
     initrdpath: str | None
