@@ -401,6 +401,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--no-dhcp",
+        action="store_true",
+        help="Disable DHCP configuration for network interfaces.",
+    )
+
+    parser.add_argument(
         "--net-mac-address",
         action="store",
         help="The MAC address to assign to the NIC interface, e.g. 52:54:00:12:34:56. "
@@ -1060,6 +1066,12 @@ class KernelSource:
         else:
             self.virtme_param["network"] = ""
 
+    def _get_virtme_no_dhcp(self, args):
+        if args.no_dhcp:
+            self.virtme_param["no_dhcp"] = "--no-dhcp"
+        else:
+            self.virtme_param["no_dhcp"] = ""
+
     def _get_virtme_net_mac_address(self, args):
         if args.net_mac_address is not None:
             self.virtme_param["net_mac_address"] = (
@@ -1331,6 +1343,7 @@ class KernelSource:
         self._get_virtme_no_virtme_ng_init(args)
         self._get_virtme_mods(args)
         self._get_virtme_network(args)
+        self._get_virtme_no_dhcp(args)
         self._get_virtme_net_mac_address(args)
         self._get_virtme_console(args)
         self._get_virtme_console_client(args)
@@ -1380,6 +1393,7 @@ class KernelSource:
             + f"{self.virtme_param['no_virtme_ng_init']} "
             + f"{self.virtme_param['mods']} "
             + f"{self.virtme_param['network']} "
+            + f"{self.virtme_param['no_dhcp']} "
             + f"{self.virtme_param['net_mac_address']} "
             + f"{self.virtme_param['console']} "
             + f"{self.virtme_param['console_client']} "

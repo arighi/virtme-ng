@@ -136,6 +136,11 @@ def make_parser() -> argparse.ArgumentParser:
         help="Enable basic network access: user, bridge(=<br>), loop.",
     )
     g.add_argument(
+        "--no-dhcp",
+        action="store_true",
+        help="Disable DHCP configuration for network interfaces.",
+    )
+    g.add_argument(
         "--net-mac-address",
         action="store",
         default=None,
@@ -1772,7 +1777,7 @@ def do_it() -> int:
                     f"--net: invalid choice: '{net}' (choose from user, bridge(=<br>), loop)"
                 )
             index += 1
-        if extend_dhcp:
+        if extend_dhcp and not args.no_dhcp:
             kernelargs.extend(["virtme.dhcp"])
         kernelargs.extend(
             [
