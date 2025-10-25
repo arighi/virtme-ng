@@ -656,7 +656,8 @@ fn get_network_handle(
     let network_dev_str = network_dev.unwrap();
     log!("setting up network device {}", network_dev_str);
     Some(thread::spawn(move || {
-        let args = [
+        let script = format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap());
+        let mut args = vec![
             "udhcpc",
             "-i",
             &network_dev_str,
@@ -664,8 +665,13 @@ fn get_network_handle(
             "-q",
             "-f",
             "-s",
-            &format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap()),
+            &script,
         ];
+        let hostname_opt_val;
+        if let Ok(hostname) = env::var("virtme_hostname") {
+            hostname_opt_val = format!("hostname:{}", hostname);
+            args.extend(["-x", &hostname_opt_val]);
+        }
         utils::run_cmd("busybox", &args);
     }))
 }

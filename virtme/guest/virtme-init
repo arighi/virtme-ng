@@ -272,7 +272,11 @@ if grep -q -E '(^| )virtme.dhcp($| )' /proc/cmdline; then
     # udev is liable to rename the interface out from under us.
     for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
         virtme_net=$(basename "${d}")
-        busybox udhcpc -i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script" &
+        udhcpc_opts=(-i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script")
+        if [[ -n $virtme_hostname ]]; then
+            udhcpc_opts+=(-x hostname:"$virtme_hostname")
+        fi
+        busybox udhcpc "${udhcpc_opts[@]}" &
     done
     wait
 fi
