@@ -1230,14 +1230,18 @@ def do_it() -> int:
         for i, numa in enumerate(args.numa, start=1):
             size, cpus = numa.split(",", 1) if "," in numa else (numa, None)
             cpus = f",{cpus}" if cpus else ""
-            qemuargs.extend(
-                [
+
+            if size == "0":
+                obj_args = []
+                numa_args = ["-numa", f"node{cpus}"]
+            else:
+                obj_args = [
                     "-object",
                     f"memory-backend-memfd,id=mem{i},size={size},share=on",
-                    "-numa",
-                    f"node,memdev=mem{i}{cpus}",
                 ]
-            )
+                numa_args = ["-numa", f"node,memdev=mem{i}{cpus}"]
+
+            qemuargs.extend(obj_args + numa_args)
 
     if args.numa_distance:
         for arg in args.numa_distance:
