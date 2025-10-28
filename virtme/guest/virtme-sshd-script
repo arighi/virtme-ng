@@ -70,6 +70,7 @@ AuthorizedKeysFile ${SSH_AUTH_KEYS}
 PubkeyAuthentication yes
 UsePAM yes
 PrintMotd no
+StrictModes no
 ${sftp_server}
 EOF
 
