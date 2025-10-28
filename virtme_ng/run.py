@@ -657,8 +657,6 @@ git reset --hard __virtme__
 
 def create_root(destdir, arch, release):
     """Initialize a rootfs directory, populating files/directory if it doesn't exist."""
-    if os.path.exists(destdir):
-        return
     # Use Ubuntu's cloud images to create a rootfs, these images are fairly
     # small and they provide a nice environment to test kernels.
     if release is None:
@@ -950,7 +948,12 @@ class KernelSource:
 
     def _get_virtme_root(self, args):
         if args.root is not None:
-            create_root(args.root, args.arch or get_host_arch(), args.root_release)
+            if os.path.exists(args.root):
+                if not os.access(args.root, os.R_OK | os.X_OK):
+                    sys.stderr.write(f"Must have read permission on {args.root}\n")
+                    sys.exit(1)
+            else:
+                create_root(args.root, args.arch or get_host_arch(), args.root_release)
             self.virtme_param["root"] = f"--root {args.root}"
         else:
             self.virtme_param["root"] = ""
