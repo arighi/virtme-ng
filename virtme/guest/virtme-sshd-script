@@ -17,14 +17,22 @@ rm -f /var/run/nologin
 # of host keys and authorized keys without dubious permission errors
 SSH_DIR=/run/sshd
 
-# use an ssh location INSIDE of the users home directory to communicate pre-
-# created hostkeys and authorized keys
-SSH_HOME="$(getent passwd "${virtme_ssh_user}" | cut -d: -f6)"
-if [ ! -e "${SSH_HOME}" ]; then
-    # Setup an arbitrary ssh location, just to be able to start sshd.
-    SSH_HOME="${SSH_DIR}"
+if grep -q "virtme.cache /run/virtme/cache" /proc/mounts; then
+    # If using args.root != '/', virtme.cache will be mounted.
+    # This way it becomes a central place for ssh files (including id_*.pub),
+    # which defaults to $HOME/.cache/virtme-ng/.ssh in the host.
+    SSH_HOME=/run/virtme/cache
+    SSH_CACHE="${SSH_HOME}"/.ssh
+else
+    # use an ssh location INSIDE of the users home directory to communicate pre-
+    # created hostkeys and authorized keys
+    SSH_HOME="$(getent passwd "${virtme_ssh_user}" | cut -d: -f6)"
+    if [ ! -e "${SSH_HOME}" ]; then
+        # Setup an arbitrary ssh location, just to be able to start sshd.
+        SSH_HOME="${SSH_DIR}"
+    fi
+    SSH_CACHE="${SSH_HOME}"/.cache/virtme-ng/.ssh
 fi
-SSH_CACHE="${SSH_HOME}"/.cache/virtme-ng/.ssh
 
 # Generate ssh host keys (if they don't exist already).
 mkdir -p "${SSH_CACHE}"/etc/ssh
@@ -62,6 +70,7 @@ AuthorizedKeysFile ${SSH_AUTH_KEYS}
 PubkeyAuthentication yes
 UsePAM yes
 PrintMotd no
+StrictModes no
 ${sftp_server}
 EOF
 

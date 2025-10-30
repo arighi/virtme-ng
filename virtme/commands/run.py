@@ -1361,27 +1361,28 @@ def do_it() -> int:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
         virtfs_config = VirtFSConfig(
+            path=str(CACHE_DIR),
+            mount_tag="virtme.cache",
+            readonly=False,
+        )
+        export_virtfs(qemu, arch, qemuargs, virtfs_config)
+        virtfs_config = VirtFSConfig(
             path=guest_tools_path,
             mount_tag="virtme.guesttools",
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
         initsh = [
             "mount -t tmpfs run /run",
+            "mkdir -p /run/virtme/cache",
+            "/bin/mount -n -t 9p -o rw,version=9p2000.L,trans=virtio,access=any "
+            + "virtme.cache /run/virtme/cache",
             "mkdir -p /run/virtme/guesttools",
             "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
             + "virtme.guesttools /run/virtme/guesttools",
         ]
         if args.systemd:
-            virtfs_config = VirtFSConfig(
-                path=str(CACHE_DIR),
-                mount_tag="virtme.cache",
-            )
-            export_virtfs(qemu, arch, qemuargs, virtfs_config)
             initsh.extend(
                 [
-                    "mkdir -p /run/virtme/cache",
-                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
-                    + "virtme.cache /run/virtme/cache",
                     "SYSTEMD_UNIT_PATH=/run/virtme/cache: exec /sbin/init",
                 ]
             )
