@@ -1415,7 +1415,7 @@ def do_it() -> int:
         if not m:
             arg_fail(f"invalid --{dirtype} parameter {dirarg!r}")
         if m.group(2) is not None:
-            guestpath = m.group(1)
+            guestpath = os.path.join(args.root, os.path.relpath("/", m.group(1)))
             hostpath = m.group(2)
         else:
             hostpath = m.group(1)
