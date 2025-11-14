@@ -25,7 +25,8 @@ CONF_DEFAULT = {
         "masks": [
             # disable getty@, since we're forcing the use of serial-getty@
             "getty@"
-        ]
+        ],
+        "fstab": "/dev/null",
     },
 }
 
