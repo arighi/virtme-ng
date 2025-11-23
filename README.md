@@ -602,6 +602,72 @@ Now you can simply run `vng --build` to build your kernel from the current
 working directory using the external build host, prepending the exec prefix
 command when running make.
 
+AI Agent Integration (MCP Server)
+==================================
+
+virtme-ng includes built-in support for the Model Context Protocol (MCP),
+which allows AI assistants (like Claude, Cursor, or other MCP-compatible
+tools) to interact with virtme-ng programmatically.
+
+What is MCP?
+------------
+
+The Model Context Protocol is an open protocol that enables AI assistants
+to securely access tools and data sources. The virtme-ng MCP server exposes
+kernel development operations as tools that AI agents can use.
+
+Starting the MCP Server
+------------------------
+
+The MCP server can be started in two ways:
+
+1. **Using the vng-mcp binary directly:**
+   ```shell
+   $ vng-mcp
+   ```
+
+2. **Using the vng command:**
+   ```shell
+   $ vng --mcp
+   ```
+
+Both methods are equivalent - `vng --mcp` simply executes `vng-mcp`
+internally. The server will start in stdio mode and communicate using the
+MCP protocol.
+
+Configuration with AI Assistants
+---------------------------------
+
+Add the following to your AI assistant configuration file:
+
+ - **Cursor**: `~/.config/cursor/mcp.json`
+ - **Claude Code (CLI)**: `~/.config/claude/config.json`
+ - **Claude Desktop**: `~/.config/Claude/claude_desktop_config.json`
+
+```json
+{
+  "mcpServers": {
+    "virtme-ng": {
+      "command": "vng",
+      "args": ["--mcp"]
+    }
+  }
+}
+```
+
+Example Workflows
+-----------------
+
+Once configured, you can ask your AI assistant:
+
+- "Build this kernel and check dmesg for errors/warnings"
+- "Build the kernel in /path/to/linux then test it by running 'uname -r'"
+- "Recompile and test the kernel with KASAN enabled"
+- "Test this kernel by running my test script at /path/to/test.sh"
+- "Compare the behavior of this kernel with the mainline kernel v6.12"
+
+The AI will use the appropriate MCP tools to accomplish these tasks.
+
 Troubleshooting
 ===============
 
