@@ -467,6 +467,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--fb",
+        action="store_true",
+        help="Show graphical console, but do not start any graphics server (mutually exclusive with --graphics).",
+    )
+
+    parser.add_argument(
         "--verbose",
         "-v",
         action="store_true",
@@ -1215,8 +1221,12 @@ class KernelSource:
             self.virtme_param["force_initramfs"] = ""
 
     def _get_virtme_graphics(self, args):
+        if args.graphics and args.fb:
+            arg_fail("--graphics and --fb are mutually exclusive")
         if args.graphics:
             self.virtme_param["graphics"] = "--graphics"
+        elif args.fb:
+            self.virtme_param["graphics"] = "--fb"
         else:
             self.virtme_param["graphics"] = ""
 
