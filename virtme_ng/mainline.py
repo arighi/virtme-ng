@@ -41,7 +41,7 @@ class KernelDownloader:
                     file.write(chunk)
         else:
             raise FileNotFoundError(
-                f"failed to download {url}, error: {response.status_code}"
+                f"failed to download '{url}', error: {response.status_code}"
             )
 
     @spinner_decorator(message="📥 downloading kernel")
