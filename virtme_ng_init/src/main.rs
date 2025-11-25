@@ -71,7 +71,7 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         target: "/dev",
         fs_type: "devtmpfs",
         flags: (libc::MS_NOSUID | libc::MS_NOEXEC) as usize,
-        fsdata: "",
+        fsdata: "mode=0755",
     },
     MountInfo {
         source: "configfs",
@@ -109,14 +109,15 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
         target: "/dev/pts",
         fs_type: "devpts",
         flags: (libc::MS_NOSUID | libc::MS_NOEXEC) as usize,
-        fsdata: "",
+        // TODO gid=tty, does not work
+        fsdata: "mode=620",
     },
     MountInfo {
         source: "tmpfs",
         target: "/dev/shm",
         fs_type: "tmpfs",
         flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
-        fsdata: "",
+        fsdata: "mode=1777",
     },
     MountInfo {
         source: "tmpfs",

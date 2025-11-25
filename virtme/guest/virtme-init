@@ -119,24 +119,24 @@ mount_sys_filesystems() {
     install -d /run/dbus
 
     # Setup rw tmpfs directories
-    [ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
-    [ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
+    [ -e /var/log ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/log/
+    [ -e /var/tmp ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/tmp/
 
     # Additional rw dirs used by systemd
-    [ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
-    [ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
-    [ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
-    [ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
-    [ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
+    [ -e /var/spool/rsyslog ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/spool/rsyslog
+    [ -e /var/lib/portables ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/lib/portables
+    [ -e /var/lib/machines ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/lib/machines
+    [ -e /var/lib/private ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/lib/private
+    [ -e /var/cache ] && mount -t tmpfs tmpfs -o nosuid,nodev /var/cache
 
     # Additional rw dirs required by apt (if present)
-    [ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
+    [ -e /var/lib/apt ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/lib/apt
 
     # Additional rw dirs required by snapd (if present)
-    [ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie
+    [ -e /var/lib/snapd/cookie ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/lib/snapd/cookie
 
     # Hide additional sudo settings
-    [ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo
+    [ -e /var/lib/sudo ] && mount -t tmpfs -o nosuid,nodev tmpfs /var/lib/sudo
 }
 
 generate_fstab() {
