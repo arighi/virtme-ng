@@ -329,6 +329,8 @@ override_system_files() {
 }
 
 setup_network() {
+    local pids=()
+
     setup_network_lo
 
     if grep -q -E '(^| )virtme.dhcp($| )' /proc/cmdline; then
@@ -344,8 +346,9 @@ setup_network() {
                 udhcpc_opts+=(-x hostname:"$virtme_hostname")
             fi
             busybox udhcpc "${udhcpc_opts[@]}" &
+            pids+=($!)
         done
-        wait
+        wait "${pids[@]}"
     fi
 }
 
