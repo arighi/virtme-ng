@@ -415,16 +415,20 @@ run_user_script() {
     fi
 
     # Set proper ownership on the virtio-ports devices
-    chown -- "${uid}" \
-        /dev/virtio-ports/virtme.stdin \
-        /dev/virtio-ports/virtme.stdout \
-        /dev/virtio-ports/virtme.stderr \
-        /dev/virtio-ports/virtme.dev_stdout \
-        /dev/virtio-ports/virtme.dev_stderr
+    if [[ -n ${virtme_user:-} ]]; then
+        chown -- "${virtme_user}" \
+            /dev/virtio-ports/virtme.stdin \
+            /dev/virtio-ports/virtme.stdout \
+            /dev/virtio-ports/virtme.stderr \
+            /dev/virtio-ports/virtme.dev_stdout \
+            /dev/virtio-ports/virtme.dev_stderr
+    fi
 
     if [ -e /dev/virtio-ports/virtme.ret ]; then
-        chown -- "${uid}" \
-            /dev/virtio-ports/virtme.ret
+        if [[ -n ${virtme_user:-} ]]; then
+            chown -- "${virtme_user}" \
+                /dev/virtio-ports/virtme.ret
+        fi
     fi
 
     # Fix /dev/stdout and /dev/stderr.
@@ -501,7 +505,9 @@ redirect_console() {
 configure_terminal() {
     local consdev=$1 uid=$2
 
-    chown -- "$uid" "/dev/${consdev}"
+    if [[ -n ${virtme_user:-} ]]; then
+        chown -- "${virtme_user}" "/dev/${consdev}"
+    fi
 
     # TODO Not available in Rust implementation?
     deallocvt
@@ -575,7 +581,9 @@ init_xdg_runtime_dir() {
     XDG_RUNTIME_DIR="/run/user/${uid}"
     export XDG_RUNTIME_DIR
     mkdir -p "$XDG_RUNTIME_DIR"
-    chown -- "$uid" "$XDG_RUNTIME_DIR"
+    if [[ -n ${virtme_user:-} ]]; then
+        chown -- "${virtme_user}" "$XDG_RUNTIME_DIR"
+    fi
 }
 
 run_user_gui() {
@@ -676,15 +684,21 @@ log "basic initialization done"
 setup_socat_console
 
 # Service initialization
-run_udevd
-symlink_fds
+# Use 'disown' so we only wait for newly started jobs, not previously
+# backgrounded ones.
+disown -a
+run_udevd &
+symlink_fds &
 # TODO Position changed
-mount_virtme_initmounts
-fix_packaging_files
-override_system_files
-run_sshd
-run_snapd
-setup_network
+mount_virtme_initmounts &
+fix_packaging_files &
+override_system_files &
+run_sshd &
+run_snapd &
+setup_network &
+
+# Wait for the completion of the detached services.
+wait
 
 # Start user session (batch or interactive)
 # TODO Position changed
