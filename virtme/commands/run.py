@@ -1500,7 +1500,7 @@ def do_it() -> int:
     qemuargs.extend(["-parallel", "none"])
     qemuargs.extend(["-net", "none"])
 
-    if not args.video and not args.script_sh and not args.script_exec:
+    if not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
 
         if args.systemd:
@@ -1516,6 +1516,9 @@ def do_it() -> int:
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
             kernelargs.extend(["console=hvc0"])
+            if args.video:
+                # however, redirect the "main" console back to VT so that guest init would spawn the session there
+                kernelargs.extend(["virtme_console=tty1"])
         else:
             print(
                 "WARNING: unable to write kernel messages, try to run vng with a valid PTS "
@@ -1542,6 +1545,7 @@ def do_it() -> int:
         if not args.disable_monitor:
             qemuargs.extend(["-mon", "chardev=console"])
 
+    if not args.script_sh and not args.script_exec and not args.video:
         kernelargs.extend(
             ["virtme_console=" + arg for arg in arch.serial_console_args()]
         )
