@@ -389,6 +389,14 @@ set_cwd() {
     fi
 }
 
+poweroff_and_exit() {
+    local rc=$1
+
+    sync
+    poweroff -f
+    exit "$rc"
+}
+
 run_user_script() {
     local uid=$1
 
@@ -398,8 +406,7 @@ run_user_script() {
         ! -e "/dev/virtio-ports/virtme.dev_stdout" ||
         ! -e "/dev/virtio-ports/virtme.dev_stderr" ]]; then
         log "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
-        poweroff -f
-        exit 1
+        poweroff_and_exit 1
     fi
 
     # Set proper ownership on the virtio-ports devices
@@ -448,9 +455,7 @@ run_user_script() {
     fi
 
     # Hmm.  We should expose the return value somehow.
-    sync
-    poweroff -f
-    exit 0
+    poweroff_and_exit 0
 }
 
 setup_user_script() {
@@ -679,6 +684,4 @@ set_cwd
 setup_user_session
 
 # Shutdown the system.
-sync
-poweroff -f
-exit 0
+poweroff_and_exit 0
