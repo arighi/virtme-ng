@@ -457,7 +457,6 @@ run_user_script() {
         echo ${ret} > /dev/virtio-ports/virtme.ret
     fi
 
-    # Hmm.  We should expose the return value somehow.
     poweroff_and_exit 0
 }
 
