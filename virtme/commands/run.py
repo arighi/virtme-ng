@@ -131,7 +131,10 @@ def make_parser() -> "VngArgumentParser":
         help="Show graphical console, but do not start any graphics server.",
     )
     g.add_argument(
-        "--verbose", action="store_true", help="Increase console output verbosity."
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase console output verbosity.",
     )
     g.add_argument(
         "--net",
