@@ -185,6 +185,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--empty-passwords",
+        action="store_true",
+        help="Use empty passwords for all users",
+    )
+
+    parser.add_argument(
         "--pin",
         "-P",
         nargs="?",
@@ -1303,6 +1309,11 @@ class KernelSource:
         else:
             self.virtme_param["busybox"] = ""
 
+    def _get_virtme_empty_passwords(self, args):
+        self.virtme_param["empty_passwords"] = ""
+        if args.empty_passwords:
+            self.virtme_param["empty_passwords"] = "--empty-passwords"
+
     def _get_virtme_qemu(self, args):
         if args.qemu is not None:
             self.virtme_param["qemu"] = "--qemu-bin " + args.qemu
@@ -1378,6 +1389,7 @@ class KernelSource:
         self._get_virtme_balloon(args)
         self._get_virtme_gdb(args)
         self._get_virtme_snaps(args)
+        self._get_virtme_empty_passwords(args)
         self._get_virtme_busybox(args)
         self._get_virtme_nvgpu(args)
         self._get_virtme_qemu(args)
@@ -1397,6 +1409,7 @@ class KernelSource:
             + f"{self.virtme_param['rwdir']} "
             + f"{self.virtme_param['overlay_rwdir']} "
             + f"{self.virtme_param['cwd']} "
+            + f"{self.virtme_param['empty_passwords']} "
             + f"{self.virtme_param['kdir']} "
             + f"{self.virtme_param['dry_run']} "
             + f"{self.virtme_param['no_virtme_ng_init']} "

@@ -127,8 +127,14 @@ fi
 
 # Populate dummy entries in /etc/shadow to allow switching to any user defined
 # in the system
+# Lock the accounts by default
+value='!'
+
 (umask 0644 && touch /run/tmp/shadow)
-sed -e 's/^\([^:]\+\).*/\1:!:::::::/' < /etc/passwd > /run/tmp/shadow
+if (("${virtme_empty_passwords:-0}" == 1)); then
+    value=''
+fi
+sed -e "s/^\([^:]\+\).*/\1:${value}:::::::/" < /etc/passwd > /run/tmp/shadow
 mount --bind /run/tmp/shadow /etc/shadow
 
 # The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
