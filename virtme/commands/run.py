@@ -2125,8 +2125,10 @@ def do_it() -> int:
         )
         initrdpath = None
 
-    if args.verbose:
+    if args.verbose >= 2:
         kernelargs.append("debug")
+    elif args.verbose:
+        kernelargs.append("loglevel=7")
     else:
         kernelargs.append("quiet")
         kernelargs.append("loglevel=1")
