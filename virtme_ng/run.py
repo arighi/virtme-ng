@@ -451,7 +451,8 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--verbose",
         "-v",
-        action="store_true",
+        action="count",
+        default=0,
         help="Increase console output verbosity.",
     )
 
@@ -1228,7 +1229,9 @@ class KernelSource:
 
     def _get_virtme_verbose(self, args):
         if args.verbose:
-            self.virtme_param["verbose"] = "--verbose --show-boot-console"
+            self.virtme_param["verbose"] = " ".join(
+                ["--show-boot-console"] + ["--verbose"] * args.verbose
+            )
         else:
             self.virtme_param["verbose"] = ""
 

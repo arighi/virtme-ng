@@ -150,7 +150,10 @@ def make_parser() -> argparse.ArgumentParser:
         + "An argument can be optionally specified to start a graphical application.",
     )
     g.add_argument(
-        "--verbose", action="store_true", help="Increase console output verbosity."
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase console output verbosity.",
     )
     g.add_argument(
         "--net",
