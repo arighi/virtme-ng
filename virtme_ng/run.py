@@ -159,6 +159,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "(instance needs to be started with --debug)",
     )
 
+    g_action.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Start the MCP (Model Context Protocol) server for AI agent integration",
+    )
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -1669,6 +1675,35 @@ def do_it() -> int:
     """Main body."""
     argcomplete.autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
+
+    # Handle --mcp option early (it's a server mode, not a normal
+    # operation).
+    if args.mcp:
+        # Execute vng-mcp binary instead of importing to avoid MCP
+        # dependencies in the main vng script.
+        try:
+            vng_mcp = shutil.which("vng-mcp")
+            if vng_mcp is None:
+                # Find it in the same directory as vng.
+                script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+                vng_mcp_local = os.path.join(script_dir, "vng-mcp")
+                if os.path.exists(vng_mcp_local):
+                    vng_mcp = vng_mcp_local
+
+            if vng_mcp is None:
+                sys.stderr.write(
+                    "Error: vng-mcp not found. Please install virtme-ng properly.\n"
+                )
+                return 1
+
+            # Execute vng-mcp and replace the current process.
+            os.execv(vng_mcp, [vng_mcp])
+        except OSError as e:
+            sys.stderr.write(
+                f"Error: Failed to execute vng-mcp: {e}\n"
+                "Make sure MCP dependencies are installed: pip install virtme-ng[mcp]\n"
+            )
+            return 1
 
     kern_source = KernelSource()
     if kern_source.default_opts:

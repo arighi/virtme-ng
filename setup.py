@@ -147,10 +147,17 @@ setup(
         "requests",
         "setuptools",
     ],
+    extras_require={
+        "mcp": [
+            "mcp>=0.9.0",
+            "anyio>=4.0.0",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "vng = virtme_ng.run:main",
             "virtme-ng = virtme_ng.run:main",
+            "vng-mcp = virtme_ng.mcp:main",
             "virtme-run = virtme.commands.run:main",
             "virtme-configkernel = virtme.commands.configkernel:main",
             "virtme-mkinitramfs = virtme.commands.mkinitramfs:main",
@@ -161,6 +168,7 @@ setup(
     package_data={"virtme.guest": package_files},
     data_files=data_files,
     scripts=[
+        "vng-mcp",
         "bin/virtme-prep-kdir-mods",
         "bin/virtme-ssh-proxy",
     ],
