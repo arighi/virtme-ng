@@ -305,9 +305,12 @@ fn generate_shadow() -> io::Result<()> {
     let reader = BufReader::new(input_file);
     let mut writer = BufWriter::new(output_file);
 
+    let empty_passwords = env::var("virtme_empty_passwords").unwrap_or(0.to_string());
+    let value = if empty_passwords == "1" { "" } else { "!" };
+
     for line in reader.lines() {
         if let Some((username, _)) = line?.split_once(':') {
-            writeln!(writer, "{username}:!:::::::")?;
+            writeln!(writer, "{username}:{value}:::::::")?;
         }
     }
     utils::do_mount(
