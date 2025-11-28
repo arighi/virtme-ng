@@ -3,6 +3,9 @@ name = "virtme-ng"
 dynamic = ["version", "license", "authors", "dependencies", "readme", "description", "classifiers", "scripts"]
 requires-python = ">=3.10"
 
+[project.optional-dependencies]
+mcp = ["mcp>=0.9.0", "anyio>=4.0.0"]
+
 [build-system]
 requires = [
   "argparse-manpage[setuptools]",
