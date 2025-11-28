@@ -71,7 +71,7 @@ const KERNEL_MOUNTS: &[MountInfo] = &[
         target: "/dev",
         fs_type: "devtmpfs",
         flags: (libc::MS_NOSUID | libc::MS_NOEXEC) as usize,
-        fsdata: "",
+        fsdata: "mode=0755",
     },
     MountInfo {
         source: "configfs",
@@ -109,14 +109,15 @@ const SYSTEM_MOUNTS: &[MountInfo] = &[
         target: "/dev/pts",
         fs_type: "devpts",
         flags: (libc::MS_NOSUID | libc::MS_NOEXEC) as usize,
-        fsdata: "",
+        // TODO gid=tty, does not work
+        fsdata: "mode=620",
     },
     MountInfo {
         source: "tmpfs",
         target: "/dev/shm",
         fs_type: "tmpfs",
         flags: (libc::MS_NOSUID | libc::MS_NODEV) as usize,
-        fsdata: "",
+        fsdata: "mode=1777",
     },
     MountInfo {
         source: "tmpfs",
@@ -263,6 +264,7 @@ fn configure_limits() {
 
 fn configure_hostname() {
     if let Ok(hostname) = env::var("virtme_hostname") {
+        log!("Setting hostname to {hostname}...");
         if let Err(err) = sethostname(hostname) {
             log!("failed to change hostname: {}", err);
         }
@@ -275,6 +277,7 @@ fn run_systemd_tmpfiles() {
     if !Path::new("/etc/systemd").exists() {
         return;
     }
+    log!("running systemd-tmpfiles");
     let args: &[&str] = &[
         "--create",
         "--boot",
@@ -347,6 +350,7 @@ fn generate_lvm() -> io::Result<()> {
 
     // Create a default lvm.conf file if --systemd was specified
     if id() != 1 {
+        log!("Creating a default lvm.conf file");
         let args: &[&str] = &["--type", "default", "--file", "/etc/lvm/lvm.conf"];
         utils::run_cmd("lvmconfig", args);
     }
@@ -558,7 +562,7 @@ fn disable_uevent_helper() {
 
     if Path::new(uevent_helper_path).exists() {
         // This kills boot performance.
-        log!("you have CONFIG_UEVENT_HELPER on, turn it off");
+        log!("you have CONFIG_UEVENT_HELPER on; turn it off");
         let mut file = OpenOptions::new().write(true).open(uevent_helper_path).ok();
         match &mut file {
             Some(file) => {
@@ -762,6 +766,7 @@ fn run_user_script(uid: u32) {
             ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
         };
         clear_virtme_envs();
+        log!("starting script");
         unsafe {
             let ret = Command::new(cmd)
                 .args(&args)
@@ -1129,6 +1134,7 @@ fn main() {
     mount_sys_filesystems();
     mount_kernel_modules();
     run_systemd_tmpfiles();
+    log!("basic initialization done");
 
     // Service running in the background for later
     setup_socat_console();
