@@ -5,27 +5,121 @@
 MCP Server for virtme-ng - Kernel development and testing tools
 Provides tools for AI agents to configure and test Linux kernels
 
-IMPORTANT NOTE FOR AI AGENTS:
+IMPORTANT NOTES FOR AI AGENTS:
 ================================
-virtme-ng (vng) requires a valid pseudo-terminal (PTS) to run. In automated
-environments without a real terminal, vng commands will fail with:
-  "ERROR: not a valid pts, try to run vng with a valid PTS (e.g., inside tmux or screen)"
 
-This MCP server automatically handles the PTS requirement by using the 'script' command,
-which provides a pseudo-terminal:
+1. BUILDING KERNELS - Prefer 'vng -v --build' over make
+   ----------------------------------------------------
+   When a user asks to test a kernel that hasn't been built yet, use
+   'vng -v --build' instead of running 'make' directly. This is faster,
+   more reliable, and handles configuration automatically.
 
-  Instead of:  vng -- uname -r
-  Use:         script -q -c "vng -- uname -r" /dev/null 2>&1
+   Why use vng -v --build:
+   - Automatically generates minimal .config if missing (saves time)
+   - Optimized for quick builds (compiles only what's needed for testing)
+   - Builds typically complete in minutes instead of hours
+   - Supports remote build hosts for cross-compilation
+   - Handles all build dependencies and options correctly
 
-AI agents should:
-1. Use this MCP server's run_kernel tool (recommended - handles PTS automatically)
-2. If using shell commands directly, use 'script' to provide a PTS:
-   script -q -c "vng -- command" /dev/null 2>&1
+   Basic build command:
+     vng -v --build
 
-The 'script' command:
-  -q: Quiet mode (no script start/stop messages)
-  -c: Execute command and exit
-  /dev/null: Discard the typescript file (we only need stdout/stderr)
+   Build specific commit/tag:
+     vng -v --build --commit v6.2-rc4
+
+   Build with custom config items:
+     vng -v --build --configitem CONFIG_KASAN=y --configitem CONFIG_DEBUG_INFO=y
+
+   Build on remote host "builder" (for cross-compilation or distributed builds):
+     vng -v --build --build-host builder
+
+   Build with environment variables (e.g., Rust support):
+     vng -v --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56
+
+   Build for different architecture:
+     vng -v --build --arch arm64 --root /opt/chroot/arm64/
+
+   IMPORTANT: vng -v --build can take a long time for full builds. Use
+   appropriate timeout values and monitor the output.
+
+   Remote Build Host (--build-host):
+   --------------------------------
+   When the user asks to build on a remote host, remote server, build server,
+   or specifies a hostname for building, use the --build-host option.
+
+   Examples of user requests that indicate remote builds:
+   - "build the kernel on my build server called 'builder'"
+   - "compile this on the remote host 'myserver'"
+   - "use my build machine to compile this"
+   - "build on <hostname>"
+
+   Command format:
+     vng -v --build --build-host <hostname>
+
+   How it works:
+   - The source is pushed to ~/.virtme on the remote host via SSH
+   - The build happens on the remote host
+   - Only required files (bzImage, modules, etc.) are copied back after build
+   - Useful for cross-compilation or using powerful build servers
+
+   Examples:
+     vng -v --build --build-host myserver
+     vng -v --build --build-host builder
+     vng -v --build --build-host build01.example.com
+     vng -v --build --build-host builder --arch arm64
+
+2. PTS (Pseudo-Terminal) Requirement
+   -----------------------------------
+   virtme-ng (vng) requires a valid pseudo-terminal (PTS) to run. In automated
+   environments without a real terminal, vng commands will fail with:
+     "ERROR: not a valid pts, try to run vng with a valid PTS (e.g., inside tmux or screen)"
+
+   This MCP server's run_kernel tool automatically handles PTS requirements.
+
+   For direct shell commands, use 'script' to provide a PTS:
+     script -q -c "vng -- command" /dev/null 2>&1
+
+   The 'script' command:
+     -q: Quiet mode (no script start/stop messages)
+     -c: Execute command and exit
+     /dev/null: Discard the typescript file (we only need stdout/stderr)
+
+3. Typical Workflow for Testing Kernel Changes
+   --------------------------------------------
+   a) Configure (optional - vng -v --build does this automatically):
+      Use configure_kernel tool or: vng -v --build --kconfig
+
+   b) Build the kernel:
+      vng -v --build
+      (NOT: make -j$(nproc), use vng -v --build instead)
+
+      If user specifies building on a remote host:
+      vng -v --build --build-host <hostname>
+
+   c) Test the kernel:
+      Use run_kernel tool or: script -q -c "vng -- uname -r" /dev/null 2>&1
+
+   Example workflows:
+
+     # Build kernel with KASAN enabled
+     vng -v --build --configitem CONFIG_KASAN=y
+     # Test it
+     script -q -c "vng -- dmesg | grep -i kasan" /dev/null 2>&1
+
+     # Build on remote host 'builder' and test locally
+     vng -v --build --build-host builder
+     # Test it
+     script -q -c "vng -- uname -r" /dev/null 2>&1
+
+4. MCP Tools Available
+   --------------------
+   This MCP server provides:
+   - configure_kernel: Generate/modify kernel .config
+   - run_kernel: Run and test kernels in QEMU
+   - get_kernel_info: Get info about kernel source directory
+   - apply_patch: Apply patches from lore.kernel.org
+
+   For building, use shell commands with 'vng -v --build' as documented above.
 """
 
 import asyncio
@@ -93,6 +187,15 @@ async def list_tools() -> list[Tool]:
 Configure a Linux kernel for virtme-ng testing.
 This generates a minimal .config file optimized for quick builds and testing in QEMU.
 
+NOTE: This step is OPTIONAL. The 'vng -v --build' command automatically
+generates a .config if one doesn't exist, so you can skip this tool and go
+straight to building with:
+
+  vng -v --build
+
+Use this tool only if you need to pre-configure the kernel before building, or if you
+want to generate a .config without building yet.
+
 Parameters:
 - kernel_dir: Path to kernel source directory (default: current directory)
 - arch: Target architecture (amd64, arm64, armhf, ppc64el, s390x, riscv64)
@@ -107,6 +210,12 @@ Example use cases:
 - Generate default config: configure_kernel({})
 - Custom config: configure_kernel({"config_items": ["CONFIG_DEBUG_INFO=y", "CONFIG_KASAN=y"]})
 - Cross-compile: configure_kernel({"arch": "arm64"})
+
+RECOMMENDED: Skip this tool and use 'vng -v --build' directly with --configitem options:
+  vng -v --build --configitem CONFIG_DEBUG_INFO=y --configitem CONFIG_KASAN=y
+
+If user wants to build on a remote host, add --build-host:
+  vng -v --build --build-host <hostname> --configitem CONFIG_DEBUG_INFO=y
             """,
             inputSchema={
                 "type": "object",
@@ -157,17 +266,20 @@ Example use cases:
 Run/test a Linux kernel in a virtualized environment using virtme-ng.
 The kernel runs in QEMU with a copy-on-write snapshot of your live system.
 
-IMPORTANT - PTS (Pseudo-Terminal) Requirement:
-virtme-ng requires a valid pseudo-terminal (PTS) to run. In automated environments without
-a real terminal, vng commands will fail with "ERROR: not a valid pts".
-
-This MCP server automatically handles this by using the 'script' command to provide a PTS:
-1. Running: script -q -c "vng -- command" /dev/null 2>&1
-2. The 'script' command provides a pseudo-terminal for vng to use
-3. Output is captured and returned to the caller
-
 AI agents should use this tool rather than running vng directly via shell commands.
 If you must use shell commands, use 'script': script -q -c "vng -- command" /dev/null 2>&1
+
+IMPORTANT - Build the kernel first:
+If testing a newly built kernel (kernel_image parameter omitted), make sure the kernel
+has been built first. Use shell command:
+  vng -v --build
+
+If user specifies building on a remote host, add --build-host:
+  vng -v --build --build-host <hostname>
+
+Then use this tool to test it. Do NOT use 'make', prefer using
+'vng -v --build' instead since it handles kernel configuration
+automatically.
 
 IMPORTANT - Understanding which kernel runs:
 1. WITHOUT kernel_image parameter (recommended for testing built kernels):
@@ -313,6 +425,9 @@ Returns: JSON object with kernel information including:
 - is_dirty: Whether there are uncommitted changes
 - config_exists: Whether .config file exists
 - architecture: Detected architecture from .config
+
+NOTE: If config_exists is false, the kernel hasn't been configured/built yet.
+Use shell command to build it: script -q -c "vng -v --build" /dev/null 2>&1
 
 Example:
 - get_kernel_info({})
