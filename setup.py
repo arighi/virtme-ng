@@ -168,7 +168,6 @@ setup(
     package_data={"virtme.guest": package_files},
     data_files=data_files,
     scripts=[
-        "vng-mcp",
         "bin/virtme-prep-kdir-mods",
         "bin/virtme-ssh-proxy",
     ],
