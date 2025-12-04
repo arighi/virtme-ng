@@ -408,19 +408,19 @@ IMPORTANT - Understanding which kernel runs:
    - Use this to test kernels you just compiled
 
 2. WITH kernel_image set to "host":
-   - Syntax: vng -r -- <command>
+   - Syntax: vng -vr -- <command>
    - Runs the HOST kernel (currently running on the system)
    - Use this to test commands in the production kernel environment
 
 3. WITH kernel_image set to an UPSTREAM VERSION (e.g., "v6.14", "v6.6.17"):
-   - Syntax: vng -r v6.14 -- <command>
+   - Syntax: vng -vr v6.14 -- <command>
    - AUTOMATICALLY DOWNLOADS and runs a precompiled upstream kernel from Ubuntu
      mainline
    - Very useful for testing against different kernel versions without building
    - Format: "v" + version number (e.g., "v6.14", "v6.6.17", "v6.12-rc3")
 
 4. WITH kernel_image set to a SPECIFIC PATH:
-   - Syntax: vng -r <path> -- <command>
+   - Syntax: vng -vr <path> -- <command>
    - Runs a specific kernel image file (e.g., "./arch/x86/boot/bzImage")
    - Use this to test a particular local kernel build
 
@@ -435,7 +435,6 @@ Parameters:
 - arch: Architecture to emulate
 - cpus: Number of CPUs for the VM (default: all host CPUs)
 - memory: Memory size for the VM (default: 1G)
-- verbose: Enable verbose output
 - timeout: Maximum runtime in seconds (default: 300 for commands, unlimited for interactive)
 - network: Enable network ("user", "bridge", "loop")
 - debug: Enable kernel debugging features
@@ -444,22 +443,22 @@ Returns: Execution result with kernel output, exit code, and any error messages.
 
 Example use cases:
 - Test newly built kernel: run_kernel({"command": "uname -r"})
-  → Runs: vng -- uname -r (tests your compiled kernel)
+  → Runs: vng -v -- uname -r (tests your compiled kernel)
 
 - Test on host kernel: run_kernel({"kernel_image": "host", "command": "uname -r"})
-  → Runs: vng -r -- uname -r (tests current system kernel)
+  → Runs: vng -vr -- uname -r (tests current system kernel)
 
 - Test upstream kernel (auto-download): run_kernel({"kernel_image": "v6.14", "command": "uname -r"})
-  → Runs: vng -r v6.14 -- uname -r (downloads v6.14 from Ubuntu mainline if not cached)
+  → Runs: vng -vr v6.14 -- uname -r (downloads v6.14 from Ubuntu mainline if not cached)
 
 - Test specific upstream version: run_kernel({"kernel_image": "v6.6.17", "command": "uname -a"})
-  → Runs: vng -r v6.6.17 -- uname -a (downloads and runs v6.6.17)
+  → Runs: vng -vr v6.6.17 -- uname -a (downloads and runs v6.6.17)
 
 - Test local kernel image: run_kernel({"kernel_image": "./arch/x86/boot/bzImage", "command": "uname -r"})
-  → Runs: vng -r ./arch/x86/boot/bzImage -- uname -r
+  → Runs: vng -vr ./arch/x86/boot/bzImage -- uname -r
 
 - Run test suite on your kernel: run_kernel({"command": "cd /path/to/tests && ./run_tests.sh"})
-  → Runs: vng -- cd /path/to/tests && ./run_tests.sh
+  → Runs: vng -v -- cd /path/to/tests && ./run_tests.sh
 
 - Compare behavior across versions:
   1) run_kernel({"command": "cat /proc/version"}) - your build
@@ -506,11 +505,6 @@ Example use cases:
                         "type": "string",
                         "description": "Memory size (e.g., '2G', '512M')",
                         "default": "1G",
-                    },
-                    "verbose": {
-                        "type": "boolean",
-                        "description": "Enable verbose output",
-                        "default": False,
                     },
                     "timeout": {
                         "type": "integer",
@@ -688,13 +682,10 @@ async def run_kernel(args: dict) -> list[TextContent]:
 
     if kernel_image == "host":
         # Run host kernel: vng -r -- <command>
-        vng_cmd.append("-r")
+        vng_cmd.append("-vr")
     elif kernel_image:
         # Run specific kernel: vng -r <image> -- <command>
-        vng_cmd.extend(["-r", kernel_image])
-
-    if args.get("verbose"):
-        vng_cmd.append("--verbose")
+        vng_cmd.extend(["-vr", kernel_image])
 
     if args.get("arch"):
         vng_cmd.extend(["--arch", args["arch"]])
