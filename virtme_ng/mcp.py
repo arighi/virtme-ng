@@ -119,7 +119,58 @@ IMPORTANT NOTES FOR AI AGENTS:
 
    ⏱️  ALWAYS use timeout=1200000 (20 min) or higher for ALL builds!
 
-2. PTS (Pseudo-Terminal) Requirement
+2. EACH run_kernel INVOCATION SPAWNS A NEW, INDEPENDENT VM
+   ===========================================================
+
+   ⚠️  CRITICAL: Every call to run_kernel() creates a FRESH, ISOLATED VM instance!
+
+   This means:
+   ✗ State does NOT persist between run_kernel invocations
+   ✗ You CANNOT run a command and then check dmesg in a separate invocation
+   ✗ You CANNOT set up something in one call and use it in another
+   ✗ Each VM starts fresh with no memory of previous invocations
+
+   ✓ CORRECT: Combine commands in a SINGLE run_kernel invocation:
+     run_kernel({"command": "some_command && dmesg | grep -i warning"})
+     run_kernel({"command": "modprobe mymod && cat /sys/module/mymod/parameters/debug"})
+     run_kernel({"command": "cd /tmp && echo test > file && cat file"})
+
+   ✗ WRONG: Multiple separate invocations (these are INDEPENDENT VMs!):
+     run_kernel({"command": "some_command"})        # VM instance #1
+     run_kernel({"command": "dmesg"})               # VM instance #2 (different VM!)
+     # These two commands run in COMPLETELY DIFFERENT virtual machines!
+     # The dmesg output will NOT contain anything from the first command!
+
+   WHY THIS MATTERS:
+   - run_kernel() starts a QEMU VM, runs the command, captures output, then EXITS
+   - Each invocation = fresh boot, fresh memory, fresh state
+   - Like rebooting a computer between each command
+
+   EXAMPLES:
+
+   ❌ BAD - Won't work (separate VMs):
+      run_kernel({"command": "insmod mymodule.ko"})
+      run_kernel({"command": "dmesg | grep mymodule"})  # Won't see module from first call!
+
+   ✅ GOOD - Works (single VM):
+      run_kernel({"command": "insmod mymodule.ko && dmesg | grep mymodule"})
+
+   ❌ BAD - Won't work (separate VMs):
+      run_kernel({"command": "echo 1 > /proc/sys/kernel/printk"})
+      run_kernel({"command": "cat /proc/sys/kernel/printk"})  # Will show default, not 1!
+
+   ✅ GOOD - Works (single VM):
+      run_kernel({"command": "echo 1 > /proc/sys/kernel/printk && cat /proc/sys/kernel/printk"})
+
+   SHELL OPERATORS for combining commands:
+   - && : Run second command only if first succeeds
+   - ;  : Run commands sequentially regardless of success
+   - || : Run second command only if first fails
+
+   Example with complex script:
+     run_kernel({"command": "cd /path && ./test.sh && dmesg | tail -50"})
+
+3. PTS (Pseudo-Terminal) Requirement
    -----------------------------------
    virtme-ng (vng) requires a valid pseudo-terminal (PTS) to run. In automated
    environments without a real terminal, vng commands will fail with:
@@ -135,7 +186,7 @@ IMPORTANT NOTES FOR AI AGENTS:
      -c: Execute command and exit
      /dev/null: Discard the typescript file (we only need stdout/stderr)
 
-3. Typical Workflow for Testing Kernel Changes
+4. Typical Workflow for Testing Kernel Changes
    ============================================
 
    STEP 1: BUILD (use shell command, NOT run_kernel tool!)
@@ -194,7 +245,7 @@ IMPORTANT NOTES FOR AI AGENTS:
 
      ⚠️  REMEMBER: All build commands MUST use timeout=1200000 (or higher)!
 
-4. MCP Tools Available
+5. MCP Tools Available
    --------------------
    This MCP server provides:
    - configure_kernel: Generate/modify kernel .config
@@ -369,6 +420,30 @@ The kernel runs in QEMU with a copy-on-write snapshot of your live system.
 ║   • Remote build:       vng -v --build --build-host <hostname>            ║
 ║                                                                           ║
 ║ This tool (run_kernel) ONLY runs/tests already-built kernels.             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ 🔴 CRITICAL: EACH INVOCATION CREATES A NEW, INDEPENDENT VM INSTANCE!      ║
+║                                                                           ║
+║ Every run_kernel() call spawns a FRESH virtual machine. State does NOT    ║
+║ persist between calls. You CANNOT run a command and check dmesg in a      ║
+║ separate invocation - they are COMPLETELY DIFFERENT VMs!                  ║
+║                                                                           ║
+║ ✅ CORRECT (single invocation, single VM):                                ║
+║    run_kernel({"command": "insmod test.ko && dmesg | grep test"})         ║
+║                                                                           ║
+║ ❌ WRONG (two invocations = two different VMs):                           ║
+║    run_kernel({"command": "insmod test.ko"})         # VM #1              ║
+║    run_kernel({"command": "dmesg | grep test"})      # VM #2 (fresh!)     ║
+║    ↑ The dmesg output will NOT contain anything from the first command!   ║
+║                                                                           ║
+║ SOLUTION: Use && or ; to combine commands into a single invocation:       ║
+║   • cmd1 && cmd2  → Run cmd2 only if cmd1 succeeds                        ║
+║   • cmd1 ; cmd2   → Run both commands sequentially                        ║
+║   • cmd1 || cmd2  → Run cmd2 only if cmd1 fails                           ║
+║                                                                           ║
+║ Each run_kernel() call = boot VM → run command → capture output → exit    ║
+║ No state carries over between invocations!                                ║
 ╚═══════════════════════════════════════════════════════════════════════════╝
 
 AI agents should use this tool rather than running vng directly via shell commands.
