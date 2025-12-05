@@ -8,11 +8,42 @@ Provides tools for AI agents to configure and test Linux kernels
 IMPORTANT NOTES FOR AI AGENTS:
 ================================
 
-1. BUILDING KERNELS - Prefer 'vng -v --build' over make
-   ----------------------------------------------------
+1. BUILDING KERNELS - CRITICAL INSTRUCTIONS
+   ==========================================
+
+   ⚠️  NEVER use the run_kernel tool to build kernels!
+   ⚠️  ALWAYS use shell commands with 'vng -v --build' for building!
+
    When a user asks to test a kernel that hasn't been built yet, use
    'vng -v --build' instead of running 'make' directly. This is faster,
    more reliable, and handles configuration automatically.
+
+   LOCAL BUILDS:
+   -------------
+   Use: vng -v --build
+
+   REMOTE BUILDS (when user specifies a build server/host):
+   --------------------------------------------------------
+   Use: vng -v --build --build-host <hostname>
+
+   ANY of these user requests indicate a REMOTE BUILD:
+   • "build on my server"
+   • "compile on <hostname>"
+   • "use my build machine"
+   • "build this remotely"
+   • "use the build server called <name>"
+
+   ⏱️  BUILD TIMEOUT REQUIREMENTS - CRITICAL:
+   ─────────────────────────────────────────
+   Kernel builds can take a LONG time (10-60+ minutes depending on the system).
+
+   ⚠️  ALWAYS use a timeout of AT LEAST 900-1200 seconds (15-20 minutes)
+   ⚠️  For full builds or slower systems, use 3600 seconds (1 hour) or more
+
+   Default shell command timeouts (30 seconds) are TOO SHORT and WILL FAIL!
+
+   Example with proper timeout:
+     Shell(command="vng -v --build", timeout=1200000)  # 20 minutes in milliseconds
 
    Why use vng -v --build:
    - Automatically generates minimal .config if missing (saves time)
@@ -21,39 +52,56 @@ IMPORTANT NOTES FOR AI AGENTS:
    - Supports remote build hosts for cross-compilation
    - Handles all build dependencies and options correctly
 
-   Basic build command:
-     vng -v --build
+   Basic build command (with proper timeout):
+     Shell(command="vng -v --build", timeout=1200000)
 
    Build specific commit/tag:
-     vng -v --build --commit v6.2-rc4
+     Shell(command="vng -v --build --commit v6.2-rc4", timeout=1200000)
 
    Build with custom config items:
-     vng -v --build --configitem CONFIG_KASAN=y --configitem CONFIG_DEBUG_INFO=y
+     Shell(command="vng -v --build --configitem CONFIG_KASAN=y --configitem CONFIG_DEBUG_INFO=y", timeout=1200000)
 
    Build on remote host "builder" (for cross-compilation or distributed builds):
-     vng -v --build --build-host builder
+     Shell(command="vng -v --build --build-host builder", timeout=1200000)
 
    Build with environment variables (e.g., Rust support):
-     vng -v --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56
+     Shell(command="vng -v --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56", timeout=1200000)
 
    Build for different architecture:
-     vng -v --build --arch arm64 --root /opt/chroot/arm64/
+     Shell(command="vng -v --build --arch arm64 --root /opt/chroot/arm64/", timeout=1200000)
 
-   IMPORTANT: vng -v --build can take a long time for full builds. Use
-   appropriate timeout values and monitor the output.
+   ⚠️  CRITICAL TIMEOUT WARNING:
+   ────────────────────────────
+   vng -v --build can take 10-60+ minutes to complete!
 
-   Remote Build Host (--build-host):
-   --------------------------------
+   When using Shell tool, ALWAYS specify timeout in MILLISECONDS:
+   • Minimum: 900000ms (15 minutes)
+   • Recommended: 1200000ms (20 minutes)
+   • Safe for all builds: 3600000ms (1 hour)
+
+   DO NOT use default 30-second timeout - builds WILL fail!
+
+   ═══════════════════════════════════════════════════════════════════
+   REMOTE BUILD HOST (--build-host) - CRITICAL FOR REMOTE BUILDS
+   ═══════════════════════════════════════════════════════════════════
+
    When the user asks to build on a remote host, remote server, build server,
-   or specifies a hostname for building, use the --build-host option.
+   or specifies ANY hostname for building, ALWAYS use --build-host option.
 
-   Examples of user requests that indicate remote builds:
-   - "build the kernel on my build server called 'builder'"
-   - "compile this on the remote host 'myserver'"
-   - "use my build machine to compile this"
-   - "build on <hostname>"
+   🔴 MANDATORY USAGE: When user mentions ANY of these:
+   ────────────────────────────────────────────────────
+   ✓ "build on my server"
+   ✓ "build on <hostname>"
+   ✓ "compile on remote host"
+   ✓ "use my build server"
+   ✓ "build remotely"
+   ✓ "compile this on <machine-name>"
+   ✓ "use the build machine"
 
-   Command format:
+   → ALWAYS use: vng -v --build --build-host <hostname>
+
+   Command format (MANDATORY for remote builds):
+   ──────────────────────────────────────────────
      vng -v --build --build-host <hostname>
 
    How it works:
@@ -62,13 +110,67 @@ IMPORTANT NOTES FOR AI AGENTS:
    - Only required files (bzImage, modules, etc.) are copied back after build
    - Useful for cross-compilation or using powerful build servers
 
-   Examples:
-     vng -v --build --build-host myserver
-     vng -v --build --build-host builder
-     vng -v --build --build-host build01.example.com
-     vng -v --build --build-host builder --arch arm64
+   Examples (all with proper 20-minute timeouts):
+     Shell(command="vng -v --build --build-host myserver", timeout=1200000)
+     Shell(command="vng -v --build --build-host builder", timeout=1200000)
+     Shell(command="vng -v --build --build-host build01.example.com", timeout=1200000)
+     Shell(command="vng -v --build --build-host builder --arch arm64", timeout=1200000)
+     Shell(command="vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y", timeout=1200000)
 
-2. PTS (Pseudo-Terminal) Requirement
+   ⏱️  ALWAYS use timeout=1200000 (20 min) or higher for ALL builds!
+
+2. EACH run_kernel INVOCATION SPAWNS A NEW, INDEPENDENT VM
+   ===========================================================
+
+   ⚠️  CRITICAL: Every call to run_kernel() creates a FRESH, ISOLATED VM instance!
+
+   This means:
+   ✗ State does NOT persist between run_kernel invocations
+   ✗ You CANNOT run a command and then check dmesg in a separate invocation
+   ✗ You CANNOT set up something in one call and use it in another
+   ✗ Each VM starts fresh with no memory of previous invocations
+
+   ✓ CORRECT: Combine commands in a SINGLE run_kernel invocation:
+     run_kernel({"command": "some_command && dmesg | grep -i warning"})
+     run_kernel({"command": "modprobe mymod && cat /sys/module/mymod/parameters/debug"})
+     run_kernel({"command": "cd /tmp && echo test > file && cat file"})
+
+   ✗ WRONG: Multiple separate invocations (these are INDEPENDENT VMs!):
+     run_kernel({"command": "some_command"})        # VM instance #1
+     run_kernel({"command": "dmesg"})               # VM instance #2 (different VM!)
+     # These two commands run in COMPLETELY DIFFERENT virtual machines!
+     # The dmesg output will NOT contain anything from the first command!
+
+   WHY THIS MATTERS:
+   - run_kernel() starts a QEMU VM, runs the command, captures output, then EXITS
+   - Each invocation = fresh boot, fresh memory, fresh state
+   - Like rebooting a computer between each command
+
+   EXAMPLES:
+
+   ❌ BAD - Won't work (separate VMs):
+      run_kernel({"command": "insmod mymodule.ko"})
+      run_kernel({"command": "dmesg | grep mymodule"})  # Won't see module from first call!
+
+   ✅ GOOD - Works (single VM):
+      run_kernel({"command": "insmod mymodule.ko && dmesg | grep mymodule"})
+
+   ❌ BAD - Won't work (separate VMs):
+      run_kernel({"command": "echo 1 > /proc/sys/kernel/printk"})
+      run_kernel({"command": "cat /proc/sys/kernel/printk"})  # Will show default, not 1!
+
+   ✅ GOOD - Works (single VM):
+      run_kernel({"command": "echo 1 > /proc/sys/kernel/printk && cat /proc/sys/kernel/printk"})
+
+   SHELL OPERATORS for combining commands:
+   - && : Run second command only if first succeeds
+   - ;  : Run commands sequentially regardless of success
+   - || : Run second command only if first fails
+
+   Example with complex script:
+     run_kernel({"command": "cd /path && ./test.sh && dmesg | tail -50"})
+
+3. PTS (Pseudo-Terminal) Requirement
    -----------------------------------
    virtme-ng (vng) requires a valid pseudo-terminal (PTS) to run. In automated
    environments without a real terminal, vng commands will fail with:
@@ -84,34 +186,66 @@ IMPORTANT NOTES FOR AI AGENTS:
      -c: Execute command and exit
      /dev/null: Discard the typescript file (we only need stdout/stderr)
 
-3. Typical Workflow for Testing Kernel Changes
-   --------------------------------------------
-   a) Configure (optional - vng -v --build does this automatically):
-      Use configure_kernel tool or: vng -v --build --kconfig
+4. Typical Workflow for Testing Kernel Changes
+   ============================================
 
-   b) Build the kernel:
-      vng -v --build
-      (NOT: make -j$(nproc), use vng -v --build instead)
+   STEP 1: BUILD (use shell command, NOT run_kernel tool!)
+   ────────────────────────────────────────────────────────
 
-      If user specifies building on a remote host:
-      vng -v --build --build-host <hostname>
+   ⏱️  TIMEOUT REQUIREMENT: Builds take 10-60+ minutes!
+       Always use timeout of at LEAST 1200000ms (20 min) in Shell tool
 
-   c) Test the kernel:
-      Use run_kernel tool or: script -q -c "vng -- uname -r" /dev/null 2>&1
+   a) Local build:
+      Shell(command="vng -v --build", timeout=1200000)
+      (NEVER use: make -j$(nproc), ALWAYS use: vng -v --build)
 
-   Example workflows:
+   b) Remote build (when user specifies a hostname/server):
+      Shell(command="vng -v --build --build-host <hostname>", timeout=1200000)
 
-     # Build kernel with KASAN enabled
-     vng -v --build --configitem CONFIG_KASAN=y
-     # Test it
+   c) Build with custom config:
+      Shell(command="vng -v --build --configitem CONFIG_KASAN=y", timeout=1200000)
+
+   d) Remote build with custom config:
+      Shell(command="vng -v --build --build-host builder --configitem CONFIG_DEBUG_INFO=y", timeout=1200000)
+
+   STEP 2: TEST (use run_kernel tool or shell command)
+   ────────────────────────────────────────────────────
+
+   After building, test the kernel:
+   • Use run_kernel tool, OR
+   • Use shell command: script -q -c "vng -- uname -r" /dev/null 2>&1
+
+   ═══════════════════════════════════════════════════════════════════
+   COMPLETE WORKFLOW EXAMPLES (with proper timeouts!):
+   ═══════════════════════════════════════════════════════════════════
+
+     Example 1: Local build + test with KASAN
+     ─────────────────────────────────────────
+     # STEP 1: BUILD (shell command with 20-minute timeout)
+     Shell(command="vng -v --build --configitem CONFIG_KASAN=y", timeout=1200000)
+
+     # STEP 2: TEST (run_kernel tool or shell command)
      script -q -c "vng -- dmesg | grep -i kasan" /dev/null 2>&1
 
-     # Build on remote host 'builder' and test locally
-     vng -v --build --build-host builder
-     # Test it
+     Example 2: Remote build + local test
+     ─────────────────────────────────────
+     # STEP 1: BUILD on remote host (shell command with 20-minute timeout)
+     Shell(command="vng -v --build --build-host builder", timeout=1200000)
+
+     # STEP 2: TEST locally (run_kernel tool or shell command)
      script -q -c "vng -- uname -r" /dev/null 2>&1
 
-4. MCP Tools Available
+     Example 3: Remote build with config + test
+     ───────────────────────────────────────────
+     # STEP 1: BUILD on remote host (shell command with 20-minute timeout)
+     Shell(command="vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y", timeout=1200000)
+
+     # STEP 2: TEST (run_kernel tool or shell command)
+     script -q -c "vng -- cat /proc/version" /dev/null 2>&1
+
+     ⚠️  REMEMBER: All build commands MUST use timeout=1200000 (or higher)!
+
+5. MCP Tools Available
    --------------------
    This MCP server provides:
    - configure_kernel: Generate/modify kernel .config
@@ -212,10 +346,20 @@ Example use cases:
 - Cross-compile: configure_kernel({"arch": "arm64"})
 
 RECOMMENDED: Skip this tool and use 'vng -v --build' directly with --configitem options:
-  vng -v --build --configitem CONFIG_DEBUG_INFO=y --configitem CONFIG_KASAN=y
 
-If user wants to build on a remote host, add --build-host:
-  vng -v --build --build-host <hostname> --configitem CONFIG_DEBUG_INFO=y
+  Local build (with proper timeout!):
+    Shell(command="vng -v --build --configitem CONFIG_DEBUG_INFO=y --configitem CONFIG_KASAN=y", timeout=1200000)
+
+  Remote build (when user specifies a build server/host):
+    Shell(command="vng -v --build --build-host <hostname> --configitem CONFIG_DEBUG_INFO=y", timeout=1200000)
+
+  ⚠️ IMPORTANT: ALWAYS add --build-host when user mentions:
+    • "build on <hostname>"
+    • "compile on remote server"
+    • "use my build machine"
+    • Any reference to a remote build host
+
+  ⏱️ TIMEOUT: Builds take 10-60+ minutes! Always use timeout=1200000ms (20 min) or higher!
             """,
             inputSchema={
                 "type": "object",
@@ -266,20 +410,71 @@ If user wants to build on a remote host, add --build-host:
 Run/test a Linux kernel in a virtualized environment using virtme-ng.
 The kernel runs in QEMU with a copy-on-write snapshot of your live system.
 
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ ⚠️  CRITICAL: THIS TOOL IS FOR TESTING/RUNNING KERNELS ONLY                ║
+║                                                                           ║
+║ DO NOT USE run_kernel TO BUILD KERNELS!                                   ║
+║                                                                           ║
+║ To build kernels, use shell commands with 'vng -v --build':               ║
+║   • Local build:        vng -v --build                                    ║
+║   • Remote build:       vng -v --build --build-host <hostname>            ║
+║                                                                           ║
+║ This tool (run_kernel) ONLY runs/tests already-built kernels.             ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
+╔═══════════════════════════════════════════════════════════════════════════╗
+║ 🔴 CRITICAL: EACH INVOCATION CREATES A NEW, INDEPENDENT VM INSTANCE!      ║
+║                                                                           ║
+║ Every run_kernel() call spawns a FRESH virtual machine. State does NOT    ║
+║ persist between calls. You CANNOT run a command and check dmesg in a      ║
+║ separate invocation - they are COMPLETELY DIFFERENT VMs!                  ║
+║                                                                           ║
+║ ✅ CORRECT (single invocation, single VM):                                ║
+║    run_kernel({"command": "insmod test.ko && dmesg | grep test"})         ║
+║                                                                           ║
+║ ❌ WRONG (two invocations = two different VMs):                           ║
+║    run_kernel({"command": "insmod test.ko"})         # VM #1              ║
+║    run_kernel({"command": "dmesg | grep test"})      # VM #2 (fresh!)     ║
+║    ↑ The dmesg output will NOT contain anything from the first command!   ║
+║                                                                           ║
+║ SOLUTION: Use && or ; to combine commands into a single invocation:       ║
+║   • cmd1 && cmd2  → Run cmd2 only if cmd1 succeeds                        ║
+║   • cmd1 ; cmd2   → Run both commands sequentially                        ║
+║   • cmd1 || cmd2  → Run cmd2 only if cmd1 fails                           ║
+║                                                                           ║
+║ Each run_kernel() call = boot VM → run command → capture output → exit    ║
+║ No state carries over between invocations!                                ║
+╚═══════════════════════════════════════════════════════════════════════════╝
+
 AI agents should use this tool rather than running vng directly via shell commands.
 If you must use shell commands, use 'script': script -q -c "vng -- command" /dev/null 2>&1
 
-IMPORTANT - Build the kernel first:
-If testing a newly built kernel (kernel_image parameter omitted), make sure the kernel
-has been built first. Use shell command:
-  vng -v --build
+WORKFLOW - Build FIRST, then Test:
+====================================
+1. BUILD the kernel (use shell command, NOT this tool):
 
-If user specifies building on a remote host, add --build-host:
-  vng -v --build --build-host <hostname>
+   ⏱️  CRITICAL: Builds take 10-60+ minutes! Use timeout=1200000 or higher!
 
-Then use this tool to test it. Do NOT use 'make', prefer using
-'vng -v --build' instead since it handles kernel configuration
-automatically.
+   • For local builds:
+     Shell(command="vng -v --build", timeout=1200000)
+
+   • For REMOTE builds (when user specifies a build server/host):
+     Shell(command="vng -v --build --build-host <hostname>", timeout=1200000)
+
+     Examples of when to use --build-host:
+     - User says: "build on my server called 'builder'"
+     - User says: "compile on remote host 'myserver'"
+     - User says: "use the build machine to compile"
+     - User says: "build this on <hostname>"
+
+   • With custom config:
+     Shell(command="vng -v --build --configitem CONFIG_DEBUG_INFO=y", timeout=1200000)
+
+   • Remote build with custom config:
+     Shell(command="vng -v --build --build-host builder --configitem CONFIG_KASAN=y", timeout=1200000)
+
+2. TEST the kernel (use THIS tool):
+   After building, use run_kernel() to test the built kernel.
 
 IMPORTANT - Understanding which kernel runs:
 1. WITHOUT kernel_image parameter (recommended for testing built kernels):
@@ -288,19 +483,19 @@ IMPORTANT - Understanding which kernel runs:
    - Use this to test kernels you just compiled
 
 2. WITH kernel_image set to "host":
-   - Syntax: vng -r -- <command>
+   - Syntax: vng -vr -- <command>
    - Runs the HOST kernel (currently running on the system)
    - Use this to test commands in the production kernel environment
 
 3. WITH kernel_image set to an UPSTREAM VERSION (e.g., "v6.14", "v6.6.17"):
-   - Syntax: vng -r v6.14 -- <command>
+   - Syntax: vng -vr v6.14 -- <command>
    - AUTOMATICALLY DOWNLOADS and runs a precompiled upstream kernel from Ubuntu
      mainline
    - Very useful for testing against different kernel versions without building
    - Format: "v" + version number (e.g., "v6.14", "v6.6.17", "v6.12-rc3")
 
 4. WITH kernel_image set to a SPECIFIC PATH:
-   - Syntax: vng -r <path> -- <command>
+   - Syntax: vng -vr <path> -- <command>
    - Runs a specific kernel image file (e.g., "./arch/x86/boot/bzImage")
    - Use this to test a particular local kernel build
 
@@ -315,7 +510,6 @@ Parameters:
 - arch: Architecture to emulate
 - cpus: Number of CPUs for the VM (default: all host CPUs)
 - memory: Memory size for the VM (default: 1G)
-- verbose: Enable verbose output
 - timeout: Maximum runtime in seconds (default: 300 for commands, unlimited for interactive)
 - network: Enable network ("user", "bridge", "loop")
 - debug: Enable kernel debugging features
@@ -324,22 +518,22 @@ Returns: Execution result with kernel output, exit code, and any error messages.
 
 Example use cases:
 - Test newly built kernel: run_kernel({"command": "uname -r"})
-  → Runs: vng -- uname -r (tests your compiled kernel)
+  → Runs: vng -v -- uname -r (tests your compiled kernel)
 
 - Test on host kernel: run_kernel({"kernel_image": "host", "command": "uname -r"})
-  → Runs: vng -r -- uname -r (tests current system kernel)
+  → Runs: vng -vr -- uname -r (tests current system kernel)
 
 - Test upstream kernel (auto-download): run_kernel({"kernel_image": "v6.14", "command": "uname -r"})
-  → Runs: vng -r v6.14 -- uname -r (downloads v6.14 from Ubuntu mainline if not cached)
+  → Runs: vng -vr v6.14 -- uname -r (downloads v6.14 from Ubuntu mainline if not cached)
 
 - Test specific upstream version: run_kernel({"kernel_image": "v6.6.17", "command": "uname -a"})
-  → Runs: vng -r v6.6.17 -- uname -a (downloads and runs v6.6.17)
+  → Runs: vng -vr v6.6.17 -- uname -a (downloads and runs v6.6.17)
 
 - Test local kernel image: run_kernel({"kernel_image": "./arch/x86/boot/bzImage", "command": "uname -r"})
-  → Runs: vng -r ./arch/x86/boot/bzImage -- uname -r
+  → Runs: vng -vr ./arch/x86/boot/bzImage -- uname -r
 
 - Run test suite on your kernel: run_kernel({"command": "cd /path/to/tests && ./run_tests.sh"})
-  → Runs: vng -- cd /path/to/tests && ./run_tests.sh
+  → Runs: vng -v -- cd /path/to/tests && ./run_tests.sh
 
 - Compare behavior across versions:
   1) run_kernel({"command": "cat /proc/version"}) - your build
@@ -386,11 +580,6 @@ Example use cases:
                         "type": "string",
                         "description": "Memory size (e.g., '2G', '512M')",
                         "default": "1G",
-                    },
-                    "verbose": {
-                        "type": "boolean",
-                        "description": "Enable verbose output",
-                        "default": False,
                     },
                     "timeout": {
                         "type": "integer",
@@ -568,13 +757,10 @@ async def run_kernel(args: dict) -> list[TextContent]:
 
     if kernel_image == "host":
         # Run host kernel: vng -r -- <command>
-        vng_cmd.append("-r")
+        vng_cmd.append("-vr")
     elif kernel_image:
         # Run specific kernel: vng -r <image> -- <command>
-        vng_cmd.extend(["-r", kernel_image])
-
-    if args.get("verbose"):
-        vng_cmd.append("--verbose")
+        vng_cmd.extend(["-vr", kernel_image])
 
     if args.get("arch"):
         vng_cmd.extend(["--arch", args["arch"]])
