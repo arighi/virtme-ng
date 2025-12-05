@@ -122,15 +122,13 @@ pub fn do_mount_check(
     let fstype_cstr = CString::new(fstype).expect("CString::new failed");
     let fsdata_cstr = CString::new(fsdata).expect("CString::new failed");
 
-    let result = mount(
+    mount(
         Some(source_cstr.as_ref()),
         target,
         Some(fstype_cstr.as_ref()),
         MsFlags::from_bits_truncate(flags.try_into().unwrap()),
         Some(fsdata_cstr.as_ref()),
-    );
-
-    result
+    )
 }
 
 pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: &str) {
