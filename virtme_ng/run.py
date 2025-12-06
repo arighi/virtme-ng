@@ -1171,8 +1171,17 @@ class KernelSource:
         disk_str = ""
 
         def ensure_name(dsk: str) -> str:
-            if "=" not in dsk:
-                return f"{dsk}={dsk}"
+            """
+            `dsk` is a comma-separated list of disk options (KEY=VAL), with the first
+            option specifying the disk name and path (NAME=PATH). As an exception,
+            NAME can be omitted (but the underlying implementation does not know that).
+            This function ensures that the first option has a NAME, and adds one
+            equal to the PATH if it is missing.
+            """
+            items = dsk.split(",")
+            first = items[0]
+            if "=" not in first:
+                return f"{first}={dsk}"
             return dsk
 
         if args.disk is not None:

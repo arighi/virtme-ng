@@ -86,6 +86,16 @@ def get_conf(key_path):
         return conf
 
 
+def strtobool(arg: str) -> bool:
+    lower = arg.strip().lower()
+    if lower in ("yes", "true", "on", "1"):
+        return True
+    elif lower in ("no", "false", "off", "0"):
+        return False
+    else:
+        raise ValueError(f"invalid boolean value: {arg!r}")
+
+
 def scsi_device_id(name: str, max_len: int) -> str:
     """
     Trim a longer string which may or may not be a path to fit within `max_len`
