@@ -4,6 +4,7 @@
 """virtme-ng: configuration path."""
 
 import json
+import os.path
 from pathlib import Path
 
 from virtme_ng.spinner import Spinner
@@ -83,3 +84,24 @@ def get_conf(key_path):
         for key in keys:
             conf = conf[key]
         return conf
+
+
+def scsi_device_id(name: str, max_len: int) -> str:
+    """
+    Trim a longer string which may or may not be a path to fit within `max_len`
+    characters.
+
+    Intended usage is to generate a `scsi-hd.device_id` value to fit within QEMU's
+    20 character limit. Normally, QEMU defaults `scsi-hd.device_id` to `scsi_hd.serial`,
+    which we set to the NAME provided in the `--disk` parameter (which, in turn,
+    defaults to the full path in the same parameter in `vng` CLI).
+    """
+    name = os.path.normpath(name)
+    # Try removing path components from the left first
+    while len(name) > max_len:
+        left, sep, right = name.partition("/")
+        if not sep:
+            # still too long, truncate from the left
+            return name[-max_len:]
+        name = right
+    return name
