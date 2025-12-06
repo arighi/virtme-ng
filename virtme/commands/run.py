@@ -1821,6 +1821,7 @@ def do_it() -> int:
                 "if=none",
                 f"id={driveid}",
                 f"file={disk.path}",
+                "format=raw",
             ]
             device_opts = [
                 arch.virtio_dev_type("blk"),
@@ -1854,6 +1855,7 @@ def do_it() -> int:
                 "if=none",
                 f"id={driveid}",
                 f"file={disk.path}",
+                "format=raw",
             ]
             device_opts = [
                 "scsi-hd",
