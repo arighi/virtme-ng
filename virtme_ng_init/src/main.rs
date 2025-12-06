@@ -23,7 +23,7 @@ use nix::sys::wait::wait;
 use nix::unistd::sethostname;
 use std::env;
 use std::fs::{File, OpenOptions};
-use std::io::{self, BufRead, BufReader, BufWriter, Write};
+use std::io::{self, BufRead, BufReader, BufWriter, Read, Write};
 use std::os::fd::{AsRawFd, IntoRawFd};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
@@ -366,11 +366,36 @@ fn generate_sudoers() -> io::Result<()> {
     if let Ok(user) = env::var("virtme_user") {
         content += &format!("{user} ALL = (ALL) NOPASSWD: ALL\n");
     }
-    if !Path::new("/etc/sudoers").exists() {
-        utils::create_file("/etc/sudoers", 0o0440, "").unwrap_or(());
+
+    let sudoers_d = Path::new("/etc/sudoers.d");
+    let sudoers = Path::new("/etc/sudoers");
+
+    let sudoers_includes_d = if sudoers.exists() {
+        let mut content = String::new();
+        File::open(sudoers)?.read_to_string(&mut content)?;
+        content
+            .split("\n")
+            .any(|line| line == "@includedir /etc/sudoers.d")
+    } else {
+        false
+    };
+
+    let path = if sudoers_includes_d && sudoers_d.exists() && sudoers_d.is_dir() {
+        &sudoers_d.join("99-virtme")
+    } else {
+        sudoers
+    };
+    if !path.exists() {
+        utils::create_file(path.to_str().unwrap(), 0o0440, "").unwrap_or(());
     }
     utils::create_file(fname, 0o0440, &content).ok();
-    utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
+    utils::do_mount(
+        fname,
+        path.to_str().unwrap(),
+        "",
+        libc::MS_BIND as usize,
+        "",
+    );
     Ok(())
 }
 
