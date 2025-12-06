@@ -419,16 +419,22 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--scsi-disk",
         action="append",
-        metavar="PATH",
-        help="Add a file as virtio-scsi disk (can be used multiple times)",
+        metavar="[NAME=]PATH[,OPT...]",
+        help="Add a file as virtio-scsi disk (can be used multiple times), "
+        + "available at /dev/disk/by-id/scsi-0virtme_disk_NAME. "
+        + "OPTs are comma-separated KEY[=VALUE] pairs; "
+        + "pass 'help' to list them.",
     )
 
     parser.add_argument(
         "--blk-disk",
         "-D",
         action="append",
-        metavar="PATH",
-        help="Add a file as virtio-blk disk (can be used multiple times)",
+        metavar="[NAME=]PATH[,OPT...]",
+        help="Add a file as virtio-blk disk (can be used multiple times), "
+        + "available at /dev/disk/by-id/virtio-virtme_disk_blk_NAME. "
+        + "OPTs are comma-separated KEY[=VALUE] pairs; "
+        + "pass 'help' to list them.",
     )
 
     parser.add_argument(
@@ -1185,8 +1191,17 @@ class KernelSource:
 
     def _get_virtme_disk(self, args):
         def ensure_name(dsk: str) -> str:
-            if "=" not in dsk:
-                return f"{dsk}={dsk}"
+            """
+            `dsk` is a comma-separated list of disk options (KEY=VAL), with the first
+            option specifying the disk name and path (NAME=PATH). As an exception,
+            NAME can be omitted (but the underlying implementation does not know that).
+            This function ensures that the first option has a NAME, and adds one
+            equal to the PATH if it is missing.
+            """
+            items = dsk.split(",")
+            first = items[0]
+            if "=" not in first:
+                return f"{first}={dsk}"
             return dsk
 
         disk_str = ""
@@ -1738,9 +1753,7 @@ def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
     if args.disk:
-        sys.stderr.write(
-            "warning: `--disk` is deprecated, use `--blk-disk` instead.\n"
-        )
+        sys.stderr.write("warning: `--disk` is deprecated, use `--blk-disk` instead.\n")
         args.blk_disk.extend(args.disk)
         args.disk = []
 
