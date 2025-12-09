@@ -362,7 +362,7 @@ fn generate_shadow() -> io::Result<()> {
 
 fn generate_sudoers() -> io::Result<()> {
     let fname = "/run/tmp/sudoers";
-    let mut content = "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n".to_string();
+    let mut content = String::new();
     content += "root ALL = (ALL) NOPASSWD: ALL\n";
     if let Ok(user) = env::var("virtme_user") {
         content += &format!("{user} ALL = (ALL) NOPASSWD: ALL\n");
@@ -400,6 +400,9 @@ fn generate_sudoers() -> io::Result<()> {
     let path = if sudoers_includes_d && sudoers_d_readable {
         &sudoers_d.join("99-virtme")
     } else {
+        // Only set a conservative default $PATH if we are writing a full sudoers
+        // (if not, we assume it is already configured as intended)
+        content += "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n";
         sudoers
     };
     if !path.exists() {
