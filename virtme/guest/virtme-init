@@ -316,7 +316,9 @@ generate_sudoers() {
         real_sudoers=/etc/sudoers.d/99-virtme
     fi
     tmpfile="$(mktemp --tmpdir=/run/tmp)"
-    echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
+    if [[ $real_sudoers == /etc/sudoers ]]; then
+        echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
+    fi
     echo "root ALL = (ALL) NOPASSWD: ALL" >> "$tmpfile"
     if [[ -n ${virtme_user:-} ]]; then
         printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
