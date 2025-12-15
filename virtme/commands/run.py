@@ -783,13 +783,23 @@ class VirtioFS:
 class VirtioFSConfig:
     # allow more than 4 arguments: pylint: disable=R0917
     def __init__(
-        self, path: str, mount_tag: str, guest_tools_path=None, memory=None, rw=False
+        self,
+        path: str,
+        mount_tag: str,
+        guest_tools_path=None,
+        memory=None,
+        rw=False,
+        numa=True,
     ):
         self.path = path
         self.mount_tag = mount_tag
         self.guest_tools_path = guest_tools_path
         self.memory = memory
         self.rw = rw
+        # virtiofsd requires a NUMA node, if --numa is specified simply use
+        # the user-defined NUMA node, otherwise create a NUMA node with all
+        # the memory.
+        self.numa = numa
 
 
 def export_virtiofs(
@@ -825,7 +835,7 @@ def export_virtiofs(
     qemuargs.extend(
         ["-object", f"memory-backend-memfd,id=mem{fsid},size={memory},share=on"]
     )
-    if arch.numa_support():
+    if arch.numa_support() and config.numa:
         qemuargs.extend(["-numa", f"node,memdev=mem{fsid}"])
     else:
         qemuargs.extend(["-machine", f"memory-backend=mem{fsid}"])
@@ -1311,11 +1321,9 @@ def do_it() -> int:
             path=args.root,
             mount_tag="ROOTFS",
             guest_tools_path=guest_tools_path,
-            # virtiofsd requires a NUMA not, if --numa is specified simply use
-            # the user-defined NUMA node, otherwise create a NUMA node with all
-            # the memory.
             memory=0 if args.numa else args.memory,
             rw=args.rw,
+            numa=args.numa,
         )
         use_virtiofs = export_virtiofs(
             virt_arch,
