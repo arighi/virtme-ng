@@ -822,11 +822,13 @@ def export_virtiofs(
     if memory == 0:
         return True
 
-    qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
+    qemuargs.extend(
+        ["-object", f"memory-backend-memfd,id=mem{fsid},size={memory},share=on"]
+    )
     if arch.numa_support():
-        qemuargs.extend(["-numa", "node,memdev=mem"])
+        qemuargs.extend(["-numa", f"node,memdev=mem{fsid}"])
     else:
-        qemuargs.extend(["-machine", "memory-backend=mem"])
+        qemuargs.extend(["-machine", f"memory-backend=mem{fsid}"])
 
     return True
 
