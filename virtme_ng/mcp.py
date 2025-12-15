@@ -245,15 +245,121 @@ IMPORTANT NOTES FOR AI AGENTS:
 
      ⚠️  REMEMBER: All build commands MUST use timeout=1200000 (or higher)!
 
-5. MCP Tools Available
+5. Running Kernel Selftests (kselftests)
+   ======================================
+
+   WORKFLOW FOR AI AGENTS - How to run kselftests with virtme-ng:
+   ──────────────────────────────────────────────────────────────
+
+   Step 1: Build the kernel
+   ─────────────────────────
+   Shell(command="vng -v --build", timeout=1200000)
+
+   Step 2: Build the specific kselftest
+   ──────────────────────────────────────
+   build_kselftest({"test_name": "sched_ext"})
+
+   This builds the test binaries outside of the VM using:
+   make -j$(nproc) -C tools/testing/selftests/<test_name>
+
+   Step 3: Run the test inside the VM
+   ────────────────────────────────────
+   run_kernel({
+       "command": "make kselftest TARGETS=\"sched_ext\" SKIP_TARGETS=\"\"",
+       "memory": "2G",
+       "timeout": 1800
+   })
+
+   The make kselftest command runs the test suite inside the virtualized kernel.
+
+   ⏱️  TIMEOUT REQUIREMENTS:
+   ────────────────────────
+   - Kselftests can take 10-30+ minutes depending on the test suite
+   - ALWAYS use timeout of at least 1800 seconds (30 minutes)
+   - Recommended: 3600 seconds (1 hour) for complex tests
+
+   OPTIONAL: Add runner arguments
+   ────────────────────────────────
+   run_kernel({
+       "command": "make kselftest TARGETS=\"vm\" SKIP_TARGETS=\"\" KSELFTEST_RUNNER_ARGS=\"--verbose\"",
+       "memory": "2G",
+       "timeout": 1800
+   })
+
+   COMPLETE EXAMPLES:
+   ──────────────────
+
+   Example 1: Run sched_ext tests
+   ───────────────────────────────
+   # Step 1: Build kernel
+   Shell(command="vng -v --build", timeout=1200000)
+
+   # Step 2: Build test
+   build_kselftest({"test_name": "sched_ext"})
+
+   # Step 3: Run test
+   run_kernel({
+       "command": "make kselftest TARGETS=\"sched_ext\" SKIP_TARGETS=\"\"",
+       "memory": "2G",
+       "timeout": 1800
+   })
+
+   Example 2: Run VM tests with verbose output
+   ────────────────────────────────────────────
+   # Step 1: Build kernel
+   Shell(command="vng -v --build", timeout=1200000)
+
+   # Step 2: Build test
+   build_kselftest({"test_name": "vm"})
+
+   # Step 3: Run test with verbose output
+   run_kernel({
+       "command": "make kselftest TARGETS=\"vm\" SKIP_TARGETS=\"\" KSELFTEST_RUNNER_ARGS=\"--verbose\"",
+       "memory": "2G",
+       "timeout": 1800
+   })
+
+   Example 3: Run tests on host kernel
+   ─────────────────────────────────────
+   # No kernel build needed when testing host kernel
+
+   # Step 1: Build test
+   build_kselftest({"test_name": "net"})
+
+   # Step 2: Run test on host kernel
+   run_kernel({
+       "kernel_image": "host",
+       "command": "make kselftest TARGETS=\"net\" SKIP_TARGETS=\"\"",
+       "memory": "2G",
+       "timeout": 3600
+   })
+
+   Example 4: Run tests on upstream kernel
+   ─────────────────────────────────────────
+   # No kernel build needed when using upstream precompiled kernels
+
+   # Step 1: Build test
+   build_kselftest({"test_name": "seccomp"})
+
+   # Step 2: Run test on upstream kernel v6.14
+   run_kernel({
+       "kernel_image": "v6.14",
+       "command": "make kselftest TARGETS=\"seccomp\" SKIP_TARGETS=\"\"",
+       "memory": "2G",
+       "timeout": 1800
+   })
+
+6. MCP Tools Available
    --------------------
    This MCP server provides:
    - configure_kernel: Generate/modify kernel .config
    - run_kernel: Run and test kernels in QEMU
    - get_kernel_info: Get info about kernel source directory
    - apply_patch: Apply patches from lore.kernel.org
+   - build_kselftest: Build kernel selftests outside VM
 
-   For building, use shell commands with 'vng -v --build' as documented above.
+   For building kernels, use shell commands with 'vng -v --build' as documented above.
+   For running kselftests, see section 5 above.
 """
 
 import asyncio
@@ -678,6 +784,90 @@ Requirements:
                 "required": ["message_id"],
             },
         ),
+        Tool(
+            name="build_kselftest",
+            description="""
+Build a Linux kernel selftest outside of the virtualized environment.
+This tool builds the kselftest binaries that can later be run inside vng.
+
+The tool will:
+- Build the kselftest outside vng: make -j$(nproc) -C tools/testing/selftests/<test_name>
+
+⚠️  IMPORTANT: The kernel must be BUILT first before building kselftests!
+   Use: Shell(command="vng -v --build", timeout=1200000)
+
+═══════════════════════════════════════════════════════════════════════════
+HOW TO RUN KSELFTESTS WITH VIRTME-NG (Complete Workflow for AI Agents):
+═══════════════════════════════════════════════════════════════════════════
+
+Step 1: Build the kernel
+────────────────────────
+Shell(command="vng -v --build", timeout=1200000)
+
+Step 2: Build the kselftest (use THIS tool)
+────────────────────────────────────────────
+build_kselftest({"test_name": "sched_ext"})
+
+Step 3: Run the test inside VM (use run_kernel tool)
+─────────────────────────────────────────────────────
+run_kernel({
+    "command": "make kselftest TARGETS=\"sched_ext\" SKIP_TARGETS=\"\"",
+    "memory": "2G",
+    "timeout": 1800
+})
+
+⏱️  CRITICAL: Use timeout of at least 1800 seconds (30 min) when running tests!
+
+Optional: Add runner arguments for verbose output or TAP format:
+run_kernel({
+    "command": "make kselftest TARGETS=\"vm\" SKIP_TARGETS=\"\" KSELFTEST_RUNNER_ARGS=\"--verbose\"",
+    "memory": "2G",
+    "timeout": 1800
+})
+
+More examples in the main module documentation (see section 5).
+
+═══════════════════════════════════════════════════════════════════════════
+
+Parameters:
+- test_name: Target kselftest to build (required)
+  Examples: "sched_ext", "vm", "net", "seccomp", "livepatch", etc.
+  See available targets in tools/testing/selftests/
+- kernel_dir: Path to kernel source directory (default: current directory)
+- timeout: Maximum build time in seconds (default: 600 seconds / 10 minutes)
+
+Returns: Build result with output, exit code, and any error messages.
+
+Example use cases:
+- Build sched_ext tests: build_kselftest({"test_name": "sched_ext"})
+- Build VM tests: build_kselftest({"test_name": "vm"})
+- Build seccomp tests: build_kselftest({"test_name": "seccomp"})
+
+Requirements:
+- Kernel must be built first (use 'vng -v --build')
+- Kernel source tree must include tools/testing/selftests/
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "test_name": {
+                        "type": "string",
+                        "description": "Target kselftest to build (e.g., 'sched_ext', 'vm', 'net', 'seccomp')",
+                    },
+                    "kernel_dir": {
+                        "type": "string",
+                        "description": "Path to kernel source directory",
+                        "default": ".",
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Maximum build time in seconds (default: 600 seconds / 10 minutes)",
+                        "default": 600,
+                    },
+                },
+                "required": ["test_name"],
+            },
+        ),
     ]
 
 
@@ -693,6 +883,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return await get_kernel_info(arguments)
     if name == "apply_patch":
         return await apply_patch(arguments)
+    if name == "build_kselftest":
+        return await build_kselftest(arguments)
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
 
@@ -1027,6 +1219,88 @@ async def apply_patch(args: dict) -> list[TextContent]:
             result["help"] = (
                 "Patch failed to apply. There may be merge conflicts or the patch is for a different kernel version"
             )
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def build_kselftest(args: dict) -> list[TextContent]:
+    """Build kernel selftests outside of vng."""
+    test_name = args.get("test_name")
+    kernel_dir = args.get("kernel_dir", ".")
+    build_timeout = args.get("timeout", 600)  # Default 10 minutes for build
+
+    if not test_name:
+        result = {
+            "success": False,
+            "error": "test_name is required",
+            "message": "Please provide a test name (e.g., 'sched_ext', 'vm', 'net', 'seccomp')",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if kernel source directory exists
+    kernel_path = Path(kernel_dir)
+    if not kernel_path.exists():
+        result = {
+            "success": False,
+            "error": "kernel_dir_not_found",
+            "message": f"Kernel directory {kernel_dir} does not exist",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if selftests directory exists
+    selftests_path = kernel_path / "tools" / "testing" / "selftests"
+    if not selftests_path.exists():
+        result = {
+            "success": False,
+            "error": "selftests_not_found",
+            "message": f"Selftests directory not found at {selftests_path}",
+            "help": "Make sure you're in a kernel source tree with tools/testing/selftests/",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if the specific test directory exists
+    test_path = selftests_path / test_name
+    if not test_path.exists():
+        result = {
+            "success": False,
+            "error": "test_not_found",
+            "message": f"Test '{test_name}' not found at {test_path}",
+            "help": f"Check available test targets in {selftests_path}/",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Build the kselftest OUTSIDE of vng
+    # This is faster and separates build from runtime
+    build_cmd = [
+        "make",
+        f"-j{run_command(['nproc'], timeout=5)[1].strip()}",
+        "-C",
+        f"tools/testing/selftests/{test_name}",
+    ]
+
+    build_start_time = time.time()
+    build_returncode, build_stdout, build_stderr = run_command(
+        build_cmd, cwd=kernel_dir, timeout=build_timeout
+    )
+    build_time = time.time() - build_start_time
+
+    # Build the response
+    result = {
+        "tool": "build_kselftest",
+        "test_name": test_name,
+        "build_command": shlex.join(build_cmd),
+        "build_returncode": build_returncode,
+        "build_time_seconds": round(build_time, 2),
+        "build_stdout": build_stdout,
+        "build_stderr": build_stderr,
+        "success": build_returncode == 0,
+    }
+
+    if build_returncode == 0:
+        result["message"] = f"Successfully built kselftest: {test_name}"
+    else:
+        result["message"] = f"Failed to build kselftest: {test_name}"
+        result["help"] = "The test failed to build. Check the build output for errors."
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
