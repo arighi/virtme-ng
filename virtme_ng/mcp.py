@@ -357,9 +357,326 @@ IMPORTANT NOTES FOR AI AGENTS:
    - get_kernel_info: Get info about kernel source directory
    - apply_patch: Apply patches from lore.kernel.org
    - build_kselftest: Build kernel selftests outside VM
+   - verify_kernel: Verify a commit by building and booting it
 
    For building kernels, use shell commands with 'vng -v --build' as documented above.
    For running kselftests, see section 5 above.
+   For validating patch series, see section 7 above.
+
+7. Validating Patch Series
+   ========================================================
+
+   When a user asks to validate a patch series by building and booting each commit,
+   use the verify_kernel tool for each commit in the series.
+
+   ⚠️  CRITICAL: ALWAYS BUILD **AND** BOOT EACH KERNEL
+   ════════════════════════════════════════════════════
+   - Building alone is NOT sufficient validation
+   - EVERY kernel MUST be booted and tested inside virtme-ng
+   - A kernel that builds but doesn't boot is a FAILED commit
+   - NEVER skip the boot testing step
+
+   ⚠️  WARNING: This operation can take HOURS (10-60+ minutes per commit)
+
+   RECOMMENDED WORKFLOW: Use verify_kernel for Each Commit
+   ────────────────────────────────────────────────────────
+
+   The verify_kernel tool validates a single commit by building and booting it.
+   For patch series, call verify_kernel multiple times - once for each commit.
+
+   STEP-BY-STEP WORKFLOW:
+   ──────────────────────
+
+   Step 1: Get the list of commits
+   Shell(command="git rev-list --reverse START_COMMIT^..END_COMMIT", timeout=10000)
+
+   This returns a list of commit SHAs, one per line.
+
+   Step 2: Save current git state
+   Shell(command="git rev-parse HEAD", timeout=10000)
+
+   Save this to restore later.
+
+   Step 3: For each commit, call verify_kernel
+   ───────────────────────────────────────────
+
+   Basic verification:
+   verify_kernel({
+       "commit": "abc1234",
+   })
+
+   With remote build host (faster):
+   verify_kernel({
+       "commit": "abc1234",
+       "build_host": "builder",
+   })
+
+   With custom config:
+   verify_kernel({
+       "commit": "abc1234",
+       "config_items": ["CONFIG_KASAN=y"],
+   })
+
+   With custom test:
+   verify_kernel({
+       "commit": "abc1234",
+       "test_command": "dmesg | grep -i error || echo 'No errors'",
+   })
+
+   Step 4: Restore original git state
+   Shell(command="git checkout ORIGINAL_SHA", timeout=30000)
+
+   Step 5: Report results
+   Summarize which commits passed/failed with a clear table or list.
+
+   EXAMPLE INTERACTION:
+   ────────────────────
+
+   User: "Validate that each commit between HEAD~3 and HEAD builds and boots"
+
+   AI should do:
+   1. Get commits: Shell("git rev-list --reverse HEAD~3^..HEAD")
+   2. Save current: Shell("git rev-parse HEAD")
+   3. For EACH commit:
+      result = verify_kernel({"commit": "<sha>"})
+      Record: commit passed/failed based on result["success"]
+   4. Restore: Shell("git checkout <original>")
+   5. Report: "Validated 4 commits: 3 passed (build+boot), 1 failed"
+
+   EXAMPLE WITH REMOTE BUILD:
+   ──────────────────────────
+
+   User: "Validate HEAD~5 to HEAD using my build server 'builder'"
+
+   For each commit:
+   verify_kernel({
+       "commit": "<sha>",
+       "build_host": "builder",
+   })
+
+   EXAMPLE WITH CUSTOM TEST:
+   ─────────────────────────
+
+   User: "Validate these commits by running dmesg checks"
+
+   For each commit:
+   verify_kernel({
+       "commit": "<sha>",
+       "test_command": "dmesg | grep -i error || echo 'No errors found'",
+   })
+
+   EXAMPLE WITH STOP ON FAILURE:
+   ──────────────────────────────
+
+   User: "Find which commit breaks the kernel between HEAD~20 and HEAD"
+
+   For each commit:
+   result = verify_kernel({"commit": "<sha>"})
+   if not result["success"]:
+       report "First failing commit: <sha>" and stop
+
+   WHY USE verify_kernel INSTEAD OF MANUAL BUILD+BOOT:
+   ───────────────────────────────────────────────────
+
+   The verify_kernel tool:
+   ✅ Automatically performs BOTH build AND boot testing
+   ✅ Cannot skip boot testing - it's enforced by the tool
+   ✅ Returns structured results with both build and boot status
+   ✅ Handles errors and timeouts gracefully
+   ✅ Reports clear success/failure status
+   ✅ More reliable than manual orchestration
+
+   CRITICAL RULES FOR AI AGENTS:
+   ─────────────────────────────
+   ⚠️  MANDATORY: Use verify_kernel for each commit
+       - The tool automatically boots every successfully built kernel
+       - You cannot skip this step - it's built into verify_kernel
+       - A kernel that builds but doesn't boot is reported as FAILED
+
+   - Always save and restore the original git state
+   - Use proper timeouts: 10s for git commands
+   - For faster builds, pass build_host if user mentions a build server
+   - Show progress to the user after each commit
+   - Provide a clear summary showing BOTH build and boot results
+   - Handle failures gracefully - continue validation unless user wants to stop
+
+   IMPORTANT NOTES:
+   ────────────────
+   ⚠️  MOST IMPORTANT: verify_kernel enforces boot testing
+       - Every call to verify_kernel boots the kernel if build succeeds
+       - This is NOT optional - it's built into the tool
+       - result["success"] is true only if BOTH build AND boot succeed
+
+   - Always use timeout=1200 (20 min) for builds (handled by verify_kernel)
+   - Always use timeout=300 (5 min) for boots (handled by verify_kernel)
+   - Each commit needs a full rebuild (10-60+ minutes per commit)
+   - Remote builds (--build-host) are much faster for patch series validation
+   - Always restore the original git state, even if validation fails
+   - Report results clearly: "Build OK, Boot OK" or "Build FAILED" or "Build OK, Boot FAILED"
+
+   MANDATORY WORKFLOW:
+   ───────────────────
+   For each commit in the range, you MUST perform ALL these steps:
+   1. Checkout the commit using git
+   2. BUILD the kernel using Shell(command="vng -v --build", timeout=1200000)
+   3. BOOT the kernel using run_kernel() - THIS STEP IS MANDATORY
+   4. Record BOTH build and boot results (both must succeed)
+   5. Return to original commit when done
+
+   A commit is considered PASSED only if BOTH build AND boot succeed.
+
+   STEP-BY-STEP IMPLEMENTATION (ALL STEPS MANDATORY):
+   ──────────────────────────────────────────────────
+
+   Step 1: Get the list of commits
+   ────────────────────────────────
+   Shell(command="git rev-list --reverse START_COMMIT^..END_COMMIT", timeout=10000)
+
+   This returns a list of commit SHAs, one per line.
+
+   Step 2: Save current state
+   ───────────────────────────
+   Shell(command="git rev-parse HEAD", timeout=10000)
+
+   Save this to restore later.
+
+   Step 3: For each commit, YOU MUST perform ALL these steps:
+   ───────────────────────────────────────────────────────────
+
+   a) Get commit info:
+      Shell(command="git log -1 --format='%h - %s' COMMIT_SHA", timeout=10000)
+
+   b) Checkout commit:
+      Shell(command="git checkout COMMIT_SHA", timeout=30000)
+
+   c) BUILD the kernel (REQUIRED):
+      Shell(command="vng -v --build", timeout=1200000)
+
+      # Or with remote build host:
+      Shell(command="vng -v --build --build-host builder", timeout=1200000)
+
+      # Or with custom config:
+      Shell(command="vng -v --build --configitem CONFIG_KASAN=y", timeout=1200000)
+
+      If build fails: Record failure and continue (or stop if user requested)
+
+   d) BOOT and TEST the kernel (REQUIRED - DO NOT SKIP):
+      ⚠️  THIS STEP IS MANDATORY - A kernel that builds but doesn't boot is FAILED
+
+      You MUST boot every successfully built kernel to verify it works.
+
+      MINIMUM (always required): Verify kernel boots
+      run_kernel({"command": "uname -r"})
+
+      OR with custom test command (if user specified):
+      run_kernel({"command": "user_test_command_here"})
+
+      OR using shell command:
+      Shell(command="script -q -c 'vng -- uname -r' /dev/null 2>&1", timeout=300000)
+
+      ⚠️  If you skip this step, the validation is INCOMPLETE and INVALID
+
+   e) Record result (BOTH build and boot required):
+      - Record build result: SUCCESS or FAILED (exit code 0 vs non-zero)
+      - Record boot result: SUCCESS or FAILED (exit code 0 vs non-zero)
+      - A commit PASSES only if BOTH build AND boot succeed
+      - A commit that builds but fails to boot is considered FAILED
+      - Store commit SHA, subject, build result, and boot result
+
+   Step 4: Restore original state
+   ───────────────────────────────
+   Shell(command="git checkout ORIGINAL_SHA", timeout=30000)
+
+   Step 5: Report results
+   ───────────────────────
+   Summarize which commits passed/failed with a clear table or list.
+
+   EXAMPLE INTERACTION:
+   ────────────────────
+
+   User: "Validate that each commit between HEAD~3 and HEAD builds and boots"
+
+   AI MUST do ALL of the following:
+   1. Get commits: git rev-list --reverse HEAD~3^..HEAD
+   2. Save current: git rev-parse HEAD
+   3. For EACH commit (ALL steps required):
+      - Checkout commit: git checkout <sha>
+      - BUILD: Shell(command="vng -v --build", timeout=1200000)
+      - If build succeeds, BOOT (MANDATORY): run_kernel({"command": "uname -r"})
+      - If build fails, mark as FAILED and skip boot (or stop if requested)
+      - Record: "✅ abc123 - Fix bug: Build OK, Boot OK"
+                or "❌ def456 - Add feature: Build OK, Boot FAILED"
+                or "❌ ghi789 - Update: Build FAILED (boot not tested)"
+   4. Restore: git checkout <original>
+   5. Report: "Validated 4 commits: 3 passed (build+boot), 1 failed"
+
+   ⚠️  CRITICAL: Even if user just says "validate builds", you MUST test boots too!
+   A kernel that compiles but doesn't boot is NOT validated.
+
+   CRITICAL RULES FOR AI AGENTS:
+   ─────────────────────────────
+   ⚠️  MANDATORY: You MUST boot every successfully built kernel
+       - Building alone is NOT validation
+       - ALWAYS run run_kernel() after successful build
+       - A kernel that builds but doesn't boot is FAILED
+
+   - Always save and restore the original git state
+   - Use proper timeouts: 1200000ms (20 min) for builds, 300000ms (5 min) for boots
+   - For faster builds, use --build-host if user mentions a build server
+   - Show progress to the user after each commit (including boot status)
+   - Provide a clear summary showing BOTH build and boot results
+   - Handle failures gracefully - if a build fails, record it and continue (or stop if requested)
+   - If boot fails after successful build, mark commit as FAILED
+
+   EXAMPLE WITH REMOTE BUILD:
+   ──────────────────────────
+
+   User: "Validate HEAD~5 to HEAD using my build server 'builder'"
+
+   For each commit:
+   1. Shell(command="git checkout COMMIT", timeout=120000)
+   2. Shell(command="vng -v --build --build-host builder", timeout=1200000)
+   3. If build succeeds: run_kernel({"command": "uname -r"})  ⚠️ MANDATORY
+   4. Record both build and boot results
+
+   EXAMPLE WITH CUSTOM TEST:
+   ─────────────────────────
+
+   User: "Validate these commits by running dmesg checks"
+
+   For each commit:
+   1. Shell(command="git checkout COMMIT", timeout=120000)
+   2. Shell(command="vng -v --build", timeout=1200000)
+   3. If build succeeds: run_kernel({"command": "dmesg | grep -i error || echo 'No errors found'"})  ⚠️ MANDATORY
+   4. Record both build and boot/test results
+
+   EXAMPLE WITH STOP ON FAILURE:
+   ──────────────────────────────
+
+   User: "Find which commit breaks the kernel between HEAD~20 and HEAD"
+
+   For each commit:
+   1. Build kernel: Shell(command="vng -v --build", timeout=1200000)
+   2. If build fails: report "First failing commit (build): COMMIT_SHA" and stop
+   3. If build succeeds: Boot kernel: run_kernel({"command": "uname -r"})  ⚠️ MANDATORY
+   4. If boot fails: report "First failing commit (boot): COMMIT_SHA" and stop
+   5. If both succeed: continue to next commit
+
+   IMPORTANT NOTES:
+   ────────────────
+   ⚠️  MOST IMPORTANT: ALWAYS test boot after every successful build
+       - This is NOT optional - it's a required validation step
+       - Use run_kernel({"command": "uname -r"}) at minimum
+       - A commit that builds but doesn't boot is FAILED
+
+   - Always use timeout=1200000 (20 min) or higher for build commands
+   - Always use timeout=300000 (5 min) or higher for boot commands
+   - Each commit needs a full rebuild (10-60+ minutes per commit)
+   - Remote builds (--build-host) are much faster for patch series validation
+   - Always restore the original git state, even if validation fails
+   - Provide clear progress updates showing BOTH build and boot status
+   - Handle git checkout failures gracefully (dirty working tree, etc.)
+   - Report results as: "Build OK, Boot OK" or "Build FAILED" or "Build OK, Boot FAILED"
 """
 
 import asyncio
@@ -868,6 +1185,164 @@ Requirements:
                 "required": ["test_name"],
             },
         ),
+        Tool(
+            name="verify_kernel",
+            description="""
+Verify a kernel commit by building and booting it.
+This tool validates that a specific commit both compiles and runs correctly.
+
+⚠️  CRITICAL: This tool validates BOTH build AND boot!
+════════════════════════════════════════════════════════
+- Building alone is NOT sufficient validation
+- The kernel MUST be booted and tested inside virtme-ng
+- A kernel that builds but doesn't boot is considered FAILED
+- This operation takes 10-60+ minutes per commit
+
+WHAT THIS TOOL DOES:
+═══════════════════════════════════════════════════════════════════════════
+1. Optionally checks out the specified commit (if commit parameter provided)
+2. BUILDS the kernel using vng --build
+3. If build succeeds: BOOTS the kernel using vng -- test_command
+4. Returns BOTH build and boot results
+
+A commit is considered PASSED only if BOTH build AND boot succeed.
+
+Parameters:
+───────────
+- commit: Git commit to verify (optional)
+  Default: None (verify current HEAD without checkout)
+  Examples: "HEAD~3", "abc1234", "v6.8"
+  If provided, the tool will checkout this commit before building
+
+- kernel_dir: Path to kernel source directory
+  Default: current directory
+
+- build_host: Remote build host for faster builds (optional)
+  Example: "builder", "myserver.example.com"
+  If specified, uses: vng --build --build-host <hostname>
+
+- config_items: List of CONFIG_ITEM=value for custom kernel config (optional)
+  Example: ["CONFIG_KASAN=y", "CONFIG_DEBUG_INFO=y"]
+
+- test_command: Command to run when booting the kernel (optional)
+  Default: "uname -r" (just verify kernel boots)
+  Example: "dmesg | grep -i error || echo 'No errors'"
+
+- build_timeout: Timeout for build in seconds (optional)
+  Default: 1200 (20 minutes)
+
+- boot_timeout: Timeout for boot test in seconds (optional)
+  Default: 300 (5 minutes)
+
+Returns:
+────────
+JSON object with:
+- success: Overall result (true if both build and boot passed)
+- commit_sha: Full commit SHA that was verified
+- commit_short: Short commit SHA
+- commit_subject: Commit message subject
+- build_status: "SUCCESS" or "FAILED"
+- build_time_seconds: Time taken to build
+- build_command: Build command that was executed
+- boot_status: "SUCCESS", "FAILED", or "SKIPPED" (if build failed)
+- boot_time_seconds: Time taken to boot (if applicable)
+- boot_command: Boot command that was executed (if applicable)
+- test_command: Test command that was run
+- overall_status: "PASSED" (both OK) or "FAILED"
+
+Example Use Cases:
+══════════════════
+
+1. Verify current commit (basic):
+   verify_kernel({})
+
+2. Verify specific commit:
+   verify_kernel({"commit": "HEAD~3"})
+
+3. Verify with remote build host (faster):
+   verify_kernel({
+       "commit": "abc1234",
+       "build_host": "builder"
+   })
+
+4. Verify with custom config and test:
+   verify_kernel({
+       "commit": "v6.8",
+       "config_items": ["CONFIG_KASAN=y"],
+       "test_command": "dmesg | grep -i kasan"
+   })
+
+VALIDATING PATCH SERIES:
+════════════════════════
+To validate a patch series, call this tool multiple times for each commit:
+
+1. Get commit list: Shell("git rev-list --reverse HEAD~5^..HEAD")
+2. Save current state: Shell("git rev-parse HEAD")
+3. For each commit:
+   - verify_kernel({"commit": "<sha>"})
+   - Record result
+4. Restore state: Shell("git checkout <original>")
+
+See section 7 of the module documentation for the complete workflow.
+
+IMPORTANT NOTES:
+════════════════
+⏱️  Time Requirements:
+   - Takes 10-60+ minutes (build + boot)
+   - Use build_host for faster builds
+
+⚠️  Boot Testing:
+   - EVERY successfully built kernel is booted
+   - This is NOT optional - it's mandatory validation
+   - Skipping boot testing makes validation incomplete
+
+🔄 Git State:
+   - If commit parameter is provided, it will checkout that commit
+   - You should save/restore git state when validating series
+   - See documentation for complete patch series workflow
+
+CRITICAL: This tool enforces complete validation. You cannot skip the
+boot testing step. The kernel is validated by BOTH building AND booting.
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "commit": {
+                        "type": "string",
+                        "description": "Git commit to verify (optional, e.g., 'HEAD~3', 'abc1234', 'v6.8')",
+                    },
+                    "kernel_dir": {
+                        "type": "string",
+                        "description": "Path to kernel source directory",
+                        "default": ".",
+                    },
+                    "build_host": {
+                        "type": "string",
+                        "description": "Remote build host for faster builds (optional)",
+                    },
+                    "config_items": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of CONFIG_ITEM=value settings (optional)",
+                    },
+                    "test_command": {
+                        "type": "string",
+                        "description": "Command to run when booting the kernel (default: 'uname -r')",
+                        "default": "uname -r",
+                    },
+                    "build_timeout": {
+                        "type": "integer",
+                        "description": "Timeout for build in seconds (default: 1200)",
+                        "default": 1200,
+                    },
+                    "boot_timeout": {
+                        "type": "integer",
+                        "description": "Timeout for boot test in seconds (default: 300)",
+                        "default": 300,
+                    },
+                },
+            },
+        ),
     ]
 
 
@@ -885,6 +1360,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return await apply_patch(arguments)
     if name == "build_kselftest":
         return await build_kselftest(arguments)
+    if name == "verify_kernel":
+        return await verify_kernel(arguments)
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
 
@@ -1301,6 +1778,151 @@ async def build_kselftest(args: dict) -> list[TextContent]:
     else:
         result["message"] = f"Failed to build kselftest: {test_name}"
         result["help"] = "The test failed to build. Check the build output for errors."
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def verify_kernel(args: dict) -> list[TextContent]:
+    """
+    Verify a kernel commit by building and booting it.
+
+    This validates that a specific commit both compiles and runs correctly.
+    """
+    kernel_dir = args.get("kernel_dir", ".")
+    commit = args.get("commit")
+    build_host = args.get("build_host")
+    config_items = args.get("config_items", [])
+    test_command = args.get("test_command", "uname -r")
+    build_timeout = args.get("build_timeout", 1200)
+    boot_timeout = args.get("boot_timeout", 300)
+
+    kernel_path = Path(kernel_dir)
+
+    # Check if kernel directory exists
+    if not kernel_path.exists():
+        result = {
+            "success": False,
+            "error": "kernel_dir_not_found",
+            "message": f"Kernel directory {kernel_dir} does not exist",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if it's a git repository
+    git_dir = kernel_path / ".git"
+    if not git_dir.exists():
+        result = {
+            "success": False,
+            "error": "not_a_git_repo",
+            "message": f"Directory {kernel_dir} is not a git repository",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # If commit is specified, checkout that commit
+    if commit:
+        returncode, _, checkout_stderr = run_command(
+            ["git", "checkout", commit], cwd=kernel_dir, timeout=30
+        )
+        if returncode != 0:
+            result = {
+                "success": False,
+                "error": "git_checkout_failed",
+                "message": f"Failed to checkout commit {commit}",
+                "stderr": checkout_stderr,
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Get current commit info
+    returncode, commit_sha, _ = run_command(
+        ["git", "rev-parse", "HEAD"], cwd=kernel_dir, timeout=10
+    )
+    if returncode != 0:
+        commit_sha = "unknown"
+    else:
+        commit_sha = commit_sha.strip()
+
+    returncode, subject, _ = run_command(
+        ["git", "log", "-1", "--format=%s"], cwd=kernel_dir, timeout=10
+    )
+    commit_subject = subject.strip() if returncode == 0 else "Unknown"
+
+    result = {
+        "commit_sha": commit_sha,
+        "commit_short": commit_sha[:12] if commit_sha != "unknown" else "unknown",
+        "commit_subject": commit_subject,
+        "test_command": test_command,
+    }
+
+    # Build the kernel
+    build_cmd = ["vng", "-v", "--build"]
+    if build_host:
+        build_cmd.extend(["--build-host", build_host])
+    for config_item in config_items:
+        build_cmd.extend(["--configitem", config_item])
+
+    build_start = time.time()
+    build_returncode, build_stdout, build_stderr = run_command(
+        build_cmd, cwd=kernel_dir, timeout=build_timeout
+    )
+    build_time = time.time() - build_start
+
+    result["build_command"] = shlex.join(build_cmd)
+    result["build_time_seconds"] = round(build_time, 2)
+
+    if build_returncode != 0:
+        result["build_status"] = "FAILED"
+        result["boot_status"] = "SKIPPED"
+        result["overall_status"] = "FAILED"
+        result["success"] = False
+        # Include last 2000 chars of output for debugging
+        result["build_stdout"] = (
+            build_stdout[-2000:] if len(build_stdout) > 2000 else build_stdout
+        )
+        result["build_stderr"] = (
+            build_stderr[-2000:] if len(build_stderr) > 2000 else build_stderr
+        )
+        result["message"] = "Kernel build failed"
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    result["build_status"] = "SUCCESS"
+
+    # Boot the kernel (MANDATORY)
+    # Use script wrapper for PTS requirement
+    vng_boot_cmd = ["vng", "-v", "--", test_command]
+    vng_boot_cmd_str = shlex.join(vng_boot_cmd)
+    shell_cmd = f"script -q -c {shlex.quote(vng_boot_cmd_str)} /dev/null 2>&1"
+
+    boot_start = time.time()
+    boot_returncode, boot_stdout, boot_stderr = run_command(
+        ["sh", "-c", shell_cmd], cwd=kernel_dir, timeout=boot_timeout
+    )
+    boot_time = time.time() - boot_start
+
+    result["boot_command"] = vng_boot_cmd_str
+    result["boot_time_seconds"] = round(boot_time, 2)
+
+    if boot_returncode != 0:
+        result["boot_status"] = "FAILED"
+        result["overall_status"] = "FAILED"
+        result["success"] = False
+        # Include last 2000 chars of output for debugging
+        result["boot_stdout"] = (
+            boot_stdout[-2000:] if len(boot_stdout) > 2000 else boot_stdout
+        )
+        result["boot_stderr"] = (
+            boot_stderr[-2000:] if len(boot_stderr) > 2000 else boot_stderr
+        )
+        result["message"] = "Kernel built successfully but boot test failed"
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Both build and boot succeeded!
+    result["boot_status"] = "SUCCESS"
+    result["overall_status"] = "PASSED"
+    result["success"] = True
+    # Include last 1000 chars of boot output
+    result["boot_stdout"] = (
+        boot_stdout[-1000:] if len(boot_stdout) > 1000 else boot_stdout
+    )
+    result["message"] = "Kernel verification passed: build and boot successful"
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
