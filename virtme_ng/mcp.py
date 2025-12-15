@@ -684,7 +684,11 @@ import json
 import shlex
 import subprocess
 import sys
+import threading
 import time
+import uuid
+from dataclasses import dataclass, field
+from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -702,6 +706,152 @@ except ImportError:
 
 # Initialize the MCP server
 app = Server("virtme-ng")
+
+
+# ============================================================================
+# Async Job Management Infrastructure
+# ============================================================================
+
+# Global job storage (jobs persist across tool calls)
+_active_jobs = {}
+_jobs_lock = threading.Lock()
+
+
+@dataclass
+class Job:
+    """Represents an async kernel test job."""
+
+    job_id: str
+    command: str
+    args: dict
+    status: str = "starting"  # starting, running, completed, failed, cancelled
+    start_time: float = field(default_factory=time.time)
+    end_time: float | None = None
+    returncode: int | None = None
+    stdout: str = ""
+    stderr: str = ""
+    error: str | None = None
+
+    def elapsed_seconds(self) -> float:
+        """Get elapsed time in seconds."""
+        end = self.end_time if self.end_time else time.time()
+        return end - self.start_time
+
+    def to_dict(self) -> dict:
+        """Convert job to dictionary for JSON serialization."""
+        result = {
+            "job_id": self.job_id,
+            "status": self.status,
+            "command": self.command,
+            "start_time": datetime.fromtimestamp(self.start_time).isoformat(),
+            "elapsed_seconds": round(self.elapsed_seconds(), 2),
+        }
+
+        if self.status in ("completed", "failed"):
+            result["end_time"] = datetime.fromtimestamp(self.end_time).isoformat()
+            result["returncode"] = self.returncode
+            result["total_time_seconds"] = round(self.elapsed_seconds(), 2)
+
+            # Include output (truncate if too large for MCP response)
+            max_output = 50000  # 50KB max per field
+            if len(self.stdout) > max_output:
+                result["stdout"] = self.stdout[-max_output:]
+                result["stdout_truncated"] = True
+                result["stdout_note"] = f"Output truncated (showing last {max_output} chars of {len(self.stdout)})"
+            else:
+                result["stdout"] = self.stdout
+                result["stdout_truncated"] = False
+
+            if self.stderr:
+                if len(self.stderr) > max_output:
+                    result["stderr"] = self.stderr[-max_output:]
+                    result["stderr_truncated"] = True
+                    result["stderr_note"] = f"Output truncated (showing last {max_output} chars of {len(self.stderr)})"
+                else:
+                    result["stderr"] = self.stderr
+                    result["stderr_truncated"] = False
+
+        if self.error:
+            result["error"] = self.error
+
+        return result
+
+
+def _run_job_in_background(job_id: str):
+    """
+    Run a kernel test job in the background thread.
+    This is the worker function that actually executes the vng command.
+    """
+    with _jobs_lock:
+        if job_id not in _active_jobs:
+            return
+        job = _active_jobs[job_id]
+
+    try:
+        # Update status to running
+        job.status = "running"
+
+        # Build the vng command (same as sync run_kernel)
+        kernel_dir = job.args.get("kernel_dir", ".")
+        vng_cmd = ["vng"]
+
+        # Determine which kernel to run
+        kernel_image = job.args.get("kernel_image")
+        if kernel_image == "host":
+            vng_cmd.append("-vr")
+        elif kernel_image:
+            vng_cmd.extend(["-vr", kernel_image])
+
+        if job.args.get("arch"):
+            vng_cmd.extend(["--arch", job.args["arch"]])
+        if job.args.get("cpus"):
+            vng_cmd.extend(["--cpus", str(job.args["cpus"])])
+        if job.args.get("memory"):
+            vng_cmd.extend(["--memory", job.args["memory"]])
+        if job.args.get("network"):
+            vng_cmd.extend(["--network", job.args["network"]])
+        if job.args.get("debug"):
+            vng_cmd.append("--debug")
+
+        if job.args.get("command"):
+            vng_cmd.append("--")
+            vng_cmd.append(job.args["command"])
+
+        # Wrap in script for PTS requirement
+        vng_cmd_str = shlex.join(vng_cmd)
+        shell_cmd = f"script -q -c {shlex.quote(vng_cmd_str)} /dev/null 2>&1"
+
+        # Execute the command
+        timeout = job.args.get("timeout", 3600)
+        returncode, stdout, stderr = run_command(
+            ["sh", "-c", shell_cmd], cwd=kernel_dir, timeout=timeout
+        )
+
+        # Update job with results
+        job.returncode = returncode
+        job.stdout = stdout
+        job.stderr = stderr
+        job.status = "completed" if returncode == 0 else "failed"
+        job.end_time = time.time()
+
+    except Exception as e:  # pylint: disable=broad-exception-caught
+        job.status = "failed"
+        job.error = str(e)
+        job.end_time = time.time()
+
+
+def _cleanup_old_jobs(max_age_hours: int = 24):
+    """
+    Clean up jobs older than max_age_hours.
+    Called automatically when listing/checking jobs.
+    """
+    cutoff = time.time() - (max_age_hours * 3600)
+
+    with _jobs_lock:
+        for job_id in list(_active_jobs.keys()):
+            job = _active_jobs[job_id]
+            if job.end_time and job.end_time < cutoff:
+                del _active_jobs[job_id]
 
 
 def run_command(
@@ -1343,6 +1493,297 @@ boot testing step. The kernel is validated by BOTH building AND booting.
                 },
             },
         ),
+        Tool(
+            name="run_kernel_async",
+            description="""
+Run a kernel test asynchronously (non-blocking).
+This tool starts a kernel test in the background and returns immediately with a job ID.
+
+⚠️  USE THIS TOOL FOR LONG-RUNNING OPERATIONS (>2 minutes)
+════════════════════════════════════════════════════════════
+
+This solves the MCP timeout problem by:
+1. Starting the job immediately (returns in <1 second)
+2. Allowing you to check status periodically with get_job_status()
+3. Each status check is fast (<1 second), avoiding MCP timeouts
+
+WORKFLOW:
+─────────
+1. Call run_kernel_async() → Get job_id
+2. Wait 10-30 seconds
+3. Call get_job_status(job_id) → Check progress
+4. Repeat step 2-3 until status is "completed" or "failed"
+5. Retrieve results from final get_job_status() response
+
+WHEN TO USE:
+────────────
+✅ Use run_kernel_async for:
+  - Kernel selftests (5-60 minutes)
+  - Long-running tests (>2 minutes)
+  - Operations that might timeout with run_kernel
+
+✅ Use run_kernel (sync) for:
+  - Quick boot tests (<2 minutes)
+  - Simple commands (uname, dmesg, etc.)
+
+Parameters are identical to run_kernel:
+- kernel_dir: Path to kernel source directory (default: current directory)
+- kernel_image: Which kernel to run (omit for newly built, "host", "v6.14", or path)
+- command: Command to execute inside the kernel
+- arch: Target architecture
+- cpus: Number of CPUs
+- memory: Memory size (e.g., '2G')
+- timeout: Maximum runtime in seconds (default: 3600)
+- network: Network mode
+- debug: Enable debugging
+
+Returns immediately with:
+- job_id: Unique identifier for this job
+- status: "starting"
+- command: The command being executed
+
+Example usage:
+──────────────
+# Step 1: Start the test
+result = run_kernel_async({
+    "command": "make kselftest TARGETS='sched_ext' SKIP_TARGETS=''",
+    "memory": "2G",
+    "timeout": 1800
+})
+# Returns: {"job_id": "kernel_test_...", "status": "starting"}
+
+# Step 2: Check status (repeat every 10-30 seconds)
+status = get_job_status({"job_id": result["job_id"]})
+# Returns: {"status": "running", "elapsed_seconds": 45, ...}
+
+# Step 3: When completed, get results
+status = get_job_status({"job_id": result["job_id"]})
+# Returns: {"status": "completed", "returncode": 0, "stdout": "...", ...}
+
+AGENT GUIDANCE:
+───────────────
+When you start an async job:
+1. Inform user: "Starting [operation] (job ID: xxx)..."
+2. Wait 10-30 seconds
+3. Check status with get_job_status()
+4. If status is "running":
+   - Inform user of progress: "Running (Xs elapsed)..."
+   - Wait 10-30 seconds
+   - Go back to step 3
+5. If status is "completed" or "failed":
+   - Report results to user
+   - Show output/errors as appropriate
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "kernel_dir": {
+                        "type": "string",
+                        "description": "Path to kernel source directory",
+                        "default": ".",
+                    },
+                    "kernel_image": {
+                        "type": "string",
+                        "description": (
+                            "Which kernel to run: omit for newly built kernel "
+                            "(DEFAULT), 'host' for host kernel, 'v6.14' for upstream "
+                            "auto-download, or './path' for local image"
+                        ),
+                    },
+                    "command": {
+                        "type": "string",
+                        "description": "Command to execute inside the kernel",
+                    },
+                    "arch": {
+                        "type": "string",
+                        "description": "Target architecture",
+                        "enum": [
+                            "amd64",
+                            "arm64",
+                            "armhf",
+                            "ppc64el",
+                            "s390x",
+                            "riscv64",
+                        ],
+                    },
+                    "cpus": {
+                        "type": "integer",
+                        "description": "Number of CPUs",
+                    },
+                    "memory": {
+                        "type": "string",
+                        "description": "Memory size (e.g., '2G', '512M')",
+                        "default": "1G",
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Maximum runtime in seconds (default: 3600)",
+                        "default": 3600,
+                    },
+                    "network": {
+                        "type": "string",
+                        "description": "Network mode",
+                        "enum": ["user", "bridge", "loop"],
+                    },
+                    "debug": {
+                        "type": "boolean",
+                        "description": "Enable debugging features",
+                        "default": False,
+                    },
+                },
+            },
+        ),
+        Tool(
+            name="get_job_status",
+            description="""
+Get the status of an async kernel test job.
+This tool checks the current state of a job started with run_kernel_async().
+
+⏱️  FAST OPERATION - Returns immediately (<1 second), no timeout risk!
+
+Returns job information including:
+- job_id: The job identifier
+- status: Current state (starting, running, completed, failed, cancelled)
+- elapsed_seconds: Time since job started
+- start_time: When the job started (ISO format)
+
+If job is completed or failed, also includes:
+- returncode: Exit code of the command
+- stdout: Command output (truncated if too large)
+- stderr: Error output (if any)
+- end_time: When the job finished
+- total_time_seconds: Total execution time
+
+Status values:
+──────────────
+- "starting": Job is initializing
+- "running": Job is currently executing
+- "completed": Job finished successfully (returncode 0)
+- "failed": Job finished with error (returncode != 0)
+- "cancelled": Job was cancelled
+
+Polling strategy:
+─────────────────
+When status is "starting" or "running":
+  → Wait 10-30 seconds before checking again
+  → Inform user of progress
+  → Continue polling until "completed", "failed", or "cancelled"
+
+When status is "completed" or "failed":
+  → Job is finished
+  → Retrieve and display results to user
+  → stdout/stderr contain the output
+
+Parameters:
+───────────
+- job_id (required): The job ID returned by run_kernel_async()
+
+Example usage:
+──────────────
+# Check job status
+status = get_job_status({"job_id": "kernel_test_1234567890_abc123"})
+
+# Response when running:
+{
+    "job_id": "kernel_test_...",
+    "status": "running",
+    "elapsed_seconds": 45,
+    "start_time": "2025-12-15T12:34:56",
+    "poll_again_in_seconds": 30
+}
+
+# Response when completed:
+{
+    "job_id": "kernel_test_...",
+    "status": "completed",
+    "returncode": 0,
+    "elapsed_seconds": 300,
+    "total_time_seconds": 300,
+    "start_time": "2025-12-15T12:34:56",
+    "end_time": "2025-12-15T12:39:56",
+    "stdout": "...test output...",
+    "stderr": ""
+}
+
+AGENT GUIDANCE:
+───────────────
+1. Call this repeatedly (every 10-30 seconds) while status is "running"
+2. Update user with progress: "Test running (Xs elapsed)..."
+3. When completed, show results to user
+4. If failed, show error information from stdout/stderr
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {
+                        "type": "string",
+                        "description": "Job ID returned by run_kernel_async()",
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="cancel_job",
+            description="""
+Cancel a running async kernel test job.
+
+This attempts to cancel a job that was started with run_kernel_async().
+
+Note: Currently this marks the job as "cancelled" but does not forcibly
+terminate the underlying process. The job will continue running but will
+be marked as cancelled in the job system.
+
+Parameters:
+───────────
+- job_id (required): The job ID to cancel
+
+Returns:
+────────
+- success: Whether the cancellation was successful
+- message: Description of what happened
+
+Example:
+────────
+cancel_job({"job_id": "kernel_test_1234567890_abc123"})
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "job_id": {
+                        "type": "string",
+                        "description": "Job ID to cancel",
+                    },
+                },
+                "required": ["job_id"],
+            },
+        ),
+        Tool(
+            name="list_jobs",
+            description="""
+List all active async kernel test jobs.
+
+Shows all jobs in the system with their current status. Useful for:
+- Debugging: See what jobs are running
+- Recovery: Find job IDs if you lost track
+- Monitoring: Check multiple running jobs
+
+Automatically cleans up old jobs (>24 hours) before listing.
+
+Returns:
+────────
+- jobs: Array of job objects with status information
+- count: Number of jobs
+
+Example:
+────────
+list_jobs({})
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {},
+            },
+        ),
     ]
 
 
@@ -1354,6 +1795,14 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return await configure_kernel(arguments)
     if name == "run_kernel":
         return await run_kernel(arguments)
+    if name == "run_kernel_async":
+        return await run_kernel_async_handler(arguments)
+    if name == "get_job_status":
+        return await get_job_status_handler(arguments)
+    if name == "cancel_job":
+        return await cancel_job_handler(arguments)
+    if name == "list_jobs":
+        return await list_jobs_handler(arguments)
     if name == "get_kernel_info":
         return await get_kernel_info(arguments)
     if name == "apply_patch":
@@ -1923,6 +2372,195 @@ async def verify_kernel(args: dict) -> list[TextContent]:
         boot_stdout[-1000:] if len(boot_stdout) > 1000 else boot_stdout
     )
     result["message"] = "Kernel verification passed: build and boot successful"
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def run_kernel_async_handler(args: dict) -> list[TextContent]:
+    """
+    Start a kernel test asynchronously.
+    Returns immediately with a job ID that can be used to check status.
+    """
+    # Generate unique job ID
+    timestamp = int(time.time())
+    job_id = f"kernel_test_{timestamp}_{uuid.uuid4().hex[:8]}"
+
+    # Build command string for display
+    command_parts = ["vng"]
+    kernel_image = args.get("kernel_image")
+    if kernel_image == "host":
+        command_parts.append("-vr")
+    elif kernel_image:
+        command_parts.extend(["-vr", kernel_image])
+
+    if args.get("command"):
+        command_parts.extend(["--", args["command"]])
+    elif args.get("interactive"):
+        command_parts.append("(interactive)")
+    else:
+        command_parts.extend(["--", "uname -r"])
+
+    command_str = " ".join(command_parts)
+
+    # Create job object
+    job = Job(job_id=job_id, command=command_str, args=args)
+
+    # Store job
+    with _jobs_lock:
+        _active_jobs[job_id] = job
+
+    # Start background thread
+    thread = threading.Thread(
+        target=_run_job_in_background, args=(job_id,), daemon=True
+    )
+    thread.start()
+
+    # Return immediately with job info
+    result = {
+        "success": True,
+        "job_id": job_id,
+        "status": "starting",
+        "message": "Job started successfully. Use get_job_status() to check progress.",
+        "command": command_str,
+        "poll_suggestion": "Wait 10-30 seconds before first status check",
+    }
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def get_job_status_handler(args: dict) -> list[TextContent]:
+    """
+    Get the current status of an async job.
+    Returns immediately (fast, no timeout risk).
+    """
+    job_id = args.get("job_id")
+
+    if not job_id:
+        result = {
+            "success": False,
+            "error": "job_id is required",
+            "message": "Please provide a job_id from run_kernel_async()",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Clean up old jobs first
+    _cleanup_old_jobs()
+
+    with _jobs_lock:
+        if job_id not in _active_jobs:
+            result = {
+                "success": False,
+                "error": "job_not_found",
+                "message": f"Job {job_id} not found. It may have been cleaned up (>24h old) or never existed.",
+                "help": "Use list_jobs() to see all active jobs.",
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        job = _active_jobs[job_id]
+
+    # Convert job to dict
+    result = job.to_dict()
+    result["success"] = True
+
+    # Add helpful messages and guidance based on status
+    if job.status == "starting":
+        result["message"] = "Job is starting up..."
+        result["poll_again_in_seconds"] = 5
+    elif job.status == "running":
+        elapsed = result["elapsed_seconds"]
+        result["message"] = f"Job is running ({elapsed}s elapsed)"
+        result["poll_again_in_seconds"] = 30 if elapsed > 60 else 10
+        result["agent_guidance"] = (
+            f"Wait {result['poll_again_in_seconds']} seconds before checking again"
+        )
+    elif job.status == "completed":
+        result["message"] = "Job completed successfully"
+        result["success_flag"] = job.returncode == 0
+        if job.returncode != 0:
+            result["warning"] = f"Job completed but command returned exit code {job.returncode}"
+    elif job.status == "failed":
+        result["message"] = "Job failed"
+        result["success_flag"] = False
+    elif job.status == "cancelled":
+        result["message"] = "Job was cancelled"
+        result["success_flag"] = False
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def cancel_job_handler(args: dict) -> list[TextContent]:
+    """
+    Cancel a running async job.
+    Note: Currently just marks as cancelled, doesn't forcibly kill the process.
+    """
+    job_id = args.get("job_id")
+
+    if not job_id:
+        result = {
+            "success": False,
+            "error": "job_id is required",
+            "message": "Please provide a job_id to cancel",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    with _jobs_lock:
+        if job_id not in _active_jobs:
+            result = {
+                "success": False,
+                "error": "job_not_found",
+                "message": f"Job {job_id} not found",
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        job = _active_jobs[job_id]
+
+        if job.status in ("completed", "failed", "cancelled"):
+            result = {
+                "success": False,
+                "error": "job_already_finished",
+                "message": f"Job {job_id} has already finished with status: {job.status}",
+            }
+            return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+        # Mark as cancelled
+        job.status = "cancelled"
+        job.end_time = time.time()
+
+        # Note: To actually kill the process, we'd need to store the Popen object
+        # and call process.terminate(). For now, we just mark it as cancelled.
+        result = {
+            "success": True,
+            "job_id": job_id,
+            "message": "Job marked as cancelled",
+            "note": "The underlying process may still be running. This marks the job as cancelled in the job system.",
+        }
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
+async def list_jobs_handler(args: dict) -> list[TextContent]:  # pylint: disable=unused-argument
+    """
+    List all active async jobs.
+    Automatically cleans up old jobs (>24 hours) first.
+    """
+    # Clean up old jobs
+    _cleanup_old_jobs()
+
+    with _jobs_lock:
+        jobs = [job.to_dict() for job in _active_jobs.values()]
+
+    # Sort by start time (newest first)
+    jobs.sort(key=lambda j: j.get("start_time", ""), reverse=True)
+
+    result = {
+        "success": True,
+        "jobs": jobs,
+        "count": len(jobs),
+        "message": f"Found {len(jobs)} active job(s)",
+    }
+
+    if len(jobs) == 0:
+        result["note"] = "No active jobs. Jobs older than 24 hours are automatically cleaned up."
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
