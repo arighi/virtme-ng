@@ -251,117 +251,119 @@ IMPORTANT NOTES FOR AI AGENTS:
    WORKFLOW FOR AI AGENTS - How to run kselftests with virtme-ng:
    ──────────────────────────────────────────────────────────────
 
-   Step 1: Build the kernel
-   ─────────────────────────
+   ⚠️  IMPORTANT: Build the kernel FIRST!
    Shell(command="vng -v --build", timeout=1200000)
 
-   Step 2: Build the specific kselftest
-   ──────────────────────────────────────
-   build_kselftest({"test_name": "sched_ext"})
+   Then run_kselftest command handles the rest:
+   1. Builds the kselftest (if needed)
+   2. Runs the kselftest asynchronously
+   3. Returns job_id for polling
 
-   This builds the test binaries outside of the VM using:
-   make -j$(nproc) -C tools/testing/selftests/<test_name>
+   BASIC USAGE
+   ───────────
+   # Start the kselftest asynchronously
+   result = run_kselftest({"test_name": "sched_ext"})
 
-   Step 3: Run the test inside the VM
-   ────────────────────────────────────
-   run_kernel({
-       "command": "make kselftest TARGETS=\"sched_ext\" SKIP_TARGETS=\"\"",
-       "memory": "2G",
-       "timeout": 1800
-   })
+   # Poll for results every 10 sec
+   status = get_job_status({"job_id": result["job_id"]})
 
-   The make kselftest command runs the test suite inside the virtualized kernel.
+   The command automatically:
+   - Checks if kernel is built (builds it if needed)
+   - Checks if kselftest is built (builds it if needed)
+   - Runs the kselftest asynchronously (no MCP timeout)
+   - Sets appropriate defaults (2G memory, 1 hour timeout)
+   - Returns a job_id for polling progress
 
-   ⏱️  TIMEOUT REQUIREMENTS:
+   ⏱️ TIMEOUT REQUIREMENTS:
    ────────────────────────
-   - Kselftests can take 10-30+ minutes depending on the test suite
-   - ALWAYS use timeout of at least 1800 seconds (30 minutes)
-   - Recommended: 3600 seconds (1 hour) for complex tests
-
-   OPTIONAL: Add runner arguments
-   ────────────────────────────────
-   run_kernel({
-       "command": "make kselftest TARGETS=\"vm\" SKIP_TARGETS=\"\" KSELFTEST_RUNNER_ARGS=\"--verbose\"",
-       "memory": "2G",
-       "timeout": 1800
-   })
+   - Kselftests can take 10+ minutes depending on the test suite
+   - Builds can take 10-20 minutes (handled automatically)
+   - run_kselftest sets default timeout to 3600 seconds (1 hour)
+   - Can be customized with timeout parameter if needed
 
    COMPLETE EXAMPLES:
    ──────────────────
 
    Example 1: Run sched_ext tests
-   ───────────────────────────────
-   # Step 1: Build kernel
+   ──────────────────────────────
+   # STEP 1: Build kernel first!
    Shell(command="vng -v --build", timeout=1200000)
 
-   # Step 2: Build test
-   build_kselftest({"test_name": "sched_ext"})
+   # STEP 2: Start the kselftest asynchronously
+   result = run_kselftest({"test_name": "sched_ext"})
 
-   # Step 3: Run test
-   run_kernel({
-       "command": "make kselftest TARGETS=\"sched_ext\" SKIP_TARGETS=\"\"",
-       "memory": "2G",
-       "timeout": 1800
-   })
+   # STEP 3: Poll for results every 10 sec
+   status = get_job_status({"job_id": result["job_id"]})
+   # Repeat until status is "completed" or "failed"
+
+   # Note: run_kselftest automatically builds the kselftest if needed!
 
    Example 2: Run VM tests with verbose output
    ────────────────────────────────────────────
-   # Step 1: Build kernel
+   # PREREQUISITE: Build kernel first (if testing newly built kernel)
    Shell(command="vng -v --build", timeout=1200000)
 
-   # Step 2: Build test
-   build_kselftest({"test_name": "vm"})
-
-   # Step 3: Run test with verbose output
-   run_kernel({
-       "command": "make kselftest TARGETS=\"vm\" SKIP_TARGETS=\"\" KSELFTEST_RUNNER_ARGS=\"--verbose\"",
-       "memory": "2G",
-       "timeout": 1800
+   # Run kselftest with options
+   result = run_kselftest({
+       "test_name": "vm",
+       "runner_args": "--verbose"
    })
 
-   Example 3: Run tests on host kernel
-   ─────────────────────────────────────
-   # No kernel build needed when testing host kernel
+   # Poll for results
+   status = get_job_status({"job_id": result["job_id"]})
 
-   # Step 1: Build test
-   build_kselftest({"test_name": "net"})
-
-   # Step 2: Run test on host kernel
-   run_kernel({
-       "kernel_image": "host",
-       "command": "make kselftest TARGETS=\"net\" SKIP_TARGETS=\"\"",
-       "memory": "2G",
-       "timeout": 3600
+   Example 3: Run tests on HOST kernel
+   ────────────────────────────────────
+   # One command - automatically builds kselftest only
+   result = run_kselftest({
+       "test_name": "net",
+       "kernel_image": "host"
    })
 
-   Example 4: Run tests on upstream kernel
-   ─────────────────────────────────────────
-   # No kernel build needed when using upstream precompiled kernels
+   # Poll for results
+   status = get_job_status({"job_id": result["job_id"]})
 
-   # Step 1: Build test
-   build_kselftest({"test_name": "seccomp"})
+   Example 4: Run tests on UPSTREAM kernel
+   ────────────────────────────────────────
+   # One command - automatically builds kselftest, downloads kernel
+   result = run_kselftest({
+       "test_name": "seccomp",
+       "kernel_image": "v6.14"
+   })
 
-   # Step 2: Run test on upstream kernel v6.14
-   run_kernel({
-       "kernel_image": "v6.14",
-       "command": "make kselftest TARGETS=\"seccomp\" SKIP_TARGETS=\"\"",
-       "memory": "2G",
-       "timeout": 1800
+   # Poll for results
+   status = get_job_status({"job_id": result["job_id"]})
+
+   Example 5: Run tests with custom settings
+   ──────────────────────────────────────────
+   # PREREQUISITE: Build kernel first
+   Shell(command="vng -v --build", timeout=1200000)
+
+   result = run_kselftest({
+       "test_name": "vm",
+       "memory": "4G",
+       "timeout": 7200,  # 2 hours for test
+       "runner_args": "--verbose"
    })
 
 6. MCP Tools Available
    --------------------
    This MCP server provides:
    - configure_kernel: Generate/modify kernel .config
-   - run_kernel: Run and test kernels in QEMU
+   - run_kernel: Run and test kernels in QEMU (synchronous)
+   - run_kselftest: Run kernel selftests asynchronously (RECOMMENDED for kselftests)
+   - run_kernel_async: Run kernel tests asynchronously (for custom long tests)
+   - get_job_status: Check status of async jobs
+   - cancel_job: Cancel running async jobs
+   - list_jobs: List all active async jobs
    - get_kernel_info: Get info about kernel source directory
    - apply_patch: Apply patches from lore.kernel.org
    - build_kselftest: Build kernel selftests outside VM
    - verify_kernel: Verify a commit by building and booting it
 
    For building kernels, use shell commands with 'vng -v --build' as documented above.
-   For running kselftests, see section 5 above.
-   For validating patch series, see section 7 above.
+   For running kselftests, use the run_kselftest command (see section 5).
+   For validating patch series, see section 7 below.
 
 7. Validating Patch Series
    ========================================================
@@ -757,7 +759,9 @@ class Job:
             if len(self.stdout) > max_output:
                 result["stdout"] = self.stdout[-max_output:]
                 result["stdout_truncated"] = True
-                result["stdout_note"] = f"Output truncated (showing last {max_output} chars of {len(self.stdout)})"
+                result["stdout_note"] = (
+                    f"Output truncated (showing last {max_output} chars of {len(self.stdout)})"
+                )
             else:
                 result["stdout"] = self.stdout
                 result["stdout_truncated"] = False
@@ -766,7 +770,9 @@ class Job:
                 if len(self.stderr) > max_output:
                     result["stderr"] = self.stderr[-max_output:]
                     result["stderr_truncated"] = True
-                    result["stderr_note"] = f"Output truncated (showing last {max_output} chars of {len(self.stderr)})"
+                    result["stderr_note"] = (
+                        f"Output truncated (showing last {max_output} chars of {len(self.stderr)})"
+                    )
                 else:
                     result["stderr"] = self.stderr
                     result["stderr_truncated"] = False
@@ -1255,7 +1261,14 @@ Requirements:
             name="build_kselftest",
             description="""
 Build a Linux kernel selftest outside of the virtualized environment.
-This tool builds the kselftest binaries that can later be run inside vng.
+
+⚠️  NOTE: You typically DON'T need to call this tool directly!
+════════════════════════════════════════════════════════════════
+The run_kselftest command automatically builds the kselftest if needed.
+Just call: run_kselftest({"test_name": "sched_ext"})
+
+This tool is only needed if you want to pre-build the kselftest separately
+for some reason, but run_kselftest will handle it automatically.
 
 The tool will:
 - Build the kselftest outside vng: make -j$(nproc) -C tools/testing/selftests/<test_name>
@@ -1264,35 +1277,25 @@ The tool will:
    Use: Shell(command="vng -v --build", timeout=1200000)
 
 ═══════════════════════════════════════════════════════════════════════════
-HOW TO RUN KSELFTESTS WITH VIRTME-NG (Complete Workflow for AI Agents):
+RECOMMENDED WORKFLOW (Automatic - ALWAYS USE THIS):
 ═══════════════════════════════════════════════════════════════════════════
 
-Step 1: Build the kernel
-────────────────────────
+Just one command - run_kselftest handles the kselftest!
+────────────────────────────────────────────────────────────
+# PREREQUISITE: Build the kernel first!
 Shell(command="vng -v --build", timeout=1200000)
 
-Step 2: Build the kselftest (use THIS tool)
-────────────────────────────────────────────
-build_kselftest({"test_name": "sched_ext"})
+# Then run the kselftest
+result = run_kselftest({"test_name": "sched_ext"})
 
-Step 3: Run the test inside VM (use run_kernel tool)
-─────────────────────────────────────────────────────
-run_kernel({
-    "command": "make kselftest TARGETS=\"sched_ext\" SKIP_TARGETS=\"\"",
-    "memory": "2G",
-    "timeout": 1800
-})
+This automatically:
+1. Builds kselftest (if needed, with 20-minute timeout)
+2. Runs the test asynchronously
 
-⏱️  CRITICAL: Use timeout of at least 1800 seconds (30 min) when running tests!
+Poll for results:
+status = get_job_status({"job_id": result["job_id"]})
 
-Optional: Add runner arguments for verbose output or TAP format:
-run_kernel({
-    "command": "make kselftest TARGETS=\"vm\" SKIP_TARGETS=\"\" KSELFTEST_RUNNER_ARGS=\"--verbose\"",
-    "memory": "2G",
-    "timeout": 1800
-})
-
-More examples in the main module documentation (see section 5).
+That's all you need! The kselftest build is automatic.
 
 ═══════════════════════════════════════════════════════════════════════════
 
@@ -1494,6 +1497,231 @@ boot testing step. The kernel is validated by BOTH building AND booting.
             },
         ),
         Tool(
+            name="run_kselftest",
+            description="""
+Run kernel selftests (kselftests) asynchronously with automatic build support.
+
+🎯 KSELFTEST RUNNER - Build kernel first!
+════════════════════════════════════════════════════════════
+⚠️  IMPORTANT: You must build the kernel BEFORE running kselftests!
+    Use: Shell(command="vng -v --build", timeout=1200000)
+
+This command automatically:
+1. Builds the kselftest (if needed)
+2. Runs the kselftest asynchronously
+
+Just call: run_kselftest({"test_name": "sched_ext"})
+
+WORKFLOW:
+─────────
+The command handles the kselftest workflow:
+1. Builds the kselftest if not already built (20 minute timeout)
+2. Runs the kselftest asynchronously in the VM
+3. Returns immediately with job_id
+
+It automatically:
+- Builds the kselftest (if needed)
+- Runs asynchronously (returns immediately with job_id)
+- Executes make kselftest with proper TARGETS/SKIP_TARGETS
+- Allocates appropriate memory (default: 2G)
+- Sets proper timeout (default: 3600 seconds / 1 hour)
+
+PARAMETERS:
+───────────
+- test_name (required): The kselftest target to run
+  Examples: "sched_ext", "vm", "net", "seccomp", "livepatch"
+
+- kernel_image (optional): Which kernel to run:
+  * omit/null = run newly built kernel in current dir (DEFAULT)
+  * "host" = run the host kernel currently running on the system
+  * "v6.14" (or any vX.Y version) = download and run upstream kernel (auto-download)
+  * "./path/to/bzImage" = run specific local kernel image file
+
+- kernel_dir (optional): Path to kernel source directory (default: current directory)
+
+- memory (optional): Memory size for VM (default: "2G")
+  Increase for memory-intensive tests
+
+- timeout (optional): Maximum runtime in seconds (default: 3600 = 1 hour)
+  Increase for very long test suites
+
+- runner_args (optional): Additional arguments for kselftest runner
+  Examples: "--verbose", "--tap", "--list"
+
+- arch (optional): Target architecture to emulate
+
+- cpus (optional): Number of CPUs for the VM
+
+- network (optional): Enable network ("user", "bridge", "loop")
+
+NOTE: The kselftest is built automatically with a 20-minute timeout.
+      The kernel must be built separately before running kselftests.
+
+Returns immediately with:
+- job_id: Unique identifier for this job
+- status: "starting"
+- test_name: The test being run
+- command: The actual command executed
+
+POLLING FOR RESULTS:
+────────────────────
+After starting the test, use get_job_status() to check progress:
+
+1. Call run_kselftest() → Get job_id
+2. Wait 10 seconds
+3. Call get_job_status({"job_id": job_id}) → Check progress
+4. Repeat step 2-3 until status is "completed" or "failed"
+5. Retrieve results from final get_job_status() response
+
+EXAMPLE USAGE:
+──────────────
+# Example 1: Test newly built kernel
+# ─────────────────────────────────────────────────────────────
+# PREREQUISITE: Build the kernel first!
+# Shell(command="vng -v --build", timeout=1200000)
+
+result = run_kselftest({
+    "test_name": "sched_ext"
+})
+# Automatically:
+# 1. Builds kselftest (if not already built)
+# 2. Runs kselftest asynchronously
+# Returns: {"job_id": "kselftest_sched_ext_...", "status": "starting"}
+
+# Poll for results
+status = get_job_status({"job_id": result["job_id"]})
+
+
+# Example 2: Test on HOST kernel
+# ──────────────────────────────
+result = run_kselftest({
+    "test_name": "net",
+    "kernel_image": "host"
+})
+# Automatically:
+# 1. Builds kselftest (if not already built)
+# 2. Runs kselftest on host kernel
+
+
+# Example 3: Test on UPSTREAM kernel
+# ──────────────────────────────────
+result = run_kselftest({
+    "test_name": "vm",
+    "kernel_image": "v6.14"
+})
+# Automatically:
+# 1. Builds kselftest (if not already built)
+# 2. Downloads upstream kernel v6.14 (if not cached)
+# 3. Runs kselftest on upstream kernel
+
+
+# Example 4: Test specific kernel image
+# ──────────────────────────────────────
+result = run_kselftest({
+    "test_name": "seccomp",
+    "kernel_image": "./arch/x86/boot/bzImage"
+})
+
+
+ADVANCED EXAMPLES:
+──────────────────
+# With verbose output:
+run_kselftest({
+    "test_name": "vm",
+    "runner_args": "--verbose"
+})
+
+# With more memory and longer timeout:
+run_kselftest({
+    "test_name": "net",
+    "memory": "4G",
+    "timeout": 7200
+})
+
+# Test on host kernel with verbose output:
+run_kselftest({
+    "test_name": "net",
+    "kernel_image": "host",
+    "runner_args": "--verbose"
+})
+
+AGENT GUIDANCE:
+───────────────
+When using this tool:
+1. ⚠️  FIRST: Build the kernel using Shell(command="vng -v --build", timeout=1200000)
+2. Then call run_kselftest() (it will build the kselftest automatically)
+3. Inform user job started
+4. Poll get_job_status() every 10-30 seconds
+5. Update user with progress
+6. Report final results when completed
+
+IMPORTANT NOTES:
+────────────────
+⏱️  Timing: Kselftests typically take 5-60+ minutes
+🧪 Test list: Available tests in tools/testing/selftests/
+🔄 Async: This tool always runs asynchronously (no MCP timeout)
+📊 Results: Full test output available in get_job_status() stdout
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "test_name": {
+                        "type": "string",
+                        "description": "Target kselftest to run (e.g., 'sched_ext', 'vm', 'net', 'seccomp')",
+                    },
+                    "kernel_image": {
+                        "type": "string",
+                        "description": (
+                            "Which kernel to run: omit for newly built kernel "
+                            "(DEFAULT), 'host' for host kernel, 'v6.14' for upstream "
+                            "auto-download, or './path' for local image"
+                        ),
+                    },
+                    "kernel_dir": {
+                        "type": "string",
+                        "description": "Path to kernel source directory",
+                        "default": ".",
+                    },
+                    "memory": {
+                        "type": "string",
+                        "description": "Memory size for VM (e.g., '2G', '4G')",
+                        "default": "2G",
+                    },
+                    "timeout": {
+                        "type": "integer",
+                        "description": "Maximum runtime in seconds (default: 3600 = 1 hour)",
+                        "default": 3600,
+                    },
+                    "runner_args": {
+                        "type": "string",
+                        "description": "Additional arguments for kselftest runner (e.g., '--verbose', '--tap')",
+                    },
+                    "arch": {
+                        "type": "string",
+                        "description": "Target architecture",
+                        "enum": [
+                            "amd64",
+                            "arm64",
+                            "armhf",
+                            "ppc64el",
+                            "s390x",
+                            "riscv64",
+                        ],
+                    },
+                    "cpus": {
+                        "type": "integer",
+                        "description": "Number of CPUs",
+                    },
+                    "network": {
+                        "type": "string",
+                        "description": "Network mode",
+                        "enum": ["user", "bridge", "loop"],
+                    },
+                },
+                "required": ["test_name"],
+            },
+        ),
+        Tool(
             name="run_kernel_async",
             description="""
 Run a kernel test asynchronously (non-blocking).
@@ -1517,9 +1745,14 @@ WORKFLOW:
 
 WHEN TO USE:
 ────────────
+✅ Use run_kselftest for:
+  - ALL kernel selftests (5-60 minutes)
+  - Works with newly built, host, or upstream kernels
+  - This is the recommended tool for kselftests
+
 ✅ Use run_kernel_async for:
-  - Kernel selftests (5-60 minutes)
-  - Long-running tests (>2 minutes)
+  - Custom long-running tests (>2 minutes)
+  - Non-kselftest operations
   - Operations that might timeout with run_kernel
 
 ✅ Use run_kernel (sync) for:
@@ -1795,6 +2028,8 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return await configure_kernel(arguments)
     if name == "run_kernel":
         return await run_kernel(arguments)
+    if name == "run_kselftest":
+        return await run_kselftest_handler(arguments)
     if name == "run_kernel_async":
         return await run_kernel_async_handler(arguments)
     if name == "get_job_status":
@@ -1802,7 +2037,7 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
     if name == "cancel_job":
         return await cancel_job_handler(arguments)
     if name == "list_jobs":
-        return await list_jobs_handler(arguments)
+        return await list_jobs_handler()
     if name == "get_kernel_info":
         return await get_kernel_info(arguments)
     if name == "apply_patch":
@@ -2376,6 +2611,173 @@ async def verify_kernel(args: dict) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
+async def run_kselftest_handler(args: dict) -> list[TextContent]:
+    """
+    Run kernel selftests asynchronously with automatic build support.
+    """
+    test_name = args.get("test_name")
+
+    if not test_name:
+        result = {
+            "success": False,
+            "error": "test_name is required",
+            "message": "Please provide a test name (e.g., 'sched_ext', 'vm', 'net', 'seccomp')",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if kernel directory exists
+    kernel_dir = args.get("kernel_dir", ".")
+    kernel_path = Path(kernel_dir)
+    if not kernel_path.exists():
+        result = {
+            "success": False,
+            "error": "kernel_dir_not_found",
+            "message": f"Kernel directory {kernel_dir} does not exist",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if selftests directory exists
+    selftests_path = kernel_path / "tools" / "testing" / "selftests"
+    if not selftests_path.exists():
+        result = {
+            "success": False,
+            "error": "selftests_not_found",
+            "message": f"Selftests directory not found at {selftests_path}",
+            "help": "Make sure you're in a kernel source tree with tools/testing/selftests/",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Check if the specific test directory exists
+    test_path = selftests_path / test_name
+    if not test_path.exists():
+        result = {
+            "success": False,
+            "error": "test_not_found",
+            "message": f"Test '{test_name}' not found at {test_path}",
+            "help": f"Check available test targets in {selftests_path}/",
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Get settings
+    kernel_image = args.get("kernel_image")
+    build_timeout = 1200  # Hard-coded 20 minutes (same as vng -v --build default)
+
+    build_steps = []
+
+    # Step 2: Build kselftest
+    nproc_result = run_command(["nproc"], timeout=5)
+    nproc = nproc_result[1].strip() if nproc_result[0] == 0 else "1"
+
+    build_cmd = [
+        "make",
+        f"-j{nproc}",
+        "-C",
+        f"tools/testing/selftests/{test_name}",
+    ]
+
+    build_start = time.time()
+    build_returncode, build_stdout, build_stderr = run_command(
+        build_cmd, cwd=kernel_dir, timeout=build_timeout
+    )
+    build_time = time.time() - build_start
+
+    if build_returncode != 0:
+        result = {
+            "success": False,
+            "error": "kselftest_build_failed",
+            "message": f"Failed to build kselftest '{test_name}' (took {round(build_time, 2)}s)",
+            "build_stdout": (
+                build_stdout[-2000:] if len(build_stdout) > 2000 else build_stdout
+            ),
+            "build_stderr": (
+                build_stderr[-2000:] if len(build_stderr) > 2000 else build_stderr
+            ),
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    build_steps.append(f"kselftest '{test_name}' (built in {round(build_time, 2)}s)")
+
+    # Build the kselftest command
+    runner_args = args.get("runner_args", "")
+    if runner_args:
+        kselftest_cmd = f'make kselftest TARGETS="{test_name}" SKIP_TARGETS="" KSELFTEST_RUNNER_ARGS="{runner_args}"'
+    else:
+        kselftest_cmd = f'make kselftest TARGETS="{test_name}" SKIP_TARGETS=""'
+
+    # Prepare arguments for run_kernel_async
+    async_args = {
+        "kernel_dir": kernel_dir,
+        "command": kselftest_cmd,
+        "memory": args.get("memory", "2G"),
+        "timeout": args.get("timeout", 3600),
+    }
+
+    # Add kernel_image if provided
+    if args.get("kernel_image"):
+        async_args["kernel_image"] = args["kernel_image"]
+
+    # Add optional parameters if provided
+    if args.get("arch"):
+        async_args["arch"] = args["arch"]
+    if args.get("cpus"):
+        async_args["cpus"] = args["cpus"]
+    if args.get("network"):
+        async_args["network"] = args["network"]
+
+    # Generate unique job ID
+    timestamp = int(time.time())
+    job_id = f"kselftest_{test_name}_{timestamp}_{uuid.uuid4().hex[:8]}"
+
+    # Build command string for display
+    kernel_image = args.get("kernel_image")
+    if kernel_image == "host":
+        command_str = f"vng -vr -- {kselftest_cmd}"
+        kernel_note = "Running on host kernel"
+    elif kernel_image:
+        command_str = f"vng -vr {kernel_image} -- {kselftest_cmd}"
+        if kernel_image.startswith("v") and any(c.isdigit() for c in kernel_image):
+            kernel_note = f"Running on upstream kernel {kernel_image}"
+        else:
+            kernel_note = f"Running on kernel image: {kernel_image}"
+    else:
+        command_str = f"vng -v -- {kselftest_cmd}"
+        kernel_note = "Running on newly built kernel"
+
+    # Create job object
+    job = Job(job_id=job_id, command=command_str, args=async_args)
+
+    # Store job
+    with _jobs_lock:
+        _active_jobs[job_id] = job
+
+    # Start background thread
+    thread = threading.Thread(
+        target=_run_job_in_background, args=(job_id,), daemon=True
+    )
+    thread.start()
+
+    # Return immediately with job info
+    result = {
+        "success": True,
+        "job_id": job_id,
+        "status": "starting",
+        "test_name": test_name,
+        "message": f"Kselftest '{test_name}' started successfully. Use get_job_status() to check progress.",
+        "command": command_str,
+        "kernel_note": kernel_note,
+        "poll_suggestion": "Wait 10 seconds before first status check",
+        "expected_runtime": "Kselftests typically take 5-60+ minutes",
+    }
+
+    # Add build information if any builds were performed
+    if build_steps:
+        result["builds_performed"] = build_steps
+    else:
+        result["builds_performed"] = ["none (everything already built)"]
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+
 async def run_kernel_async_handler(args: dict) -> list[TextContent]:
     """
     Start a kernel test asynchronously.
@@ -2422,7 +2824,7 @@ async def run_kernel_async_handler(args: dict) -> list[TextContent]:
         "status": "starting",
         "message": "Job started successfully. Use get_job_status() to check progress.",
         "command": command_str,
-        "poll_suggestion": "Wait 10-30 seconds before first status check",
+        "poll_suggestion": "Wait 10 seconds before first status check",
     }
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
@@ -2465,11 +2867,11 @@ async def get_job_status_handler(args: dict) -> list[TextContent]:
     # Add helpful messages and guidance based on status
     if job.status == "starting":
         result["message"] = "Job is starting up..."
-        result["poll_again_in_seconds"] = 5
+        result["poll_again_in_seconds"] = 60
     elif job.status == "running":
         elapsed = result["elapsed_seconds"]
         result["message"] = f"Job is running ({elapsed}s elapsed)"
-        result["poll_again_in_seconds"] = 30 if elapsed > 60 else 10
+        result["poll_again_in_seconds"] = 10
         result["agent_guidance"] = (
             f"Wait {result['poll_again_in_seconds']} seconds before checking again"
         )
@@ -2477,7 +2879,9 @@ async def get_job_status_handler(args: dict) -> list[TextContent]:
         result["message"] = "Job completed successfully"
         result["success_flag"] = job.returncode == 0
         if job.returncode != 0:
-            result["warning"] = f"Job completed but command returned exit code {job.returncode}"
+            result["warning"] = (
+                f"Job completed but command returned exit code {job.returncode}"
+            )
     elif job.status == "failed":
         result["message"] = "Job failed"
         result["success_flag"] = False
@@ -2538,7 +2942,7 @@ async def cancel_job_handler(args: dict) -> list[TextContent]:
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
-async def list_jobs_handler(args: dict) -> list[TextContent]:  # pylint: disable=unused-argument
+async def list_jobs_handler() -> list[TextContent]:
     """
     List all active async jobs.
     Automatically cleans up old jobs (>24 hours) first.
@@ -2560,7 +2964,9 @@ async def list_jobs_handler(args: dict) -> list[TextContent]:  # pylint: disable
     }
 
     if len(jobs) == 0:
-        result["note"] = "No active jobs. Jobs older than 24 hours are automatically cleaned up."
+        result["note"] = (
+            "No active jobs. Jobs older than 24 hours are automatically cleaned up."
+        )
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
