@@ -474,6 +474,18 @@ fn mount_virtme_overlays() {
     }
 }
 
+// The format for a shared_path is
+//   virtme_shared_path1=tag_name=mount_path
+fn mount_virtme_shared_path() {
+    for (key, path) in env::vars() {
+        if key.starts_with("virtme_shared_path") {
+            let parts: Vec<&str> = path.split('=').collect();
+            // parts[0] contains the tag and parts[1] counts the mount point
+            utils::do_mount(parts[0], parts[1], "virtiofs", 0, "");
+        }
+    }
+}
+
 fn mount_virtme_initmounts() {
     for (key, path) in env::vars() {
         if key.starts_with("virtme_initmount") {
@@ -1126,6 +1138,7 @@ fn main() {
     mount_cgroupfs();
     configure_limits();
     mount_virtme_overlays();
+    mount_virtme_shared_path();
     mount_sys_filesystems();
     mount_kernel_modules();
     run_systemd_tmpfiles();

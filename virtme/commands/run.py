@@ -180,6 +180,16 @@ def make_parser() -> argparse.ArgumentParser:
         help="Add a read/write virtio-blk disk.  The device nodes will be /dev/disk/by-id/virtio-virtme_disk_blk_NAME.",
     )
     g.add_argument(
+        "--shared-path",
+        action="append",
+        default=[],
+        metavar="TAG=PATH_ON_HOST:PATH_ON_GUEST",
+        help="Share a directory with guest as virtiofs with tag (can be used multiple times). "
+        + "The expected format is: --shared-path tag_name=/path/on/host:/path/on/guest. "
+        + "This options is handy when used with --root, since it exposes one "
+        + "directory from the host in a different rootfs oon the guest.",
+    )
+    g.add_argument(
         "--memory",
         action="store",
         default=None,
@@ -905,6 +915,23 @@ def sanitize_disk_args(func: str, arg: str) -> tuple[str, str]:
     return name, fn
 
 
+# Validate tag=path arguments from --shared-path
+# Format expected:
+#   --shared-path tag_name=/path/on/host:/mount/path/on/guest
+def sanitize_shared_path_args(arg: str) -> tuple[str, str, str]:
+    tag, paths = arg.split("=")
+    path_host, path_guest = paths.split(":")
+
+    # Check if the directory exists in the
+    if not Path(path_host).exists():
+        arg_fail(f"shared_path {path_host} doesn't exists")
+
+    if not Path(path_host).is_dir():
+        arg_fail(f"shared_path {path_host} is not a directory")
+
+    return tag, path_host, path_guest
+
+
 def can_access_file(path):
     if not os.path.exists(path):
         return False
@@ -1306,6 +1333,11 @@ def do_it() -> int:
     if guest_tools_path is None:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
+    if can_use_microvm(args):
+        virt_arch = architectures.get("microvm")
+    else:
+        virt_arch = arch
+
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
     # is forced.
     if args.force_9p:
@@ -1313,10 +1345,6 @@ def do_it() -> int:
     else:
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
-        if can_use_microvm(args):
-            virt_arch = architectures.get("microvm")
-        else:
-            virt_arch = arch
         virtiofs_config = VirtioFSConfig(
             path=args.root,
             mount_tag="ROOTFS",
@@ -1342,6 +1370,25 @@ def do_it() -> int:
             readonly=(not args.rw),
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
+
+    for i, arg in enumerate(args.shared_path):
+        tag, path_host, path_guest = sanitize_shared_path_args(arg)
+        virtiofs_config = VirtioFSConfig(
+            path=path_host,
+            mount_tag=tag,
+            guest_tools_path=guest_tools_path,
+            memory=args.memory,
+            rw=args.rw,
+            numa=args.numa,
+        )
+        use_virtiofs = export_virtiofs(
+            virt_arch,
+            qemuargs,
+            virtiofs_config,
+            verbose=args.verbose,
+        )
+
+        kernelargs.append(f"virtme_shared_path{i}={tag}={path_guest}")
 
     # Use the faster virtme-ng-init if we are running on a native architecture.
     if (

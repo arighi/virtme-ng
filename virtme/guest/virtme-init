@@ -39,6 +39,17 @@ for tag in "${!virtme_rw_overlay@}"; do
         mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
 done
 
+# Setup the directories that were shared from the host using virtiofs
+# The format is virtme_shared_path0=tag_name=mount_point
+printenv | grep "^virtme_shared_path" | while IFS="=" read -r var_name value; do
+    value="${!var_name}"
+
+    tag=$(echo "$value" | cut -d "=" -f 1)
+    mnt_point=$(echo "$value" | cut -d "=" -f 2)
+
+    mount -t virtiofs "${tag}" "${mnt_point}"
+done
+
 # Setup kernel modules
 kver="$(uname -r)"
 

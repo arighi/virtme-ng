@@ -434,6 +434,16 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--shared-path",
+        action="append",
+        metavar="TAG=PATH_ON_HOST:PATH_ON_GUEST",
+        help="Share a directory with guest as virtiofs with tag (can be used multiple times). "
+        + "The expected format is: --shared-path tag_name=/path/on/host:/path/on/guest. "
+        + "This options is handy when used with --root, since it exposes one "
+        + "directory from the host in a different rootfs oon the guest.",
+    )
+
+    parser.add_argument(
         "--exec",
         "-e",
         action="store",
@@ -1169,6 +1179,14 @@ class KernelSource:
         else:
             self.virtme_param["disk"] = ""
 
+    def _get_virtme_shared_path(self, args):
+        shared_path_str = ""
+        if args.shared_path is not None:
+            for sp in args.shared_path:
+                tag, path = sp.split("=")
+                shared_path_str += f"--shared-path {tag}={path} "
+        self.virtme_param["shared_path"] = shared_path_str
+
     def _get_virtme_sound(self, args):
         if args.sound:
             self.virtme_param["sound"] = "--sound"
@@ -1371,6 +1389,7 @@ class KernelSource:
         self._get_virtme_ssh_client(args)
         self._get_virtme_remote_cmd(args)
         self._get_virtme_disk(args)
+        self._get_virtme_shared_path(args)
         self._get_virtme_sound(args)
         self._get_virtme_vmcoreinfo(args)
         self._get_virtme_disable_microvm(args)
@@ -1423,6 +1442,7 @@ class KernelSource:
             + f"{self.virtme_param['ssh_client']} "
             + f"{self.virtme_param['remote_cmd']} "
             + f"{self.virtme_param['disk']} "
+            + f"{self.virtme_param['shared_path']} "
             + f"{self.virtme_param['sound']} "
             + f"{self.virtme_param['vmcoreinfo']} "
             + f"{self.virtme_param['disable_microvm']} "
