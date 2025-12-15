@@ -5,7 +5,9 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+configure_environment() {
+    export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+}
 
 log() {
     if [[ -e /dev/kmsg ]]; then
@@ -15,333 +17,402 @@ log() {
     fi
 }
 
-# Mount procfs and sysfs (needed for stat, sadly)
-mount -t proc -o nosuid,noexec,nodev proc /proc/
-mount -t sysfs -o nosuid,noexec,nodev sys /sys/
+mount_kernel_filesystems() {
+    # Mount procfs and sysfs (needed for stat, sadly)
+    mount -t proc -o nosuid,noexec,nodev proc /proc/
+    mount -t sysfs -o nosuid,noexec,nodev sys /sys/
 
-if [[ $$ -eq 1 ]]; then
-    # only mount /run if systemd is not the init
-    if ! grep -q "run /run" /proc/mounts; then
-        # Mount tmpfs dirs
-        mount -t tmpfs -o mode=0755 run /run/
-    fi
-fi
-mkdir /run/tmp
-
-# Setup rw filesystem overlays
-for tag in "${!virtme_rw_overlay@}"; do
-    dir="${!tag}"
-    upperdir="/run/tmp/$tag/upper"
-    workdir="/run/tmp/$tag/work"
-    mkdir -p "$upperdir" "$workdir"
-    mnt_opts="lowerdir=$dir,upperdir=$upperdir,workdir=$workdir"
-    mount -t overlay -o xino=off,"${mnt_opts}" "${tag}" "${dir}" ||
-        mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
-done
-
-# Setup kernel modules
-kver="$(uname -r)"
-
-# Make sure to always have /lib/modules, otherwise we won't be able to
-# configure kmod support properly (this can happen in some container
-# environments, such as docker).
-if [[ ! -d /lib/modules ]]; then
-    mkdir -p /lib/modules
-fi
-
-if [[ -n $virtme_root_mods ]]; then
-    # /lib/modules is already set up
-    true
-elif [[ -n $virtme_link_mods ]]; then
-    mount -n -t tmpfs none /lib/modules
-    ln -s "$virtme_link_mods" "/lib/modules/$kver"
-elif [[ -d "/lib/modules/$kver" ]]; then
-    # We may have mismatched modules.  Mask them off.
-    mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
-fi
-
-# Adjust max limit of open files
-if [[ -n ${nr_open} ]]; then
-    printf -- '%s\n' "${nr_open}" > /proc/sys/fs/nr_open
-fi
-
-# devtmpfs might be automounted; if not, mount it.
-if ! grep -q devtmpfs /proc/mounts; then
-    # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
-    if [[ -c /dev/null ]]; then
-        mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
-            &> /dev/null
-    else
-        mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
-    fi
-
-    # shellcheck disable=SC2181
-    if (($? != 0)); then
-        # The running kernel doesn't have devtmpfs.  Use regular tmpfs.
-        mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
-
-        # Make some basic devices first, and let udev handle the rest
-        mknod -m 0666 /dev/null c 1 3
-        mknod -m 0660 /dev/kmsg c 1 11
-        mknod -m 0600 /dev/console c 5 1
-    fi
-fi
-
-# Setup rw tmpfs directories
-[ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
-[ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
-
-# Additional rw dirs used by systemd
-[ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
-[ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
-[ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
-[ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
-[ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
-
-# Additional rw dirs required by apt (if present)
-[ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
-
-# Additional rw dirs required by snapd (if present)
-[ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie
-
-# Hide additional sudo settings
-[ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo
-
-# Fix up /etc a little bit
-touch /run/tmp/fstab
-mount --bind /run/tmp/fstab /etc/fstab
-
-if [[ -n $virtme_hostname ]]; then
-    cp /etc/hosts /run/tmp/hosts
-    printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /run/tmp/hosts
-    mount --bind /run/tmp/hosts /etc/hosts
-fi
-
-# Fix dpkg if we are on a Debian-based distro
-if [ -d /var/lib/dpkg ]; then
-    lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
-    for file in "${lock_files[@]}"; do
-        [ -e "$file" ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
-    done
-fi
-
-# Populate dummy entries in /etc/shadow to allow switching to any user defined
-# in the system
-# Lock the accounts by default
-value='!'
-
-(umask 0644 && touch /run/tmp/shadow)
-if (("${virtme_empty_passwords:-0}" == 1)); then
-    value=''
-fi
-sed -e "s/^\([^:]\+\).*/\1:${value}:::::::/" < /etc/passwd > /run/tmp/shadow
-mount --bind /run/tmp/shadow /etc/shadow
-
-# The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
-# run on rootless users just create a dummy directory and bind mount it in the same place.
-mkdir /run/tmp/lvm
-mount --bind /run/tmp/lvm /etc/lvm
-
-# Create a default lvm configuration is lvmconfig is available when systemd is enabled
-if [[ $$ -ne 1 ]]; then
-    if command -v lvmconfig &> /dev/null; then
-        log "Creating a default lvm.conf file"
-        lvmconfig --type default > /etc/lvm/lvm.conf
-    fi
-fi
-
-for tag in "${!virtme_initmount@}"; do
-    if [[ ! -d ${!tag} ]]; then
-        mkdir -p "${!tag}"
-    fi
-    mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.initmount${tag:16}" "${!tag}" || exit 1
-done
-
-if [[ -n ${virtme_chdir} ]]; then
-    cd -- "${virtme_chdir}" || exit
-fi
-
-log "basic initialization done"
-
-######## The remainder of this script is a very simple init (PID 1) ########
-
-# Does the system use systemd-tmpfiles?
-if command -v systemd-tmpfiles &> /dev/null; then
-    log "running systemd-tmpfiles"
-    systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
-fi
-
-# Make dbus work (if tmpfiles wasn't there or didn't create the directory).
-install -d /run/dbus
-
-# Set up useful things in /sys, assuming our kernel supports it.
-mount -t configfs configfs /sys/kernel/config &> /dev/null
-mount -t debugfs debugfs /sys/kernel/debug &> /dev/null
-mount -t tracefs tracefs /sys/kernel/tracing &> /dev/null
-mount -t securityfs securityfs /sys/kernel/security &> /dev/null
-
-# Set up cgroup mount points (mount cgroupv2 hierarchy by default)
-#
-# If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
-# behavior and mount the legacy cgroup v1 layout.
-if grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )' /proc/cmdline; then
-    mount -t tmpfs cgroup /sys/fs/cgroup
-    sybsys=(cpu cpuacct blkio memory devices pids)
-    for s in "${sybsys[@]}"; do
-        mkdir -p "/sys/fs/cgroup/${s}"
-        # Don't treat failure as critical here, since the kernel may not
-        # support all the legacy cgroups.
-        mount -t cgroup "${s}" -o "${s}" "/sys/fs/cgroup/${s}" || true
-    done
-else
-    mount -t cgroup2 cgroup2 /sys/fs/cgroup
-fi
-
-# Set up filesystems that live in /dev
-# shellcheck disable=SC2174  # Use -p to ignore errors if the directories already exist
-mkdir -p -m 0755 /dev /dev/shm /dev/pts
-mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
-mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
-
-# Find udevd
-if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
-    udevd=/usr/lib/systemd/systemd-udevd
-elif [[ -x /lib/systemd/systemd-udevd ]]; then
-    udevd=/lib/systemd/systemd-udevd
-else
-    udevd=$(command -v udevd)
-fi
-
-# Try to get udevd to coldplug everything.
-if [[ -n $udevd ]]; then
-    if [[ -e '/sys/kernel/uevent_helper' ]]; then
-        # This kills boot performance.
-        log "you have CONFIG_UEVENT_HELPER on; turn it off"
-        echo '' > /sys/kernel/uevent_helper
-    fi
-    log "starting udevd"
-    udev_out=$($udevd --daemon 2>&1)
-    if ! grep -q "quiet" /proc/cmdline; then
-        log "udev: $udev_out"
-    fi
-    log "triggering udev coldplug"
-    udevadm trigger --type=subsystems --action=add > /dev/null 2>&1
-    udevadm trigger --type=devices --action=add > /dev/null 2>&1
-    log "waiting for udev to settle"
-    udevadm settle --timeout=300
-    log "udev is done"
-else
-    log "udevd not found"
-fi
-
-# Install /proc/self/fd symlinks into /dev if not already present
-declare -r -A fdlinks=(
-    ["/dev/fd"]="/proc/self/fd"
-    ["/dev/stdin"]="/proc/self/fd/0"
-    ["/dev/stdout"]="/proc/self/fd/1"
-    ["/dev/stderr"]="/proc/self/fd/2")
-
-for p in "${!fdlinks[@]}"; do
-    [[ -e $p ]] || ln -s "${fdlinks[$p]}" "$p"
-done
-
-if [[ -n $virtme_hostname ]]; then
-    log "Setting hostname to $virtme_hostname..."
-    hostname "$virtme_hostname"
-fi
-
-# Bring up networking
-ip link set dev lo up
-
-# Setup sudoers
-real_sudoers=/etc/sudoers
-if [ ! -e ${real_sudoers} ]; then
-    touch ${real_sudoers}
-fi
-tmpfile="$(mktemp --tmpdir=/run/tmp)"
-echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
-echo "root ALL = (ALL) NOPASSWD: ALL" >> "$tmpfile"
-if [[ -n ${virtme_user} ]]; then
-    printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
-fi
-chmod 440 "$tmpfile"
-if [ ! -f "$real_sudoers" ]; then
-    touch "$real_sudoers"
-fi
-mount --bind "$tmpfile" "$real_sudoers"
-
-if grep -q -E '(^| )virtme.dhcp($| )' /proc/cmdline; then
-    # Make sure all GIDs are allowed to create raw ICMP sockets (this
-    # allows to run ping as regular user).
-    echo "0 2147483647" > /proc/sys/net/ipv4/ping_group_range
-
-    # udev is liable to rename the interface out from under us.
-    for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
-        virtme_net=$(basename "${d}")
-        udhcpc_opts=(-i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script")
-        if [[ -n $virtme_hostname ]]; then
-            udhcpc_opts+=(-x hostname:"$virtme_hostname")
+    if [[ $$ -eq 1 ]]; then
+        # only mount /run if systemd is not the init
+        if ! grep -q "run /run" /proc/mounts; then
+            # Mount tmpfs dirs
+            mount -t tmpfs -o mode=0755 run /run/
         fi
-        busybox udhcpc "${udhcpc_opts[@]}" &
+    fi
+
+    # devtmpfs might be automounted; if not, mount it.
+    if ! grep -q devtmpfs /proc/mounts; then
+        # Ideally we'll use devtmpfs (but don't rely on /dev/null existing).
+        if [[ -c /dev/null ]]; then
+            mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev \
+                &> /dev/null
+        else
+            mount -n -t devtmpfs -o mode=0755,nosuid,noexec devtmpfs /dev
+        fi
+
+        # shellcheck disable=SC2181
+        if (($? != 0)); then
+            # The running kernel doesn't have devtmpfs.  Use regular tmpfs.
+            mount -t tmpfs -o mode=0755,nosuid,noexec none /dev
+
+            # Not available in Rust implementation
+            # Make some basic devices first, and let udev handle the rest
+            mknod -m 0666 /dev/null c 1 3
+            mknod -m 0660 /dev/kmsg c 1 11
+            mknod -m 0600 /dev/console c 5 1
+        fi
+    fi
+
+    # Set up useful things in /sys, assuming our kernel supports it.
+    mount -t configfs configfs /sys/kernel/config &> /dev/null
+    mount -t debugfs debugfs /sys/kernel/debug &> /dev/null
+    mount -t tracefs tracefs /sys/kernel/tracing &> /dev/null
+    mount -t securityfs securityfs /sys/kernel/security &> /dev/null
+}
+
+mount_virtme_overlays() {
+    mkdir /run/tmp
+
+    # Setup rw filesystem overlays
+    for tag in "${!virtme_rw_overlay@}"; do
+        dir="${!tag}"
+        upperdir="/run/tmp/$tag/upper"
+        workdir="/run/tmp/$tag/work"
+        mkdir -p "$upperdir" "$workdir"
+        mnt_opts="lowerdir=$dir,upperdir=$upperdir,workdir=$workdir"
+        mount -t overlay -o xino=off,"${mnt_opts}" "${tag}" "${dir}" ||
+            mount -t overlay -o "${mnt_opts}" "${tag}" "${dir}" &
     done
-    wait
-fi
+}
 
-if grep -q -E '(^| )virtme.ssh($| )' /proc/cmdline; then
-    "$(dirname -- "$0")"/virtme-sshd-script < /dev/null
-fi
+mount_kernel_modules() {
+    local kver
 
-if grep -q -E '(^| )virtme.snapd($| )' /proc/cmdline; then
-    # If snapd is present in the system try to start it, to properly support snaps.
-    snapd_bin="/usr/lib/snapd/snapd"
-    if [ -e "$snapd_bin" ]; then
-        snapd_state="/var/lib/snapd/state.json"
-        if [ -e "$snapd_state" ]; then
-            "$(dirname -- "$0")"/virtme-snapd-script
-            $snapd_bin > /dev/null 2>&1 < /dev/null &
-            snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
-            if [ -e $snapd_apparmor_bin ]; then
-                $snapd_apparmor_bin start > /dev/null 2>&1 < /dev/null
+    # Setup kernel modules
+    kver="$(uname -r)"
+
+    # Make sure to always have /lib/modules, otherwise we won't be able to
+    # configure kmod support properly (this can happen in some container
+    # environments, such as docker).
+    if [[ ! -d /lib/modules ]]; then
+        mkdir -p /lib/modules
+    fi
+
+    if [[ -n ${virtme_root_mods:-} ]]; then
+        # /lib/modules is already set up
+        true
+    elif [[ -n ${virtme_link_mods:-} ]]; then
+        mount -n -t tmpfs none /lib/modules
+        ln -s "$virtme_link_mods" "/lib/modules/$kver"
+    elif [[ -d "/lib/modules/$kver" ]]; then
+        # We may have mismatched modules.  Mask them off.
+        mount -n -t tmpfs -o ro,mode=0000 disallow_modules "/lib/modules/$kver"
+    fi
+}
+
+configure_limits() {
+    # Adjust max limit of open files
+    if [[ -n ${nr_open} ]]; then
+        printf -- '%s\n' "${nr_open}" > /proc/sys/fs/nr_open
+    fi
+}
+
+mount_sys_filesystems() {
+    # Set up filesystems that live in /dev
+    # shellcheck disable=SC2174  # Use -p to ignore errors if the directories already exist
+    mkdir -p -m 0755 /dev /dev/shm /dev/pts
+    mount -t devpts -o gid=tty,mode=620,noexec,nosuid devpts /dev/pts
+    mount -t tmpfs -o mode=1777,nosuid,nodev tmpfs /dev/shm
+    # Make dbus work (if tmpfiles wasn't there or didn't create the directory).
+    install -d /run/dbus
+
+    # Setup rw tmpfs directories
+    [ -e /var/log ] && mount -t tmpfs tmpfs /var/log/
+    [ -e /var/tmp ] && mount -t tmpfs tmpfs /var/tmp/
+
+    # Additional rw dirs used by systemd
+    [ -e /var/spool/rsyslog ] && mount -t tmpfs tmpfs /var/spool/rsyslog
+    [ -e /var/lib/portables ] && mount -t tmpfs tmpfs /var/lib/portables
+    [ -e /var/lib/machines ] && mount -t tmpfs tmpfs /var/lib/machines
+    [ -e /var/lib/private ] && mount -t tmpfs tmpfs /var/lib/private
+    [ -e /var/cache ] && mount -t tmpfs tmpfs /var/cache
+
+    # Additional rw dirs required by apt (if present)
+    [ -e /var/lib/apt ] && mount -t tmpfs tmpfs /var/lib/apt
+
+    # Additional rw dirs required by snapd (if present)
+    [ -e /var/lib/snapd/cookie ] && mount -t tmpfs tmpfs /var/lib/snapd/cookie
+
+    # Hide additional sudo settings
+    [ -e /var/lib/sudo ] && mount -t tmpfs tmpfs /var/lib/sudo
+}
+
+generate_fstab() {
+    # Fix up /etc a little bit
+    touch /run/tmp/fstab
+    mount --bind /run/tmp/fstab /etc/fstab
+}
+
+generate_hosts() {
+    if [[ -n ${virtme_hostname:-} ]]; then
+        cp /etc/hosts /run/tmp/hosts
+        printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /run/tmp/hosts
+        mount --bind /run/tmp/hosts /etc/hosts
+    fi
+}
+
+fix_dpkg_locks() {
+    # Fix dpkg if we are on a Debian-based distro
+    if [ -d /var/lib/dpkg ]; then
+        lock_files=(/var/lib/dpkg/lock /var/lib/dpkg/lock-frontend /var/lib/dpkg/triggers/Lock)
+        for file in "${lock_files[@]}"; do
+            [ -e "$file" ] && touch "/run/tmp/${file##*/}" && mount --bind "/run/tmp/${file##*/}" "$file"
+        done
+    fi
+}
+
+fix_packaging_files() {
+    fix_dpkg_locks
+}
+
+generate_shadow() {
+    # Populate dummy entries in /etc/shadow to allow switching to any user defined
+    # in the system
+    # Lock the accounts by default
+    value='!'
+
+    (umask 0644 && touch /run/tmp/shadow)
+    if (("${virtme_empty_passwords:-0}" == 1)); then
+        value=''
+    fi
+    sed -e "s/^\([^:]\+\).*/\1:${value}:::::::/" < /etc/passwd > /run/tmp/shadow
+    mount --bind /run/tmp/shadow /etc/shadow
+}
+
+generate_lvm() {
+    # The /etc/lvm is usually only read/write by root. In order to allow commands like pvcreate to be
+    # run on rootless users just create a dummy directory and bind mount it in the same place.
+    mkdir /run/tmp/lvm
+    mount --bind /run/tmp/lvm /etc/lvm
+
+    # Create a default lvm configuration is lvmconfig is available when systemd is enabled
+    if [[ $$ -ne 1 ]]; then
+        if command -v lvmconfig &> /dev/null; then
+            log "Creating a default lvm.conf file"
+            lvmconfig --type default > /etc/lvm/lvm.conf
+        fi
+    fi
+}
+
+mount_virtme_initmounts() {
+    for tag in "${!virtme_initmount@}"; do
+        if [[ ! -d ${!tag} ]]; then
+            mkdir -p "${!tag}"
+        fi
+        mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.initmount${tag:16}" "${!tag}" || exit 1
+    done
+}
+
+run_systemd_tmpfiles() {
+    # Does the system use systemd-tmpfiles?
+    if command -v systemd-tmpfiles &> /dev/null; then
+        log "running systemd-tmpfiles"
+        systemd-tmpfiles --create --boot --exclude-prefix="/dev" --exclude-prefix="/root"
+    fi
+}
+
+mount_cgroupfs() {
+    # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
+    #
+    # If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
+    # behavior and mount the legacy cgroup v1 layout.
+    if grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )' /proc/cmdline; then
+        mount -t tmpfs cgroup /sys/fs/cgroup
+        sybsys=(cpu cpuacct blkio memory devices pids)
+        for s in "${sybsys[@]}"; do
+            mkdir -p "/sys/fs/cgroup/${s}"
+            # Don't treat failure as critical here, since the kernel may not
+            # support all the legacy cgroups.
+            mount -t cgroup "${s}" -o "${s}" "/sys/fs/cgroup/${s}" || true
+        done
+    else
+        mount -t cgroup2 cgroup2 /sys/fs/cgroup
+    fi
+}
+
+# shellcheck disable=SC2034
+find_udevd() {
+    local -n udevd_ref=$1
+
+    # Find udevd
+    if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
+        udevd_ref=/usr/lib/systemd/systemd-udevd
+    elif [[ -x /lib/systemd/systemd-udevd ]]; then
+        udevd_ref=/lib/systemd/systemd-udevd
+    else
+        udevd_ref="$(command -v udevd)"
+    fi
+}
+
+run_udevd() {
+    local udevd=''
+
+    find_udevd udevd
+
+    # Try to get udevd to coldplug everything.
+    if [[ -n $udevd ]]; then
+        if [[ -e '/sys/kernel/uevent_helper' ]]; then
+            # This kills boot performance.
+            log "you have CONFIG_UEVENT_HELPER on; turn it off"
+            echo '' > /sys/kernel/uevent_helper
+        fi
+        log "starting udevd"
+        udev_out=$("$udevd" --daemon 2>&1)
+        if ! grep -q "quiet" /proc/cmdline; then
+            log "udev: $udev_out"
+        fi
+        log "triggering udev coldplug"
+        udevadm trigger --type=subsystems --action=add > /dev/null 2>&1
+        udevadm trigger --type=devices --action=add > /dev/null 2>&1
+        log "waiting for udev to settle"
+        udevadm settle --timeout=300
+        log "udev is done"
+    else
+        log "udevd not found"
+    fi
+}
+
+symlink_fds() {
+    declare -r -A fdlinks=(
+        ["/dev/fd"]="/proc/self/fd"
+        ["/dev/stdin"]="/proc/self/fd/0"
+        ["/dev/stdout"]="/proc/self/fd/1"
+        ["/dev/stderr"]="/proc/self/fd/2")
+
+    # Install /proc/self/fd symlinks into /dev if not already present
+    for p in "${!fdlinks[@]}"; do
+        [[ -e $p ]] || ln -s "${fdlinks[$p]}" "$p"
+    done
+}
+
+configure_hostname() {
+    if [[ -n ${virtme_hostname:-} ]]; then
+        log "Setting hostname to $virtme_hostname..."
+        hostname "$virtme_hostname"
+    else
+        log "virtme_hostname is not defined"
+    fi
+}
+
+setup_network_lo() {
+    # Bring up networking
+    ip link set dev lo up
+}
+
+generate_sudoers() {
+    # Setup sudoers
+    real_sudoers=/etc/sudoers
+    if [ ! -e ${real_sudoers} ]; then
+        touch ${real_sudoers}
+    fi
+    tmpfile="$(mktemp --tmpdir=/run/tmp)"
+    echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
+    echo "root ALL = (ALL) NOPASSWD: ALL" >> "$tmpfile"
+    if [[ -n ${virtme_user:-} ]]; then
+        printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
+    fi
+    chmod 440 "$tmpfile"
+    if [ ! -f "$real_sudoers" ]; then
+        touch "$real_sudoers"
+    fi
+    mount --bind "$tmpfile" "$real_sudoers"
+}
+
+override_system_files() {
+    generate_fstab
+    generate_shadow
+    generate_sudoers
+    generate_hosts
+    generate_lvm
+}
+
+setup_network() {
+    setup_network_lo
+
+    if grep -q -E '(^| )virtme.dhcp($| )' /proc/cmdline; then
+        # Make sure all GIDs are allowed to create raw ICMP sockets (this
+        # allows to run ping as regular user).
+        echo "0 2147483647" > /proc/sys/net/ipv4/ping_group_range
+
+        # udev is liable to rename the interface out from under us.
+        for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
+            virtme_net=$(basename -- "${d}")
+            udhcpc_opts=(-i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script")
+            if [[ -n $virtme_hostname ]]; then
+                udhcpc_opts+=(-x hostname:"$virtme_hostname")
+            fi
+            busybox udhcpc "${udhcpc_opts[@]}" &
+        done
+        wait
+    fi
+}
+
+run_sshd() {
+    if grep -q -E '(^| )virtme.ssh($| )' /proc/cmdline; then
+        "$(dirname -- "$0")"/virtme-sshd-script < /dev/null
+    fi
+}
+
+run_snapd() {
+    if grep -q -E '(^| )virtme.snapd($| )' /proc/cmdline; then
+        # If snapd is present in the system try to start it, to properly support snaps.
+        snapd_bin="/usr/lib/snapd/snapd"
+        if [ -e "$snapd_bin" ]; then
+            snapd_state="/var/lib/snapd/state.json"
+            if [ -e "$snapd_state" ]; then
+                "$(dirname -- "$0")"/virtme-snapd-script
+                $snapd_bin > /dev/null 2>&1 < /dev/null &
+                snapd_apparmor_bin=/usr/lib/snapd/snapd-apparmor
+                if [ -e $snapd_apparmor_bin ]; then
+                    $snapd_apparmor_bin start > /dev/null 2>&1 < /dev/null
+                fi
             fi
         fi
     fi
-fi
+}
 
-vsock_exec=$(sed -ne "s/.*virtme.vsockexec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
-if [[ -n ${vsock_exec} ]]; then
-    if [[ -n ${virtme_vsockmount} ]]; then
-        mkdir -p "${virtme_vsockmount}"
-        mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.vsockmount" "${virtme_vsockmount}"
+setup_socat_console() {
+    vsock_exec=$(sed -ne "s/.*virtme.vsockexec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
+    if [[ -n ${vsock_exec} ]]; then
+        if [[ -n ${virtme_vsockmount:-} ]]; then
+            mkdir -p "${virtme_vsockmount}"
+            mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.vsockmount" "${virtme_vsockmount}"
+        fi
+        socat "VSOCK-LISTEN:1024,reuseaddr,fork" \
+            "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &
     fi
-    socat "VSOCK-LISTEN:1024,reuseaddr,fork" \
-        "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &
-fi
+}
 
-user_cmd=$(sed -ne "s/.*virtme.exec=\`\([^\`]*\)\`.*/\1/p" /proc/cmdline)
-if [[ -n ${user_cmd} ]]; then
+set_cwd() {
+    if [[ -n ${virtme_chdir:-} ]]; then
+        cd -- "${virtme_chdir}" || exit
+    fi
+}
+
+run_user_script() {
+    local uid=$1
+
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
         ! -e "/dev/virtio-ports/virtme.stdout" ||
         ! -e "/dev/virtio-ports/virtme.stderr" ||
         ! -e "/dev/virtio-ports/virtme.dev_stdout" ||
         ! -e "/dev/virtio-ports/virtme.dev_stderr" ]]; then
-        echo "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
+        log "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
         poweroff -f
         exit 1
     fi
 
     # Set proper ownership on the virtio-ports devices
-    if [[ -n ${virtme_user} ]]; then
-        chown -- "${virtme_user}" \
-            /dev/virtio-ports/virtme.stdin \
-            /dev/virtio-ports/virtme.stdout \
-            /dev/virtio-ports/virtme.stderr \
-            /dev/virtio-ports/virtme.dev_stdout \
-            /dev/virtio-ports/virtme.dev_stderr
+    chown -- "${uid}" \
+        /dev/virtio-ports/virtme.stdin \
+        /dev/virtio-ports/virtme.stdout \
+        /dev/virtio-ports/virtme.stderr \
+        /dev/virtio-ports/virtme.dev_stdout \
+        /dev/virtio-ports/virtme.dev_stderr
 
-        if [ -e /dev/virtio-ports/virtme.ret ]; then
-            chown -- "${virtme_user}" \
-                /dev/virtio-ports/virtme.ret
-        fi
+    if [ -e /dev/virtio-ports/virtme.ret ]; then
+        chown -- "${uid}" \
+            /dev/virtio-ports/virtme.ret
     fi
 
     # Fix /dev/stdout and /dev/stderr.
@@ -359,118 +430,147 @@ if [[ -n ${user_cmd} ]]; then
     ln -s /dev/virtio-ports/virtme.dev_stdout /dev/stdout
     ln -s /dev/virtio-ports/virtme.dev_stderr /dev/stderr
 
-    # Decode shell command (base64) and dump it to a script
-    printf -- '%s\n' "$user_cmd" | base64 -d > /run/tmp/.virtme-script
+    clear_virtme_envs
 
-    if [[ -z ${virtme_graphics} ]]; then
-        # Start the script
-        log 'starting script'
-        if [[ -n ${virtme_user} ]]; then
-            chmod +x /run/tmp/.virtme-script
-            setsid su -c /run/tmp/.virtme-script -- "${virtme_user}" < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
-        else
-            setsid bash /run/tmp/.virtme-script < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
-        fi
-        ret=$?
-        log "script returned {$ret}"
-
-        # Channel exit code to the host.
-        if [ -e /dev/virtio-ports/virtme.ret ]; then
-            echo ${ret} > /dev/virtio-ports/virtme.ret
-        fi
-
-        # Hmm.  We should expose the return value somehow.
-        sync
-        poweroff -f
-        exit 0
+    log 'starting script'
+    if [[ -n ${virtme_user:-} ]]; then
+        chmod +x /run/tmp/.virtme-script
+        setsid su -c /run/tmp/.virtme-script -- "${virtme_user}" < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
+    else
+        setsid bash /run/tmp/.virtme-script < /dev/virtio-ports/virtme.stdin > /dev/virtio-ports/virtme.stdout 2> /dev/virtio-ports/virtme.stderr
     fi
-fi
+    ret=$?
+    log "script returned {$ret}"
 
-# Figure out what the main console is
-if [[ -n ${virtme_console} ]]; then
-    consdev=${virtme_console}
-else
-    consdev="$(grep ' ... (.C' /proc/consoles | cut -d' ' -f1)"
-fi
-if [[ -z $consdev ]]; then
-    log "can't deduce console device"
-    exec bash --login # At least try to be helpful
-fi
-if [[ -n ${virtme_user} ]]; then
-    chown -- "${virtme_user}" /dev/"${consdev}"
-fi
+    # Channel exit code to the host.
+    if [ -e /dev/virtio-ports/virtme.ret ]; then
+        echo ${ret} > /dev/virtio-ports/virtme.ret
+    fi
 
-deallocvt
+    # Hmm.  We should expose the return value somehow.
+    sync
+    poweroff -f
+    exit 0
+}
 
-if [[ $consdev == "tty0" ]]; then
-    # Create some VTs
-    openvt -c 2 -- /bin/bash
-    openvt -c 3 -- /bin/bash
-    openvt -c 4 -- /bin/bash
+setup_user_script() {
+    local uid=$1
 
-    consdev=tty1 # sigh
-fi
+    user_cmd=$(sed -ne "s/.*virtme.exec=\`\([^\`]*\)\`.*/\1/p" /proc/cmdline)
+    if [[ -n ${user_cmd} ]]; then
+        # Decode shell command (base64) and dump it to a script
+        printf -- '%s\n' "$user_cmd" | base64 -d > /run/tmp/.virtme-script
 
-if [[ ! -e "/dev/$consdev" ]]; then
-    log "/dev/$consdev doesn't exist."
-    exec bash --login
-fi
+        if [[ -z ${virtme_graphics:-} ]]; then
+            # Start the script
+            run_user_script "$uid"
+        fi
+    fi
+}
 
-# Redirect current stdout/stderr to consdev
-exec 1> "/dev/${consdev}"
-exec 2>&1
+# shellcheck disable=SC2034
+get_active_console() {
+    local -n consdev_ref=$1
 
-# Parameters that start with virtme_ shouldn't pollute the environment
-for p in "${!virtme_@}"; do
-    export -n -- "${p?}"
-done
+    # Figure out what the main console is
+    if [[ -n ${virtme_console:-} ]]; then
+        consdev_ref=${virtme_console}
+    else
+        consdev_ref="$(grep ' ... (.C' /proc/consoles | cut -d' ' -f1)"
+    fi
+}
 
-# Welcome message
-echo "          _      _                                    "
-echo "   __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _ "
-echo "   \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |"
-echo "    \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |"
-echo "     \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |"
-echo "                                                |___/ "
-echo "   kernel version: $(uname -mr)"
-echo "   (CTRL+d to exit)"
-echo ""
+redirect_console() {
+    local consdev=$1
 
-# Set up a basic environment (unless virtme-ng is running as root on the host)
-if [[ -z ${virtme_root_user} ]]; then
-    install -d -m 0755 /run/tmp/roothome
-    export HOME=/run/tmp/roothome
-    mount --bind /run/tmp/roothome /root
-else
-    export HOME=/root
-fi
+    # Redirect current stdout/stderr to consdev
+    exec 1> "/dev/${consdev}"
+    exec 2>&1
+}
 
-# $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
-# non-essential runtime files and other file objects (such as sockets, named
-# pipes, ...) should be stored.
-if [[ -n ${virtme_user} ]]; then
-    XDG_RUNTIME_DIR=/run/user/"$(id -u -- "${virtme_user}")"
-else
-    XDG_RUNTIME_DIR=/run/user/"$(id -u)"
-fi
-export XDG_RUNTIME_DIR
-mkdir -p "$XDG_RUNTIME_DIR"
-if [[ -n ${virtme_user} ]]; then
-    chown -- "${virtme_user}" "$XDG_RUNTIME_DIR"
-fi
+configure_terminal() {
+    local consdev=$1 uid=$2
 
-# Bring up a functioning shell on the console.  This is a bit magical:
-# We have no controlling terminal because we're attached to a fake
-# console device (probably something like /dev/console), which can't
-# be a controlling terminal.  We are also not a member of a session.
-# Init apparently can't setsid (whether that's a limitation of the
-# setsid binary or the system call, I don't know).
-if [[ -n ${virtme_stty_con} ]]; then
-    # Program the console sensibly
-    # shellcheck disable=SC2086  # The parameter is a white space separated array
-    stty ${virtme_stty_con} < "/dev/$consdev"
-fi
-if [[ -n ${virtme_graphics} ]]; then
+    chown -- "$uid" "/dev/${consdev}"
+
+    # Not available in Rust implementation
+    deallocvt
+    if [[ $consdev == "tty0" ]]; then
+        # Create some VTs
+        openvt -c 2 -- /bin/bash
+        openvt -c 3 -- /bin/bash
+        openvt -c 4 -- /bin/bash
+
+        consdev=tty1 # sigh
+    fi
+
+    # Not available in Rust implementation
+    if [[ ! -e "/dev/$consdev" ]]; then
+        log "/dev/$consdev doesn't exist."
+        exec bash --login
+    fi
+
+    redirect_console "$consdev"
+
+    # Bring up a functioning shell on the console.  This is a bit magical:
+    # We have no controlling terminal because we're attached to a fake
+    # console device (probably something like /dev/console), which can't
+    # be a controlling terminal.  We are also not a member of a session.
+    # Init apparently can't setsid (whether that's a limitation of the
+    # setsid binary or the system call, I don't know).
+    if [[ -n ${virtme_stty_con:-} ]]; then
+        # Program the console sensibly
+        # shellcheck disable=SC2086  # The parameter is a white space separated array
+        stty ${virtme_stty_con} < "/dev/$consdev"
+    fi
+}
+
+clear_virtme_envs() {
+    # Parameters that start with virtme_ shouldn't pollute the environment
+    for p in "${!virtme_@}"; do
+        export -n -- "${p?}"
+    done
+}
+
+print_logo() {
+    # Welcome message
+    echo "          _      _                                    "
+    echo "   __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _ "
+    echo "   \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |"
+    echo "    \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |"
+    echo "     \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |"
+    echo "                                                |___/ "
+    echo "   kernel version: $(uname -mr)"
+    echo "   (CTRL+d to exit)"
+    echo ""
+}
+
+setup_root_home() {
+    # Set up a basic environment (unless virtme-ng is running as root on the host)
+    if [[ -z ${virtme_root_user:-} ]]; then
+        install -d -m 0755 /run/tmp/roothome
+        export HOME=/run/tmp/roothome
+        mount --bind /run/tmp/roothome /root
+    else
+        export HOME=/root
+    fi
+}
+
+init_xdg_runtime_dir() {
+    local uid=$1
+
+    # $XDG_RUNTIME_DIR defines the base directory relative to which user-specific
+    # non-essential runtime files and other file objects (such as sockets, named
+    # pipes, ...) should be stored.
+    XDG_RUNTIME_DIR="/run/user/${uid}"
+    export XDG_RUNTIME_DIR
+    mkdir -p "$XDG_RUNTIME_DIR"
+    chown -- "$uid" "$XDG_RUNTIME_DIR"
+}
+
+run_user_gui() {
+    local consdev=$1
+
     # Check if we need to enable the sound system.
     if grep -q -E '(^| )virtme.sound($| )' /proc/cmdline; then
         pre_exec_cmd="$(dirname -- "$0")/virtme-sound-script"
@@ -485,7 +585,7 @@ if [[ -n ${virtme_graphics} ]]; then
     xinit_rc=/run/tmp/.xinitrc
     echo -e "${pre_exec_cmd}\nexec /run/tmp/.virtme-script" > ${xinit_rc}
     chmod +x /run/tmp/.virtme-script
-    if [[ -n ${virtme_user} ]]; then
+    if [[ -n ${virtme_user:-} ]]; then
         chown -- "${virtme_user}" ${xinit_rc}
         # Try to fix permissions on the virtual consoles, we are starting X
         # directly here so we may need extra permissions on the tty devices.
@@ -494,20 +594,91 @@ if [[ -n ${virtme_graphics} ]]; then
     else
         setsid bash -c "xinit ${xinit_rc}" 0<> "/dev/$consdev" 1>&0 2>&0
     fi
-    # Drop to console if the graphical app failed.
-fi
+}
 
-if [[ -n ${virtme_user} ]]; then
-    shell=""
-    if [[ -n ${virtme_shell} ]]; then
-        shell="-s ${virtme_shell}"
+run_user_shell() {
+    local consdev=$1 uid=$2
+
+    print_logo
+
+    if [[ -n ${virtme_user:-} ]]; then
+        shell=""
+        if [[ -n ${virtme_shell:-} ]]; then
+            shell="-s ${virtme_shell}"
+        fi
+        setsid bash -c "su ${shell} -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
+    else
+        setsid bash 0<> "/dev/$consdev" 1>&0 2>&0
     fi
-    setsid bash -c "su ${shell} -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
-else
-    setsid bash 0<> "/dev/$consdev" 1>&0 2>&0
-fi
+}
 
-# Exit when the main shell session terminates
+run_user_session() {
+    local consdev=$1 uid=$2
+
+    setup_user_script "$uid"
+
+    if [[ -n ${virtme_graphics:-} ]]; then
+        run_user_gui "$consdev" "$uid"
+        # Drop to console if the graphical app failed.
+    fi
+
+    run_user_shell "$consdev" "$uid"
+}
+
+setup_user_session() {
+    local uid consdev
+
+    if [[ -n ${virtme_user:-} ]]; then
+        uid="$(id -u -- "${virtme_user}")"
+    else
+        uid="$(id -u)"
+    fi
+
+    get_active_console consdev
+    if [[ -z $consdev ]]; then
+        log "failed to determine console"
+        exec bash --login # At least try to be helpful
+    fi
+
+    configure_terminal "$consdev" "$uid"
+    init_xdg_runtime_dir "$uid"
+    setup_root_home
+
+    log "initialization done"
+
+    run_user_session "$consdev" "$uid"
+}
+
+# Basic system initialization (order is important here).
+configure_environment
+configure_hostname
+mount_kernel_filesystems
+mount_cgroupfs
+configure_limits
+mount_virtme_overlays
+mount_sys_filesystems
+mount_kernel_modules
+run_systemd_tmpfiles
+log "basic initialization done"
+
+# Service running in the background for later
+setup_socat_console
+
+# Service initialization
+run_udevd
+symlink_fds
+mount_virtme_initmounts
+fix_packaging_files
+override_system_files
+run_sshd
+run_snapd
+setup_network
+
+# Start user session (batch or interactive)
+set_cwd
+setup_user_session
+
+# Shutdown the system.
 sync
 poweroff -f
 exit 0
