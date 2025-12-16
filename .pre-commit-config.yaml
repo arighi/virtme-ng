@@ -1,5 +1,6 @@
 ---
 ci:
+    autoupdate_schedule: monthly
     skip: [cargo-clippy-fix, cargo-clippy, cargo-check, cargo-fmt]
 
 repos:
