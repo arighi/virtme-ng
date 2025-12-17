@@ -346,7 +346,6 @@ IMPORTANT NOTES FOR AI AGENTS:
    - list_jobs: List all active async jobs
    - get_kernel_info: Get info about kernel source directory
    - apply_patch: Apply patches from lore.kernel.org
-   - build_kselftest: Build kernel selftests outside VM
    - verify_kernel: Verify a commit by building and booting it
 
    For building kernels, use shell commands with 'vng -v --build' as documented above.
@@ -1281,87 +1280,6 @@ Requirements:
             },
         ),
         Tool(
-            name="build_kselftest",
-            description="""
-Build a Linux kernel selftest outside of the virtualized environment.
-
-⚠️  NOTE: You typically DON'T need to call this tool directly!
-════════════════════════════════════════════════════════════════
-The run_kselftest command automatically builds the kselftest if needed.
-Just call: run_kselftest({"test_name": "sched_ext"})
-
-This tool is only needed if you want to pre-build the kselftest separately
-for some reason, but run_kselftest will handle it automatically.
-
-The tool will:
-- Build the kselftest outside vng: make -j$(nproc) -C tools/testing/selftests/<test_name>
-
-⚠️  IMPORTANT: The kernel must be BUILT first before building kselftests!
-   Use: vng -v --build
-
-═══════════════════════════════════════════════════════════════════════════
-RECOMMENDED WORKFLOW (Automatic - ALWAYS USE THIS):
-═══════════════════════════════════════════════════════════════════════════
-
-Just one command - run_kselftest handles the kselftest!
-────────────────────────────────────────────────────────────
-# PREREQUISITE: Build the kernel first!
-vng -v --build
-
-# Then run the kselftest
-result = run_kselftest({"test_name": "sched_ext"})
-
-This automatically:
-1. Builds kselftest
-2. Runs the test asynchronously
-
-Poll for results:
-status = get_job_status({"job_id": result["job_id"]})
-
-That's all you need! The kselftest build is automatic.
-
-═══════════════════════════════════════════════════════════════════════════
-
-Parameters:
-- test_name: Target kselftest to build (required)
-  Examples: "sched_ext", "vm", "net", "seccomp", "livepatch", etc.
-  See available targets in tools/testing/selftests/
-- kernel_dir: Path to kernel source directory (default: current directory)
-- timeout: Maximum build time in seconds (default: 600 seconds / 10 minutes)
-
-Returns: Build result with output, exit code, and any error messages.
-
-Example use cases:
-- Build sched_ext tests: build_kselftest({"test_name": "sched_ext"})
-- Build VM tests: build_kselftest({"test_name": "vm"})
-- Build seccomp tests: build_kselftest({"test_name": "seccomp"})
-
-Requirements:
-- Kernel must be built first (use 'vng -v --build')
-- Kernel source tree must include tools/testing/selftests/
-            """,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "test_name": {
-                        "type": "string",
-                        "description": "Target kselftest to build (e.g., 'sched_ext', 'vm', 'net', 'seccomp')",
-                    },
-                    "kernel_dir": {
-                        "type": "string",
-                        "description": "Path to kernel source directory",
-                        "default": ".",
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "Maximum build time in seconds (default: 600 seconds / 10 minutes)",
-                        "default": 600,
-                    },
-                },
-                "required": ["test_name"],
-            },
-        ),
-        Tool(
             name="verify_kernel",
             description="""
 Verify a kernel commit by building and booting it.
@@ -2065,8 +1983,6 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return await get_kernel_info(arguments)
     if name == "apply_patch":
         return await apply_patch(arguments)
-    if name == "build_kselftest":
-        return await build_kselftest(arguments)
     if name == "verify_kernel":
         return await verify_kernel(arguments)
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
@@ -2403,104 +2319,6 @@ async def apply_patch(args: dict) -> list[TextContent]:
             result["help"] = (
                 "Patch failed to apply. There may be merge conflicts or the patch is for a different kernel version"
             )
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-
-async def build_kselftest(args: dict) -> list[TextContent]:
-    """Build kernel selftests outside of vng."""
-    test_name = args.get("test_name")
-    kernel_dir = args.get("kernel_dir", ".")
-    build_timeout = args.get("timeout", 600)  # Default 10 minutes for build
-
-    if not test_name:
-        result = {
-            "success": False,
-            "error": "test_name is required",
-            "message": "Please provide a test name (e.g., 'sched_ext', 'vm', 'net', 'seccomp')",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Check if kernel source directory exists
-    kernel_path = Path(kernel_dir)
-    if not kernel_path.exists():
-        result = {
-            "success": False,
-            "error": "kernel_dir_not_found",
-            "message": f"Kernel directory {kernel_dir} does not exist",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Check if selftests directory exists
-    selftests_path = kernel_path / "tools" / "testing" / "selftests"
-    if not selftests_path.exists():
-        result = {
-            "success": False,
-            "error": "selftests_not_found",
-            "message": f"Selftests directory not found at {selftests_path}",
-            "help": "Make sure you're in a kernel source tree with tools/testing/selftests/",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Check if the specific test directory exists
-    test_path = selftests_path / test_name
-    if not test_path.exists():
-        result = {
-            "success": False,
-            "error": "test_not_found",
-            "message": f"Test '{test_name}' not found at {test_path}",
-            "help": f"Check available test targets in {selftests_path}/",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Install kernel headers first (required by most kselftests)
-    headers_cmd = ["make", "headers_install"]
-    headers_returncode, headers_stdout, headers_stderr = run_command(
-        headers_cmd, cwd=kernel_dir, timeout=build_timeout
-    )
-
-    if headers_returncode != 0:
-        result = {
-            "success": False,
-            "error": "headers_install_failed",
-            "message": "Failed to install kernel headers (required for kselftests)",
-            "headers_stdout": headers_stdout,
-            "headers_stderr": headers_stderr,
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Build the kselftest OUTSIDE of vng
-    # This is faster and separates build from runtime
-    build_cmd = [
-        "make",
-        f"-j{run_command(['nproc'], timeout=5)[1].strip()}",
-        "-C",
-        f"tools/testing/selftests/{test_name}",
-    ]
-
-    build_start_time = time.time()
-    build_returncode, build_stdout, build_stderr = run_command(
-        build_cmd, cwd=kernel_dir, timeout=build_timeout
-    )
-    build_time = time.time() - build_start_time
-
-    # Build the response
-    result = {
-        "tool": "build_kselftest",
-        "test_name": test_name,
-        "build_command": shlex.join(build_cmd),
-        "build_returncode": build_returncode,
-        "build_time_seconds": round(build_time, 2),
-        "build_stdout": build_stdout,
-        "build_stderr": build_stderr,
-        "success": build_returncode == 0,
-    }
-
-    if build_returncode == 0:
-        result["message"] = f"Successfully built kselftest: {test_name}"
-    else:
-        result["message"] = f"Failed to build kselftest: {test_name}"
-        result["help"] = "The test failed to build. Check the build output for errors."
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
