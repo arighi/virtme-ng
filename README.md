@@ -665,6 +665,10 @@ Once configured, you can ask your AI assistant:
 - "Recompile and test the kernel with KASAN enabled"
 - "Test this kernel by running my test script at /path/to/test.sh"
 - "Compare the behavior of this kernel with the mainline kernel v6.12"
+- "Validate that each commit in this patch series builds and boots correctly"
+- "Apply the patch from lore.kernel.org with message ID xyz and test it"
+- "Verify commit HEAD~3 builds and boots correctly"
+- "Validate commits with KASAN enabled using the build server 'builder'"
 
 The AI will use the appropriate MCP tools to accomplish these tasks.
 
