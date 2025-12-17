@@ -832,6 +832,43 @@ def _run_job_in_background(job_id: str):
         job.end_time = time.time()
 
 
+def _wait_for_job_completion(job_id: str, max_wait_seconds: int = 60) -> Job:
+    """
+    Wait for a job to complete, polling its status periodically.
+    Returns the job object after waiting up to max_wait_seconds.
+
+    Args:
+        job_id: The job ID to wait for
+        max_wait_seconds: Maximum time to wait in seconds (default: 60)
+
+    Returns:
+        The job object (may or may not be completed)
+    """
+    start_time = time.time()
+    poll_interval = 2  # Poll every 2 seconds
+
+    while time.time() - start_time < max_wait_seconds:
+        with _jobs_lock:
+            if job_id not in _active_jobs:
+                # Job disappeared, return None or handle error
+                break
+            job = _active_jobs[job_id]
+
+            # Check if job completed
+            if job.status in ("completed", "failed", "cancelled"):
+                return job
+
+        # Wait before next poll
+        time.sleep(poll_interval)
+
+    # Return job even if not completed (max wait time exceeded)
+    with _jobs_lock:
+        if job_id in _active_jobs:
+            return _active_jobs[job_id]
+
+    return None
+
+
 def _cleanup_old_jobs(max_age_hours: int = 24):
     """
     Clean up jobs older than max_age_hours.
@@ -2742,17 +2779,50 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
     )
     thread.start()
 
-    # Return immediately with job info
+    # Wait for up to 60 seconds to see if job completes quickly
+    job = _wait_for_job_completion(job_id, max_wait_seconds=60)
+
+    if job and job.status in ("completed", "failed", "cancelled"):
+        # Job completed within 60 seconds - return full results
+        result = job.to_dict()
+        result["success"] = True
+        result["auto_completed"] = True
+        result["test_name"] = test_name
+        result["message"] = (
+            f"Kselftest '{test_name}' completed automatically (finished in {round(job.elapsed_seconds(), 2)}s)"
+        )
+
+        # Add build information
+        if build_steps:
+            result["builds_performed"] = build_steps
+        else:
+            result["builds_performed"] = ["none (everything already built)"]
+
+        if job.status == "completed":
+            result["success_flag"] = job.returncode == 0
+            if job.returncode != 0:
+                result["warning"] = (
+                    f"Test completed but command returned exit code {job.returncode}"
+                )
+        elif job.status == "failed":
+            result["success_flag"] = False
+        elif job.status == "cancelled":
+            result["success_flag"] = False
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Job still running after 60 seconds - return job info for manual polling
     result = {
         "success": True,
         "job_id": job_id,
-        "status": "starting",
+        "status": job.status if job else "starting",
         "test_name": test_name,
-        "message": f"Kselftest '{test_name}' started successfully. Use get_job_status() to check progress.",
+        "message": f"Kselftest '{test_name}' is still running after 60s. Use get_job_status() to check progress.",
         "command": command_str,
         "kernel_note": kernel_note,
         "poll_suggestion": "Wait 10 seconds before first status check",
         "expected_runtime": "Kselftests typically take 5-60+ minutes",
+        "elapsed_seconds": round(job.elapsed_seconds(), 2) if job else 0,
     }
 
     # Add build information if any builds were performed
@@ -2803,14 +2873,40 @@ async def run_kernel_async_handler(args: dict) -> list[TextContent]:
     )
     thread.start()
 
-    # Return immediately with job info
+    # Wait for up to 60 seconds to see if job completes quickly
+    job = _wait_for_job_completion(job_id, max_wait_seconds=60)
+
+    if job and job.status in ("completed", "failed", "cancelled"):
+        # Job completed within 60 seconds - return full results
+        result = job.to_dict()
+        result["success"] = True
+        result["auto_completed"] = True
+        result["message"] = (
+            f"Job completed automatically (finished in {round(job.elapsed_seconds(), 2)}s)"
+        )
+
+        if job.status == "completed":
+            result["success_flag"] = job.returncode == 0
+            if job.returncode != 0:
+                result["warning"] = (
+                    f"Job completed but command returned exit code {job.returncode}"
+                )
+        elif job.status == "failed":
+            result["success_flag"] = False
+        elif job.status == "cancelled":
+            result["success_flag"] = False
+
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Job still running after 60 seconds - return job info for manual polling
     result = {
         "success": True,
         "job_id": job_id,
-        "status": "starting",
-        "message": "Job started successfully. Use get_job_status() to check progress.",
+        "status": job.status if job else "starting",
+        "message": "Job is still running after 60s. Use get_job_status() to check progress.",
         "command": command_str,
         "poll_suggestion": "Wait 10 seconds before first status check",
+        "elapsed_seconds": round(job.elapsed_seconds(), 2) if job else 0,
     }
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
