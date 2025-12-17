@@ -2703,6 +2703,65 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
 
     build_steps = []
 
+    # Step 1: Rebuild kernel with test config (if config file exists)
+    # Only rebuild for newly built kernels (not host or upstream kernels)
+    if not kernel_image:
+        test_config_path = test_path / "config"
+        if test_config_path.exists():
+            # Rebuild kernel with test config to ensure all required
+            # configs are enabled
+            rebuild_cmd = [
+                "vng",
+                "-v",
+                "--build",
+                "--force",
+            ]
+
+            # Pass both .config (to preserve old configs) and test config
+            # (to add test requirements)
+            kernel_config_path = kernel_path / ".config"
+            if kernel_config_path.exists():
+                rebuild_cmd.extend(["--config", str(kernel_config_path)])
+
+            if test_config_path.exists():
+                rebuild_cmd.extend(
+                    ["--config", str(test_config_path.relative_to(kernel_path))]
+                )
+
+            rebuild_start = time.time()
+            rebuild_returncode, rebuild_stdout, rebuild_stderr = run_command(
+                rebuild_cmd,
+                cwd=kernel_dir,
+                timeout=3600,  # 1 hour timeout for kernel rebuild
+            )
+            rebuild_time = time.time() - rebuild_start
+
+            if rebuild_returncode != 0:
+                result = {
+                    "success": False,
+                    "error": "kernel_rebuild_failed",
+                    "message": (
+                        f"Failed to rebuild kernel with required configs for "
+                        f"kselftest '{test_name}' (took {round(rebuild_time, 2)}s)"
+                    ),
+                    "config_file": str(test_config_path.relative_to(kernel_path)),
+                    "rebuild_stdout": (
+                        rebuild_stdout[-2000:]
+                        if len(rebuild_stdout) > 2000
+                        else rebuild_stdout
+                    ),
+                    "rebuild_stderr": (
+                        rebuild_stderr[-2000:]
+                        if len(rebuild_stderr) > 2000
+                        else rebuild_stderr
+                    ),
+                }
+                return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+            build_steps.append(
+                f"kernel rebuilt with test configs (took {round(rebuild_time, 2)}s)"
+            )
+
     # Step 2: Install kernel headers (required by most kselftests)
     headers_cmd = ["make", "headers_install"]
     headers_returncode, headers_stdout, headers_stderr = run_command(
