@@ -2453,6 +2453,22 @@ async def build_kselftest(args: dict) -> list[TextContent]:
         }
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
+    # Install kernel headers first (required by most kselftests)
+    headers_cmd = ["make", "headers_install"]
+    headers_returncode, headers_stdout, headers_stderr = run_command(
+        headers_cmd, cwd=kernel_dir, timeout=build_timeout
+    )
+
+    if headers_returncode != 0:
+        result = {
+            "success": False,
+            "error": "headers_install_failed",
+            "message": "Failed to install kernel headers (required for kselftests)",
+            "headers_stdout": headers_stdout,
+            "headers_stderr": headers_stderr,
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
     # Build the kselftest OUTSIDE of vng
     # This is faster and separates build from runtime
     build_cmd = [
@@ -2687,7 +2703,27 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
 
     build_steps = []
 
-    # Step 2: Build kselftest
+    # Step 2: Install kernel headers (required by most kselftests)
+    headers_cmd = ["make", "headers_install"]
+    headers_returncode, headers_stdout, headers_stderr = run_command(
+        headers_cmd, cwd=kernel_dir, timeout=build_timeout
+    )
+
+    if headers_returncode != 0:
+        result = {
+            "success": False,
+            "error": "headers_install_failed",
+            "message": "Failed to install kernel headers (required for kselftests)",
+            "headers_stdout": (
+                headers_stdout[-2000:] if len(headers_stdout) > 2000 else headers_stdout
+            ),
+            "headers_stderr": (
+                headers_stderr[-2000:] if len(headers_stderr) > 2000 else headers_stderr
+            ),
+        }
+        return [TextContent(type="text", text=json.dumps(result, indent=2))]
+
+    # Step 3: Build kselftest
     nproc_result = run_command(["nproc"], timeout=5)
     nproc = nproc_result[1].strip() if nproc_result[0] == 0 else "1"
 
