@@ -11,7 +11,7 @@ IMPORTANT NOTES FOR AI AGENTS:
 1. BUILDING KERNELS - CRITICAL INSTRUCTIONS
    ==========================================
 
-   ⚠️  NEVER use the run_kernel tool to build kernels!
+   ⚠️  NEVER use the run_kernel_async tool to build kernels!
    ⚠️  ALWAYS use shell commands with 'vng -v --build' for building!
 
    When a user asks to test a kernel that hasn't been built yet, use
@@ -110,48 +110,48 @@ IMPORTANT NOTES FOR AI AGENTS:
      vng -v --build --build-host builder --arch arm64
      vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y
 
-2. EACH run_kernel INVOCATION SPAWNS A NEW, INDEPENDENT VM
-   ===========================================================
+2. EACH run_kernel_async INVOCATION SPAWNS A NEW, INDEPENDENT VM
+   ==================================================================
 
-   ⚠️  CRITICAL: Every call to run_kernel() creates a FRESH, ISOLATED VM instance!
+   ⚠️  CRITICAL: Every call to run_kernel_async() creates a FRESH, ISOLATED VM instance!
 
    This means:
-   ✗ State does NOT persist between run_kernel invocations
+   ✗ State does NOT persist between run_kernel_async invocations
    ✗ You CANNOT run a command and then check dmesg in a separate invocation
    ✗ You CANNOT set up something in one call and use it in another
    ✗ Each VM starts fresh with no memory of previous invocations
 
-   ✓ CORRECT: Combine commands in a SINGLE run_kernel invocation:
-     run_kernel({"command": "some_command && dmesg | grep -i warning"})
-     run_kernel({"command": "modprobe mymod && cat /sys/module/mymod/parameters/debug"})
-     run_kernel({"command": "cd /tmp && echo test > file && cat file"})
+   ✓ CORRECT: Combine commands in a SINGLE run_kernel_async invocation:
+     run_kernel_async({"command": "some_command && dmesg | grep -i warning"})
+     run_kernel_async({"command": "modprobe mymod && cat /sys/module/mymod/parameters/debug"})
+     run_kernel_async({"command": "cd /tmp && echo test > file && cat file"})
 
    ✗ WRONG: Multiple separate invocations (these are INDEPENDENT VMs!):
-     run_kernel({"command": "some_command"})        # VM instance #1
-     run_kernel({"command": "dmesg"})               # VM instance #2 (different VM!)
+     run_kernel_async({"command": "some_command"})        # VM instance #1
+     run_kernel_async({"command": "dmesg"})               # VM instance #2 (different VM!)
      # These two commands run in COMPLETELY DIFFERENT virtual machines!
      # The dmesg output will NOT contain anything from the first command!
 
    WHY THIS MATTERS:
-   - run_kernel() starts a QEMU VM, runs the command, captures output, then EXITS
+   - run_kernel_async() starts a QEMU VM, runs the command, captures output, then EXITS
    - Each invocation = fresh boot, fresh memory, fresh state
    - Like rebooting a computer between each command
 
    EXAMPLES:
 
    ❌ BAD - Won't work (separate VMs):
-      run_kernel({"command": "insmod mymodule.ko"})
-      run_kernel({"command": "dmesg | grep mymodule"})  # Won't see module from first call!
+      run_kernel_async({"command": "insmod mymodule.ko"})
+      run_kernel_async({"command": "dmesg | grep mymodule"})  # Won't see module from first call!
 
    ✅ GOOD - Works (single VM):
-      run_kernel({"command": "insmod mymodule.ko && dmesg | grep mymodule"})
+      run_kernel_async({"command": "insmod mymodule.ko && dmesg | grep mymodule"})
 
    ❌ BAD - Won't work (separate VMs):
-      run_kernel({"command": "echo 1 > /proc/sys/kernel/printk"})
-      run_kernel({"command": "cat /proc/sys/kernel/printk"})  # Will show default, not 1!
+      run_kernel_async({"command": "echo 1 > /proc/sys/kernel/printk"})
+      run_kernel_async({"command": "cat /proc/sys/kernel/printk"})  # Will show default, not 1!
 
    ✅ GOOD - Works (single VM):
-      run_kernel({"command": "echo 1 > /proc/sys/kernel/printk && cat /proc/sys/kernel/printk"})
+      run_kernel_async({"command": "echo 1 > /proc/sys/kernel/printk && cat /proc/sys/kernel/printk"})
 
    SHELL OPERATORS for combining commands:
    - && : Run second command only if first succeeds
@@ -159,7 +159,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    - || : Run second command only if first fails
 
    Example with complex script:
-     run_kernel({"command": "cd /path && ./test.sh && dmesg | tail -50"})
+     run_kernel_async({"command": "cd /path && ./test.sh && dmesg | tail -50"})
 
 3. PTS (Pseudo-Terminal) Requirement
    -----------------------------------
@@ -167,7 +167,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    environments without a real terminal, vng commands will fail with:
      "ERROR: not a valid pts, try to run vng with a valid PTS (e.g., inside tmux or screen)"
 
-   This MCP server's run_kernel tool automatically handles PTS requirements.
+   This MCP server's run_kernel_async tool automatically handles PTS requirements.
 
    For direct shell commands, use 'script' to provide a PTS:
      script -q -c "vng -- command" /dev/null 2>&1
@@ -180,7 +180,7 @@ IMPORTANT NOTES FOR AI AGENTS:
 4. Typical Workflow for Testing Kernel Changes
    ============================================
 
-   STEP 1: BUILD (use shell command, NOT run_kernel tool!)
+   STEP 1: BUILD (use shell command, NOT run_kernel_async tool!)
    ────────────────────────────────────────────────────────
 
    ⏱️  TIMEOUT REQUIREMENT: Builds take a long time (use sufficient timeout)
@@ -198,11 +198,11 @@ IMPORTANT NOTES FOR AI AGENTS:
    d) Remote build with custom config:
       vng -v --build --build-host builder --configitem CONFIG_DEBUG_INFO=y
 
-   STEP 2: TEST (use run_kernel tool or shell command)
+   STEP 2: TEST (use run_kernel_async tool or shell command)
    ────────────────────────────────────────────────────
 
    After building, test the kernel:
-   • Use run_kernel tool, OR
+   • Use run_kernel_async tool, OR
    • Use shell command: script -q -c "vng -- uname -r" /dev/null 2>&1
 
    ═══════════════════════════════════════════════════════════════════
@@ -214,7 +214,7 @@ IMPORTANT NOTES FOR AI AGENTS:
     # STEP 1: BUILD
     vng -v --build --configitem CONFIG_KASAN=y
 
-     # STEP 2: TEST (run_kernel tool or shell command)
+     # STEP 2: TEST (run_kernel_async tool or shell command)
      script -q -c "vng -- dmesg | grep -i kasan" /dev/null 2>&1
 
      Example 2: Remote build + local test
@@ -222,7 +222,7 @@ IMPORTANT NOTES FOR AI AGENTS:
     # STEP 1: BUILD on remote host
     vng -v --build --build-host builder
 
-     # STEP 2: TEST locally (run_kernel tool or shell command)
+     # STEP 2: TEST locally (run_kernel_async tool or shell command)
      script -q -c "vng -- uname -r" /dev/null 2>&1
 
     Example 3: Remote build with config + test
@@ -230,7 +230,7 @@ IMPORTANT NOTES FOR AI AGENTS:
     # STEP 1: BUILD on remote host
     vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y
 
-    # STEP 2: TEST (run_kernel tool or shell command)
+    # STEP 2: TEST (run_kernel_async tool or shell command)
     script -q -c "vng -- cat /proc/version" /dev/null 2>&1
 
 5. Running Kernel Selftests (kselftests)
@@ -338,9 +338,8 @@ IMPORTANT NOTES FOR AI AGENTS:
    --------------------
    This MCP server provides:
    - configure_kernel: Generate/modify kernel .config
-   - run_kernel: Run and test kernels in QEMU (synchronous)
+   - run_kernel_async: Run kernel tests asynchronously (for all kernel testing)
    - run_kselftest: Run kernel selftests asynchronously (RECOMMENDED for kselftests)
-   - run_kernel_async: Run kernel tests asynchronously (for custom long tests)
    - get_job_status: Check status of async jobs
    - cancel_job: Cancel running async jobs
    - list_jobs: List all active async jobs
@@ -551,7 +550,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit in the range, you MUST perform ALL these steps:
    1. Checkout the commit using git
    2. BUILD the kernel using: vng -v --build
-   3. BOOT the kernel using run_kernel() - THIS STEP IS MANDATORY
+   3. BOOT the kernel using run_kernel_async() - THIS STEP IS MANDATORY
    4. Record BOTH build and boot results (both must succeed)
    5. Return to original commit when done
 
@@ -598,10 +597,10 @@ IMPORTANT NOTES FOR AI AGENTS:
       You MUST boot every successfully built kernel to verify it works.
 
       MINIMUM (always required): Verify kernel boots
-      run_kernel({"command": "uname -r"})
+      run_kernel_async({"command": "uname -r"})
 
       OR with custom test command (if user specified):
-      run_kernel({"command": "user_test_command_here"})
+      run_kernel_async({"command": "user_test_command_here"})
 
       OR using shell command:
       script -q -c 'vng -- uname -r' /dev/null 2>&1
@@ -634,7 +633,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    3. For EACH commit (ALL steps required):
       - Checkout commit: git checkout <sha>
       - BUILD: vng -v --build
-      - If build succeeds, BOOT (MANDATORY): run_kernel({"command": "uname -r"})
+      - If build succeeds, BOOT (MANDATORY): run_kernel_async({"command": "uname -r"})
       - If build fails, mark as FAILED and skip boot (or stop if requested)
       - Record: "✅ abc123 - Fix bug: Build OK, Boot OK"
                 or "❌ def456 - Add feature: Build OK, Boot FAILED"
@@ -649,7 +648,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    ─────────────────────────────
    ⚠️  MANDATORY: You MUST boot every successfully built kernel
        - Building alone is NOT validation
-       - ALWAYS run run_kernel() after successful build
+       - ALWAYS run run_kernel_async() after successful build
        - A kernel that builds but doesn't boot is FAILED
 
   - Always save and restore the original git state
@@ -668,7 +667,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit:
    1. git checkout COMMIT
    2. vng -v --build --build-host builder
-   3. If build succeeds: run_kernel({"command": "uname -r"})  ⚠️ MANDATORY
+   3. If build succeeds: run_kernel_async({"command": "uname -r"})  ⚠️ MANDATORY
    4. Record both build and boot results
 
    EXAMPLE WITH CUSTOM TEST:
@@ -679,7 +678,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit:
    1. git checkout COMMIT
    2. vng -v --build
-   3. If build succeeds: run_kernel({"command": "dmesg | grep -i error || echo 'No errors found'"})  ⚠️ MANDATORY
+   3. If build succeeds: run_kernel_async({"command": "dmesg | grep -i error || echo 'No errors found'"})  ⚠️ MANDATORY
    4. Record both build and boot/test results
 
    EXAMPLE WITH STOP ON FAILURE:
@@ -690,7 +689,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit:
    1. Build kernel: vng -v --build
    2. If build fails: report "First failing commit (build): COMMIT_SHA" and stop
-   3. If build succeeds: Boot kernel: run_kernel({"command": "uname -r"})  ⚠️ MANDATORY
+   3. If build succeeds: Boot kernel: run_kernel_async({"command": "uname -r"})  ⚠️ MANDATORY
    4. If boot fails: report "First failing commit (boot): COMMIT_SHA" and stop
    5. If both succeed: continue to next commit
 
@@ -698,7 +697,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    ────────────────
    ⚠️  MOST IMPORTANT: ALWAYS test boot after every successful build
        - This is NOT optional - it's a required validation step
-       - Use run_kernel({"command": "uname -r"}) at minimum
+       - Use run_kernel_async({"command": "uname -r"}) at minimum
        - A commit that builds but doesn't boot is FAILED
 
    - Each commit needs a full rebuild (10-60+ minutes per commit)
@@ -1231,200 +1230,6 @@ RECOMMENDED: Skip this tool and use 'vng -v --build' directly with --configitem 
                     "verbose": {
                         "type": "boolean",
                         "description": "Enable verbose output",
-                        "default": False,
-                    },
-                },
-            },
-        ),
-        Tool(
-            name="run_kernel",
-            description="""
-Run/test a Linux kernel in a virtualized environment using virtme-ng.
-The kernel runs in QEMU with a copy-on-write snapshot of your live system.
-
-╔═══════════════════════════════════════════════════════════════════════════╗
-║ ⚠️  CRITICAL: THIS TOOL IS FOR TESTING/RUNNING KERNELS ONLY                ║
-║                                                                           ║
-║ DO NOT USE run_kernel TO BUILD KERNELS!                                   ║
-║                                                                           ║
-║ To build kernels, use shell commands with 'vng -v --build':               ║
-║   • Local build:        vng -v --build                                    ║
-║   • Remote build:       vng -v --build --build-host <hostname>            ║
-║                                                                           ║
-║ This tool (run_kernel) ONLY runs/tests already-built kernels.             ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-╔═══════════════════════════════════════════════════════════════════════════╗
-║ 🔴 CRITICAL: EACH INVOCATION CREATES A NEW, INDEPENDENT VM INSTANCE!      ║
-║                                                                           ║
-║ Every run_kernel() call spawns a FRESH virtual machine. State does NOT    ║
-║ persist between calls. You CANNOT run a command and check dmesg in a      ║
-║ separate invocation - they are COMPLETELY DIFFERENT VMs!                  ║
-║                                                                           ║
-║ ✅ CORRECT (single invocation, single VM):                                ║
-║    run_kernel({"command": "insmod test.ko && dmesg | grep test"})         ║
-║                                                                           ║
-║ ❌ WRONG (two invocations = two different VMs):                           ║
-║    run_kernel({"command": "insmod test.ko"})         # VM #1              ║
-║    run_kernel({"command": "dmesg | grep test"})      # VM #2 (fresh!)     ║
-║    ↑ The dmesg output will NOT contain anything from the first command!   ║
-║                                                                           ║
-║ SOLUTION: Use && or ; to combine commands into a single invocation:       ║
-║   • cmd1 && cmd2  → Run cmd2 only if cmd1 succeeds                        ║
-║   • cmd1 ; cmd2   → Run both commands sequentially                        ║
-║   • cmd1 || cmd2  → Run cmd2 only if cmd1 fails                           ║
-║                                                                           ║
-║ Each run_kernel() call = boot VM → run command → capture output → exit    ║
-║ No state carries over between invocations!                                ║
-╚═══════════════════════════════════════════════════════════════════════════╝
-
-AI agents should use this tool rather than running vng directly via shell commands.
-If you must use shell commands, use 'script': script -q -c "vng -- command" /dev/null 2>&1
-
-WORKFLOW - Build FIRST, then Test:
-====================================
-1. BUILD the kernel (use shell command, NOT this tool):
-
-   ⏱️  CRITICAL: Builds take 10-60+ minutes! Use sufficient timeout.
-
-   • For local builds:
-     vng -v --build
-
-   • For REMOTE builds (when user specifies a build server/host):
-     vng -v --build --build-host <hostname>
-
-     Examples of when to use --build-host:
-     - User says: "build on my server called 'builder'"
-     - User says: "compile on remote host 'myserver'"
-     - User says: "use the build machine to compile"
-     - User says: "build this on <hostname>"
-
-   • With custom config:
-     vng -v --build --configitem CONFIG_DEBUG_INFO=y
-
-   • Remote build with custom config:
-     vng -v --build --build-host builder --configitem CONFIG_KASAN=y
-
-2. TEST the kernel (use THIS tool):
-   After building, use run_kernel() to test the built kernel.
-
-IMPORTANT - Understanding which kernel runs:
-1. WITHOUT kernel_image parameter (recommended for testing built kernels):
-   - Syntax: vng -- <command>
-   - Runs the NEWLY BUILT kernel in the current kernel source directory
-   - Use this to test kernels you just compiled
-
-2. WITH kernel_image set to "host":
-   - Syntax: vng -vr -- <command>
-   - Runs the HOST kernel (currently running on the system)
-   - Use this to test commands in the production kernel environment
-
-3. WITH kernel_image set to an UPSTREAM VERSION (e.g., "v6.14", "v6.6.17"):
-   - Syntax: vng -vr v6.14 -- <command>
-   - AUTOMATICALLY DOWNLOADS and runs a precompiled upstream kernel from Ubuntu
-     mainline
-   - Very useful for testing against different kernel versions without building
-   - Format: "v" + version number (e.g., "v6.14", "v6.6.17", "v6.12-rc3")
-
-4. WITH kernel_image set to a SPECIFIC PATH:
-   - Syntax: vng -vr <path> -- <command>
-   - Runs a specific kernel image file (e.g., "./arch/x86/boot/bzImage")
-   - Use this to test a particular local kernel build
-
-Parameters:
-- kernel_dir: Path to kernel source directory (default: current directory)
-- kernel_image: Controls which kernel to run:
-  * omit/null = run newly built kernel in current dir (DEFAULT - use this for testing your builds)
-  * "host" = run the host kernel currently running on the system
-  * "v6.14" (or any vX.Y version) = download and run upstream kernel from Ubuntu mainline (auto-download)
-  * "./path/to/bzImage" = run specific local kernel image file
-- command: Command to execute inside the kernel (kernel exits after execution)
-- arch: Architecture to emulate
-- cpus: Number of CPUs for the VM (default: all host CPUs)
-- memory: Memory size for the VM (default: 1G)
-- timeout: Maximum runtime in seconds (default: 300 for commands, unlimited for interactive)
-- network: Enable network ("user", "bridge", "loop")
-- debug: Enable kernel debugging features
-
-Returns: Execution result with kernel output, exit code, and any error messages.
-
-Example use cases:
-- Test newly built kernel: run_kernel({"command": "uname -r"})
-  → Runs: vng -v -- uname -r (tests your compiled kernel)
-
-- Test on host kernel: run_kernel({"kernel_image": "host", "command": "uname -r"})
-  → Runs: vng -vr -- uname -r (tests current system kernel)
-
-- Test upstream kernel (auto-download): run_kernel({"kernel_image": "v6.14", "command": "uname -r"})
-  → Runs: vng -vr v6.14 -- uname -r (downloads v6.14 from Ubuntu mainline if not cached)
-
-- Test specific upstream version: run_kernel({"kernel_image": "v6.6.17", "command": "uname -a"})
-  → Runs: vng -vr v6.6.17 -- uname -a (downloads and runs v6.6.17)
-
-- Test local kernel image: run_kernel({"kernel_image": "./arch/x86/boot/bzImage", "command": "uname -r"})
-  → Runs: vng -vr ./arch/x86/boot/bzImage -- uname -r
-
-- Run test suite on your kernel: run_kernel({"command": "cd /path/to/tests && ./run_tests.sh"})
-  → Runs: vng -v -- cd /path/to/tests && ./run_tests.sh
-
-- Compare behavior across versions:
-  1) run_kernel({"command": "cat /proc/version"}) - your build
-  2) run_kernel({"kernel_image": "v6.14", "command": "cat /proc/version"}) - upstream v6.14
-  3) run_kernel({"kernel_image": "host", "command": "cat /proc/version"}) - host kernel
-            """,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "kernel_dir": {
-                        "type": "string",
-                        "description": "Path to kernel source directory",
-                        "default": ".",
-                    },
-                    "kernel_image": {
-                        "type": "string",
-                        "description": (
-                            "Which kernel to run: omit for newly built kernel "
-                            "(DEFAULT), 'host' for host kernel, 'v6.14' for upstream "
-                            "auto-download, or './path' for local image"
-                        ),
-                    },
-                    "command": {
-                        "type": "string",
-                        "description": "Command to execute inside the kernel",
-                    },
-                    "arch": {
-                        "type": "string",
-                        "description": "Target architecture",
-                        "enum": [
-                            "amd64",
-                            "arm64",
-                            "armhf",
-                            "ppc64el",
-                            "s390x",
-                            "riscv64",
-                        ],
-                    },
-                    "cpus": {
-                        "type": "integer",
-                        "description": "Number of CPUs",
-                    },
-                    "memory": {
-                        "type": "string",
-                        "description": "Memory size (e.g., '2G', '512M')",
-                        "default": "1G",
-                    },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "Maximum runtime in seconds",
-                    },
-                    "network": {
-                        "type": "string",
-                        "description": "Network mode",
-                        "enum": ["user", "bridge", "loop"],
-                    },
-                    "debug": {
-                        "type": "boolean",
-                        "description": "Enable debugging features",
                         "default": False,
                     },
                 },
@@ -1992,15 +1797,13 @@ WHEN TO USE:
   - This is the recommended tool for kselftests
 
 ✅ Use run_kernel_async for:
-  - Custom long-running tests (>2 minutes)
-  - Non-kselftest operations
-  - Operations that might timeout with run_kernel
-
-✅ Use run_kernel (sync) for:
-  - Quick boot tests (<2 minutes)
+  - All kernel testing operations
+  - Quick boot tests
+  - Long-running tests
   - Simple commands (uname, dmesg, etc.)
+  - Custom tests and operations
 
-Parameters are identical to run_kernel:
+Parameters:
 - kernel_dir: Path to kernel source directory (default: current directory)
 - kernel_image: Which kernel to run (omit for newly built, "host", "v6.14", or path)
 - command: Command to execute inside the kernel
@@ -2269,8 +2072,6 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
 
     if name == "configure_kernel":
         return await configure_kernel(arguments)
-    if name == "run_kernel":
-        return await run_kernel(arguments)
     if name == "run_kselftest":
         return await run_kselftest_handler(arguments)
     if name == "run_kernel_async":
@@ -2335,116 +2136,6 @@ async def configure_kernel(args: dict) -> list[TextContent]:
             result["message"] = "Configuration command succeeded but .config not found"
     else:
         result["message"] = "Kernel configuration failed"
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-
-async def run_kernel(args: dict) -> list[TextContent]:
-    """Run the kernel using vng with output redirection to handle PTS requirement."""
-    kernel_dir = args.get("kernel_dir", ".")
-
-    # Build the vng command
-    vng_cmd = ["vng"]
-
-    # Determine which kernel to run based on kernel_image parameter
-    kernel_image = args.get("kernel_image")
-
-    if kernel_image == "host":
-        # Run host kernel: vng -r -- <command>
-        vng_cmd.append("-vr")
-    elif kernel_image:
-        # Run specific kernel: vng -r <image> -- <command>
-        vng_cmd.extend(["-vr", kernel_image])
-
-    if args.get("arch"):
-        vng_cmd.extend(["--arch", args["arch"]])
-
-    if args.get("cpus"):
-        vng_cmd.extend(["--cpus", str(args["cpus"])])
-
-    if args.get("memory"):
-        vng_cmd.extend(["--memory", args["memory"]])
-
-    if args.get("network"):
-        vng_cmd.extend(["--network", args["network"]])
-
-    if args.get("debug"):
-        vng_cmd.append("--debug")
-
-    # Add command to execute using -- separator (modern syntax)
-    # The -- separates vng options from the command to run in the kernel
-    if args.get("command"):
-        vng_cmd.append("--")
-        vng_cmd.append(args["command"])
-
-    # Determine timeout
-    if args.get("timeout"):
-        timeout = args["timeout"]
-    elif args.get("command"):
-        # If running a command, use shorter default timeout
-        timeout = 300  # 5 minutes
-    else:
-        # Interactive mode - not recommended for agents
-        timeout = 60  # 1 minute for safety
-
-    # IMPORTANT: vng requires a valid PTS (pseudo-terminal).
-    # In automated environments, we must use 'script' to provide a PTS.
-    # Use: script -q -c "vng ..." /dev/null 2>&1
-
-    # Construct the vng command string
-    vng_cmd_str = shlex.join(vng_cmd)
-
-    # Wrap vng command in 'script' to provide a pseudo-terminal
-    # script -q: quiet mode (no start/stop messages)
-    # script -c: execute command
-    # /dev/null: discard the typescript file
-    shell_cmd = f"script -q -c {shlex.quote(vng_cmd_str)} /dev/null 2>&1"
-
-    # Execute the command with script wrapper
-    start_time = time.time()
-    returncode, stdout, stderr = run_command(
-        ["sh", "-c", shell_cmd], cwd=kernel_dir, timeout=timeout
-    )
-    run_time = time.time() - start_time
-
-    # Build the response
-    result = {
-        "success": returncode == 0,
-        "command": vng_cmd_str,  # Show the actual vng command (without script wrapper)
-        "shell_command": shell_cmd,  # Show the full shell command with script wrapper
-        "returncode": returncode,
-        "run_time_seconds": round(run_time, 2),
-        "stdout": stdout,
-        "stderr": stderr,
-        "pts_workaround": "Using 'script' command to provide pseudo-terminal for vng",
-    }
-
-    # Add context about which kernel was run
-    if not kernel_image:
-        result["kernel_type"] = "newly_built_kernel"
-        result["note"] = "Ran newly built kernel in the current directory"
-    elif kernel_image == "host":
-        result["kernel_type"] = "host_kernel"
-        result["note"] = "Ran host kernel (currently running on system)"
-    elif kernel_image.startswith("v") and any(c.isdigit() for c in kernel_image):
-        # Looks like an upstream version (e.g., v6.14, v6.6.17, v6.12-rc3)
-        result["kernel_type"] = "upstream_kernel"
-        result["kernel_version"] = kernel_image
-        result["note"] = (
-            f"Ran upstream kernel {kernel_image} (auto-downloaded from Ubuntu mainline if not cached)"
-        )
-    else:
-        # Likely a path to a specific kernel image
-        result["kernel_type"] = "local_kernel_image"
-        result["kernel_image"] = kernel_image
-        result["note"] = f"Ran local kernel image: {kernel_image}"
-
-    if returncode == 0:
-        result["message"] = "Kernel execution completed successfully"
-    elif returncode == -1:
-        result["message"] = "Kernel execution timed out or failed"
-    else:
-        result["message"] = f"Kernel execution failed with exit code {returncode}"
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
