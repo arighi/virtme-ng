@@ -345,7 +345,6 @@ IMPORTANT NOTES FOR AI AGENTS:
    - list_jobs: List all active async jobs
    - get_kernel_info: Get info about kernel source directory
    - apply_patch: Apply patches from lore.kernel.org
-   - verify_kernel: Verify a commit by building and booting it
 
    For building kernels, use shell commands with 'vng -v --build' as documented above.
    For running kselftests, use the run_kselftest command (see section 5).
@@ -355,7 +354,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    ========================================================
 
    When a user asks to validate a patch series by building and booting each commit,
-   use the verify_kernel tool for each commit in the series.
+   use a combination of Shell commands and run_kernel_async() for each commit.
 
    ⚠️  CRITICAL: ALWAYS BUILD **AND** BOOT EACH KERNEL
    ════════════════════════════════════════════════════
@@ -366,184 +365,14 @@ IMPORTANT NOTES FOR AI AGENTS:
 
    ⚠️  WARNING: This operation can take HOURS (10-60+ minutes per commit)
 
-   RECOMMENDED WORKFLOW: Use verify_kernel for Each Commit
-   ────────────────────────────────────────────────────────
+   WORKFLOW: Build + Boot Each Commit
+   ───────────────────────────────────
 
-   The verify_kernel tool validates a single commit by building and booting it.
-   For patch series, call verify_kernel multiple times - once for each commit.
-
-   STEP-BY-STEP WORKFLOW:
-   ──────────────────────
-
-   Step 1: Get the list of commits
-   git rev-list --reverse START_COMMIT^..END_COMMIT
-
-   This returns a list of commit SHAs, one per line.
-
-   Step 2: Save current git state
-   git rev-parse HEAD
-
-   Save this to restore later.
-
-   Step 3: For each commit, call verify_kernel
-   ───────────────────────────────────────────
-
-   Basic verification:
-   result = verify_kernel({
-       "commit": "abc1234",
-   })
-   # If "job_id" in result: poll with get_job_status({"job_id": result["job_id"]})
-
-   With remote build host (faster):
-   result = verify_kernel({
-       "commit": "abc1234",
-       "build_host": "builder",
-   })
-
-   With custom config:
-   result = verify_kernel({
-       "commit": "abc1234",
-       "config_items": ["CONFIG_KASAN=y"],
-   })
-
-   With custom test:
-   result = verify_kernel({
-       "commit": "abc1234",
-       "test_command": "dmesg | grep -i error || echo 'No errors'",
-   })
-
-   ⚠️  verify_kernel runs ASYNCHRONOUSLY:
-   - Returns immediately with job_id if operation takes >60 seconds
-   - Use get_job_status() to poll for results
-   - Wait 30-60 seconds between polls
-   - CRITICAL: Do NOT re-run verify_kernel for the same commit!
-   - If you already have a job_id, use get_job_status() instead
-   - The tool automatically rejects duplicate runs for the same commit
-
-   Step 4: Restore original git state
-   git checkout ORIGINAL_SHA
-
-   Step 5: Report results
-   Summarize which commits passed/failed with a clear table or list.
-
-   EXAMPLE INTERACTION:
-   ────────────────────
-
-   User: "Validate that each commit between HEAD~3 and HEAD builds and boots"
-
-   AI should do:
-   1. Get commits: git rev-list --reverse HEAD~3^..HEAD
-   2. Save current: git rev-parse HEAD
-   3. For EACH commit:
-      result = verify_kernel({"commit": "<sha>"})
-      If result["error"] == "duplicate_job_running":
-          Use the existing_job_id from the error response
-          job_id = result["existing_job_id"]
-      If "job_id" in result:
-          Poll with get_job_status({"job_id": job_id}) until complete
-          ⚠️  Do NOT call verify_kernel() again for this commit!
-          Keep using get_job_status() to check progress
-      Record: commit passed/failed based on result["success"]
-   4. Restore: git checkout <original>
-   5. Report: "Validated 4 commits: 3 passed (build+boot), 1 failed"
-
-   EXAMPLE WITH REMOTE BUILD:
-   ──────────────────────────
-
-   User: "Validate HEAD~5 to HEAD using my build server 'builder'"
-
-   For each commit:
-   verify_kernel({
-       "commit": "<sha>",
-       "build_host": "builder",
-   })
-
-   EXAMPLE WITH CUSTOM TEST:
-   ─────────────────────────
-
-   User: "Validate these commits by running dmesg checks"
-
-   For each commit:
-   verify_kernel({
-       "commit": "<sha>",
-       "test_command": "dmesg | grep -i error || echo 'No errors found'",
-   })
-
-   EXAMPLE WITH STOP ON FAILURE:
-   ──────────────────────────────
-
-   User: "Find which commit breaks the kernel between HEAD~20 and HEAD"
-
-   For each commit:
-   result = verify_kernel({"commit": "<sha>"})
-
-   # Handle duplicate detection
-   if result.get("error") == "duplicate_job_running":
-       job_id = result["existing_job_id"]
-       # Use get_job_status() to check the existing job
-   elif "job_id" in result:
-       job_id = result["job_id"]
-
-   # Poll for completion (do NOT call verify_kernel again!)
-   while True:
-       status = get_job_status({"job_id": job_id})
-       if status["status"] in ("completed", "failed"):
-           break
-       wait 30 seconds
-
-   # Use final result from get_job_status()
-   if not status["success"]:
-       report "First failing commit: <sha>" and stop
-
-   WHY USE verify_kernel INSTEAD OF MANUAL BUILD+BOOT:
-   ───────────────────────────────────────────────────
-
-   The verify_kernel tool:
-   ✅ Automatically performs BOTH build AND boot testing
-   ✅ Cannot skip boot testing - it's enforced by the tool
-   ✅ Returns structured results with both build and boot status
-   ✅ Handles errors and timeouts gracefully
-   ✅ Reports clear success/failure status
-   ✅ Runs asynchronously
-   ✅ More reliable than manual orchestration
-
-   CRITICAL RULES FOR AI AGENTS:
-   ─────────────────────────────
-   ⚠️  MANDATORY: Use verify_kernel for each commit
-       - The tool automatically boots every successfully built kernel
-       - You cannot skip this step - it's built into verify_kernel
-       - A kernel that builds but doesn't boot is reported as FAILED
-       - Runs asynchronously - poll with get_job_status() if job_id returned
-
-   ⚠️  AVOID DUPLICATE RUNS:
-       - NEVER call verify_kernel() twice for the same commit
-       - If you already have a job_id, use get_job_status() to check progress
-       - The tool will automatically reject duplicate runs for the same commit
-       - Keep track of job_ids in your conversation context
-       - Before calling verify_kernel(), check if you already started a job for this commit
-
-   - Always save and restore the original git state
-   - Use proper timeouts: 10s for git commands
-   - For faster builds, pass build_host if user mentions a build server
-   - If job_id returned: poll with get_job_status() every 30-60 seconds
-   - Show progress to the user after each commit
-   - Provide a clear summary showing BOTH build and boot results
-   - Handle failures gracefully - continue validation unless user wants to stop
-
-   IMPORTANT NOTES:
-   ────────────────
-   ⚠️  MOST IMPORTANT: verify_kernel enforces boot testing
-       - Every call to verify_kernel boots the kernel if build succeeds
-       - This is NOT optional - it's built into the tool
-       - result["success"] is true only if BOTH build AND boot succeed
-       - Runs asynchronously - use get_job_status() to poll for results
-
-   - Timeouts are handled automatically by verify_kernel (600s build, 300s boot)
-   - Each commit needs a full rebuild (10-60+ minutes per commit)
-   - Remote builds (--build-host) are much faster for patch series validation
-   - Always restore the original git state, even if validation fails
-   - If job_id returned: poll every 30-60 seconds with get_job_status()
-   - Report results clearly: "Build OK, Boot OK" or "Build FAILED" or "Build OK, Boot FAILED"
+   For each commit in a series:
+   1. Checkout the commit
+   2. Build the kernel using: vng -v --build
+   3. Boot and test using: run_kernel_async()
+   4. Record BOTH build and boot results
 
    MANDATORY WORKFLOW:
    ───────────────────
@@ -910,194 +739,6 @@ def _wait_for_job_completion(job_id: str, max_wait_seconds: int = 60) -> Job:
     return None
 
 
-def _find_running_verify_kernel_job(kernel_dir: str, commit_sha: str) -> Job | None:
-    """
-    Find an existing running verify_kernel job for the same commit.
-
-    This prevents duplicate verify_kernel runs for the same commit, which can
-    cause conflicts and waste resources.
-
-    Args:
-        kernel_dir: Path to kernel source directory
-        commit_sha: Full commit SHA to check for
-
-    Returns:
-        Job object if found, None otherwise
-    """
-    with _jobs_lock:
-        for job_id, job in _active_jobs.items():
-            # Only check verify_kernel jobs
-            if not job_id.startswith("verify_kernel_"):
-                continue
-
-            # Only check jobs that are still running (not completed/failed/cancelled)
-            if job.status not in ("starting", "running"):
-                continue
-
-            # Check if it's for the same kernel directory and commit
-            job_kernel_dir = job.args.get("kernel_dir", ".")
-            job_commit_sha = job_id.split("_")[2]  # Extract commit short from job_id
-
-            # Normalize paths for comparison
-            job_kernel_path = Path(job_kernel_dir).resolve()
-            request_kernel_path = Path(kernel_dir).resolve()
-
-            # Check if same directory and same commit (compare first 12 chars)
-            if job_kernel_path == request_kernel_path and commit_sha.startswith(
-                job_commit_sha
-            ):
-                return job
-
-    return None
-
-
-def _run_verify_kernel_in_background(job_id: str):
-    """
-    Run verify_kernel job in the background thread.
-    This validates a commit by building and booting it.
-    """
-    with _jobs_lock:
-        if job_id not in _active_jobs:
-            return
-        job = _active_jobs[job_id]
-
-    try:
-        # Update status to running
-        job.status = "running"
-
-        # Extract parameters
-        kernel_dir = job.args.get("kernel_dir", ".")
-        build_host = job.args.get("build_host")
-        config_items = job.args.get("config_items", [])
-        test_command = job.args.get("test_command", "uname -r")
-        build_timeout = job.args.get("build_timeout", 600)
-        boot_timeout = job.args.get("boot_timeout", 300)
-
-        # Get current commit info
-        returncode, commit_sha, _ = run_command(
-            ["git", "rev-parse", "HEAD"], cwd=kernel_dir, timeout=10
-        )
-        if returncode != 0:
-            commit_sha = "unknown"
-        else:
-            commit_sha = commit_sha.strip()
-
-        returncode, subject, _ = run_command(
-            ["git", "log", "-1", "--format=%s"], cwd=kernel_dir, timeout=10
-        )
-        commit_subject = subject.strip() if returncode == 0 else "Unknown"
-
-        result = {
-            "commit_sha": commit_sha,
-            "commit_short": commit_sha[:12] if commit_sha != "unknown" else "unknown",
-            "commit_subject": commit_subject,
-            "test_command": test_command,
-        }
-
-        # Build the kernel
-        build_cmd = ["vng", "-v", "--build"]
-        if build_host:
-            build_cmd.extend(["--build-host", build_host])
-        for config_item in config_items:
-            build_cmd.extend(["--configitem", config_item])
-
-        build_start = time.time()
-        build_returncode, build_stdout, build_stderr = run_command(
-            build_cmd, cwd=kernel_dir, timeout=build_timeout
-        )
-        build_time = time.time() - build_start
-
-        result["build_command"] = shlex.join(build_cmd)
-        result["build_time_seconds"] = round(build_time, 2)
-
-        if build_returncode != 0:
-            result["build_status"] = "FAILED"
-            result["boot_status"] = "SKIPPED"
-            result["overall_status"] = "FAILED"
-            result["success"] = False
-            # Include last 2000 chars of output for debugging
-            result["build_stdout"] = (
-                build_stdout[-2000:] if len(build_stdout) > 2000 else build_stdout
-            )
-            result["build_stderr"] = (
-                build_stderr[-2000:] if len(build_stderr) > 2000 else build_stderr
-            )
-            result["message"] = "Kernel build failed"
-
-            # Store result as JSON in stdout
-            job.stdout = json.dumps(result, indent=2)
-            job.returncode = 1
-            job.status = "failed"
-            job.end_time = time.time()
-            return
-
-        result["build_status"] = "SUCCESS"
-
-        # Boot the kernel (MANDATORY)
-        # Use script wrapper for PTS requirement
-        vng_boot_cmd = ["vng", "-v", "--", test_command]
-        vng_boot_cmd_str = shlex.join(vng_boot_cmd)
-        shell_cmd = f"script -q -c {shlex.quote(vng_boot_cmd_str)} /dev/null 2>&1"
-
-        boot_start = time.time()
-        boot_returncode, boot_stdout, boot_stderr = run_command(
-            ["sh", "-c", shell_cmd], cwd=kernel_dir, timeout=boot_timeout
-        )
-        boot_time = time.time() - boot_start
-
-        result["boot_command"] = vng_boot_cmd_str
-        result["boot_time_seconds"] = round(boot_time, 2)
-
-        if boot_returncode != 0:
-            result["boot_status"] = "FAILED"
-            result["overall_status"] = "FAILED"
-            result["success"] = False
-            # Include last 2000 chars of output for debugging
-            result["boot_stdout"] = (
-                boot_stdout[-2000:] if len(boot_stdout) > 2000 else boot_stdout
-            )
-            result["boot_stderr"] = (
-                boot_stderr[-2000:] if len(boot_stderr) > 2000 else boot_stderr
-            )
-            result["message"] = "Kernel built successfully but boot test failed"
-
-            # Store result as JSON in stdout
-            job.stdout = json.dumps(result, indent=2)
-            job.returncode = 1
-            job.status = "failed"
-            job.end_time = time.time()
-            return
-
-        # Both build and boot succeeded!
-        result["boot_status"] = "SUCCESS"
-        result["overall_status"] = "PASSED"
-        result["success"] = True
-        # Include last 1000 chars of boot output
-        result["boot_stdout"] = (
-            boot_stdout[-1000:] if len(boot_stdout) > 1000 else boot_stdout
-        )
-        result["message"] = "Kernel verification passed: build and boot successful"
-
-        # Store result as JSON in stdout
-        job.stdout = json.dumps(result, indent=2)
-        job.returncode = 0
-        job.status = "completed"
-        job.end_time = time.time()
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        job.status = "failed"
-        job.error = str(e)
-        job.end_time = time.time()
-        # Store error as JSON in stdout
-        error_result = {
-            "success": False,
-            "error": "exception",
-            "message": str(e),
-        }
-        job.stdout = json.dumps(error_result, indent=2)
-        job.returncode = 1
-
-
 def _cleanup_old_jobs(max_age_hours: int = 24):
     """
     Clean up jobs older than max_age_hours.
@@ -1313,233 +954,6 @@ Requirements:
                     },
                 },
                 "required": ["message_id"],
-            },
-        ),
-        Tool(
-            name="verify_kernel",
-            description="""
-Verify a kernel commit by building and booting it asynchronously.
-This tool validates that a specific commit both compiles and runs correctly.
-
-⚠️  CRITICAL: This tool validates BOTH build AND boot!
-════════════════════════════════════════════════════════
-- Building alone is NOT sufficient validation
-- The kernel MUST be booted and tested inside virtme-ng
-- A kernel that builds but doesn't boot is considered FAILED
-- This operation takes 10-60+ minutes per commit
-- Runs asynchronously - returns immediately with job_id for long operations
-
-ASYNC BEHAVIOR:
-═══════════════════════════════════════════════════════════════════════════
-Similar to run_kselftest, this tool runs asynchronously:
-1. Returns immediately with a job_id for long-running operations (>60 seconds)
-2. If the verification completes within 60 seconds, returns full results
-3. Use get_job_status() to poll for results if job_id is returned
-
-WHAT THIS TOOL DOES:
-═══════════════════════════════════════════════════════════════════════════
-1. Optionally checks out the specified commit (if commit parameter provided)
-2. BUILDS the kernel using vng --build (asynchronously)
-3. If build succeeds: BOOTS the kernel using vng -- test_command (asynchronously)
-4. Returns BOTH build and boot results
-
-A commit is considered PASSED only if BOTH build AND boot succeed.
-
-Parameters:
-───────────
-- commit: Git commit to verify (optional)
-  Default: None (verify current HEAD without checkout)
-  Examples: "HEAD~3", "abc1234", "v6.8"
-  If provided, the tool will checkout this commit before building
-
-- kernel_dir: Path to kernel source directory
-  Default: current directory
-
-- build_host: Remote build host for faster builds (optional)
-  Example: "builder", "myserver.example.com"
-  If specified, uses: vng --build --build-host <hostname>
-
-- config_items: List of CONFIG_ITEM=value for custom kernel config (optional)
-  Example: ["CONFIG_KASAN=y", "CONFIG_DEBUG_INFO=y"]
-
-- test_command: Command to run when booting the kernel (optional)
-  Default: "uname -r" (just verify kernel boots)
-  Example: "dmesg | grep -i error || echo 'No errors'"
-
-- build_timeout: Timeout for build in seconds (optional)
-  Default: 600 (10 minutes max)
-
-- boot_timeout: Timeout for boot test in seconds (optional)
-  Default: 300 (5 minutes)
-
-Returns (if completes within 60 seconds):
-────────────────────────────────────────
-JSON object with:
-- success: Overall result (true if both build and boot passed)
-- commit_sha: Full commit SHA that was verified
-- commit_short: Short commit SHA
-- commit_subject: Commit message subject
-- build_status: "SUCCESS" or "FAILED"
-- build_time_seconds: Time taken to build
-- build_command: Build command that was executed
-- boot_status: "SUCCESS", "FAILED", or "SKIPPED" (if build failed)
-- boot_time_seconds: Time taken to boot (if applicable)
-- boot_command: Boot command that was executed (if applicable)
-- test_command: Test command that was run
-- overall_status: "PASSED" (both OK) or "FAILED"
-- auto_completed: true (indicates it finished quickly)
-
-Returns (if still running after 60 seconds):
-────────────────────────────────────────────
-JSON object with:
-- success: true (job started successfully)
-- job_id: Unique identifier for this job
-- status: "starting" or "running"
-- commit_sha: Full commit SHA being verified
-- commit_short: Short commit SHA
-- commit_subject: Commit message subject
-- message: Instructions to use get_job_status()
-- poll_suggestion: When to check status again
-- expected_runtime: Typical runtime estimate
-
-POLLING FOR RESULTS:
-════════════════════
-After starting verification, use get_job_status() to check progress:
-
-1. Call verify_kernel() → Get job_id
-2. Wait 30 seconds
-3. Call get_job_status({"job_id": job_id}) → Check progress
-4. Repeat step 2-3 until status is "completed" or "failed"
-5. Retrieve results from final get_job_status() response
-
-Example Use Cases:
-══════════════════
-
-1. Verify current commit (basic):
-   result = verify_kernel({})
-   if "job_id" in result:
-       # Poll with get_job_status({"job_id": result["job_id"]})
-   else:
-       # Result available immediately in result
-
-2. Verify specific commit:
-   verify_kernel({"commit": "HEAD~3"})
-
-3. Verify with remote build host (faster):
-   verify_kernel({
-       "commit": "abc1234",
-       "build_host": "builder"
-   })
-
-4. Verify with custom config and test:
-   verify_kernel({
-       "commit": "v6.8",
-       "config_items": ["CONFIG_KASAN=y"],
-       "test_command": "dmesg | grep -i kasan"
-   })
-
-VALIDATING PATCH SERIES:
-════════════════════════
-To validate a patch series, call this tool for each commit and poll for results:
-
-1. Get commit list: Shell("git rev-list --reverse HEAD~5^..HEAD")
-2. Save current state: Shell("git rev-parse HEAD")
-3. For each commit:
-   - result = verify_kernel({"commit": "<sha>"})
-   - If result["error"] == "duplicate_job_running":
-       * Use existing_job_id from error: job_id = result["existing_job_id"]
-   - Else if "job_id" in result:
-       * job_id = result["job_id"]
-   - Poll with get_job_status({"job_id": job_id}) until complete
-   - ⚠️  Do NOT call verify_kernel() again! Keep using get_job_status()
-   - Record result
-4. Restore state: Shell("git checkout <original>")
-
-See section 7 of the module documentation for the complete workflow.
-
-AGENT GUIDANCE:
-═══════════════
-⚠️  CRITICAL: AVOID DUPLICATE RUNS!
-────────────────────────────────────
-Before calling verify_kernel():
-1. Check if you already started a job for this commit earlier in the conversation
-2. If you have a job_id from a previous verify_kernel() call, use get_job_status()
-   to check its progress instead of starting a new verification
-3. The tool will automatically reject duplicate runs for the same commit
-
-When using this tool:
-1. FIRST: Check if you already have a running job (look at previous verify_kernel calls)
-2. If you have a job_id: Use get_job_status() instead of calling verify_kernel() again
-3. ONLY call verify_kernel() for new commits you haven't verified yet
-4. If job_id is returned, inform user and poll get_job_status()
-5. Wait 30-60 seconds between polls
-6. Update user with progress
-7. Report final results when completed
-
-DUPLICATE PREVENTION:
-────────────────────
-- The tool automatically detects if a verify_kernel job is already running for a commit
-- If detected, it returns an error with the existing job_id
-- Use that job_id with get_job_status() instead of starting a new job
-- This prevents conflicts and wasted resources
-
-IMPORTANT NOTES:
-════════════════
-⏱️  Time Requirements:
-   - Takes 10-60+ minutes (build + boot)
-   - Use build_host for faster builds
-   - Runs asynchronously - no MCP timeout risk
-
-⚠️  Boot Testing:
-   - EVERY successfully built kernel is booted
-   - This is NOT optional - it's mandatory validation
-   - Skipping boot testing makes validation incomplete
-
-🔄 Git State:
-   - If commit parameter is provided, it will checkout that commit
-   - You should save/restore git state when validating series
-   - See documentation for complete patch series workflow
-
-CRITICAL: This tool enforces complete validation. You cannot skip the
-boot testing step. The kernel is validated by BOTH building AND booting.
-            """,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "commit": {
-                        "type": "string",
-                        "description": "Git commit to verify (optional, e.g., 'HEAD~3', 'abc1234', 'v6.8')",
-                    },
-                    "kernel_dir": {
-                        "type": "string",
-                        "description": "Path to kernel source directory",
-                        "default": ".",
-                    },
-                    "build_host": {
-                        "type": "string",
-                        "description": "Remote build host for faster builds (optional)",
-                    },
-                    "config_items": {
-                        "type": "array",
-                        "items": {"type": "string"},
-                        "description": "List of CONFIG_ITEM=value settings (optional)",
-                    },
-                    "test_command": {
-                        "type": "string",
-                        "description": "Command to run when booting the kernel (default: 'uname -r')",
-                        "default": "uname -r",
-                    },
-                    "build_timeout": {
-                        "type": "integer",
-                        "description": "Timeout for build in seconds (default: 600)",
-                        "default": 600,
-                    },
-                    "boot_timeout": {
-                        "type": "integer",
-                        "description": "Timeout for boot test in seconds (default: 300)",
-                        "default": 300,
-                    },
-                },
             },
         ),
         Tool(
@@ -1914,8 +1328,8 @@ When you start an async job:
             name="get_job_status",
             description="""
 Get the status of an async kernel test job.
-This tool checks the current state of a job started with run_kernel_async(),
-run_kselftest(), or verify_kernel().
+This tool checks the current state of a job started with run_kernel_async()
+or run_kselftest().
 
 ⏱️  FAST OPERATION - Returns immediately (<1 second), no timeout risk!
 
@@ -2006,8 +1420,8 @@ AGENT GUIDANCE:
             description="""
 Cancel a running async kernel test job.
 
-This attempts to cancel a job that was started with run_kernel_async(),
-run_kselftest(), or verify_kernel().
+This attempts to cancel a job that was started with run_kernel_async()
+or run_kselftest().
 
 Note: Currently this marks the job as "cancelled" but does not forcibly
 terminate the underlying process. The job will continue running but will
@@ -2086,8 +1500,6 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
         return await get_kernel_info(arguments)
     if name == "apply_patch":
         return await apply_patch(arguments)
-    if name == "verify_kernel":
-        return await verify_kernel(arguments)
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
 
 
@@ -2312,178 +1724,6 @@ async def apply_patch(args: dict) -> list[TextContent]:
             result["help"] = (
                 "Patch failed to apply. There may be merge conflicts or the patch is for a different kernel version"
             )
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-
-async def verify_kernel(args: dict) -> list[TextContent]:
-    """
-    Verify a kernel commit by building and booting it asynchronously.
-
-    This validates that a specific commit both compiles and runs correctly.
-    Similar to run_kselftest, this runs asynchronously and returns a job_id
-    for long-running operations.
-    """
-    kernel_dir = args.get("kernel_dir", ".")
-    commit = args.get("commit")
-    build_host = args.get("build_host")
-    config_items = args.get("config_items", [])
-    test_command = args.get("test_command", "uname -r")
-    build_timeout = args.get("build_timeout", 600)  # 10 minutes for builds
-    boot_timeout = args.get("boot_timeout", 300)  # 5 minutes for boot
-
-    kernel_path = Path(kernel_dir)
-
-    # Check if kernel directory exists
-    if not kernel_path.exists():
-        result = {
-            "success": False,
-            "error": "kernel_dir_not_found",
-            "message": f"Kernel directory {kernel_dir} does not exist",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Check if it's a git repository
-    git_dir = kernel_path / ".git"
-    if not git_dir.exists():
-        result = {
-            "success": False,
-            "error": "not_a_git_repo",
-            "message": f"Directory {kernel_dir} is not a git repository",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # If commit is specified, checkout that commit
-    if commit:
-        returncode, _, checkout_stderr = run_command(
-            ["git", "checkout", commit], cwd=kernel_dir, timeout=30
-        )
-        if returncode != 0:
-            result = {
-                "success": False,
-                "error": "git_checkout_failed",
-                "message": f"Failed to checkout commit {commit}",
-                "stderr": checkout_stderr,
-            }
-            return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Get current commit info for display
-    returncode, commit_sha, _ = run_command(
-        ["git", "rev-parse", "HEAD"], cwd=kernel_dir, timeout=10
-    )
-    if returncode != 0:
-        commit_sha = "unknown"
-    else:
-        commit_sha = commit_sha.strip()
-
-    returncode, subject, _ = run_command(
-        ["git", "log", "-1", "--format=%s"], cwd=kernel_dir, timeout=10
-    )
-    commit_subject = subject.strip() if returncode == 0 else "Unknown"
-
-    # Check if there's already a running verify_kernel job for this commit
-    # This prevents duplicate runs that can cause conflicts
-    existing_job = _find_running_verify_kernel_job(kernel_dir, commit_sha)
-    if existing_job:
-        commit_short = commit_sha[:12] if commit_sha != "unknown" else "unknown"
-        result = {
-            "success": False,
-            "error": "duplicate_job_running",
-            "existing_job_id": existing_job.job_id,
-            "commit_sha": commit_sha,
-            "commit_short": commit_short,
-            "commit_subject": commit_subject,
-            "message": (
-                f"A verify_kernel job for commit {commit_short} is already running. "
-                f"Use get_job_status() to check its progress instead of starting a new one."
-            ),
-            "existing_job_status": existing_job.status,
-            "existing_job_elapsed_seconds": round(existing_job.elapsed_seconds(), 2),
-            "agent_guidance": (
-                f"IMPORTANT: Do NOT start a new verify_kernel job for this commit. "
-                f'Instead, use get_job_status({{"job_id": "{existing_job.job_id}"}}) '
-                f"to check the status of the existing job. Wait 30-60 seconds between "
-                f"status checks until the job completes."
-            ),
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Generate unique job ID
-    timestamp = int(time.time())
-    commit_short = commit_sha[:12] if commit_sha != "unknown" else "unknown"
-    job_id = f"verify_kernel_{commit_short}_{timestamp}_{uuid.uuid4().hex[:8]}"
-
-    # Build command string for display
-    build_cmd_parts = ["vng", "-v", "--build"]
-    if build_host:
-        build_cmd_parts.extend(["--build-host", build_host])
-    for config_item in config_items:
-        build_cmd_parts.extend(["--configitem", config_item])
-    build_cmd_str = shlex.join(build_cmd_parts)
-
-    boot_cmd_str = f"vng -v -- {test_command}"
-    command_str = f"{build_cmd_str} && {boot_cmd_str}"
-
-    # Prepare arguments for background job
-    async_args = {
-        "kernel_dir": kernel_dir,
-        "build_host": build_host,
-        "config_items": config_items,
-        "test_command": test_command,
-        "build_timeout": build_timeout,
-        "boot_timeout": boot_timeout,
-    }
-
-    # Create job object
-    job = Job(job_id=job_id, command=command_str, args=async_args)
-
-    # Store job
-    with _jobs_lock:
-        _active_jobs[job_id] = job
-
-    # Start background thread
-    thread = threading.Thread(
-        target=_run_verify_kernel_in_background, args=(job_id,), daemon=True
-    )
-    thread.start()
-
-    # Wait for up to 60 seconds to see if job completes quickly
-    job = _wait_for_job_completion(job_id, max_wait_seconds=60)
-
-    if job and job.status in ("completed", "failed", "cancelled"):
-        # Job completed within 60 seconds - return full results
-        # Parse the JSON result from stdout
-        try:
-            result = json.loads(job.stdout)
-        except (json.JSONDecodeError, ValueError):
-            # Fallback if JSON parsing fails
-            result = {
-                "success": job.status == "completed",
-                "status": job.status,
-                "returncode": job.returncode,
-                "error": "Could not parse verification results",
-            }
-
-        result["auto_completed"] = True
-        result["job_id"] = job_id
-        result["elapsed_seconds"] = round(job.elapsed_seconds(), 2)
-
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Job still running after 60 seconds - return job info for manual polling
-    result = {
-        "success": True,
-        "job_id": job_id,
-        "status": job.status if job else "starting",
-        "commit_sha": commit_sha,
-        "commit_short": commit_short,
-        "commit_subject": commit_subject,
-        "message": f"Kernel verification for commit {commit_short} is running. Use get_job_status() to check progress.",
-        "command": command_str,
-        "poll_suggestion": "Wait 30 seconds before first status check",
-        "expected_runtime": "Verification typically takes 10-60+ minutes (build + boot)",
-        "elapsed_seconds": round(job.elapsed_seconds(), 2) if job else 0,
-    }
 
     return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
@@ -2856,7 +2096,7 @@ async def get_job_status_handler(args: dict) -> list[TextContent]:
         result = {
             "success": False,
             "error": "job_id is required",
-            "message": "Please provide a job_id from run_kernel_async(), run_kselftest(), or verify_kernel()",
+            "message": "Please provide a job_id from run_kernel_async() or run_kselftest()",
         }
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
@@ -2879,19 +2119,6 @@ async def get_job_status_handler(args: dict) -> list[TextContent]:
     result = job.to_dict()
     result["success"] = True
 
-    # Special handling for verify_kernel jobs
-    # If this is a verify_kernel job and it's completed/failed, parse the JSON result
-    is_verify_kernel = job_id.startswith("verify_kernel_")
-    if is_verify_kernel and job.status in ("completed", "failed") and job.stdout:
-        try:
-            # Parse the JSON result from stdout
-            verify_result = json.loads(job.stdout)
-            # Merge verify_kernel specific fields into the result
-            result.update(verify_result)
-        except (json.JSONDecodeError, ValueError):
-            # If parsing fails, keep the default result
-            pass
-
     # Add helpful messages and guidance based on status
     if job.status == "starting":
         result["message"] = "Job is starting up..."
@@ -2904,16 +2131,14 @@ async def get_job_status_handler(args: dict) -> list[TextContent]:
             f"Wait {result['poll_again_in_seconds']} seconds before checking again"
         )
     elif job.status == "completed":
-        if not is_verify_kernel or "message" not in result:
-            result["message"] = "Job completed successfully"
+        result["message"] = "Job completed successfully"
         result["success_flag"] = job.returncode == 0
         if job.returncode != 0:
             result["warning"] = (
                 f"Job completed but command returned exit code {job.returncode}"
             )
     elif job.status == "failed":
-        if not is_verify_kernel or "message" not in result:
-            result["message"] = "Job failed"
+        result["message"] = "Job failed"
         result["success_flag"] = False
     elif job.status == "cancelled":
         result["message"] = "Job was cancelled"
