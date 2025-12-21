@@ -11,7 +11,7 @@ IMPORTANT NOTES FOR AI AGENTS:
 1. BUILDING KERNELS - CRITICAL INSTRUCTIONS
    ==========================================
 
-   ⚠️  NEVER use the run_kernel_async tool to build kernels!
+   ⚠️  NEVER use the run_kernel_cmd tool to build kernels!
    ⚠️  ALWAYS use shell commands with 'vng -v --build' for building!
 
    When a user asks to test a kernel that hasn't been built yet, use
@@ -39,8 +39,6 @@ IMPORTANT NOTES FOR AI AGENTS:
 
    ⚠️  ALWAYS use sufficient timeout for builds
    ⚠️  For faster builds, use remote hosts with --build-host option
-
-   Default shell command timeouts (30 seconds) are TOO SHORT and WILL FAIL!
 
    Why use vng -v --build:
    - Automatically generates minimal .config if missing (saves time)
@@ -110,48 +108,48 @@ IMPORTANT NOTES FOR AI AGENTS:
      vng -v --build --build-host builder --arch arm64
      vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y
 
-2. EACH run_kernel_async INVOCATION SPAWNS A NEW, INDEPENDENT VM
+2. EACH run_kernel_cmd INVOCATION SPAWNS A NEW, INDEPENDENT VM
    ==================================================================
 
-   ⚠️  CRITICAL: Every call to run_kernel_async() creates a FRESH, ISOLATED VM instance!
+   ⚠️  CRITICAL: Every call to run_kernel_cmd() creates a FRESH, ISOLATED VM instance!
 
    This means:
-   ✗ State does NOT persist between run_kernel_async invocations
+   ✗ State does NOT persist between run_kernel_cmd invocations
    ✗ You CANNOT run a command and then check dmesg in a separate invocation
    ✗ You CANNOT set up something in one call and use it in another
    ✗ Each VM starts fresh with no memory of previous invocations
 
-   ✓ CORRECT: Combine commands in a SINGLE run_kernel_async invocation:
-     run_kernel_async({"command": "some_command && dmesg | grep -i warning"})
-     run_kernel_async({"command": "modprobe mymod && cat /sys/module/mymod/parameters/debug"})
-     run_kernel_async({"command": "cd /tmp && echo test > file && cat file"})
+   ✓ CORRECT: Combine commands in a SINGLE run_kernel_cmd invocation:
+     run_kernel_cmd({"command": "some_command && dmesg | grep -i warning"})
+     run_kernel_cmd({"command": "modprobe mymod && cat /sys/module/mymod/parameters/debug"})
+     run_kernel_cmd({"command": "cd /tmp && echo test > file && cat file"})
 
    ✗ WRONG: Multiple separate invocations (these are INDEPENDENT VMs!):
-     run_kernel_async({"command": "some_command"})        # VM instance #1
-     run_kernel_async({"command": "dmesg"})               # VM instance #2 (different VM!)
+     run_kernel_cmd({"command": "some_command"})        # VM instance #1
+     run_kernel_cmd({"command": "dmesg"})               # VM instance #2 (different VM!)
      # These two commands run in COMPLETELY DIFFERENT virtual machines!
      # The dmesg output will NOT contain anything from the first command!
 
    WHY THIS MATTERS:
-   - run_kernel_async() starts a QEMU VM, runs the command, captures output, then EXITS
+   - run_kernel_cmd() returns a command that starts a QEMU VM, runs the command, captures output, then EXITS
    - Each invocation = fresh boot, fresh memory, fresh state
    - Like rebooting a computer between each command
 
    EXAMPLES:
 
    ❌ BAD - Won't work (separate VMs):
-      run_kernel_async({"command": "insmod mymodule.ko"})
-      run_kernel_async({"command": "dmesg | grep mymodule"})  # Won't see module from first call!
+      run_kernel_cmd({"command": "insmod mymodule.ko"})
+      run_kernel_cmd({"command": "dmesg | grep mymodule"})  # Won't see module from first call!
 
    ✅ GOOD - Works (single VM):
-      run_kernel_async({"command": "insmod mymodule.ko && dmesg | grep mymodule"})
+      run_kernel_cmd({"command": "insmod mymodule.ko && dmesg | grep mymodule"})
 
    ❌ BAD - Won't work (separate VMs):
-      run_kernel_async({"command": "echo 1 > /proc/sys/kernel/printk"})
-      run_kernel_async({"command": "cat /proc/sys/kernel/printk"})  # Will show default, not 1!
+      run_kernel_cmd({"command": "echo 1 > /proc/sys/kernel/printk"})
+      run_kernel_cmd({"command": "cat /proc/sys/kernel/printk"})  # Will show default, not 1!
 
    ✅ GOOD - Works (single VM):
-      run_kernel_async({"command": "echo 1 > /proc/sys/kernel/printk && cat /proc/sys/kernel/printk"})
+      run_kernel_cmd({"command": "echo 1 > /proc/sys/kernel/printk && cat /proc/sys/kernel/printk"})
 
    SHELL OPERATORS for combining commands:
    - && : Run second command only if first succeeds
@@ -159,7 +157,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    - || : Run second command only if first fails
 
    Example with complex script:
-     run_kernel_async({"command": "cd /path && ./test.sh && dmesg | tail -50"})
+     run_kernel_cmd({"command": "cd /path && ./test.sh && dmesg | tail -50"})
 
 3. PTS (Pseudo-Terminal) Requirement
    -----------------------------------
@@ -167,7 +165,8 @@ IMPORTANT NOTES FOR AI AGENTS:
    environments without a real terminal, vng commands will fail with:
      "ERROR: not a valid pts, try to run vng with a valid PTS (e.g., inside tmux or screen)"
 
-   This MCP server's run_kernel_async tool automatically handles PTS requirements.
+   This MCP server's run_kernel_cmd tool automatically handles PTS requirements by wrapping
+   commands with 'script'.
 
    For direct shell commands, use 'script' to provide a PTS:
      script -q -c "vng -- command" /dev/null 2>&1
@@ -180,7 +179,7 @@ IMPORTANT NOTES FOR AI AGENTS:
 4. Typical Workflow for Testing Kernel Changes
    ============================================
 
-   STEP 1: BUILD (use shell command, NOT run_kernel_async tool!)
+   STEP 1: BUILD (use build_kernel tool or shell command, NOT run_kernel_cmd tool!)
    ────────────────────────────────────────────────────────
 
    ⏱️  TIMEOUT REQUIREMENT: Builds take a long time (use sufficient timeout)
@@ -198,12 +197,12 @@ IMPORTANT NOTES FOR AI AGENTS:
    d) Remote build with custom config:
       vng -v --build --build-host builder --configitem CONFIG_DEBUG_INFO=y
 
-   STEP 2: TEST (use run_kernel_async tool or shell command)
+   STEP 2: TEST (use run_kernel_cmd tool or shell command)
    ────────────────────────────────────────────────────
 
    After building, test the kernel:
-   • Use run_kernel_async tool, OR
-   • Use shell command: script -q -c "vng -- uname -r" /dev/null 2>&1
+   • Use run_kernel_cmd tool to get the command, then execute it with Shell tool, OR
+   • Use shell command directly: script -q -c "vng -- uname -r" /dev/null 2>&1
 
    ═══════════════════════════════════════════════════════════════════
    COMPLETE WORKFLOW EXAMPLES (with proper timeouts!):
@@ -214,7 +213,7 @@ IMPORTANT NOTES FOR AI AGENTS:
     # STEP 1: BUILD
     vng -v --build --configitem CONFIG_KASAN=y
 
-     # STEP 2: TEST (run_kernel_async tool or shell command)
+     # STEP 2: TEST (shell command)
      script -q -c "vng -- dmesg | grep -i kasan" /dev/null 2>&1
 
      Example 2: Remote build + local test
@@ -222,7 +221,7 @@ IMPORTANT NOTES FOR AI AGENTS:
     # STEP 1: BUILD on remote host
     vng -v --build --build-host builder
 
-     # STEP 2: TEST locally (run_kernel_async tool or shell command)
+     # STEP 2: TEST locally (shell command)
      script -q -c "vng -- uname -r" /dev/null 2>&1
 
     Example 3: Remote build with config + test
@@ -230,7 +229,7 @@ IMPORTANT NOTES FOR AI AGENTS:
     # STEP 1: BUILD on remote host
     vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y
 
-    # STEP 2: TEST (run_kernel_async tool or shell command)
+    # STEP 2: TEST (shell command)
     script -q -c "vng -- cat /proc/version" /dev/null 2>&1
 
 5. Running Kernel Selftests (kselftests)
@@ -242,32 +241,38 @@ IMPORTANT NOTES FOR AI AGENTS:
    ⚠️  IMPORTANT: Build the kernel FIRST!
    vng -v --build
 
-   Then run_kselftest command handles the rest:
-   1. Builds the kselftest (if needed)
-   2. Runs the kselftest asynchronously
-   3. Returns job_id for polling
+   Then use run_kselftest_cmd to get a script and command to execute:
+   1. Call run_kselftest_cmd() to get a single command
+   2. IMMEDIATELY execute the command using Shell tool in the SAME response
+   3. That's it!
+
+   ⚠️  IMPORTANT: Always execute the returned command immediately - do NOT wait for user input!
 
    BASIC USAGE
    ───────────
-   # Start the kselftest asynchronously
-   result = run_kselftest({"test_name": "sched_ext"})
+   # Get the command to run
+   result = run_kselftest_cmd({"test_name": "sched_ext"})
 
-   # Poll for results every 10 sec
-   status = get_job_status({"job_id": result["job_id"]})
+   # result contains:
+   # {
+   #   "success": true,
+   #   "command": "bash /path/to/kernel/vng-kselftest.sh",
+   #   "action_required": "EXECUTE_NOW",
+   #   "description": "Run kselftest sched_ext"
+   # }
 
-   The command automatically:
-   - Checks if kernel is built (builds it if needed)
-   - Checks if kselftest is built (builds it if needed)
-   - Runs the kselftest asynchronously (no MCP timeout)
-   - Sets appropriate defaults (2G memory, 1 hour timeout)
-   - Returns a job_id for polling progress
+   # IMMEDIATELY execute the command in the same response - do NOT wait!
+   Shell(command=result["command"])
 
-   ⏱️ TIMEOUT REQUIREMENTS:
-   ────────────────────────
+   The run_kselftest_cmd tool returns:
+   - A single command that executes a script
+   - The script handles all steps automatically (headers, build, test)
+
+   ⏱️ TIMING:
+   ──────────
   - Kselftests can take 10+ minutes depending on the test suite
-  - Builds can take 5-10 minutes (handled automatically, 10 min timeout)
-  - run_kselftest sets default timeout to 3600 seconds (1 hour)
-   - Can be customized with timeout parameter if needed
+  - Builds can take 5-10 minutes
+  - Execute the command using Shell tool which handles timeouts automatically
 
    COMPLETE EXAMPLES:
    ──────────────────
@@ -277,84 +282,87 @@ IMPORTANT NOTES FOR AI AGENTS:
    # STEP 1: Build kernel first!
    vng -v --build
 
-   # STEP 2: Start the kselftest asynchronously
-   result = run_kselftest({"test_name": "sched_ext"})
+   # STEP 2: Get command to run
+   result = run_kselftest_cmd({"test_name": "sched_ext"})
 
-   # STEP 3: Poll for results every 10 sec
-   status = get_job_status({"job_id": result["job_id"]})
-   # Repeat until status is "completed" or "failed"
+   # STEP 3: Execute the command
+   Shell(command=result["command"])
+   # The script automatically handles all steps!
 
-   # Note: run_kselftest automatically builds the kselftest if needed!
-
-   Example 2: Run VM tests with verbose output
-   ────────────────────────────────────────────
-   # PREREQUISITE: Build kernel first (if testing newly built kernel)
-   vng -v --build
-
-   # Run kselftest with options
-   result = run_kselftest({
-       "test_name": "vm",
-       "runner_args": "--verbose"
-   })
-
-   # Poll for results
-   status = get_job_status({"job_id": result["job_id"]})
-
-   Example 3: Run tests on HOST kernel
+   Example 2: Run tests on HOST kernel
    ────────────────────────────────────
-   # One command - automatically builds kselftest only
-   result = run_kselftest({
+   # Get command - only builds kselftest, skips kernel rebuild
+   result = run_kselftest_cmd({
        "test_name": "net",
        "kernel_image": "host"
    })
 
-   # Poll for results
-   status = get_job_status({"job_id": result["job_id"]})
+   # Execute command
+   Shell(command=result["command"])
 
-   Example 4: Run tests on UPSTREAM kernel
+   Example 3: Run tests on UPSTREAM kernel
    ────────────────────────────────────────
-   # One command - automatically builds kselftest, downloads kernel
-   result = run_kselftest({
+   # Get command - builds kselftest and uses upstream kernel
+   result = run_kselftest_cmd({
        "test_name": "seccomp",
        "kernel_image": "v6.14"
    })
 
-   # Poll for results
-   status = get_job_status({"job_id": result["job_id"]})
-
-   Example 5: Run tests with custom settings
-   ──────────────────────────────────────────
-   # PREREQUISITE: Build kernel first
-   vng -v --build
-
-   result = run_kselftest({
-       "test_name": "vm",
-       "memory": "4G",
-       "timeout": 7200,  # 2 hours for test
-       "runner_args": "--verbose"
-   })
+   # Execute command
+   Shell(command=result["command"])
 
 6. MCP Tools Available
    --------------------
    This MCP server provides:
    - configure_kernel: Generate/modify kernel .config
-   - run_kernel_async: Run kernel tests asynchronously (for all kernel testing)
-   - run_kselftest: Run kernel selftests asynchronously (RECOMMENDED for kselftests)
-   - get_job_status: Check status of async jobs
-   - cancel_job: Cancel running async jobs
-   - list_jobs: List all active async jobs
+   - run_kernel_cmd: Generate command for running kernel tests
+   - run_kselftest_cmd: Generate script and return command for running kernel selftests (RECOMMENDED for kselftests)
    - get_kernel_info: Get info about kernel source directory
    - apply_patch: Apply patches from lore.kernel.org
 
+   Tools return a single command that you execute directly using Shell tool.
+   This is simple and works great with all AI models!
+
+   How it works:
+   ─────────────
+   For complex operations (like run_kselftest_cmd), the tool creates a script (vng-kselftest.sh)
+   in the kernel workspace that handles all the steps automatically, and returns a single
+   command to execute it. The agent MUST execute this command immediately.
+
+   You just execute the command - the script does everything:
+   ✓ Install dependencies
+   ✓ Build components
+   ✓ Run the actual test
+
+   No need to manage multiple commands or worry about execution order!
+
    For building kernels, use shell commands with 'vng -v --build' as documented above.
-   For running kselftests, use the run_kselftest command (see section 5).
+   For running kselftests, use the run_kselftest_cmd tool (see section 5).
    For validating patch series, see section 7 below.
+
+   ⚠️  CRITICAL WARNING: Architecture Parameter (--arch)
+   ══════════════════════════════════════════════════════
+   NEVER set the 'arch' parameter unless the user EXPLICITLY requests a specific architecture!
+
+   When to set arch (rare):
+   ✓ User explicitly says: "test on arm64"
+   ✓ User explicitly says: "build for riscv64"
+   ✓ User explicitly says: "cross-compile to aarch64"
+
+   When NOT to set arch (99% of cases):
+   ✗ User says: "build and test the kernel"
+   ✗ User says: "run kselftests"
+   ✗ User says: "test this patch"
+   ✗ ANY request that doesn't explicitly mention an architecture
+
+   If arch is omitted, the tool automatically uses the host architecture (which is correct).
+   Setting arch unnecessarily triggers cross-compilation and requires special chroot setup!
 
 7. Validating Patch Series
    ========================================================
 
    When a user asks to validate a patch series by building and booting each commit,
-   use a combination of Shell commands and run_kernel_async() for each commit.
+   use a combination of Shell commands and run_kernel_cmd() for each commit.
 
    ⚠️  CRITICAL: ALWAYS BUILD **AND** BOOT EACH KERNEL
    ════════════════════════════════════════════════════
@@ -371,7 +379,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit in a series:
    1. Checkout the commit
    2. Build the kernel using: vng -v --build
-   3. Boot and test using: run_kernel_async()
+   3. Boot and test using: run_kernel_cmd()
    4. Record BOTH build and boot results
 
    MANDATORY WORKFLOW:
@@ -379,7 +387,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit in the range, you MUST perform ALL these steps:
    1. Checkout the commit using git
    2. BUILD the kernel using: vng -v --build
-   3. BOOT the kernel using run_kernel_async() - THIS STEP IS MANDATORY
+   3. BOOT the kernel using run_kernel_cmd() - THIS STEP IS MANDATORY
    4. Record BOTH build and boot results (both must succeed)
    5. Return to original commit when done
 
@@ -425,14 +433,15 @@ IMPORTANT NOTES FOR AI AGENTS:
 
       You MUST boot every successfully built kernel to verify it works.
 
-      MINIMUM (always required): Verify kernel boots
-      run_kernel_async({"command": "uname -r"})
+      MINIMUM (always required): Verify kernel boots using shell command:
+      script -q -c 'vng -- uname -r' /dev/null 2>&1
 
       OR with custom test command (if user specified):
-      run_kernel_async({"command": "user_test_command_here"})
+      script -q -c 'vng -- user_test_command_here' /dev/null 2>&1
 
-      OR using shell command:
-      script -q -c 'vng -- uname -r' /dev/null 2>&1
+      OR use run_kernel_cmd() to get the command:
+      result = run_kernel_cmd({"command": "uname -r"})
+      # Execute: result["command"]
 
       ⚠️  If you skip this step, the validation is INCOMPLETE and INVALID
 
@@ -462,7 +471,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    3. For EACH commit (ALL steps required):
       - Checkout commit: git checkout <sha>
       - BUILD: vng -v --build
-      - If build succeeds, BOOT (MANDATORY): run_kernel_async({"command": "uname -r"})
+      - If build succeeds, BOOT (MANDATORY): script -q -c 'vng -- uname -r' /dev/null 2>&1
       - If build fails, mark as FAILED and skip boot (or stop if requested)
       - Record: "✅ abc123 - Fix bug: Build OK, Boot OK"
                 or "❌ def456 - Add feature: Build OK, Boot FAILED"
@@ -477,7 +486,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    ─────────────────────────────
    ⚠️  MANDATORY: You MUST boot every successfully built kernel
        - Building alone is NOT validation
-       - ALWAYS run run_kernel_async() after successful build
+       - ALWAYS run boot test (script -q -c 'vng -- uname -r' /dev/null 2>&1) after successful build
        - A kernel that builds but doesn't boot is FAILED
 
   - Always save and restore the original git state
@@ -496,7 +505,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit:
    1. git checkout COMMIT
    2. vng -v --build --build-host builder
-   3. If build succeeds: run_kernel_async({"command": "uname -r"})  ⚠️ MANDATORY
+   3. If build succeeds: script -q -c 'vng -- uname -r' /dev/null 2>&1  ⚠️ MANDATORY
    4. Record both build and boot results
 
    EXAMPLE WITH CUSTOM TEST:
@@ -507,7 +516,8 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit:
    1. git checkout COMMIT
    2. vng -v --build
-   3. If build succeeds: run_kernel_async({"command": "dmesg | grep -i error || echo 'No errors found'"})  ⚠️ MANDATORY
+   3. If build succeeds: script -q -c 'vng -- dmesg | grep -i error || echo "No errors found"'
+      /dev/null 2>&1  ⚠️ MANDATORY
    4. Record both build and boot/test results
 
    EXAMPLE WITH STOP ON FAILURE:
@@ -518,7 +528,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    For each commit:
    1. Build kernel: vng -v --build
    2. If build fails: report "First failing commit (build): COMMIT_SHA" and stop
-   3. If build succeeds: Boot kernel: run_kernel_async({"command": "uname -r"})  ⚠️ MANDATORY
+   3. If build succeeds: Boot kernel: script -q -c 'vng -- uname -r' /dev/null 2>&1  ⚠️ MANDATORY
    4. If boot fails: report "First failing commit (boot): COMMIT_SHA" and stop
    5. If both succeed: continue to next commit
 
@@ -526,7 +536,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    ────────────────
    ⚠️  MOST IMPORTANT: ALWAYS test boot after every successful build
        - This is NOT optional - it's a required validation step
-       - Use run_kernel_async({"command": "uname -r"}) at minimum
+       - Use run_kernel_cmd({"command": "uname -r"}) at minimum
        - A commit that builds but doesn't boot is FAILED
 
    - Each commit needs a full rebuild (10-60+ minutes per commit)
@@ -539,14 +549,9 @@ IMPORTANT NOTES FOR AI AGENTS:
 
 import asyncio
 import json
-import shlex
+import os
 import subprocess
 import sys
-import threading
-import time
-import uuid
-from dataclasses import dataclass, field
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -566,203 +571,34 @@ except ImportError:
 app = Server("virtme-ng")
 
 
-# ============================================================================
-# Async Job Management Infrastructure
-# ============================================================================
-
-# Global job storage (jobs persist across tool calls)
-_active_jobs = {}
-_jobs_lock = threading.Lock()
-
-
-@dataclass
-class Job:
-    """Represents an async kernel test job."""
-
-    job_id: str
-    command: str
-    args: dict
-    status: str = "starting"  # starting, running, completed, failed, cancelled
-    start_time: float = field(default_factory=time.time)
-    end_time: float | None = None
-    returncode: int | None = None
-    stdout: str = ""
-    stderr: str = ""
-    error: str | None = None
-
-    def elapsed_seconds(self) -> float:
-        """Get elapsed time in seconds."""
-        end = self.end_time if self.end_time else time.time()
-        return end - self.start_time
-
-    def to_dict(self) -> dict:
-        """Convert job to dictionary for JSON serialization."""
-        result = {
-            "job_id": self.job_id,
-            "status": self.status,
-            "command": self.command,
-            "start_time": datetime.fromtimestamp(self.start_time).isoformat(),
-            "elapsed_seconds": round(self.elapsed_seconds(), 2),
-        }
-
-        if self.status in ("completed", "failed"):
-            result["end_time"] = datetime.fromtimestamp(self.end_time).isoformat()
-            result["returncode"] = self.returncode
-            result["total_time_seconds"] = round(self.elapsed_seconds(), 2)
-
-            # Include output (truncate if too large for MCP response)
-            max_output = 50000  # 50KB max per field
-            if len(self.stdout) > max_output:
-                result["stdout"] = self.stdout[-max_output:]
-                result["stdout_truncated"] = True
-                result["stdout_note"] = (
-                    f"Output truncated (showing last {max_output} chars of {len(self.stdout)})"
-                )
-            else:
-                result["stdout"] = self.stdout
-                result["stdout_truncated"] = False
-
-            if self.stderr:
-                if len(self.stderr) > max_output:
-                    result["stderr"] = self.stderr[-max_output:]
-                    result["stderr_truncated"] = True
-                    result["stderr_note"] = (
-                        f"Output truncated (showing last {max_output} chars of {len(self.stderr)})"
-                    )
-                else:
-                    result["stderr"] = self.stderr
-                    result["stderr_truncated"] = False
-
-        if self.error:
-            result["error"] = self.error
-
-        return result
-
-
-def _run_job_in_background(job_id: str):
+def normalize_arch(arch: str | None) -> str | None:
     """
-    Run a kernel test job in the background thread.
-    This is the worker function that actually executes the vng command.
-    """
-    with _jobs_lock:
-        if job_id not in _active_jobs:
-            return
-        job = _active_jobs[job_id]
-
-    try:
-        # Update status to running
-        job.status = "running"
-
-        # Build the vng command (same as sync run_kernel)
-        kernel_dir = job.args.get("kernel_dir", ".")
-        vng_cmd = ["vng"]
-
-        # Determine which kernel to run
-        kernel_image = job.args.get("kernel_image")
-        if kernel_image == "host":
-            vng_cmd.append("-vr")
-        elif kernel_image:
-            vng_cmd.extend(["-vr", kernel_image])
-
-        if job.args.get("arch"):
-            vng_cmd.extend(["--arch", job.args["arch"]])
-        if job.args.get("cpus"):
-            vng_cmd.extend(["--cpus", str(job.args["cpus"])])
-        if job.args.get("memory"):
-            vng_cmd.extend(["--memory", job.args["memory"]])
-        if job.args.get("network"):
-            vng_cmd.extend(["--network", job.args["network"]])
-        if job.args.get("debug"):
-            vng_cmd.append("--debug")
-
-        if job.args.get("command"):
-            vng_cmd.append("--")
-            vng_cmd.append(job.args["command"])
-
-        # Wrap in script for PTS requirement
-        vng_cmd_str = shlex.join(vng_cmd)
-        shell_cmd = f"script -q -c {shlex.quote(vng_cmd_str)} /dev/null 2>&1"
-
-        # Execute the command
-        timeout = job.args.get("timeout", 3600)
-        returncode, stdout, stderr = run_command(
-            ["sh", "-c", shell_cmd], cwd=kernel_dir, timeout=timeout
-        )
-
-        # Update job with results
-        job.returncode = returncode
-        job.stdout = stdout
-        job.stderr = stderr
-        job.status = "completed" if returncode == 0 else "failed"
-        job.end_time = time.time()
-
-    except Exception as e:  # pylint: disable=broad-exception-caught
-        job.status = "failed"
-        job.error = str(e)
-        job.end_time = time.time()
-
-
-def _wait_for_job_completion(job_id: str, max_wait_seconds: int = 60) -> Job:
-    """
-    Wait for a job to complete, polling its status periodically.
-    Returns the job object after waiting up to max_wait_seconds.
+    Normalize architecture name to virtme-ng conventions.
+    Converts x86/x86_64 to amd64.
 
     Args:
-        job_id: The job ID to wait for
-        max_wait_seconds: Maximum time to wait in seconds (default: 60)
+        arch: Architecture name (may be None)
 
     Returns:
-        The job object (may or may not be completed)
+        Normalized architecture name, or None if input was None
     """
-    start_time = time.time()
-    poll_interval = 2  # Poll every 2 seconds
+    if arch is None:
+        return None
 
-    while time.time() - start_time < max_wait_seconds:
-        with _jobs_lock:
-            if job_id not in _active_jobs:
-                # Job disappeared, return None or handle error
-                break
-            job = _active_jobs[job_id]
+    arch_lower = arch.lower()
+    if arch_lower in ("x86", "x86_64"):
+        return "amd64"
 
-            # Check if job completed
-            if job.status in ("completed", "failed", "cancelled"):
-                return job
-
-        # Wait before next poll
-        time.sleep(poll_interval)
-
-    # Return job even if not completed (max wait time exceeded)
-    with _jobs_lock:
-        if job_id in _active_jobs:
-            return _active_jobs[job_id]
-
-    return None
+    return arch
 
 
-def _cleanup_old_jobs(max_age_hours: int = 24):
-    """
-    Clean up jobs older than max_age_hours.
-    Called automatically when listing/checking jobs.
-    """
-    cutoff = time.time() - (max_age_hours * 3600)
-
-    with _jobs_lock:
-        for job_id in list(_active_jobs.keys()):
-            job = _active_jobs[job_id]
-            if job.end_time and job.end_time < cutoff:
-                del _active_jobs[job_id]
-
-
-def run_command(
-    cmd: list[str], cwd: str | None = None, timeout: int = 3600
-) -> tuple[int, str, str]:
+def run_command(cmd: list[str], cwd: str | None = None) -> tuple[int, str, str]:
     """
     Execute a command and return the result.
 
     Args:
         cmd: Command and arguments as a list
         cwd: Working directory (defaults to current directory)
-        timeout: Command timeout in seconds (default: 1 hour)
 
     Returns:
         Tuple of (return_code, stdout, stderr)
@@ -773,12 +609,9 @@ def run_command(
             cwd=cwd,
             capture_output=True,
             text=True,
-            timeout=timeout,
             check=False,
         )
         return result.returncode, result.stdout, result.stderr
-    except subprocess.TimeoutExpired:
-        return -1, "", f"Command timed out after {timeout} seconds"
     except Exception as e:  # pylint: disable=broad-exception-caught
         return -1, "", f"Error executing command: {str(e)}"
 
@@ -957,34 +790,54 @@ Requirements:
             },
         ),
         Tool(
-            name="run_kselftest",
+            name="run_kselftest_cmd",
             description="""
-Run kernel selftests (kselftests) asynchronously with automatic build support.
+Generate a script and return command for running kernel selftests (kselftests).
 
-🎯 KSELFTEST RUNNER - Build kernel first!
+🎯 KSELFTEST COMMAND GENERATOR - Build kernel first!
 ════════════════════════════════════════════════════════════
-⚠  IMPORTANT: You must build the kernel BEFORE running kselftests!
+⚠  IMPORTANT: You must build the kernel BEFORE calling this!
     Use: vng -v --build
 
-This command automatically:
-1. Builds the kselftest (if needed)
-2. Runs the kselftest asynchronously
+⚠  CRITICAL: This tool DOES NOT run the test - it returns a COMMAND that you MUST execute!
 
-Just call: run_kselftest({"test_name": "sched_ext"})
+This tool creates a script (vng-kselftest.sh) in the kernel workspace and returns a single command to execute it.
+The script handles all steps automatically:
+1. Install kernel headers
+2. Build the kselftest
+3. Run the kselftest in VM
+
+You just execute the single returned command using Shell tool - that's it!
+
+Always set the minimum amount of arguments: when in doubt, don't set
+additional arguments.
+
+Just call: run_kselftest_cmd({"test_name": "sched_ext"})
 
 WORKFLOW:
 ─────────
-The command handles the kselftest workflow:
-1. Builds the kselftest if not already built (10 minute timeout)
-2. Runs the kselftest asynchronously in the VM
-3. Returns immediately with job_id
+1. Call run_kselftest_cmd() to get a single command
+2. IMMEDIATELY execute the command with Shell tool in the SAME response
+3. Done!
 
-It automatically:
-- Builds the kselftest (if needed)
-- Runs asynchronously (returns immediately with job_id)
-- Executes make kselftest with proper TARGETS/SKIP_TARGETS
-- Allocates appropriate memory (default: 2G)
-- Sets proper timeout (default: 3600 seconds / 1 hour)
+⚠️  CRITICAL: You MUST execute the returned command immediately using Shell tool.
+    Do NOT return the command to the user without executing it.
+    Do NOT wait for user confirmation - execute it in the same tool call batch.
+    THIS TOOL ONLY RETURNS A COMMAND - IT DOES NOT RUN THE TEST!
+
+The command runs a script that handles all steps automatically:
+- Installs kernel headers
+- Builds the kselftest
+- Runs the test in VM
+
+You don't need to worry about multiple steps - the script does everything!
+
+The returned command executes a script that handles:
+- Installing kernel headers (if needed)
+- Building the kselftest (if needed)
+- Running the kselftest in VM with proper parameters
+
+Just execute the single command using Shell tool - the script does all the work!
 
 PARAMETERS:
 ───────────
@@ -999,48 +852,39 @@ PARAMETERS:
 
 - kernel_dir (optional): Path to kernel source directory (default: current directory)
 
-- build_host (optional): Remote build host for faster kernel builds
-  Example: "builder", "myserver.example.com"
-  If specified, uses: vng --build --build-host <hostname> --force
-  This is used when rebuilding the kernel with test configs
-
-  ⚠️  IMPORTANT: If the user mentions a remote build server, ALWAYS pass
-      build_host to run_kselftest(). This ensures kernel rebuilds (when
-      needed for test configs) happen on the same remote server.
-
 - memory (optional): Memory size for VM (default: "2G")
   Increase for memory-intensive tests
 
-- timeout (optional): Maximum runtime in seconds (default: 3600 = 1 hour)
-  Increase for very long test suites
-
-- runner_args (optional): Additional arguments for kselftest runner
+- runner_args (optional): Additional arguments for kselftest runner (NEVER set unless specified by the user)
   Examples: "--verbose", "--tap", "--list"
 
 - arch (optional): Target architecture to emulate
+  ⚠️  WARNING: Do NOT set this parameter unless the user explicitly requests a specific architecture!
+  Setting this can trigger cross-compilation and requires proper chroot setup.
+  Omit this parameter to use the host architecture (which is what you want 99% of the time).
 
 - cpus (optional): Number of CPUs for the VM
 
 - network (optional): Enable network ("user", "bridge", "loop")
 
-NOTE: The kselftest is built automatically with proper timeout.
-      The kernel must be built separately before running kselftests.
+Returns:
+────────
+{
+  "success": true,
+  "command": "bash /path/to/kernel/vng-kselftest.sh",
+  "test_name": "sched_ext",
+  "description": "Run kselftest sched_ext",
+  "action_required": "EXECUTE_NOW",
+  "next_step": "You must now execute this command using the Shell tool: bash /path/to/kernel/vng-kselftest.sh",
+  "execution_note": "Execute it immediately, do not wait for user confirmation."
+}
 
-Returns immediately with:
-- job_id: Unique identifier for this job
-- status: "starting"
-- test_name: The test being run
-- command: The actual command executed
+The script automatically handles all steps:
+1. Install kernel headers
+2. Build the kselftest
+3. Run the kselftest in VM
 
-POLLING FOR RESULTS:
-────────────────────
-After starting the test, use get_job_status() to check progress:
-
-1. Call run_kselftest() → Get job_id
-2. Wait 10 seconds
-3. Call get_job_status({"job_id": job_id}) → Check progress
-4. Repeat step 2-3 until status is "completed" or "failed"
-5. Retrieve results from final get_job_status() response
+Just execute the single command - no need to manage multiple steps!
 
 EXAMPLE USAGE:
 ──────────────
@@ -1049,106 +893,94 @@ EXAMPLE USAGE:
 # PREREQUISITE: Build the kernel first!
 # vng -v --build
 
-result = run_kselftest({
-    "test_name": "sched_ext"
-})
-# Automatically:
-# 1. Builds kselftest (if not already built)
-# 2. Runs kselftest asynchronously
-# Returns: {"job_id": "kselftest_sched_ext_...", "status": "starting"}
+result = run_kselftest_cmd({"test_name": "sched_ext"})
+# Returns: {"command": "bash /path/to/kernel/vng-kselftest.sh", "action_required": "EXECUTE_NOW", ...}
 
-# Poll for results
-status = get_job_status({"job_id": result["job_id"]})
+# IMMEDIATELY execute the command - do NOT wait for user confirmation!
+Shell(command=result["command"], description=result["description"])
+# The script automatically handles all steps: headers, build, and test execution
 
 
 # Example 2: Test on HOST kernel
 # ──────────────────────────────
-result = run_kselftest({
+result = run_kselftest_cmd({
     "test_name": "net",
     "kernel_image": "host"
 })
-# Automatically:
-# 1. Builds kselftest (if not already built)
-# 2. Runs kselftest on host kernel
+Shell(command=result["command"])
 
 
 # Example 3: Test on UPSTREAM kernel
 # ──────────────────────────────────
-result = run_kselftest({
+result = run_kselftest_cmd({
     "test_name": "vm",
     "kernel_image": "v6.14"
 })
-# Automatically:
-# 1. Builds kselftest (if not already built)
-# 2. Downloads upstream kernel v6.14 (if not cached)
-# 3. Runs kselftest on upstream kernel
-
-
-# Example 4: Test specific kernel image
-# ──────────────────────────────────────
-result = run_kselftest({
-    "test_name": "seccomp",
-    "kernel_image": "./arch/x86/boot/bzImage"
-})
+Shell(command=result["command"])
 
 
 ADVANCED EXAMPLES:
 ──────────────────
 # With verbose output:
-run_kselftest({
+result = run_kselftest_cmd({
     "test_name": "vm",
     "runner_args": "--verbose"
 })
+Shell(command=result["command"])
 
-# With more memory and longer timeout:
-run_kselftest({
+# With more memory:
+result = run_kselftest_cmd({
     "test_name": "net",
-    "memory": "4G",
-    "timeout": 7200
+    "memory": "4G"
 })
+Shell(command=result["command"])
 
 # Test on host kernel with verbose output:
-run_kselftest({
+result = run_kselftest_cmd({
     "test_name": "net",
     "kernel_image": "host",
     "runner_args": "--verbose"
 })
-
-# Use remote build host for faster kernel rebuilds:
-# ⚠️  ALWAYS specify build_host when user mentions a remote build server
-run_kselftest({
-    "test_name": "sched_ext",
-    "build_host": "builder"
-})
-
-# Example with remote build host and custom options:
-run_kselftest({
-    "test_name": "net",
-    "build_host": "myserver.example.com",
-    "memory": "4G",
-    "runner_args": "--verbose"
-})
+Shell(command=result["command"])
 
 AGENT GUIDANCE:
 ───────────────
 When using this tool:
 1. ⚠️  FIRST: Build the kernel using: vng -v --build
-2. Then call run_kselftest() (it will build the kselftest automatically)
-3. ⚠️  IMPORTANT: If user mentions a remote build server/host:
-   - ALWAYS pass build_host parameter to run_kselftest()
-   - Example mentions: "build on <hostname>", "use build server", "compile remotely"
-   - This ensures kernel rebuilds (for test configs) use the remote server
-4. Inform user job started
-5. Poll get_job_status() every 10-30 seconds
-6. Update user with progress
-7. Report final results when completed
+2. Call run_kselftest_cmd() to get a single command
+3. IMMEDIATELY execute the command with Shell tool (do NOT wait or ask for confirmation)
+4. Report results to user
+
+⚠️  CRITICAL: This tool RETURNS a command - it does NOT run the test!
+⚠️  CRITICAL: Always execute the returned command IMMEDIATELY in the SAME response.
+    Never return just the command without executing it.
+    Use parallel tool calls if building kernel and running test in same response.
+
+That's it! The command runs a script that handles all the steps automatically.
+No need to manage multiple commands or worry about stopping early - the script does everything!
+
+⚠️  CRITICAL: Architecture Parameter
+────────────────────────────────────
+NEVER set the 'arch' parameter unless the user EXPLICITLY requests a specific architecture!
+
+Examples of when to set arch:
+  ✓ User says: "test on arm64"
+  ✓ User says: "build for riscv64"
+  ✓ User says: "cross-compile to aarch64"
+
+Examples of when NOT to set arch (most common):
+  ✗ User says: "build and test the kernel"
+  ✗ User says: "run kselftests"
+  ✗ User says: "test this patch"
+
+If arch is not specified, the tool uses the host architecture automatically.
+Setting arch unnecessarily triggers cross-compilation and requires chroot setup!
 
 IMPORTANT NOTES:
 ────────────────
 ⏱️  Timing: Kselftests typically take 5-60+ minutes
 🧪 Test list: Available tests in tools/testing/selftests/
-🔄 Async: This tool always runs asynchronously (no MCP timeout)
-📊 Results: Full test output available in get_job_status() stdout
+📊 Results: Command output shows test results directly
             """,
             inputSchema={
                 "type": "object",
@@ -1174,8 +1006,7 @@ IMPORTANT NOTES:
                         "type": "string",
                         "description": (
                             "Remote build host for faster kernel builds (optional). "
-                            "IMPORTANT: Always specify this when user mentions a remote "
-                            "build server to ensure kernel rebuilds use the remote host."
+                            "Used if kernel needs to be rebuilt with test-specific config options."
                         ),
                     },
                     "memory": {
@@ -1183,18 +1014,16 @@ IMPORTANT NOTES:
                         "description": "Memory size for VM (e.g., '2G', '4G')",
                         "default": "2G",
                     },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "Maximum runtime in seconds (default: 3600 = 1 hour)",
-                        "default": 3600,
-                    },
                     "runner_args": {
                         "type": "string",
                         "description": "Additional arguments for kselftest runner (e.g., '--verbose', '--tap')",
                     },
                     "arch": {
                         "type": "string",
-                        "description": "Target architecture",
+                        "description": (
+                            "Target architecture (WARNING: Only set if user explicitly requests! "
+                            "Omit to use host architecture)"
+                        ),
                         "enum": [
                             "amd64",
                             "arm64",
@@ -1218,88 +1047,81 @@ IMPORTANT NOTES:
             },
         ),
         Tool(
-            name="run_kernel_async",
+            name="run_kernel_cmd",
             description="""
-Run a kernel test asynchronously (non-blocking).
-This tool starts a kernel test in the background and returns immediately with a job ID.
+Generate command for running kernel tests.
 
-⚠️  USE THIS TOOL FOR LONG-RUNNING OPERATIONS (>2 minutes)
-════════════════════════════════════════════════════════════
+⚠️  CRITICAL: This tool DOES NOT run the test - it returns a COMMAND that you MUST execute!
 
-This solves the MCP timeout problem by:
-1. Starting the job immediately (returns in <1 second)
-2. Allowing you to check status periodically with get_job_status()
-3. Each status check is fast (<1 second), avoiding MCP timeouts
+This tool returns the command to execute for running a kernel test or command.
+You execute the command using the Shell tool.
 
 WORKFLOW:
 ─────────
-1. Call run_kernel_async() → Get job_id
-2. Wait 10-30 seconds
-3. Call get_job_status(job_id) → Check progress
-4. Repeat step 2-3 until status is "completed" or "failed"
-5. Retrieve results from final get_job_status() response
+1. Call run_kernel_cmd() with desired parameters
+2. Execute the returned command with Shell tool
+3. Done!
 
 WHEN TO USE:
 ────────────
-✅ Use run_kselftest for:
+✅ Use run_kselftest_cmd for:
   - ALL kernel selftests (5-60 minutes)
-  - Works with newly built, host, or upstream kernels
-  - This is the recommended tool for kselftests
+  - Recommended tool for kselftests
 
-✅ Use run_kernel_async for:
-  - All kernel testing operations
+✅ Use run_kernel_cmd for:
   - Quick boot tests
-  - Long-running tests
   - Simple commands (uname, dmesg, etc.)
   - Custom tests and operations
+  - Anything not a kselftest
 
 Parameters:
+-----------
 - kernel_dir: Path to kernel source directory (default: current directory)
 - kernel_image: Which kernel to run (omit for newly built, "host", "v6.14", or path)
-- command: Command to execute inside the kernel
+- command: Command to execute inside the kernel (default: "uname -r")
 - arch: Target architecture
+  ⚠️  WARNING: Do NOT set this parameter unless the user explicitly requests a specific architecture!
+  Setting this can trigger cross-compilation and requires proper chroot setup.
+  Omit this parameter to use the host architecture (which is what you want 99% of the time).
 - cpus: Number of CPUs
-- memory: Memory size (e.g., '2G')
-- timeout: Maximum runtime in seconds (default: 3600)
+- memory: Memory size (e.g., '2G', default: '1G')
 - network: Network mode
 - debug: Enable debugging
 
-Returns immediately with:
-- job_id: Unique identifier for this job
-- status: "starting"
-- command: The command being executed
+Returns:
+────────
+{
+  "success": true,
+  "command": "cd /path/to/kernel && script -q -c 'vng -v -- uname -r' /dev/null 2>&1",
+  "description": "Run kernel test: uname -r"
+}
 
 Example usage:
 ──────────────
-# Step 1: Start the test
-result = run_kernel_async({
-    "command": "make kselftest TARGETS='sched_ext' SKIP_TARGETS=''",
-    "memory": "2G",
-    "timeout": 1800
-})
-# Returns: {"job_id": "kernel_test_...", "status": "starting"}
+# Quick boot test
+result = run_kernel_cmd({"command": "uname -r"})
+# Execute: result["command"]
 
-# Step 2: Check status (repeat every 10-30 seconds)
-status = get_job_status({"job_id": result["job_id"]})
-# Returns: {"status": "running", "elapsed_seconds": 45, ...}
+# Test with custom memory
+result = run_kernel_cmd({"command": "dmesg | grep -i kasan", "memory": "2G"})
+# Execute: result["command"]
 
-# Step 3: When completed, get results
-status = get_job_status({"job_id": result["job_id"]})
-# Returns: {"status": "completed", "returncode": 0, "stdout": "...", ...}
+# Test on host kernel
+result = run_kernel_cmd({"command": "cat /proc/version", "kernel_image": "host"})
+# Execute: result["command"]
 
 AGENT GUIDANCE:
 ───────────────
-When you start an async job:
-1. Inform user: "Starting [operation] (job ID: xxx)..."
-2. Wait 10-30 seconds
-3. Check status with get_job_status()
-4. If status is "running":
-   - Inform user of progress: "Running (Xs elapsed)..."
-   - Wait 10-30 seconds
-   - Go back to step 3
-5. If status is "completed" or "failed":
-   - Report results to user
-   - Show output/errors as appropriate
+1. Call run_kernel_cmd() with desired parameters
+2. Execute command using Shell tool
+3. Report results to user
+
+⚠️  CRITICAL: This tool RETURNS a command - it does NOT run the test!
+⚠️  CRITICAL: Architecture Parameter
+────────────────────────────────────
+NEVER set the 'arch' parameter unless the user EXPLICITLY requests a specific architecture!
+If arch is not specified, the tool uses the host architecture automatically (which is correct 99% of the time).
+Setting arch unnecessarily triggers cross-compilation and requires chroot setup!
             """,
             inputSchema={
                 "type": "object",
@@ -1319,11 +1141,15 @@ When you start an async job:
                     },
                     "command": {
                         "type": "string",
-                        "description": "Command to execute inside the kernel",
+                        "description": "Command to execute inside the kernel (default: 'uname -r')",
+                        "default": "uname -r",
                     },
                     "arch": {
                         "type": "string",
-                        "description": "Target architecture",
+                        "description": (
+                            "Target architecture (WARNING: Only set if user explicitly requests! "
+                            "Omit to use host architecture)"
+                        ),
                         "enum": [
                             "amd64",
                             "arm64",
@@ -1342,11 +1168,6 @@ When you start an async job:
                         "description": "Memory size (e.g., '2G', '512M')",
                         "default": "1G",
                     },
-                    "timeout": {
-                        "type": "integer",
-                        "description": "Maximum runtime in seconds (default: 3600)",
-                        "default": 3600,
-                    },
                     "network": {
                         "type": "string",
                         "description": "Network mode",
@@ -1360,159 +1181,6 @@ When you start an async job:
                 },
             },
         ),
-        Tool(
-            name="get_job_status",
-            description="""
-Get the status of an async kernel test job.
-This tool checks the current state of a job started with run_kernel_async()
-or run_kselftest().
-
-⏱️  FAST OPERATION - Returns immediately (<1 second), no timeout risk!
-
-Returns job information including:
-- job_id: The job identifier
-- status: Current state (starting, running, completed, failed, cancelled)
-- elapsed_seconds: Time since job started
-- start_time: When the job started (ISO format)
-
-If job is completed or failed, also includes:
-- returncode: Exit code of the command
-- stdout: Command output (truncated if too large)
-- stderr: Error output (if any)
-- end_time: When the job finished
-- total_time_seconds: Total execution time
-
-Status values:
-──────────────
-- "starting": Job is initializing
-- "running": Job is currently executing
-- "completed": Job finished successfully (returncode 0)
-- "failed": Job finished with error (returncode != 0)
-- "cancelled": Job was cancelled
-
-Polling strategy:
-─────────────────
-When status is "starting" or "running":
-  → Wait 10-30 seconds before checking again
-  → Inform user of progress
-  → Continue polling until "completed", "failed", or "cancelled"
-
-When status is "completed" or "failed":
-  → Job is finished
-  → Retrieve and display results to user
-  → stdout/stderr contain the output
-
-Parameters:
-───────────
-- job_id (required): The job ID returned by run_kernel_async()
-
-Example usage:
-──────────────
-# Check job status
-status = get_job_status({"job_id": "kernel_test_1234567890_abc123"})
-
-# Response when running:
-{
-    "job_id": "kernel_test_...",
-    "status": "running",
-    "elapsed_seconds": 45,
-    "start_time": "2025-12-15T12:34:56",
-    "poll_again_in_seconds": 30
-}
-
-# Response when completed:
-{
-    "job_id": "kernel_test_...",
-    "status": "completed",
-    "returncode": 0,
-    "elapsed_seconds": 300,
-    "total_time_seconds": 300,
-    "start_time": "2025-12-15T12:34:56",
-    "end_time": "2025-12-15T12:39:56",
-    "stdout": "...test output...",
-    "stderr": ""
-}
-
-AGENT GUIDANCE:
-───────────────
-1. Call this repeatedly (every 10-30 seconds) while status is "running"
-2. Update user with progress: "Test running (Xs elapsed)..."
-3. When completed, show results to user
-4. If failed, show error information from stdout/stderr
-            """,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "job_id": {
-                        "type": "string",
-                        "description": "Job ID returned by run_kernel_async()",
-                    },
-                },
-                "required": ["job_id"],
-            },
-        ),
-        Tool(
-            name="cancel_job",
-            description="""
-Cancel a running async kernel test job.
-
-This attempts to cancel a job that was started with run_kernel_async()
-or run_kselftest().
-
-Note: Currently this marks the job as "cancelled" but does not forcibly
-terminate the underlying process. The job will continue running but will
-be marked as cancelled in the job system.
-
-Parameters:
-───────────
-- job_id (required): The job ID to cancel
-
-Returns:
-────────
-- success: Whether the cancellation was successful
-- message: Description of what happened
-
-Example:
-────────
-cancel_job({"job_id": "kernel_test_1234567890_abc123"})
-            """,
-            inputSchema={
-                "type": "object",
-                "properties": {
-                    "job_id": {
-                        "type": "string",
-                        "description": "Job ID to cancel",
-                    },
-                },
-                "required": ["job_id"],
-            },
-        ),
-        Tool(
-            name="list_jobs",
-            description="""
-List all active async kernel test jobs.
-
-Shows all jobs in the system with their current status. Useful for:
-- Debugging: See what jobs are running
-- Recovery: Find job IDs if you lost track
-- Monitoring: Check multiple running jobs
-
-Automatically cleans up old jobs (>24 hours) before listing.
-
-Returns:
-────────
-- jobs: Array of job objects with status information
-- count: Number of jobs
-
-Example:
-────────
-list_jobs({})
-            """,
-            inputSchema={
-                "type": "object",
-                "properties": {},
-            },
-        ),
     ]
 
 
@@ -1522,16 +1190,10 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
 
     if name == "configure_kernel":
         return await configure_kernel(arguments)
-    if name == "run_kselftest":
+    if name == "run_kselftest_cmd":
         return await run_kselftest_handler(arguments)
-    if name == "run_kernel_async":
-        return await run_kernel_async_handler(arguments)
-    if name == "get_job_status":
-        return await get_job_status_handler(arguments)
-    if name == "cancel_job":
-        return await cancel_job_handler(arguments)
-    if name == "list_jobs":
-        return await list_jobs_handler()
+    if name == "run_kernel_cmd":
+        return await run_kernel_handler(arguments)
     if name == "get_kernel_info":
         return await get_kernel_info(arguments)
     if name == "apply_patch":
@@ -1553,7 +1215,8 @@ async def configure_kernel(args: dict) -> list[TextContent]:
         cmd.append("--verbose")
 
     if args.get("arch"):
-        cmd.extend(["--arch", args["arch"]])
+        arch = normalize_arch(args["arch"])
+        cmd.extend(["--arch", arch])
 
     if args.get("config_fragments"):
         for fragment in args["config_fragments"]:
@@ -1569,7 +1232,7 @@ async def configure_kernel(args: dict) -> list[TextContent]:
     # Build the response
     result = {
         "success": returncode == 0,
-        "command": shlex.join(cmd),
+        "command": cmd,
         "returncode": returncode,
         "stdout": stdout,
         "stderr": stderr,
@@ -1609,7 +1272,7 @@ async def get_kernel_info(args: dict) -> list[TextContent]:
 
         # Get git commit
         returncode, stdout, _ = run_command(
-            ["git", "rev-parse", "HEAD"], cwd=kernel_dir, timeout=10
+            ["git", "rev-parse", "HEAD"], cwd=kernel_dir
         )
         if returncode == 0:
             info["git_commit"] = stdout.strip()
@@ -1617,14 +1280,14 @@ async def get_kernel_info(args: dict) -> list[TextContent]:
 
         # Get git branch
         returncode, stdout, _ = run_command(
-            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=kernel_dir, timeout=10
+            ["git", "rev-parse", "--abbrev-ref", "HEAD"], cwd=kernel_dir
         )
         if returncode == 0:
             info["git_branch"] = stdout.strip()
 
         # Check if dirty
         returncode, stdout, _ = run_command(
-            ["git", "status", "--porcelain"], cwd=kernel_dir, timeout=10
+            ["git", "status", "--porcelain"], cwd=kernel_dir
         )
         if returncode == 0:
             info["is_dirty"] = len(stdout.strip()) > 0
@@ -1695,7 +1358,7 @@ async def apply_patch(args: dict) -> list[TextContent]:
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
     # Check if b4 is installed
-    returncode, stdout, stderr = run_command(["which", "b4"], timeout=5)
+    returncode, stdout, stderr = run_command(["which", "b4"])
     if returncode != 0:
         result = {
             "success": False,
@@ -1724,12 +1387,12 @@ async def apply_patch(args: dict) -> list[TextContent]:
     cmd.append(message_id)
 
     # Execute the command
-    returncode, stdout, stderr = run_command(cmd, cwd=kernel_dir, timeout=300)
+    returncode, stdout, stderr = run_command(cmd, cwd=kernel_dir)
 
     # Build the response
     result = {
         "success": returncode == 0,
-        "command": shlex.join(cmd),
+        "command": cmd,
         "message_id": message_id,
         "returncode": returncode,
         "stdout": stdout,
@@ -1766,7 +1429,8 @@ async def apply_patch(args: dict) -> list[TextContent]:
 
 async def run_kselftest_handler(args: dict) -> list[TextContent]:
     """
-    Run kernel selftests asynchronously with automatic build support.
+    Generate commands for running kernel selftests.
+    Returns a list of commands to execute in order.
     """
     test_name = args.get("test_name")
 
@@ -1780,7 +1444,7 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
 
     # Check if kernel directory exists
     kernel_dir = args.get("kernel_dir", ".")
-    kernel_path = Path(kernel_dir)
+    kernel_path = Path(kernel_dir).absolute()
     if not kernel_path.exists():
         result = {
             "success": False,
@@ -1811,460 +1475,314 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
         }
         return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
-    # Get settings
+    # Get number of CPUs for parallel builds
+    nproc_result = run_command(["nproc"])
+    nproc = nproc_result[1].strip() if nproc_result[0] == 0 else "8"
+
+    # Normalize architecture if provided and not empty
+    arch = args.get("arch", "").strip()
+    if arch:
+        arch = normalize_arch(arch)
+    else:
+        # Don't specify arch - let vng use host architecture automatically
+        arch = None
+
+    # Build the vng command for running the test
+    vng_cmd_parts = ["vng"]
+
+    # Determine which kernel to run
     kernel_image = args.get("kernel_image")
-    build_host = args.get("build_host")
-    build_timeout = 600  # Hard-coded 10 minutes for kselftest builds
+    if kernel_image == "host":
+        vng_cmd_parts.append("-vr")
+    elif kernel_image:
+        vng_cmd_parts.extend(["-vr", kernel_image])
 
-    build_steps = []
+    # Add optional VM parameters
+    # Only add arch if explicitly specified and not empty
+    if arch:
+        vng_cmd_parts.extend(["--arch", arch])
 
-    # Step 1: Rebuild kernel with test config (if config file exists)
-    # Only rebuild for newly built kernels (not host or upstream kernels)
-    if not kernel_image:
-        test_config_path = test_path / "config"
-        if test_config_path.exists():
-            # Rebuild kernel with test config to ensure all required
-            # configs are enabled
-            rebuild_cmd = [
-                "vng",
-                "-v",
-                "--build",
-                "--force",
-            ]
+    if args.get("cpus"):
+        vng_cmd_parts.extend(["--cpus", str(args["cpus"])])
 
-            # Add build host if specified
-            if build_host:
-                rebuild_cmd.extend(["--build-host", build_host])
+    memory = args.get("memory", "2G")
+    vng_cmd_parts.extend(["--memory", memory])
 
-            # Pass both .config (to preserve old configs) and test config
-            # (to add test requirements)
-            kernel_config_path = kernel_path / ".config"
-            if kernel_config_path.exists():
-                rebuild_cmd.extend(["--config", str(kernel_config_path)])
+    if args.get("network"):
+        vng_cmd_parts.extend(["--network", args["network"]])
 
-            if test_config_path.exists():
-                rebuild_cmd.extend(
-                    ["--config", str(test_config_path.relative_to(kernel_path))]
-                )
-
-            rebuild_start = time.time()
-            rebuild_returncode, rebuild_stdout, rebuild_stderr = run_command(
-                rebuild_cmd,
-                cwd=kernel_dir,
-                timeout=3600,  # 1 hour timeout for kernel rebuild
-            )
-            rebuild_time = time.time() - rebuild_start
-
-            if rebuild_returncode != 0:
-                result = {
-                    "success": False,
-                    "error": "kernel_rebuild_failed",
-                    "message": (
-                        f"Failed to rebuild kernel with required configs for "
-                        f"kselftest '{test_name}' (took {round(rebuild_time, 2)}s)"
-                    ),
-                    "config_file": str(test_config_path.relative_to(kernel_path)),
-                    "rebuild_stdout": (
-                        rebuild_stdout[-2000:]
-                        if len(rebuild_stdout) > 2000
-                        else rebuild_stdout
-                    ),
-                    "rebuild_stderr": (
-                        rebuild_stderr[-2000:]
-                        if len(rebuild_stderr) > 2000
-                        else rebuild_stderr
-                    ),
-                }
-                return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-            build_steps.append(
-                f"kernel rebuilt with test configs (took {round(rebuild_time, 2)}s)"
-            )
-
-    # Step 2: Install kernel headers (required by most kselftests)
-    headers_cmd = ["make", "headers_install"]
-    headers_returncode, headers_stdout, headers_stderr = run_command(
-        headers_cmd, cwd=kernel_dir, timeout=build_timeout
-    )
-
-    if headers_returncode != 0:
-        result = {
-            "success": False,
-            "error": "headers_install_failed",
-            "message": "Failed to install kernel headers (required for kselftests)",
-            "headers_stdout": (
-                headers_stdout[-2000:] if len(headers_stdout) > 2000 else headers_stdout
-            ),
-            "headers_stderr": (
-                headers_stderr[-2000:] if len(headers_stderr) > 2000 else headers_stderr
-            ),
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Step 3: Build kselftest
-    nproc_result = run_command(["nproc"], timeout=5)
-    nproc = nproc_result[1].strip() if nproc_result[0] == 0 else "1"
-
-    build_cmd = [
-        "make",
-        f"-j{nproc}",
-        "-C",
-        f"tools/testing/selftests/{test_name}",
-    ]
-
-    build_start = time.time()
-    build_returncode, build_stdout, build_stderr = run_command(
-        build_cmd, cwd=kernel_dir, timeout=build_timeout
-    )
-    build_time = time.time() - build_start
-
-    if build_returncode != 0:
-        result = {
-            "success": False,
-            "error": "kselftest_build_failed",
-            "message": f"Failed to build kselftest '{test_name}' (took {round(build_time, 2)}s)",
-            "build_stdout": (
-                build_stdout[-2000:] if len(build_stdout) > 2000 else build_stdout
-            ),
-            "build_stderr": (
-                build_stderr[-2000:] if len(build_stderr) > 2000 else build_stderr
-            ),
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    build_steps.append(f"kselftest '{test_name}' (built in {round(build_time, 2)}s)")
-
-    # Build the kselftest command
+    # Add the kselftest command
     runner_args = args.get("runner_args", "")
     if runner_args:
         kselftest_cmd = f'make kselftest TARGETS="{test_name}" SKIP_TARGETS="" KSELFTEST_RUNNER_ARGS="{runner_args}"'
     else:
         kselftest_cmd = f'make kselftest TARGETS="{test_name}" SKIP_TARGETS=""'
 
-    # Prepare arguments for run_kernel_async
-    async_args = {
-        "kernel_dir": kernel_dir,
-        "command": kselftest_cmd,
-        "memory": args.get("memory", "2G"),
-        "timeout": args.get("timeout", 3600),
-    }
+    vng_cmd_parts.append("--")
+    vng_cmd_parts.append(kselftest_cmd)
 
-    # Add kernel_image if provided
-    if args.get("kernel_image"):
-        async_args["kernel_image"] = args["kernel_image"]
+    vng_cmd_str = " ".join(vng_cmd_parts)
 
-    # Add optional parameters if provided
-    if args.get("arch"):
-        async_args["arch"] = args["arch"]
-    if args.get("cpus"):
-        async_args["cpus"] = args["cpus"]
-    if args.get("network"):
-        async_args["network"] = args["network"]
+    # Check if kernel rebuild is needed (only for newly built kernels, not host/upstream)
+    needs_rebuild = False
+    rebuild_reason = ""
 
-    # Generate unique job ID
-    timestamp = int(time.time())
-    job_id = f"kselftest_{test_name}_{timestamp}_{uuid.uuid4().hex[:8]}"
+    if not kernel_image:  # Only check for newly built kernels
+        test_config_path = test_path / "config"
+        kernel_config_path = kernel_path / ".config"
 
-    # Build command string for display
-    kernel_image = args.get("kernel_image")
+        if test_config_path.exists() and kernel_config_path.exists():
+            # Read test config requirements
+            try:
+                with open(test_config_path, encoding="utf-8") as f:
+                    test_configs = [
+                        line.strip()
+                        for line in f
+                        if line.strip() and not line.startswith("#")
+                    ]
+
+                # Read current kernel config
+                with open(kernel_config_path, encoding="utf-8") as f:
+                    kernel_config_content = f.read()
+
+                # Check if all required configs are present and enabled
+                missing_configs = []
+                for config_line in test_configs:
+                    # Handle CONFIG_FOO=y or CONFIG_FOO=m format
+                    if "=" in config_line:
+                        config_name = config_line.split("=")[0].strip()
+                        # Check if config is set to y or m in kernel config
+                        if (
+                            f"{config_name}=y" not in kernel_config_content
+                            and f"{config_name}=m" not in kernel_config_content
+                        ):
+                            missing_configs.append(config_line)
+                    else:
+                        # Just a config name, check if it's enabled
+                        if (
+                            f"{config_line}=y" not in kernel_config_content
+                            and f"{config_line}=m" not in kernel_config_content
+                        ):
+                            missing_configs.append(config_line)
+
+                if missing_configs:
+                    needs_rebuild = True
+                    rebuild_reason = (
+                        f"Missing required configs: {', '.join(missing_configs[:5])}"
+                    )
+                    if len(missing_configs) > 5:
+                        rebuild_reason += f" (and {len(missing_configs) - 5} more)"
+            except (OSError, UnicodeDecodeError) as e:
+                # If we can't read configs, assume rebuild is needed to be safe
+                needs_rebuild = True
+                rebuild_reason = f"Could not verify configs: {str(e)}"
+
+    # Build the rebuild command if needed
+    rebuild_cmd = ""
+    if needs_rebuild:
+        rebuild_cmd_parts = ["vng", "-v", "--build", "--force"]
+        if args.get("build_host"):
+            rebuild_cmd_parts.extend(["--build-host", args["build_host"]])
+        # Add test config as additional config
+        rebuild_cmd_parts.extend(
+            ["--config", f"tools/testing/selftests/{test_name}/config"]
+        )
+        rebuild_cmd = " ".join(rebuild_cmd_parts)
+
+    # Determine total steps based on whether rebuild is needed
+    total_steps = 4 if needs_rebuild else 3
+    current_step = 1
+
+    # Create a script file in the workspace with a predictable name
+    script_path = kernel_path / "vng-kselftest.sh"
+
+    # Build script with conditional rebuild step
+    script_parts = [
+        f"""#!/bin/bash
+set -e  # Exit on any error
+
+echo "======================================================================"
+echo "Running kselftest '{test_name}'"
+echo "======================================================================"
+echo ""
+"""
+    ]
+
+    # Add rebuild step if needed
+    if needs_rebuild:
+        script_parts.append(
+            f"""echo "Step {current_step}/{total_steps}: Rebuilding kernel with required configs..."
+echo "Reason: {rebuild_reason}"
+cd {kernel_path}
+if ! {rebuild_cmd} &>/dev/null; then
+    echo "✗ Failed to rebuild kernel"
+    echo "Running again with full output for debugging:"
+    {rebuild_cmd}
+    exit 1
+fi
+echo "✓ Kernel rebuilt with test configs"
+echo ""
+
+"""
+        )
+        current_step += 1
+
+    # Add remaining steps
+    script_parts.append(
+        f"""echo "Step {current_step}/{total_steps}: Installing kernel headers..."
+cd {kernel_path}
+if ! make headers_install &>/dev/null; then
+    echo "✗ Failed to install headers"
+    echo "Running again with full output for debugging:"
+    make headers_install
+    exit 1
+fi
+echo "✓ Headers installed"
+echo ""
+
+echo "Step {current_step + 1}/{total_steps}: Building kselftest '{test_name}'..."
+if ! make -j{nproc} -C tools/testing/selftests/{test_name} &>/dev/null; then
+    echo "✗ Failed to build kselftest"
+    echo "Running again with full output for debugging:"
+    make -C tools/testing/selftests/{test_name}
+    exit 1
+fi
+echo "✓ Kselftest built"
+echo ""
+
+echo "Step {current_step + 2}/{total_steps}: Running kselftest '{test_name}' in VM..."
+if ! script -q -c '{vng_cmd_str}' /dev/null 2>&1; then
+    echo "✗ Kselftest failed in VM"
+    exit 1
+fi
+echo "✓ Kselftest completed"
+echo ""
+
+echo "Cleaning up..."
+rm -f {script_path}
+"""
+    )
+
+    script_content = "".join(script_parts)
+
+    # Write the script to the workspace
+    with open(script_path, "w", encoding="utf-8") as f:
+        f.write(script_content)
+
+    # Make the script executable
+    os.chmod(script_path, 0o755)
+
+    # Build the result with explicit bash command
+    bash_command = f"bash {script_path}"
+
+    kernel_note = ""
     if kernel_image == "host":
-        command_str = f"vng -vr -- {kselftest_cmd}"
         kernel_note = "Running on host kernel"
     elif kernel_image:
-        command_str = f"vng -vr {kernel_image} -- {kselftest_cmd}"
         if kernel_image.startswith("v") and any(c.isdigit() for c in kernel_image):
             kernel_note = f"Running on upstream kernel {kernel_image}"
         else:
             kernel_note = f"Running on kernel image: {kernel_image}"
     else:
-        command_str = f"vng -v -- {kselftest_cmd}"
         kernel_note = "Running on newly built kernel"
 
-    # Create job object
-    job = Job(job_id=job_id, command=command_str, args=async_args)
-
-    # Store job
-    with _jobs_lock:
-        _active_jobs[job_id] = job
-
-    # Start background thread
-    thread = threading.Thread(
-        target=_run_job_in_background, args=(job_id,), daemon=True
-    )
-    thread.start()
-
-    # Wait for up to 60 seconds to see if job completes quickly
-    job = _wait_for_job_completion(job_id, max_wait_seconds=60)
-
-    if job and job.status in ("completed", "failed", "cancelled"):
-        # Job completed within 60 seconds - return full results
-        result = job.to_dict()
-        result["success"] = True
-        result["auto_completed"] = True
-        result["test_name"] = test_name
-        result["message"] = (
-            f"Kselftest '{test_name}' completed automatically (finished in {round(job.elapsed_seconds(), 2)}s)"
-        )
-
-        # Add build information
-        if build_steps:
-            result["builds_performed"] = build_steps
-        else:
-            result["builds_performed"] = ["none (everything already built)"]
-
-        if job.status == "completed":
-            result["success_flag"] = job.returncode == 0
-            if job.returncode != 0:
-                result["warning"] = (
-                    f"Test completed but command returned exit code {job.returncode}"
-                )
-        elif job.status == "failed":
-            result["success_flag"] = False
-        elif job.status == "cancelled":
-            result["success_flag"] = False
-
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Job still running after 60 seconds - return job info for manual polling
-    result = {
-        "success": True,
-        "job_id": job_id,
-        "status": job.status if job else "starting",
-        "test_name": test_name,
-        "message": f"Kselftest '{test_name}' is still running after 60s. Use get_job_status() to check progress.",
-        "command": command_str,
-        "kernel_note": kernel_note,
-        "poll_suggestion": "Wait 10 seconds before first status check",
-        "expected_runtime": "Kselftests typically take 5-60+ minutes",
-        "elapsed_seconds": round(job.elapsed_seconds(), 2) if job else 0,
-    }
-
-    # Add build information if any builds were performed
-    if build_steps:
-        result["builds_performed"] = build_steps
+    # Create a clean, simple response
+    rebuild_note = ""
+    if needs_rebuild:
+        rebuild_note = f"\nKernel Rebuild: REQUIRED ({rebuild_reason})"
+        if args.get("build_host"):
+            rebuild_note += f"\nBuild Host: {args['build_host']}"
     else:
-        result["builds_performed"] = ["none (everything already built)"]
+        rebuild_note = "\nKernel Rebuild: Not needed (all required configs present)"
 
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+    response_text = f"""Command generated successfully. You MUST execute it immediately using Shell tool.
+
+EXECUTE THIS COMMAND NOW:
+{bash_command}
+
+Test: {test_name}
+Kernel: {kernel_note}{rebuild_note}
+
+CRITICAL: This tool only generated the command. You must execute it with Shell tool to actually run the test.
+The test has NOT run yet. Execute the command above in the same response."""
+
+    return [TextContent(type="text", text=response_text)]
 
 
-async def run_kernel_async_handler(args: dict) -> list[TextContent]:
+async def run_kernel_handler(args: dict) -> list[TextContent]:
     """
-    Start a kernel test asynchronously.
-    Returns immediately with a job ID that can be used to check status.
+    Generate command for running a kernel test.
+    Returns the command to execute.
     """
-    # Generate unique job ID
-    timestamp = int(time.time())
-    job_id = f"kernel_test_{timestamp}_{uuid.uuid4().hex[:8]}"
+    # Normalize architecture if provided and not empty
+    arch = args.get("arch", "").strip()
+    if arch:
+        arch = normalize_arch(arch)
+    else:
+        # Don't specify arch - let vng use host architecture automatically
+        arch = None
 
-    # Build command string for display
-    command_parts = ["vng"]
+    # Get kernel directory
+    kernel_dir = args.get("kernel_dir", ".")
+    kernel_path = Path(kernel_dir).absolute()
+
+    # Build the vng command
+    vng_cmd = ["vng"]
+
+    # Determine which kernel to run
     kernel_image = args.get("kernel_image")
     if kernel_image == "host":
-        command_parts.append("-vr")
+        vng_cmd.append("-vr")
     elif kernel_image:
-        command_parts.extend(["-vr", kernel_image])
+        vng_cmd.extend(["-vr", kernel_image])
 
-    if args.get("command"):
-        command_parts.extend(["--", args["command"]])
-    elif args.get("interactive"):
-        command_parts.append("(interactive)")
+    # Add optional VM parameters
+    # Only add arch if explicitly specified and not empty
+    if arch:
+        vng_cmd.extend(["--arch", arch])
+    if args.get("cpus"):
+        vng_cmd.extend(["--cpus", str(args["cpus"])])
+
+    memory = args.get("memory", "1G")
+    vng_cmd.extend(["--memory", memory])
+
+    if args.get("network"):
+        vng_cmd.extend(["--network", args["network"]])
+    if args.get("debug"):
+        vng_cmd.append("--debug")
+
+    # Add the command to execute
+    command = args.get("command", "uname -r")
+    vng_cmd.append("--")
+    vng_cmd.append(command)
+
+    # Wrap in script for PTS requirement and include cd to working directory
+    shell_cmd = f"cd {kernel_path} && script -q -c {vng_cmd} /dev/null 2>&1"
+
+    kernel_note = ""
+    if kernel_image == "host":
+        kernel_note = "Running on host kernel"
+    elif kernel_image:
+        if kernel_image.startswith("v") and any(c.isdigit() for c in kernel_image):
+            kernel_note = f"Running on upstream kernel {kernel_image}"
+        else:
+            kernel_note = f"Running on kernel image: {kernel_image}"
     else:
-        command_parts.extend(["--", "uname -r"])
+        kernel_note = "Running on newly built kernel"
 
-    command_str = " ".join(command_parts)
+    # Create a clean, simple response
+    response_text = f"""Command generated successfully. You MUST execute it immediately using Shell tool.
 
-    # Create job object
-    job = Job(job_id=job_id, command=command_str, args=args)
+EXECUTE THIS COMMAND NOW:
+{shell_cmd}
 
-    # Store job
-    with _jobs_lock:
-        _active_jobs[job_id] = job
+Test command: {command}
+Kernel: {kernel_note}
 
-    # Start background thread
-    thread = threading.Thread(
-        target=_run_job_in_background, args=(job_id,), daemon=True
-    )
-    thread.start()
+CRITICAL: This tool only generated the command. You must execute it with Shell tool to actually run the test.
+The test has NOT run yet. Execute the command above in the same response."""
 
-    # Wait for up to 60 seconds to see if job completes quickly
-    job = _wait_for_job_completion(job_id, max_wait_seconds=60)
-
-    if job and job.status in ("completed", "failed", "cancelled"):
-        # Job completed within 60 seconds - return full results
-        result = job.to_dict()
-        result["success"] = True
-        result["auto_completed"] = True
-        result["message"] = (
-            f"Job completed automatically (finished in {round(job.elapsed_seconds(), 2)}s)"
-        )
-
-        if job.status == "completed":
-            result["success_flag"] = job.returncode == 0
-            if job.returncode != 0:
-                result["warning"] = (
-                    f"Job completed but command returned exit code {job.returncode}"
-                )
-        elif job.status == "failed":
-            result["success_flag"] = False
-        elif job.status == "cancelled":
-            result["success_flag"] = False
-
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Job still running after 60 seconds - return job info for manual polling
-    result = {
-        "success": True,
-        "job_id": job_id,
-        "status": job.status if job else "starting",
-        "message": "Job is still running after 60s. Use get_job_status() to check progress.",
-        "command": command_str,
-        "poll_suggestion": "Wait 10 seconds before first status check",
-        "elapsed_seconds": round(job.elapsed_seconds(), 2) if job else 0,
-    }
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-
-async def get_job_status_handler(args: dict) -> list[TextContent]:
-    """
-    Get the current status of an async job.
-    Returns immediately (fast, no timeout risk).
-    """
-    job_id = args.get("job_id")
-
-    if not job_id:
-        result = {
-            "success": False,
-            "error": "job_id is required",
-            "message": "Please provide a job_id from run_kernel_async() or run_kselftest()",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    # Clean up old jobs first
-    _cleanup_old_jobs()
-
-    with _jobs_lock:
-        if job_id not in _active_jobs:
-            result = {
-                "success": False,
-                "error": "job_not_found",
-                "message": f"Job {job_id} not found. It may have been cleaned up (>24h old) or never existed.",
-                "help": "Use list_jobs() to see all active jobs.",
-            }
-            return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-        job = _active_jobs[job_id]
-
-    # Convert job to dict
-    result = job.to_dict()
-    result["success"] = True
-
-    # Add helpful messages and guidance based on status
-    if job.status == "starting":
-        result["message"] = "Job is starting up..."
-        result["poll_again_in_seconds"] = 60
-    elif job.status == "running":
-        elapsed = result["elapsed_seconds"]
-        result["message"] = f"Job is running ({elapsed}s elapsed)"
-        result["poll_again_in_seconds"] = 10
-        result["agent_guidance"] = (
-            f"Wait {result['poll_again_in_seconds']} seconds before checking again"
-        )
-    elif job.status == "completed":
-        result["message"] = "Job completed successfully"
-        result["success_flag"] = job.returncode == 0
-        if job.returncode != 0:
-            result["warning"] = (
-                f"Job completed but command returned exit code {job.returncode}"
-            )
-    elif job.status == "failed":
-        result["message"] = "Job failed"
-        result["success_flag"] = False
-    elif job.status == "cancelled":
-        result["message"] = "Job was cancelled"
-        result["success_flag"] = False
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-
-async def cancel_job_handler(args: dict) -> list[TextContent]:
-    """
-    Cancel a running async job.
-    Note: Currently just marks as cancelled, doesn't forcibly kill the process.
-    """
-    job_id = args.get("job_id")
-
-    if not job_id:
-        result = {
-            "success": False,
-            "error": "job_id is required",
-            "message": "Please provide a job_id to cancel",
-        }
-        return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-    with _jobs_lock:
-        if job_id not in _active_jobs:
-            result = {
-                "success": False,
-                "error": "job_not_found",
-                "message": f"Job {job_id} not found",
-            }
-            return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-        job = _active_jobs[job_id]
-
-        if job.status in ("completed", "failed", "cancelled"):
-            result = {
-                "success": False,
-                "error": "job_already_finished",
-                "message": f"Job {job_id} has already finished with status: {job.status}",
-            }
-            return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-        # Mark as cancelled
-        job.status = "cancelled"
-        job.end_time = time.time()
-
-        # Note: To actually kill the process, we'd need to store the Popen object
-        # and call process.terminate(). For now, we just mark it as cancelled.
-        result = {
-            "success": True,
-            "job_id": job_id,
-            "message": "Job marked as cancelled",
-            "note": "The underlying process may still be running. This marks the job as cancelled in the job system.",
-        }
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
-
-
-async def list_jobs_handler() -> list[TextContent]:
-    """
-    List all active async jobs.
-    Automatically cleans up old jobs (>24 hours) first.
-    """
-    # Clean up old jobs
-    _cleanup_old_jobs()
-
-    with _jobs_lock:
-        jobs = [job.to_dict() for job in _active_jobs.values()]
-
-    # Sort by start time (newest first)
-    jobs.sort(key=lambda j: j.get("start_time", ""), reverse=True)
-
-    result = {
-        "success": True,
-        "jobs": jobs,
-        "count": len(jobs),
-        "message": f"Found {len(jobs)} active job(s)",
-    }
-
-    if len(jobs) == 0:
-        result["note"] = (
-            "No active jobs. Jobs older than 24 hours are automatically cleaned up."
-        )
-
-    return [TextContent(type="text", text=json.dumps(result, indent=2))]
+    return [TextContent(type="text", text=response_text)]
 
 
 async def run_mcp_server():
