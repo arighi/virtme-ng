@@ -963,7 +963,7 @@ Run kernel selftests (kselftests) asynchronously with automatic build support.
 
 🎯 KSELFTEST RUNNER - Build kernel first!
 ════════════════════════════════════════════════════════════
-⚠️  IMPORTANT: You must build the kernel BEFORE running kselftests!
+⚠  IMPORTANT: You must build the kernel BEFORE running kselftests!
     Use: vng -v --build
 
 This command automatically:
@@ -998,6 +998,15 @@ PARAMETERS:
   * "./path/to/bzImage" = run specific local kernel image file
 
 - kernel_dir (optional): Path to kernel source directory (default: current directory)
+
+- build_host (optional): Remote build host for faster kernel builds
+  Example: "builder", "myserver.example.com"
+  If specified, uses: vng --build --build-host <hostname> --force
+  This is used when rebuilding the kernel with test configs
+
+  ⚠️  IMPORTANT: If the user mentions a remote build server, ALWAYS pass
+      build_host to run_kselftest(). This ensures kernel rebuilds (when
+      needed for test configs) happen on the same remote server.
 
 - memory (optional): Memory size for VM (default: "2G")
   Increase for memory-intensive tests
@@ -1105,15 +1114,34 @@ run_kselftest({
     "runner_args": "--verbose"
 })
 
+# Use remote build host for faster kernel rebuilds:
+# ⚠️  ALWAYS specify build_host when user mentions a remote build server
+run_kselftest({
+    "test_name": "sched_ext",
+    "build_host": "builder"
+})
+
+# Example with remote build host and custom options:
+run_kselftest({
+    "test_name": "net",
+    "build_host": "myserver.example.com",
+    "memory": "4G",
+    "runner_args": "--verbose"
+})
+
 AGENT GUIDANCE:
 ───────────────
 When using this tool:
 1. ⚠️  FIRST: Build the kernel using: vng -v --build
 2. Then call run_kselftest() (it will build the kselftest automatically)
-3. Inform user job started
-4. Poll get_job_status() every 10-30 seconds
-5. Update user with progress
-6. Report final results when completed
+3. ⚠️  IMPORTANT: If user mentions a remote build server/host:
+   - ALWAYS pass build_host parameter to run_kselftest()
+   - Example mentions: "build on <hostname>", "use build server", "compile remotely"
+   - This ensures kernel rebuilds (for test configs) use the remote server
+4. Inform user job started
+5. Poll get_job_status() every 10-30 seconds
+6. Update user with progress
+7. Report final results when completed
 
 IMPORTANT NOTES:
 ────────────────
@@ -1141,6 +1169,14 @@ IMPORTANT NOTES:
                         "type": "string",
                         "description": "Path to kernel source directory",
                         "default": ".",
+                    },
+                    "build_host": {
+                        "type": "string",
+                        "description": (
+                            "Remote build host for faster kernel builds (optional). "
+                            "IMPORTANT: Always specify this when user mentions a remote "
+                            "build server to ensure kernel rebuilds use the remote host."
+                        ),
                     },
                     "memory": {
                         "type": "string",
@@ -1777,6 +1813,7 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
 
     # Get settings
     kernel_image = args.get("kernel_image")
+    build_host = args.get("build_host")
     build_timeout = 600  # Hard-coded 10 minutes for kselftest builds
 
     build_steps = []
@@ -1794,6 +1831,10 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
                 "--build",
                 "--force",
             ]
+
+            # Add build host if specified
+            if build_host:
+                rebuild_cmd.extend(["--build-host", build_host])
 
             # Pass both .config (to preserve old configs) and test config
             # (to add test requirements)
