@@ -159,6 +159,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "(instance needs to be started with --debug)",
     )
 
+    g_action.add_argument(
+        "--mcp",
+        action="store_true",
+        help="Start the MCP (Model Context Protocol) server for AI agent integration",
+    )
+
     parser.add_argument(
         "--dry-run",
         action="store_true",
@@ -176,6 +182,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
+    )
+
+    parser.add_argument(
+        "--empty-passwords",
+        action="store_true",
+        help="Use empty passwords for all users",
     )
 
     parser.add_argument(
@@ -1297,6 +1309,11 @@ class KernelSource:
         else:
             self.virtme_param["busybox"] = ""
 
+    def _get_virtme_empty_passwords(self, args):
+        self.virtme_param["empty_passwords"] = ""
+        if args.empty_passwords:
+            self.virtme_param["empty_passwords"] = "--empty-passwords"
+
     def _get_virtme_qemu(self, args):
         if args.qemu is not None:
             self.virtme_param["qemu"] = "--qemu-bin " + args.qemu
@@ -1372,6 +1389,7 @@ class KernelSource:
         self._get_virtme_balloon(args)
         self._get_virtme_gdb(args)
         self._get_virtme_snaps(args)
+        self._get_virtme_empty_passwords(args)
         self._get_virtme_busybox(args)
         self._get_virtme_nvgpu(args)
         self._get_virtme_qemu(args)
@@ -1391,6 +1409,7 @@ class KernelSource:
             + f"{self.virtme_param['rwdir']} "
             + f"{self.virtme_param['overlay_rwdir']} "
             + f"{self.virtme_param['cwd']} "
+            + f"{self.virtme_param['empty_passwords']} "
             + f"{self.virtme_param['kdir']} "
             + f"{self.virtme_param['dry_run']} "
             + f"{self.virtme_param['no_virtme_ng_init']} "
@@ -1669,6 +1688,35 @@ def do_it() -> int:
     """Main body."""
     argcomplete.autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
+
+    # Handle --mcp option early (it's a server mode, not a normal
+    # operation).
+    if args.mcp:
+        # Execute vng-mcp binary instead of importing to avoid MCP
+        # dependencies in the main vng script.
+        try:
+            vng_mcp = shutil.which("vng-mcp")
+            if vng_mcp is None:
+                # Find it in the same directory as vng.
+                script_dir = os.path.dirname(os.path.abspath(sys.argv[0]))
+                vng_mcp_local = os.path.join(script_dir, "vng-mcp")
+                if os.path.exists(vng_mcp_local):
+                    vng_mcp = vng_mcp_local
+
+            if vng_mcp is None:
+                sys.stderr.write(
+                    "Error: vng-mcp not found. Please install virtme-ng properly.\n"
+                )
+                return 1
+
+            # Execute vng-mcp and replace the current process.
+            os.execv(vng_mcp, [vng_mcp])
+        except OSError as e:
+            sys.stderr.write(
+                f"Error: Failed to execute vng-mcp: {e}\n"
+                "Make sure MCP dependencies are installed: pip install virtme-ng[mcp]\n"
+            )
+            return 1
 
     kern_source = KernelSource()
     if kern_source.default_opts:

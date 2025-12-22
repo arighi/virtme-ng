@@ -263,6 +263,7 @@ fn configure_limits() {
 
 fn configure_hostname() {
     if let Ok(hostname) = env::var("virtme_hostname") {
+        log!("Setting hostname to {hostname}...");
         if let Err(err) = sethostname(hostname) {
             log!("failed to change hostname: {}", err);
         }
@@ -275,6 +276,7 @@ fn run_systemd_tmpfiles() {
     if !Path::new("/etc/systemd").exists() {
         return;
     }
+    log!("running systemd-tmpfiles");
     let args: &[&str] = &[
         "--create",
         "--boot",
@@ -305,9 +307,12 @@ fn generate_shadow() -> io::Result<()> {
     let reader = BufReader::new(input_file);
     let mut writer = BufWriter::new(output_file);
 
+    let empty_passwords = env::var("virtme_empty_passwords").unwrap_or(0.to_string());
+    let value = if empty_passwords == "1" { "" } else { "!" };
+
     for line in reader.lines() {
         if let Some((username, _)) = line?.split_once(':') {
-            writeln!(writer, "{username}:!:::::::")?;
+            writeln!(writer, "{username}:{value}:::::::")?;
         }
     }
     utils::do_mount(
@@ -344,6 +349,7 @@ fn generate_lvm() -> io::Result<()> {
 
     // Create a default lvm.conf file if --systemd was specified
     if id() != 1 {
+        log!("Creating a default lvm.conf file");
         let args: &[&str] = &["--type", "default", "--file", "/etc/lvm/lvm.conf"];
         utils::run_cmd("lvmconfig", args);
     }
@@ -555,7 +561,7 @@ fn disable_uevent_helper() {
 
     if Path::new(uevent_helper_path).exists() {
         // This kills boot performance.
-        log!("you have CONFIG_UEVENT_HELPER on, turn it off");
+        log!("you have CONFIG_UEVENT_HELPER on; turn it off");
         let mut file = OpenOptions::new().write(true).open(uevent_helper_path).ok();
         match &mut file {
             Some(file) => {
@@ -759,6 +765,7 @@ fn run_user_script(uid: u32) {
             ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
         };
         clear_virtme_envs();
+        log!("starting script");
         unsafe {
             let ret = Command::new(cmd)
                 .args(&args)
@@ -1126,6 +1133,7 @@ fn main() {
     mount_sys_filesystems();
     mount_kernel_modules();
     run_systemd_tmpfiles();
+    log!("basic initialization done");
 
     // Service running in the background for later
     setup_socat_console();

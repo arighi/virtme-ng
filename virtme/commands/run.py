@@ -319,9 +319,13 @@ def make_parser() -> argparse.ArgumentParser:
         "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
     )
 
-    g = parser.add_argument_group(
-        title="Guest userspace configuration"
-    ).add_mutually_exclusive_group()
+    g = parser.add_argument_group(title="Guest userspace configuration")
+    g.add_argument(
+        "--empty-passwords",
+        action="store_true",
+        help="Set all user passwords to empty",
+    )
+    g = g.add_mutually_exclusive_group()
     g.add_argument(
         "--pwd",
         action="store_true",
@@ -1117,6 +1121,12 @@ def ssh_server(args, arch, qemuargs, kernelargs):
         )
         ssh_channel_type = "tcp"
 
+    if ssh_channel_type != "vsock" and args.empty_passwords:
+        arg_fail(
+            "--empty-passwords can only be used in combination with SSH over vsock",
+            show_usage=False,
+        )
+
     kernelargs.extend(
         [
             "virtme.ssh",
@@ -1453,6 +1463,9 @@ def do_it() -> int:
 
     for i, d in enumerate(args.overlay_rwdir):
         kernelargs.append(f"virtme_rw_overlay{i}={d}")
+
+    if args.empty_passwords:
+        kernelargs.append("virtme_empty_passwords=1")
 
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)

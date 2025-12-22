@@ -147,10 +147,17 @@ setup(
         "requests",
         "setuptools",
     ],
+    extras_require={
+        "mcp": [
+            "mcp>=0.9.0",
+            "anyio>=4.0.0",
+        ],
+    },
     entry_points={
         "console_scripts": [
             "vng = virtme_ng.run:main",
             "virtme-ng = virtme_ng.run:main",
+            "vng-mcp = virtme_ng.mcp:main [mcp]",
             "virtme-run = virtme.commands.run:main",
             "virtme-configkernel = virtme.commands.configkernel:main",
             "virtme-mkinitramfs = virtme.commands.mkinitramfs:main",

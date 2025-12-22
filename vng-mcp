@@ -1,0 +1,23 @@
+#!/usr/bin/env python3
+# -*- mode: python -*-
+# vng-mcp: MCP (Model Context Protocol) server for virtme-ng
+
+# This file is not installed; it's just used to run the MCP server from inside
+# a source distribution.
+
+import os
+import sys
+
+os.environ["__VNG_LOCAL"] = "1"
+
+try:
+    from virtme_ng import mcp  # noqa: E402
+except ImportError:
+    sys.stderr.write(
+        "Error: MCP server dependencies not installed.\n"
+        "Install with: pip install mcp anyio\n"
+        "Or: pip install virtme-ng[mcp]\n"
+    )
+    sys.exit(1)
+
+sys.exit(mcp.main())

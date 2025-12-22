@@ -87,10 +87,20 @@ if [[ ${virtme_ssh_channel} == "vsock" ]]; then
         echo "ssh: vsock module could not be loaded. SSHD cannot be started. Use '--ssh-tcp' instead to fallback to SSH over TCP." >&2
         exit 1
     fi
+
+    if (("${virtme_empty_passwords:-0}" == 1)); then
+        echo 'PermitEmptyPasswords yes' >> "${SSH_CONFIG}"
+    fi
+
     # 4294967295 == U32_MAX == -1
     declare -r VMADDR_CID_ANY=4294967295
     # TODO Use something like syslog or journal for the logging
     setsid --fork -- systemd-socket-activate --accept --listen="vsock:${VMADDR_CID_ANY}:22" --inetd -- /usr/sbin/sshd -i "${ARGS[@]}" &> /dev/null < /dev/null
 else
+    if (("${virtme_empty_passwords:-0}" == 1)); then
+        echo "Using TCP-based SSH together with empty passwords is insecure." >&2
+        exit 1
+    fi
+
     /usr/sbin/sshd "${ARGS[@]}"
 fi
