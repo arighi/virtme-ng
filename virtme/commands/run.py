@@ -1369,6 +1369,7 @@ def do_it() -> int:
             path=guest_tools_path,
             mount_tag="virtme.guesttools",
         )
+        fstab_path = get_conf("systemd.fstab")
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
         initsh = [
             "mount -t tmpfs run /run",
@@ -1378,6 +1379,7 @@ def do_it() -> int:
             "mkdir -p /run/virtme/guesttools",
             "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
             + "virtme.guesttools /run/virtme/guesttools",
+            f"mount --bind {fstab_path} /etc/fstab",
         ]
         if args.systemd:
             initsh.extend(
