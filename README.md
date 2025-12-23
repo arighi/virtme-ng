@@ -163,7 +163,8 @@ Configuration
   {
       "default_opts": {},
       "systemd": {
-          "masks": ["getty@"]
+          "masks": ["getty@"],
+          "fstab": "/dev/null"
       }
   }
   ```

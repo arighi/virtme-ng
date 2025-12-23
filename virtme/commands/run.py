@@ -1344,8 +1344,6 @@ def do_it() -> int:
         virtme_init_cmd = "virtme-init"
 
     if args.systemd:
-        # disable systemd-fstab-generator so boot does not freeze while waiting for disks
-        kernelargs.append("fstab=no")
         # disable systemd-cryptsetup-generator so it doesn't wait for encrypted disks
         kernelargs.append("luks=no")
         # disable auditd so there are no errors if the user lacks `--rw`
@@ -1361,11 +1359,12 @@ def do_it() -> int:
 
     if args.root == "/":
         if args.systemd:
+            fstab_path = get_conf("systemd.fstab")
             initcmds = [
                 "init=/bin/sh",
                 "--",
                 "-c",
-                f"SYSTEMD_UNIT_PATH={CACHE_DIR}: exec /sbin/init;",
+                f"mount --bind {fstab_path} /etc/fstab && SYSTEMD_UNIT_PATH={CACHE_DIR}: exec /sbin/init;",
             ]
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
@@ -1380,6 +1379,7 @@ def do_it() -> int:
             path=guest_tools_path,
             mount_tag="virtme.guesttools",
         )
+        fstab_path = get_conf("systemd.fstab")
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
         initsh = [
             "mount -t tmpfs run /run",
@@ -1389,6 +1389,7 @@ def do_it() -> int:
             "mkdir -p /run/virtme/guesttools",
             "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
             + "virtme.guesttools /run/virtme/guesttools",
+            f"mount --bind {fstab_path} /etc/fstab",
         ]
         if args.systemd:
             initsh.extend(
