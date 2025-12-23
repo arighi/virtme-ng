@@ -262,7 +262,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    # }
 
    # IMMEDIATELY execute the command in the same response - do NOT wait!
-   Shell(command=result["command"])
+   # Execute: result["command"]
 
    The run_kselftest_cmd tool returns:
    - A single command that executes a script
@@ -286,7 +286,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    result = run_kselftest_cmd({"test_name": "sched_ext"})
 
    # STEP 3: Execute the command
-   Shell(command=result["command"])
+   # Execute: result["command"]
    # The script automatically handles all steps!
 
    Example 2: Run tests on HOST kernel
@@ -298,7 +298,7 @@ IMPORTANT NOTES FOR AI AGENTS:
    })
 
    # Execute command
-   Shell(command=result["command"])
+   # Execute: result["command"]
 
    Example 3: Run tests on UPSTREAM kernel
    ────────────────────────────────────────
@@ -309,11 +309,12 @@ IMPORTANT NOTES FOR AI AGENTS:
    })
 
    # Execute command
-   Shell(command=result["command"])
+   # Execute: result["command"]
 
 6. MCP Tools Available
    --------------------
    This MCP server provides:
+   - build_kernel: Generate command for building the kernel (RECOMMENDED for kernel builds)
    - configure_kernel: Generate/modify kernel .config
    - run_kernel_cmd: Generate command for running kernel tests
    - run_kselftest_cmd: Generate script and return command for running kernel selftests (RECOMMENDED for kselftests)
@@ -336,7 +337,7 @@ IMPORTANT NOTES FOR AI AGENTS:
 
    No need to manage multiple commands or worry about execution order!
 
-   For building kernels, use shell commands with 'vng -v --build' as documented above.
+   For building kernels, use the build_kernel tool (RECOMMENDED) or shell commands with 'vng -v --build'.
    For running kselftests, use the run_kselftest_cmd tool (see section 5).
    For validating patch series, see section 7 below.
 
@@ -621,6 +622,131 @@ async def list_tools() -> list[Tool]:
     """List available tools for kernel development."""
     return [
         Tool(
+            name="build_kernel",
+            description="""
+Generate command for building a Linux kernel using virtme-ng.
+
+This tool returns the 'vng -v --build' command that the AI agent needs to execute
+to build the kernel. This is the RECOMMENDED way to build kernels for testing.
+
+WORKFLOW:
+─────────
+1. Call build_kernel() with desired parameters
+2. Execute the returned command with Shell tool
+3. Done!
+
+Why use vng -v --build:
+- Automatically generates minimal .config if missing (saves time)
+- Optimized for quick builds (compiles only what's needed for testing)
+- Builds typically complete in minutes instead of hours
+- Supports remote build hosts for cross-compilation
+- Handles all build dependencies and options correctly
+
+Parameters:
+-----------
+- kernel_dir: Path to kernel source directory (default: current directory)
+- build_host: Remote build host for faster builds (optional)
+  When user mentions "build on <hostname>", "use my build server", etc., set this parameter
+- config_items: List of specific CONFIG_ITEM=value settings to apply during build
+  Examples: ["CONFIG_DEBUG_INFO=y", "CONFIG_KASAN=y"]
+- arch: Target architecture (amd64, arm64, armhf, ppc64el, s390x, riscv64)
+  ⚠️  WARNING: Do NOT set this parameter unless the user explicitly requests a specific architecture!
+  Setting this can trigger cross-compilation and requires proper chroot setup.
+  Omit this parameter to use the host architecture (which is what you want 99% of the time).
+- verbose: Enable verbose output (default: true)
+
+Returns:
+────────
+{
+  "success": true,
+  "command": "cd /path/to/kernel && vng -v --build",
+  "description": "Build kernel"
+}
+
+Example usage:
+──────────────
+# Basic local build
+result = build_kernel({})
+# Execute: result["command"]
+# Returns: cd /path/to/kernel && vng -v --build
+
+# Remote build
+result = build_kernel({"build_host": "builder"})
+# Execute: result["command"]
+# Returns: cd /path/to/kernel && vng -v --build --build-host builder
+
+# Build with custom config
+result = build_kernel({"config_items": ["CONFIG_KASAN=y", "CONFIG_DEBUG_INFO=y"]})
+# Execute: result["command"]
+# Returns: cd /path/to/kernel && vng -v --build --configitem CONFIG_KASAN=y --configitem CONFIG_DEBUG_INFO=y
+
+# Remote build with custom config
+result = build_kernel({
+    "build_host": "myserver",
+    "config_items": ["CONFIG_DEBUG_INFO=y"]
+})
+# Execute: result["command"]
+# Returns: cd /path/to/kernel && vng -v --build --build-host myserver --configitem CONFIG_DEBUG_INFO=y
+
+AGENT GUIDANCE:
+───────────────
+1. Call build_kernel() with desired parameters
+2. Execute command using Shell tool with sufficient timeout (10-60+ minutes)
+3. Report results to user
+
+⚠️  CRITICAL: Use sufficient timeout for builds (600000ms / 10 minutes minimum)
+⚠️  CRITICAL: Architecture Parameter
+────────────────────────────────────
+NEVER set the 'arch' parameter unless the user EXPLICITLY requests a specific architecture!
+If arch is not specified, the tool uses the host architecture automatically (which is correct 99% of the time).
+Setting arch unnecessarily triggers cross-compilation and requires chroot setup!
+
+⏱️  TIMEOUT: Builds take 10-60+ minutes! Use sufficient timeout (e.g., 600000ms).
+            """,
+            inputSchema={
+                "type": "object",
+                "properties": {
+                    "kernel_dir": {
+                        "type": "string",
+                        "description": "Path to kernel source directory",
+                        "default": ".",
+                    },
+                    "build_host": {
+                        "type": "string",
+                        "description": (
+                            "Remote build host for faster kernel builds (optional). "
+                            "Set this when user mentions a remote build server."
+                        ),
+                    },
+                    "config_items": {
+                        "type": "array",
+                        "items": {"type": "string"},
+                        "description": "List of CONFIG_ITEM=value settings to apply during build",
+                    },
+                    "arch": {
+                        "type": "string",
+                        "description": (
+                            "Target architecture (WARNING: Only set if user explicitly requests! "
+                            "Omit to use host architecture)"
+                        ),
+                        "enum": [
+                            "amd64",
+                            "arm64",
+                            "armhf",
+                            "ppc64el",
+                            "s390x",
+                            "riscv64",
+                        ],
+                    },
+                    "verbose": {
+                        "type": "boolean",
+                        "description": "Enable verbose output",
+                        "default": True,
+                    },
+                },
+            },
+        ),
+        Tool(
             name="configure_kernel",
             description="""
 Configure a Linux kernel for virtme-ng testing.
@@ -897,7 +1023,7 @@ result = run_kselftest_cmd({"test_name": "sched_ext"})
 # Returns: {"command": "bash /path/to/kernel/vng-kselftest.sh", "action_required": "EXECUTE_NOW", ...}
 
 # IMMEDIATELY execute the command - do NOT wait for user confirmation!
-Shell(command=result["command"], description=result["description"])
+# Execute: result["command"]
 # The script automatically handles all steps: headers, build, and test execution
 
 
@@ -907,7 +1033,7 @@ result = run_kselftest_cmd({
     "test_name": "net",
     "kernel_image": "host"
 })
-Shell(command=result["command"])
+# Execute: result["command"]
 
 
 # Example 3: Test on UPSTREAM kernel
@@ -916,7 +1042,7 @@ result = run_kselftest_cmd({
     "test_name": "vm",
     "kernel_image": "v6.14"
 })
-Shell(command=result["command"])
+# Execute: result["command"]
 
 
 ADVANCED EXAMPLES:
@@ -926,14 +1052,14 @@ result = run_kselftest_cmd({
     "test_name": "vm",
     "runner_args": "--verbose"
 })
-Shell(command=result["command"])
+# Execute: result["command"]
 
 # With more memory:
 result = run_kselftest_cmd({
     "test_name": "net",
     "memory": "4G"
 })
-Shell(command=result["command"])
+# Execute: result["command"]
 
 # Test on host kernel with verbose output:
 result = run_kselftest_cmd({
@@ -941,7 +1067,7 @@ result = run_kselftest_cmd({
     "kernel_image": "host",
     "runner_args": "--verbose"
 })
-Shell(command=result["command"])
+# Execute: result["command"]
 
 AGENT GUIDANCE:
 ───────────────
@@ -1188,6 +1314,8 @@ Setting arch unnecessarily triggers cross-compilation and requires chroot setup!
 async def call_tool(name: str, arguments: Any) -> list[TextContent]:
     """Handle tool calls from the MCP client."""
 
+    if name == "build_kernel":
+        return await build_kernel_handler(arguments)
     if name == "configure_kernel":
         return await configure_kernel(arguments)
     if name == "run_kselftest_cmd":
@@ -1199,6 +1327,62 @@ async def call_tool(name: str, arguments: Any) -> list[TextContent]:
     if name == "apply_patch":
         return await apply_patch(arguments)
     return [TextContent(type="text", text=f"Unknown tool: {name}")]
+
+
+async def build_kernel_handler(args: dict) -> list[TextContent]:
+    """
+    Generate command for building a kernel using vng --build.
+    Returns the command to execute.
+    """
+    # Normalize architecture if provided
+    if args.get("arch"):
+        args["arch"] = normalize_arch(args["arch"])
+
+    # Get kernel directory
+    kernel_dir = args.get("kernel_dir", ".")
+    kernel_path = Path(kernel_dir).absolute()
+
+    # Build the vng command
+    vng_cmd = ["vng"]
+
+    # Add verbose flag (default: true)
+    if args.get("verbose", True):
+        vng_cmd.append("-v")
+
+    # Add --build flag
+    vng_cmd.append("--build")
+
+    # Add optional parameters
+    if args.get("build_host"):
+        vng_cmd.extend(["--build-host", args["build_host"]])
+
+    if args.get("arch"):
+        vng_cmd.extend(["--arch", args["arch"]])
+
+    if args.get("config_items"):
+        for item in args["config_items"]:
+            vng_cmd.extend(["--configitem", item])
+
+    # Build the shell command with cd to working directory
+    shell_cmd = f"cd {kernel_path} && {' '.join(vng_cmd)}"
+
+    # Build the result
+    result = {
+        "success": True,
+        "command": shell_cmd,
+        "description": "Build kernel",
+        "note": "Execute this command using Shell tool with sufficient timeout (600000ms / 10 minutes minimum)",
+    }
+
+    if args.get("build_host"):
+        result["build_note"] = f"Building on remote host: {args['build_host']}"
+    else:
+        result["build_note"] = "Building locally"
+
+    if args.get("config_items"):
+        result["config_note"] = f"With custom config: {', '.join(args['config_items'])}"
+
+    return [TextContent(type="text", text=json.dumps(result, indent=2))]
 
 
 async def configure_kernel(args: dict) -> list[TextContent]:
