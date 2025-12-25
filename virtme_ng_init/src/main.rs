@@ -1125,8 +1125,8 @@ fn print_logo() {
 fn main() {
     // Basic system initialization (order is important here).
     configure_environment();
-    configure_hostname();
     mount_kernel_filesystems();
+    configure_hostname();
     mount_cgroupfs();
     configure_limits();
     mount_virtme_overlays();
