@@ -28,6 +28,7 @@ from typing import Any, NoReturn
 from virtme_ng.utils import (
     CACHE_DIR,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
+    SERIAL_GETTY_DIR,
     SERIAL_GETTY_FILE,
     SSH_CONF_FILE,
     SSH_DIR,
@@ -1941,6 +1942,7 @@ def do_it() -> int:
                     continue
                 init_environment_vars.append(f"{match.group(1)}={match.group(2)}")
             os.makedirs(CACHE_DIR, exist_ok=True)
+            os.makedirs(SERIAL_GETTY_DIR, exist_ok=True)
             with open(SERIAL_GETTY_FILE, "w", encoding="utf-8") as f:
                 f.write(
                     f"""[Service]
@@ -1949,7 +1951,8 @@ StandardOutput=tty
 TTYPath=/dev/%I
 TTYReset=yes
 TTYVHangup=yes
-Environment={shlex.join(init_environment_vars)}"""
+Environment={shlex.join(init_environment_vars)}
+ExecStart="""
                 )
                 if args.root == "/":
                     f.write(f"\nExecStart={guest_tools_path}/{virtme_init_cmd}")
