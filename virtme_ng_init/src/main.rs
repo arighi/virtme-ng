@@ -273,6 +273,9 @@ fn configure_hostname() {
 }
 
 fn run_systemd_tmpfiles() {
+    if id() != 1 {
+        return;
+    }
     if !Path::new("/etc/systemd").exists() {
         return;
     }

@@ -204,6 +204,9 @@ mount_virtme_initmounts() {
 }
 
 run_systemd_tmpfiles() {
+    if [[ $$ -ne 1 ]]; then
+        return
+    fi
     # Does the system use systemd-tmpfiles?
     if command -v systemd-tmpfiles &> /dev/null; then
         log "running systemd-tmpfiles"
