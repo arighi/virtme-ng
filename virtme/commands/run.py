@@ -759,7 +759,7 @@ class VirtioFS:
         else:
             stderr = ""
         os.system(
-            f"{virtiofsd_path} --syslog --no-announce-submounts "
+            f"{virtiofsd_path} --syslog --no-announce-submounts --posix-acl "
             + f"--socket-path {self.sock} --shared-dir {path} "
             + f"--sandbox none -o cache={cache} {stderr} &"
         )
