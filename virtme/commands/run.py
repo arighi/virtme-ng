@@ -1370,6 +1370,7 @@ def do_it() -> int:
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
+        os.makedirs(CACHE_DIR, exist_ok=True)
         virtfs_config = VirtFSConfig(
             path=str(CACHE_DIR),
             mount_tag="virtme.cache",
@@ -1941,7 +1942,6 @@ def do_it() -> int:
                 if not match:
                     continue
                 init_environment_vars.append(f"{match.group(1)}={match.group(2)}")
-            os.makedirs(CACHE_DIR, exist_ok=True)
             os.makedirs(SERIAL_GETTY_DIR, exist_ok=True)
             with open(SERIAL_GETTY_FILE, "w", encoding="utf-8") as f:
                 f.write(
