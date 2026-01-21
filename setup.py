@@ -145,7 +145,6 @@ setup(
     install_requires=[
         "argcomplete",
         "requests",
-        "setuptools",
     ],
     extras_require={
         "mcp": [
