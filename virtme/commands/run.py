@@ -1386,10 +1386,10 @@ def do_it() -> int:
         initsh = [
             "mount -t tmpfs run /run",
             "mkdir -p /run/virtme/cache",
-            "/bin/mount -n -t 9p -o rw,version=9p2000.L,trans=virtio,access=any "
+            "/bin/mount -n -t 9p -o rw,version=9p2000.L,trans=virtio,access=any,msize=524288 "
             + "virtme.cache /run/virtme/cache",
             "mkdir -p /run/virtme/guesttools",
-            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any "
+            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
             + "virtme.guesttools /run/virtme/guesttools",
             f"mount --bind {fstab_path} /etc/fstab",
         ]
@@ -1905,7 +1905,7 @@ def do_it() -> int:
             kernelargs.extend(
                 [
                     "rootfstype=9p",
-                    "rootflags=version=9p2000.L,trans=virtio,access=any",
+                    "rootflags=version=9p2000.L,trans=virtio,access=any,msize=524288",
                 ]
             )
         kernelargs.extend(

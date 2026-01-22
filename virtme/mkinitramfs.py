@@ -116,7 +116,7 @@ source /modules/load_all.sh
 log 'mounting hostfs...'
 
 if ! /bin/mount -n -t virtiofs -o {access} ROOTFS /newroot/ 2>/dev/null; then
-  if ! /bin/mount -n -t 9p -o {access},version=9p2000.L,trans=virtio,access=any /dev/root /newroot/; then
+  if ! /bin/mount -n -t 9p -o {access},version=9p2000.L,trans=virtio,access=any,msize=524288 /dev/root /newroot/; then
     echo "Failed to mount real root.  We are stuck."
     sleep 5
     exit 1

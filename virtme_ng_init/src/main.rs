@@ -489,7 +489,7 @@ fn mount_virtme_initmounts() {
                 &path,
                 "9p",
                 0,
-                "version=9p2000.L,trans=virtio,access=any",
+                "version=9p2000.L,trans=virtio,access=any,msize=524288",
             );
         }
     }
@@ -1088,7 +1088,7 @@ fn setup_socat_console() {
                         &path,
                         "9p",
                         0,
-                        "version=9p2000.L,trans=virtio,access=any",
+                        "version=9p2000.L,trans=virtio,access=any,msize=524288",
                     );
                 }
 
