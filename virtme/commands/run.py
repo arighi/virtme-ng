@@ -739,7 +739,7 @@ class VirtioFS:
                     pass
         return None
 
-    def start(self, path, verbose=True, cache="always"):
+    def start(self, path, verbose=True, cache="always", posix_acl=False):
         virtiofsd_path = self._get_virtiofsd_path()
         if virtiofsd_path is None:
             return False
@@ -758,8 +758,13 @@ class VirtioFS:
             stderr = "2>/dev/null"
         else:
             stderr = ""
+        # Only enable --posix-acl when using an external root filesystem.
+        # When sharing the host root (/), --posix-acl breaks UID/GID translation
+        # which causes authentication failures (e.g., unix_chkpwd cannot obtain
+        # user info).
+        acl_opt = "--posix-acl " if posix_acl else ""
         os.system(
-            f"{virtiofsd_path} --syslog --no-announce-submounts --posix-acl "
+            f"{virtiofsd_path} --syslog --no-announce-submounts {acl_opt}"
             + f"--socket-path {self.sock} --shared-dir {path} "
             + f"--sandbox none -o cache={cache} {stderr} &"
         )
@@ -784,13 +789,20 @@ class VirtioFS:
 class VirtioFSConfig:
     # allow more than 4 arguments: pylint: disable=R0917
     def __init__(
-        self, path: str, mount_tag: str, guest_tools_path=None, memory=None, rw=False
+        self,
+        path: str,
+        mount_tag: str,
+        guest_tools_path=None,
+        memory=None,
+        rw=False,
+        posix_acl=False,
     ):
         self.path = path
         self.mount_tag = mount_tag
         self.guest_tools_path = guest_tools_path
         self.memory = memory
         self.rw = rw
+        self.posix_acl = posix_acl
 
 
 def export_virtiofs(
@@ -806,7 +818,7 @@ def export_virtiofs(
 
     # Try to start virtiofsd daemon
     virtio_fs = VirtioFS(config.guest_tools_path)
-    ret = virtio_fs.start(config.path, verbose, cache)
+    ret = virtio_fs.start(config.path, verbose, cache, config.posix_acl)
     if not ret:
         return False
 
@@ -1315,6 +1327,10 @@ def do_it() -> int:
             # the memory.
             memory=0 if args.numa else args.memory,
             rw=args.rw,
+            # Only enable POSIX ACLs when using an external root filesystem.
+            # When sharing the host root (/), --posix-acl breaks UID/GID
+            # translation which causes authentication failures.
+            posix_acl=(args.root != "/"),
         )
         use_virtiofs = export_virtiofs(
             virt_arch,
