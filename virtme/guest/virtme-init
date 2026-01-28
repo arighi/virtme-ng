@@ -199,11 +199,14 @@ mount_virtme_initmounts() {
         if [[ ! -d ${!tag} ]]; then
             mkdir -p "${!tag}"
         fi
-        mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.initmount${tag:16}" "${!tag}" || exit 1
+        mount -t 9p -o version=9p2000.L,trans=virtio,access=any,msize=524288 "virtme.initmount${tag:16}" "${!tag}" || exit 1
     done
 }
 
 run_systemd_tmpfiles() {
+    if [[ $$ -ne 1 ]]; then
+        return
+    fi
     # Does the system use systemd-tmpfiles?
     if command -v systemd-tmpfiles &> /dev/null; then
         log "running systemd-tmpfiles"
@@ -379,7 +382,7 @@ setup_socat_console() {
     if [[ -n ${vsock_exec} ]]; then
         if [[ -n ${virtme_vsockmount:-} ]]; then
             mkdir -p "${virtme_vsockmount}"
-            mount -t 9p -o version=9p2000.L,trans=virtio,access=any "virtme.vsockmount" "${virtme_vsockmount}"
+            mount -t 9p -o version=9p2000.L,trans=virtio,access=any,msize=524288 "virtme.vsockmount" "${virtme_vsockmount}"
         fi
         socat "VSOCK-LISTEN:1024,reuseaddr,fork" \
             "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &
