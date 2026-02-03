@@ -140,6 +140,7 @@ mount_sys_filesystems() {
 generate_fstab() {
     # Fix up /etc a little bit
     touch /run/tmp/fstab
+    touch /etc/fstab
     mount --bind /run/tmp/fstab /etc/fstab
 }
 

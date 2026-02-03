@@ -291,6 +291,7 @@ fn run_systemd_tmpfiles() {
 
 fn generate_fstab() -> io::Result<()> {
     utils::create_file("/run/tmp/fstab", 0o0664, "").ok();
+    utils::create_file("/etc/fstab", 0o0664, "").ok();
     utils::do_mount(
         "/run/tmp/fstab",
         "/etc/fstab",
