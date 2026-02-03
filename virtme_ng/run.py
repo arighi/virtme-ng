@@ -1683,6 +1683,12 @@ def dump(kern_source, args):
     kern_source.dump(args)
     return True
 
+def is_kernel_source_tree():
+    return (
+        os.path.exists("Kconfig")
+        and os.path.exists("Makefile")
+        and os.path.isdir("arch")
+    )
 
 def do_it() -> int:
     """Main body."""
@@ -1732,6 +1738,8 @@ def do_it() -> int:
         elif args.dump is not None:
             dump(kern_source, args)
         elif args.build or args.kconfig:
+            if not is_kernel_source_tree(): 
+                arg_fail("Error: must run from a kernel source tree", show_usage=False)
             if args.commit:
                 checkout(kern_source, args)
             config(kern_source, args)
