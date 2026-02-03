@@ -324,6 +324,10 @@ class Arch_ppc(Arch):
         self.gccname = "powerpc64le"
 
     @staticmethod
+    def virtiofs_support() -> bool:
+        return True
+
+    @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):
         ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
         ret.extend(["-M", "pseries"])
