@@ -214,7 +214,8 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--gdb-port",
         action="store",
-        default="1234",
+        type=int,
+        default=1234,
         help="GDB TCP port to use when --debug is enabled (default: 1234)",
     )
 
@@ -725,25 +726,11 @@ def get_host_arch():
     }
     return arch_map.get(arch, None)
 
+
 def _get_qmp_path(name):
     base = name or socket.gethostname()
     safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", base)
     return f"/tmp/virtme-ng-{safe}.qmp"
-
-
-def _is_tcp_port_free(port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        port = int(port)
-    except ValueError:
-        return False
-    try:
-        sock.bind(("127.0.0.1", port))
-        return True
-    except OSError:
-        return False
-    finally:
-        sock.close()
 
 
 def _qmp_socket_available(path):
@@ -1385,13 +1372,10 @@ class KernelSource:
                 )
                 sys.exit(1)
             self.qmp_path = qmp_path
-            gdb_port = args.gdb_port or 1234
-            if not _is_tcp_port_free(gdb_port):
-                sys.stderr.write(
-                        f"GDB port {gdb_port} is in use. Rerun with --gdb-port <PORT>.\n"
-                    )
-                sys.exit(1)
-            qemu_args += f"-gdb tcp::{gdb_port} -qmp unix:{qmp_path},server,nowait "
+
+            gdb_port = args.gdb_port
+            qemu_args += f"-gdb tcp:127.0.0.1:{gdb_port} "
+            qemu_args += f"-qmp unix:{qmp_path},server,nowait "
         if args.qemu_opts is not None:
             qemu_args += " ".join(args.qemu_opts)
         if qemu_args != "":
@@ -1506,7 +1490,7 @@ class KernelSource:
         try:
             check_call(cmd, shell=True)
         finally:
-            #Cleanup the QMP socket
+            # Cleanup the QMP socket
             if self.qmp_path and os.path.exists(self.qmp_path):
                 try:
                     os.remove(self.qmp_path)
@@ -1752,12 +1736,14 @@ def dump(kern_source, args):
     kern_source.dump(args)
     return True
 
+
 def is_kernel_source_tree():
     return (
         os.path.exists("Kconfig")
         and os.path.exists("Makefile")
         and os.path.isdir("arch")
     )
+
 
 def do_it() -> int:
     """Main body."""
@@ -1807,7 +1793,7 @@ def do_it() -> int:
         elif args.dump is not None:
             dump(kern_source, args)
         elif args.build or args.kconfig:
-            if not is_kernel_source_tree(): 
+            if not is_kernel_source_tree():
                 arg_fail("Error: must run from a kernel source tree", show_usage=False)
             if args.commit:
                 checkout(kern_source, args)
