@@ -12,6 +12,7 @@ import shlex
 import shutil
 import signal
 import socket
+import stat
 import sys
 import tempfile
 import threading
@@ -210,6 +211,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="store_true",
         help="Attach a debugging session to a running instance started with --debug",
     )
+    parser.add_argument(
+        "--gdb-port",
+        action="store",
+        default="1234",
+        help="GDB TCP port to use when --debug is enabled (default: 1234)",
+    )
 
     parser.add_argument(
         "--snaps", action="store_true", help="Allow to execute snaps inside virtme-ng"
@@ -218,7 +225,10 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Start the instance with debugging enabled (allow to generate crash dumps)",
+        help=(
+            "Start the instance with debugging enabled (allow to generate crash dumps; "
+            "use --gdb-port to change the GDB port)"
+        ),
     )
 
     parser.add_argument(
@@ -715,6 +725,36 @@ def get_host_arch():
     }
     return arch_map.get(arch, None)
 
+def _get_qmp_path(name):
+    base = name or socket.gethostname()
+    safe = re.sub(r"[^A-Za-z0-9_.-]+", "_", base)
+    return f"/tmp/virtme-ng-{safe}.qmp"
+
+
+def _is_tcp_port_free(port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        port = int(port)
+    except ValueError:
+        return False
+    try:
+        sock.bind(("127.0.0.1", port))
+        return True
+    except OSError:
+        return False
+    finally:
+        sock.close()
+
+
+def _qmp_socket_available(path):
+    if not os.path.exists(path):
+        return True
+    try:
+        st = os.stat(path)
+        return not stat.S_ISSOCK(st.st_mode)
+    except OSError:
+        return False
+
 
 class KernelSource:
     """Main class that implement actions to perform on a kernel source directory."""
@@ -723,6 +763,7 @@ class KernelSource:
         self.virtme_param = {}
         self.default_opts = get_conf("default_opts")
         self.cpus = str(os.cpu_count())
+        self.qmp_path = None
 
     def _format_cmd(self, cmd):
         return shlex.split(cmd)
@@ -1337,7 +1378,20 @@ class KernelSource:
         qemu_args = ""
         if args.debug or args.pin:
             # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
-            qemu_args += "-s -qmp tcp:localhost:3636,server,nowait "
+            qmp_path = _get_qmp_path(args.name)
+            if not _qmp_socket_available(qmp_path):
+                sys.stderr.write(
+                    "QMP socket already exists. Rerun with a unique --name or stop the existing VM.\n"
+                )
+                sys.exit(1)
+            self.qmp_path = qmp_path
+            gdb_port = args.gdb_port or 1234
+            if not _is_tcp_port_free(gdb_port):
+                sys.stderr.write(
+                        f"GDB port {gdb_port} is in use. Rerun with --gdb-port <PORT>.\n"
+                    )
+                sys.exit(1)
+            qemu_args += f"-gdb tcp::{gdb_port} -qmp unix:{qmp_path},server,nowait "
         if args.qemu_opts is not None:
             qemu_args += " ".join(args.qemu_opts)
         if qemu_args != "":
@@ -1449,13 +1503,28 @@ class KernelSource:
         )
         if args.pin:
             self.set_affinity(args)
-        check_call(cmd, shell=True)
+        try:
+            check_call(cmd, shell=True)
+        finally:
+            #Cleanup the QMP socket
+            if self.qmp_path and os.path.exists(self.qmp_path):
+                try:
+                    os.remove(self.qmp_path)
+                except OSError:
+                    pass
 
     def dump(self, args):
         """Generate or analyze a crash memory dump."""
         # Use QMP to generate a memory dump
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.connect(("localhost", 3636))
+        qmp_path = _get_qmp_path(args.name)
+        sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        try:
+            sock.connect(qmp_path)
+        except (FileNotFoundError, ConnectionRefusedError):
+            sys.stderr.write(
+                "QMP connection failed (is the VM running with --debug or --pin?)\n"
+            )
+            sys.exit(1)
         sock_f = sock.makefile(encoding="utf-8")
         data = sock_f.readline()
         if not data:
@@ -1541,12 +1610,12 @@ class KernelSource:
         # Attempt QMP connection to the guest (retry up to 5 times)
         for attempt in range(5):
             try:
-                sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                # TODO: support multiple vng guests. pylint: disable=W0511
-                sock.connect(("localhost", 3636))
+                sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                qmp_path = _get_qmp_path(args.name)
+                sock.connect(qmp_path)
                 sock_f = sock.makefile(encoding="utf-8")
                 break
-            except ConnectionRefusedError:
+            except (FileNotFoundError, ConnectionRefusedError):
                 if attempt < 4:
                     time.sleep(1)
                 else:
