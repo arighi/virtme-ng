@@ -291,6 +291,7 @@ fn run_systemd_tmpfiles() {
 
 fn generate_fstab() -> io::Result<()> {
     utils::create_file("/run/tmp/fstab", 0o0664, "").ok();
+    utils::create_file("/etc/fstab", 0o0664, "").ok();
     utils::do_mount(
         "/run/tmp/fstab",
         "/etc/fstab",
@@ -382,6 +383,24 @@ fn override_system_files() {
     generate_sudoers().ok();
     generate_hosts().ok();
     generate_lvm().ok();
+}
+
+fn find_busybox() -> Option<String> {
+    let binaries = ["busybox-static", "busybox"];
+    for bin in binaries {
+        let status = Command::new(bin)
+            .arg("true")
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+        match status {
+            Ok(_) => return Some(bin.to_string()),
+            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
+            Err(_) => continue,
+        }
+    }
+    None
 }
 
 fn set_cwd() {
@@ -661,6 +680,7 @@ fn get_network_devices() -> Vec<Option<String>> {
 fn get_network_handle(
     network_dev: Option<String>,
     guest_tools_dir: Option<String>,
+    busybox: String,
 ) -> Option<thread::JoinHandle<()>> {
     let network_dev_str = network_dev.unwrap();
     log!("setting up network device {}", network_dev_str);
@@ -681,7 +701,7 @@ fn get_network_handle(
             hostname_opt_val = format!("hostname:{}", hostname);
             args.extend(["-x", &hostname_opt_val]);
         }
-        utils::run_cmd("busybox", &args);
+        utils::run_cmd(&busybox, &args);
     }))
 }
 
@@ -705,11 +725,20 @@ fn setup_network() -> Vec<Option<thread::JoinHandle<()>>> {
             let _ = file.write_all("0 2147483647".as_bytes());
         }
 
+        let busybox = match find_busybox() {
+            Some(path) => path,
+            None => {
+                log!("virtme-init: cannot find busybox (needed for udhcpc)");
+                return vec;
+            }
+        };
+
         if let Some(guest_tools_dir) = get_guest_tools_dir() {
             for network_dev in get_network_devices() {
                 vec.push(get_network_handle(
                     network_dev,
                     Some(guest_tools_dir.clone()),
+                    busybox.clone(),
                 ));
             }
         }

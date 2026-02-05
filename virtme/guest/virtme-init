@@ -140,6 +140,7 @@ mount_sys_filesystems() {
 generate_fstab() {
     # Fix up /etc a little bit
     touch /run/tmp/fstab
+    touch /etc/fstab
     mount --bind /run/tmp/fstab /etc/fstab
 }
 
@@ -329,6 +330,16 @@ override_system_files() {
     generate_lvm
 }
 
+find_busybox() {
+    if command -v busybox-static &> /dev/null; then
+        echo busybox-static
+    elif command -v busybox &> /dev/null; then
+        echo busybox
+    else
+        return 1
+    fi
+}
+
 setup_network() {
     local pids=()
 
@@ -339,6 +350,11 @@ setup_network() {
         # allows to run ping as regular user).
         echo "0 2147483647" > /proc/sys/net/ipv4/ping_group_range
 
+        if ! busybox="$(find_busybox)"; then
+            log "virtme-init: cannot find busybox (needed for udhcpc)"
+            return 1
+        fi
+
         # udev is liable to rename the interface out from under us.
         for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
             virtme_net=$(basename -- "${d}")
@@ -346,7 +362,7 @@ setup_network() {
             if [[ -n $virtme_hostname ]]; then
                 udhcpc_opts+=(-x hostname:"$virtme_hostname")
             fi
-            busybox udhcpc "${udhcpc_opts[@]}" &
+            "$busybox" udhcpc "${udhcpc_opts[@]}" &
             pids+=($!)
         done
         wait "${pids[@]}"
