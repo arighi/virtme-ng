@@ -1621,7 +1621,7 @@ def do_it() -> int:
             )
 
     if args.gdb_server:
-        qemuargs.extend(["-s"])
+        qemuargs.extend(["-gdb", "tcp:localhost:1234"])
 
     ret_path = None
 
