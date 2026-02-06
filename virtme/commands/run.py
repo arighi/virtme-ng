@@ -1500,6 +1500,8 @@ def do_it() -> int:
     qemuargs.extend(["-parallel", "none"])
     qemuargs.extend(["-net", "none"])
 
+    kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
+
     if args.graphics is None and not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
 
@@ -1541,10 +1543,6 @@ def do_it() -> int:
         qemuargs.extend(["-serial", "chardev:console"])
         if not args.disable_monitor:
             qemuargs.extend(["-mon", "chardev=console"])
-
-        kernelargs.extend(
-            ["virtme_console=" + arg for arg in arch.serial_console_args()]
-        )
 
         if args.nvgpu is None:
             qemuargs.extend(arch.qemu_nodisplay_args())
