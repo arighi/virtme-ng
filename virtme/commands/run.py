@@ -115,7 +115,12 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument(
         "--gdb",
         action="store_true",
-        help="Attach a gdb session to a running instance started with --debug",
+        help="Attach a GDB session to a running instance started with --gdb-server",
+    )
+    g.add_argument(
+        "--gdb-server",
+        action="store_true",
+        help="Open a GDB server on TCP port 1234 to connect to the guest",
     )
     g.add_argument(
         "--graphics",
@@ -1614,6 +1619,9 @@ def do_it() -> int:
                     f"scsi-hd,drive={driveid},vendor=virtme,product=disk,serial={name}",
                 ]
             )
+
+    if args.gdb_server:
+        qemuargs.extend(["-s"])
 
     ret_path = None
 
