@@ -114,13 +114,21 @@ def make_parser() -> argparse.ArgumentParser:
     )
     g.add_argument(
         "--gdb",
-        action="store_true",
+        action="store",
+        nargs="?",
+        type=int,
+        const=1234,
+        metavar="PORT",
         help="Attach a GDB session to a running instance started with --gdb-server",
     )
     g.add_argument(
         "--gdb-server",
-        action="store_true",
-        help="Open a GDB server on TCP port 1234 to connect to the guest",
+        action="store",
+        nargs="?",
+        type=int,
+        const=1234,
+        metavar="PORT",
+        help="Open a GDB server on TCP to connect to the guest",
     )
     g.add_argument(
         "--graphics",
@@ -1211,7 +1219,7 @@ def do_it() -> int:
     if config.modfiles:
         need_initramfs = True
 
-    if args.gdb:
+    if args.gdb is not None:
         if kernel.version:
             print(f"kernel version = {kernel.version}")
         vmlinux = ""
@@ -1221,7 +1229,7 @@ def do_it() -> int:
             vmlinux = "vmlinux"
         elif os.path.exists(f"/usr/lib/debug/boot/vmlinux-{kernel.version}"):
             vmlinux = f"/usr/lib/debug/boot/vmlinux-{kernel.version}"
-        command = ["gdb", "-q", "-ex", "target remote localhost:1234", vmlinux]
+        command = ["gdb", "-q", "-ex", f"target remote localhost:{args.gdb}", vmlinux]
         if args.dry_run:
             print(shlex.join(command))
         else:
@@ -1620,8 +1628,8 @@ def do_it() -> int:
                 ]
             )
 
-    if args.gdb_server:
-        qemuargs.extend(["-gdb", "tcp:localhost:1234"])
+    if args.gdb_server is not None:
+        qemuargs.extend(["-gdb", f"tcp:localhost:{args.gdb_server}"])
 
     ret_path = None
 
