@@ -1294,6 +1294,8 @@ class KernelSource:
 
             signal.signal(signal.SIGINT, signal_handler)
             self.virtme_param["gdb"] = "--gdb"
+        elif args.debug:
+            self.virtme_param["gdb"] = "--gdb-server"
         else:
             self.virtme_param["gdb"] = ""
 
@@ -1337,7 +1339,7 @@ class KernelSource:
         qemu_args = ""
         if args.debug or args.pin:
             # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
-            qemu_args += "-s -qmp tcp:localhost:3636,server,nowait "
+            qemu_args += "-qmp tcp:localhost:3636,server,nowait "
         if args.qemu_opts is not None:
             qemu_args += " ".join(args.qemu_opts)
         if qemu_args != "":
