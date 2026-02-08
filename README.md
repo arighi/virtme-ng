@@ -162,10 +162,20 @@ Configuration
   ```json
   {
       "default_opts": {},
+      "clean_exclude": [],
       "systemd": {
           "masks": ["getty@"],
           "fstab": "/dev/null"
       }
+  }
+  ```
+
+* `clean_exclude` is a list of patterns to exclude from `vng --clean`. Each
+  pattern is passed as a `-e <pattern>` argument to `git clean`. For example,
+  to preserve a `.semcode.db` file when running `vng --clean`:
+  ```json
+  {
+      "clean_exclude": [".semcode.db"]
   }
   ```
 

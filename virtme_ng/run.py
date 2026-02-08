@@ -1635,12 +1635,15 @@ class KernelSource:
         """Clean a local or remote git repository."""
         if not os.path.exists(".git"):
             arg_fail("error: must run from a kernel git repository", show_usage=False)
+        excludes = ""
+        for pattern in get_conf("clean_exclude"):
+            excludes += f" -e {shlex.quote(pattern)}"
         if args.build_host is None:
-            cmd = self._format_cmd("git clean -xdf")
+            cmd = self._format_cmd(f"git clean -xdf{excludes}")
         else:
             cmd = f"ssh {args.build_host} --"
             cmd = self._format_cmd(cmd)
-            cmd.append("cd ~/.virtme && git clean -xdf")
+            cmd.append(f"cd ~/.virtme && git clean -xdf{excludes}")
         check_call_cmd(cmd, quiet=not args.verbose, dry_run=args.dry_run)
 
 
