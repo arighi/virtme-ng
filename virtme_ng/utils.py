@@ -22,6 +22,7 @@ SERIAL_GETTY_FILE = Path(SERIAL_GETTY_DIR, "virtme-ng.conf")
 # NOTE: this must stay in sync with README.md
 CONF_DEFAULT = {
     "default_opts": {},
+    "clean_exclude": [],
     "systemd": {
         "masks": [
             # disable getty@, since we're forcing the use of serial-getty@
