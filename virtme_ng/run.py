@@ -1234,8 +1234,6 @@ class KernelSource:
                 split_items = shlex.split(item)
                 for split_item in split_items:
                     append += ["-a", split_item]
-        if args.debug:
-            append += ["-a", "nokaslr"]
 
         # Set default user's shell override, if specified.
         if args.shell is not None:

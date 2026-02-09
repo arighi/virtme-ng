@@ -1628,6 +1628,7 @@ def do_it() -> int:
 
     if args.gdb_server is not None:
         qemuargs.extend(["-gdb", f"tcp:localhost:{args.gdb_server}"])
+        kernelargs.extend(["-a", "nokaslr"])
 
     ret_path = None
 
