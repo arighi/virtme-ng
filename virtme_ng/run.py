@@ -218,7 +218,10 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument(
         "--debug",
         action="store_true",
-        help="Start the instance with debugging enabled (allow to generate crash dumps)",
+        help=(
+            "Start the instance with debugging enabled: allow to generate "
+            "crash dumps, attach a debugging session with GDB, etc."
+        ),
     )
 
     parser.add_argument(
