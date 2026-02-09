@@ -1030,6 +1030,8 @@ def console_client(args):
 
     user = args.user if args.user else "${virtme_user:-root}"
 
+    shell = '${virtme_shell:+-s "${virtme_shell}"}'
+
     if args.pwd:
         cwd = os.path.relpath(os.getcwd(), args.root)
     elif args.cwd is not None:
@@ -1038,12 +1040,12 @@ def console_client(args):
         cwd = '${virtme_chdir:+"${virtme_chdir}"}'
 
     # use 'su' only if needed: another use, or to get a prompt
-    cmd = f'if [ "{user}" != "root" ]; then\n' + f'  exec su "{user}"'
+    cmd = f'if [ "{user}" != "root" ]; then\n' + f'  exec su {shell} "{user}"'
     if args.remote_cmd is not None:
         exec_escaped = args.remote_cmd.replace('"', '\\"')
         cmd += f' -c "{exec_escaped}"' + "\nelse\n" + f"  {args.remote_cmd}\n"
     else:
-        cmd += "\nelse\n" + "  exec su\n"
+        cmd += "\nelse\n" + f"  exec su {shell}\n"
     cmd += "fi"
 
     console_script_path = get_console_path(args.port)
