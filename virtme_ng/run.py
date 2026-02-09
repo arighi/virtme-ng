@@ -1242,7 +1242,7 @@ class KernelSource:
             for item in args.append:
                 split_items = shlex.split(item)
                 for split_item in split_items:
-                    append += ["-a", split_item]
+                    append += ["--kopt", split_item]
 
         self.virtme_param["append"] = shlex.join(append)
 
