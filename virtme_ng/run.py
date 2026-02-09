@@ -951,6 +951,12 @@ class KernelSource:
         if args.user is not None:
             self.virtme_param["user"] = "--user " + args.user
 
+    def _get_virtme_shell(self, args):
+        if args.shell is not None:
+            self.virtme_param["shell"] = "--shell " + args.shell
+        else:
+            self.virtme_param["shell"] = ""
+
     def _get_virtme_arch(self, args):
         if args.arch is not None:
             if args.arch not in ARCH_MAPPING:
@@ -1238,10 +1244,6 @@ class KernelSource:
                 for split_item in split_items:
                     append += ["-a", split_item]
 
-        # Set default user's shell override, if specified.
-        if args.shell is not None:
-            append += ["-a", "virtme_shell=" + args.shell]
-
         self.virtme_param["append"] = shlex.join(append)
 
     def _get_virtme_memory(self, args):
@@ -1353,6 +1355,7 @@ class KernelSource:
         self._get_virtme_name(args)
         self._get_virtme_exec(args)
         self._get_virtme_user(args)
+        self._get_virtme_shell(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
         self._get_virtme_systemd(args)
@@ -1404,6 +1407,7 @@ class KernelSource:
             + f"{self.virtme_param['name']} "
             + f"{self.virtme_param['exec']} "
             + f"{self.virtme_param['user']} "
+            + f"{self.virtme_param['shell']} "
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
             + f"{self.virtme_param['systemd']} "

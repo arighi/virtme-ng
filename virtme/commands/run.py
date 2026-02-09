@@ -221,6 +221,13 @@ def make_parser() -> argparse.ArgumentParser:
         help="Set guest hostname and qemu -name flag.",
     )
     g.add_argument("--user", action="store", help="Change guest user")
+    g.add_argument(
+        "--shell",
+        metavar="BINARY",
+        action="store",
+        default=None,
+        help="Override the default user shell",
+    )
 
     g = parser.add_argument_group(
         title="Scripting",
@@ -1863,6 +1870,9 @@ def do_it() -> int:
 
     if args.user and args.user != "root":
         kernelargs.append(f"virtme_user={args.user}")
+
+    if args.shell is not None:
+        kernelargs.append(f"virtme_shell={args.shell}")
 
     if args.nvgpu:
         qemuargs.extend(["-device", args.nvgpu])
