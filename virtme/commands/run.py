@@ -1030,7 +1030,10 @@ def console_client(args):
 
     user = args.user if args.user else "${virtme_user:-root}"
 
-    shell = '${virtme_shell:+-s "${virtme_shell}"}'
+    if args.shell is not None:
+        shell = f'-s "{args.shell}"'
+    else:
+        shell = '${virtme_shell:+-s "${virtme_shell}"}'
 
     if args.pwd:
         cwd = os.path.relpath(os.getcwd(), args.root)
