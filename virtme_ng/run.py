@@ -434,6 +434,13 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--blk-disk",
+        action="append",
+        metavar="PATH",
+        help="Add a file as virtio-blk disk (can be used multiple times)",
+    )
+
+    parser.add_argument(
         "--exec",
         "-e",
         action="store",
@@ -1161,13 +1168,33 @@ class KernelSource:
             self.virtme_param["remote_cmd"] = ""
 
     def _get_virtme_disk(self, args):
+        disk_str = ""
+
+        def ensure_name(dsk: str) -> str:
+            """
+            `dsk` is a comma-separated list of disk options (KEY=VAL), with the first
+            option specifying the disk name and path (NAME=PATH). As an exception,
+            NAME can be omitted (but the underlying implementation does not know that).
+            This function ensures that the first option has a NAME, and adds one
+            equal to the PATH if it is missing.
+            """
+            items = dsk.split(",")
+            first = items[0]
+            if "=" not in first:
+                return f"{first}={dsk}"
+            return dsk
+
         if args.disk is not None:
-            disk_str = ""
             for dsk in args.disk:
-                disk_str += f"--blk-disk {dsk}={dsk} "
-            self.virtme_param["disk"] = disk_str
-        else:
-            self.virtme_param["disk"] = ""
+                dsk = ensure_name(dsk)
+                disk_str += f"--disk {shlex.quote(dsk)} "
+
+        if args.blk_disk is not None:
+            for dsk in args.blk_disk:
+                dsk = ensure_name(dsk)
+                disk_str += f"--blk-disk {shlex.quote(dsk)} "
+
+        self.virtme_param["disk"] = disk_str
 
     def _get_virtme_sound(self, args):
         if args.sound:

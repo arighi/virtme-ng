@@ -20,6 +20,8 @@ import sys
 import tempfile
 import termios
 from base64 import b64encode
+from collections.abc import Callable
+from dataclasses import dataclass
 from pathlib import Path
 from shutil import which
 from time import sleep
@@ -35,6 +37,8 @@ from virtme_ng.utils import (
     VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
     get_conf,
+    scsi_device_id,
+    strtobool,
 )
 
 from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
@@ -892,18 +896,153 @@ def quote_karg(arg: str) -> str:
     return arg
 
 
-# Validate name=path arguments from --disk and --blk-disk
-def sanitize_disk_args(func: str, arg: str) -> tuple[str, str]:
-    namefile = arg.split("=", 1)
-    if len(namefile) != 2:
-        arg_fail(f"invalid argument to {func}")
-    name, fn = namefile
-    if "=" in fn or "," in fn:
-        arg_fail(f"{func} filenames cannot contain '=' or ','")
-    if "=" in name or "," in name:
-        arg_fail(f"{func} device names cannot contain '=' or ','")
+@dataclass(kw_only=True)
+class DiskArg:
+    name: str
+    path: str
+    opts: dict[str, str]
 
-    return name, fn
+    _OPTS_HELP = {
+        # meta parameters
+        "topology": ("bool", "Forward host device topology (sector and I/O sizes)"),
+        "iothread": ("bool", "Create a dedicated I/O thread for the disk"),
+        # general format parameters
+        "format": ("str", "Disk image format (raw|qcow2)"),
+        # I/O driver parameters
+        "cache": ("str", "Cache mode (none|writeback|writethrough|directsync|unsafe)"),
+        "aio": ("str", "Asynchronous I/O mode (native|threads|io_uring)"),
+        "discard": (
+            "bool",
+            "Pass through TRIM/UNMAP requests (true=unmap, false=ignore)",
+        ),
+        "detect-zeroes": ("bool", "Detect all-zero writes (true=on/unmap, false=off)"),
+        "queues": ("int", "Number of I/O queues"),
+        # topology parameters
+        # "alignment": ("bytes", "Block alignment offset"),
+        "log-sec": ("bytes", "Logical (LBA) sector size (typically 512 or 4096)"),
+        "phy-sec": ("bytes", "Physical (underlying) sector size (>=log-sec)"),
+        "min-io": ("bytes", "Minimum I/O request size"),
+        "opt-io": ("bytes", "Optimal I/O request size"),
+        "rota": ("bool", "Device is rotational"),
+        # "wzeroes": ("bytes", "Maximum WRITE ZEROES request size"),
+        # "disc-aln": ("bytes", "TRIM/UNMAP alignment offset"),
+        "disc-gran": ("bytes", "TRIM/UNMAP request granularity"),
+        # "disc-max": ("bytes", "Maximum TRIM/UNMAP request size"),
+        # "disc-zero": ("bool", "TRIM/UNMAP zeroes data"),
+    }
+
+    def __post_init__(self):
+        if self.pop_opt("topology", strtobool, False):
+            self.opts = self.topology() | self.opts
+
+    def get_opt(
+        self, name: str, parser: Callable[[str], Any] = str, default: Any = None
+    ) -> Any:
+        opt = self.opts.get(name, None)
+        return parser(opt) if opt is not None else default
+
+    def pop_opt(
+        self, name: str, parser: Callable[[str], Any] = str, default: Any = None
+    ) -> Any:
+        opt = self.opts.pop(name, None)
+        return parser(opt) if opt is not None else default
+
+    def pop_opt_qemu(
+        self,
+        name: str,
+        default: Any = None,
+        *,
+        parser: Callable[[str], Any] = str,
+        dest: str | None = None,
+    ) -> str | None:
+        opt = self.pop_opt(name, parser, default)
+        # return DiskArg.qemu_opt(name=qemu if qemu is not None else name, value=opt)
+        if opt is None:
+            return None
+        if isinstance(opt, bool):
+            opt = "on" if opt else "off"
+        return f"{dest if dest is not None else name}={opt}"
+
+    def topology(self) -> dict[str, str]:
+        # Get the real device name (handles symlinks like /dev/mapper -> /dev/dm-X)
+        real_path = os.path.realpath(self.path, strict=True)
+        dev_name = os.path.basename(real_path)
+        sys_base = Path(f"/sys/block/{dev_name}")
+
+        attributes = {
+            # 'alignment': ('alignment_offset', int),
+            "log-sec": ("queue/logical_block_size", int),
+            "phy-sec": ("queue/physical_block_size", int),
+            "min-io": ("queue/minimum_io_size", int),
+            "opt-io": ("queue/optimal_io_size", int),
+            "rota": ("queue/rotational", bool),
+            # 'wzeroes': ('queue/write_zeroes_max_bytes', int),
+            # 'disc-aln': ('discard_alignment', int),
+            "disc-gran": ("queue/discard_granularity", int),
+            # 'disc-max': ('queue/discard_max_bytes', int),
+            # 'disc-zero': ('queue/discard_zeroes_data', bool),
+        }
+
+        result = {}
+        for key, (path, parser) in attributes.items():
+            try:
+                value = sys_base.joinpath(path).read_text().strip()
+                if parser is int:
+                    parsed = parser(value)
+                    if parsed <= 0:
+                        continue
+                result[key] = value
+            except FileNotFoundError:
+                pass
+            except ValueError:
+                pass
+        return result
+
+    # Validate name=path arguments from --disk and --blk-disk
+    @classmethod
+    def parse(cls, func: str, arg: str) -> "DiskArg":
+        items = arg.split(",")
+
+        namefile = items[0]
+        extra = items[1:]
+
+        name, sep, fn = namefile.partition("=")
+        if not (name and sep and fn):
+            arg_fail(f"invalid argument to {func}: {arg}")
+        if "=" in fn or "," in fn:
+            arg_fail(f"{func} filenames cannot contain '=' or ',': {fn}")
+        if "=" in name or "," in name:
+            arg_fail(f"{func} device names cannot contain '=' or ',': {name}")
+
+        opts = dict()
+        for i in extra:
+            key, sep, value = i.partition("=")
+            if not key:
+                arg_fail(f"invalid argument to {func}: {arg}")
+            if sep:
+                opts[key] = value
+            else:
+                opts[key] = "1"
+
+        if "help" in opts:
+            print(
+                "\n".join(
+                    [
+                        f"Possible {func} options:",
+                    ]
+                    + [
+                        "{:<20} {}".format(f"{key}=({typ})", value)
+                        for key, (typ, value) in DiskArg._OPTS_HELP.items()
+                    ]
+                )
+            )
+            sys.exit(0)
+
+        return cls(
+            name=name,
+            path=fn,
+            opts=opts,
+        )
 
 
 def can_access_file(path):
@@ -1583,35 +1722,198 @@ def do_it() -> int:
     if args.cpus:
         qemuargs.extend(["-smp", args.cpus])
 
+    iothread_index = 0
+
     if args.blk_disk:
         for i, d in enumerate(args.blk_disk):
             driveid = f"blk-disk{i}"
-            name, fn = sanitize_disk_args("--blk-disk", d)
+            disk = DiskArg.parse("--blk-disk", d)
+
+            drive_opts = [
+                "if=none",
+                f"id={driveid}",
+                f"file={disk.path}",
+            ]
+            device_opts = [
+                arch.virtio_dev_type("blk"),
+                f"drive={driveid}",
+                f"serial={disk.name}",
+            ]
+
+            # we need those parameters multiple times
+            discard = disk.pop_opt("discard", parser=strtobool, default=None)
+            detect_zeroes = disk.pop_opt(
+                "detect-zeroes", parser=strtobool, default=None
+            )
+            # we need this parameter both to transform other parameters and as itself later
+            # log_sec = disk.get_opt("log-sec", parser=int, default=512)
+
+            drive_opts.extend(
+                [
+                    disk.pop_opt_qemu("format", "raw"),
+                    disk.pop_opt_qemu("cache", None),
+                    disk.pop_opt_qemu("aio", None),
+                    f"discard={'unmap' if discard else 'ignore'}"
+                    if discard is not None
+                    else None,
+                    f"detect-zeroes={('unmap' if discard else 'on') if detect_zeroes else 'off'}"
+                    if detect_zeroes is not None
+                    else None,
+                ]
+            )
+
+            device_opts.extend(
+                [
+                    f"discard={'on' if discard else 'off'}"
+                    if discard is not None
+                    else None,
+                    disk.pop_opt_qemu("disc-gran", dest="discard_granularity"),
+                    disk.pop_opt_qemu("log-sec", dest="logical_block_size"),
+                    disk.pop_opt_qemu("phy-sec", dest="physical_block_size"),
+                    # disk.pop_qemu("disc-max", dest="max-discard-sectors", parser=lambda arg: int(arg) / log_sec),
+                    # disk.pop_qemu("wzeroes", dest="max-write-zeroes-sectors", parser=lambda arg: int(arg) / log_sec),
+                    disk.pop_opt_qemu("min-io", dest="min_io_size"),
+                    disk.pop_opt_qemu("opt-io", dest="opt_io_size"),
+                    disk.pop_opt_qemu("queues", dest="num-queues"),
+                ]
+            )
+            # unused
+            disk.opts.pop("rota", None)
+
+            if disk.pop_opt("iothread", bool, False):
+                iothreadid = f"iothread{iothread_index}"
+                iothread_index += 1
+                qemuargs.extend(
+                    [
+                        "-object",
+                        f"iothread,id={iothreadid}",
+                    ]
+                )
+                device_opts.append(f"iothread={iothreadid}")
+
             qemuargs.extend(
                 [
                     "-drive",
-                    f"if=none,id={driveid},file={fn}",
+                    ",".join(o for o in drive_opts if o is not None),
                     "-device",
-                    "{},drive={},serial={}".format(
-                        arch.virtio_dev_type("blk"), driveid, name
+                    ",".join(o for o in device_opts if o is not None),
+                ]
+            )
+
+            # any options that were not consumed are errors
+            if disk.opts:
+                raise ValueError(
+                    f"invalid --disk parameter: {d!r}\n(keys were not consumed: {disk.opts.keys()})"
+                )
+
+    if args.disk:
+        for i, d in enumerate(args.disk):
+            scsiid = f"scsi{i}"
+            driveid = f"disk{i}"
+            disk = DiskArg.parse("--disk", d)
+
+            # scsi-hd.device_id= is normally defaulted to scsi-hd.serial=,
+            # but it must not be longer than 20 characters
+            device_id = scsi_device_id(disk.name, 20)
+
+            scsi_opts = [
+                arch.virtio_dev_type("scsi"),
+                f"id={scsiid}",
+            ]
+            drive_opts = [
+                "if=none",
+                f"id={driveid}",
+                f"file={disk.path}",
+            ]
+            device_opts = [
+                "scsi-hd",
+                f"drive={driveid}",
+                f"bus={scsiid}.0",
+                "vendor=virtme",
+                "product=disk",
+                f"serial={disk.name}",
+                f"device_id={device_id}" if device_id != disk.name else None,
+            ]
+
+            # we need those parameters multiple times
+            discard = disk.pop_opt("discard", parser=strtobool, default=None)
+            detect_zeroes = disk.pop_opt(
+                "detect-zeroes", parser=strtobool, default=None
+            )
+            # we need this parameter both to transform other parameters and as itself later
+            log_sec = disk.get_opt("log-sec")
+
+            drive_opts.extend(
+                [
+                    disk.pop_opt_qemu("format", "raw"),
+                    disk.pop_opt_qemu("cache", None),
+                    disk.pop_opt_qemu("aio", None),
+                    f"discard={'unmap' if discard else 'ignore'}"
+                    if discard is not None
+                    else None,
+                    f"detect-zeroes={('unmap' if discard else 'on') if detect_zeroes else 'off'}"
+                    if detect_zeroes is not None
+                    else None,
+                ]
+            )
+
+            scsi_opts.extend(
+                [
+                    disk.pop_opt_qemu("queues", dest="num-queues"),
+                ]
+            )
+
+            device_opts.extend(
+                [
+                    disk.pop_opt_qemu("disc-gran", dest="discard_granularity"),
+                    disk.pop_opt_qemu("log-sec", dest="logical_block_size"),
+                    # convenience: QEMU does not automatically adjust physical_block_size
+                    # to be not less than logical_block_size (it errors out instead), so we do it here
+                    disk.pop_opt_qemu(
+                        "phy-sec", dest="physical_block_size", default=log_sec
+                    ),
+                    # disk.pop_qemu("disc-max", dest="max_unmap_size"),
+                    # disk.pop_qemu("wzeroes", dest="???"),
+                    disk.pop_opt_qemu("min-io", dest="min_io_size"),
+                    disk.pop_opt_qemu("opt-io", dest="opt_io_size"),
+                    # sic: set rotation_rate to "1" for non-rotating disks ("1" is a special value
+                    # that means "non-rotating medium"), but set to "0" for rotating disks
+                    # ("0" means "rotation rate not reported").
+                    disk.pop_opt_qemu(
+                        "rota",
+                        dest="rotation_rate",
+                        parser=lambda arg: "0" if strtobool(arg) else "1",
                     ),
                 ]
             )
 
-    if args.disk:
-        qemuargs.extend(["-device", "{},id=scsi".format(arch.virtio_dev_type("scsi"))])
+            if disk.pop_opt("iothread", bool, False):
+                iothreadid = f"iothread{iothread_index}"
+                iothread_index += 1
+                qemuargs.extend(
+                    [
+                        "-object",
+                        f"iothread,id={iothreadid}",
+                    ]
+                )
+                scsi_opts.append(f"iothread={iothreadid}")
 
-        for i, d in enumerate(args.disk):
-            driveid = f"disk{i}"
-            name, fn = sanitize_disk_args("--disk", d)
             qemuargs.extend(
                 [
                     "-drive",
-                    f"if=none,id={driveid},file={fn}",
+                    ",".join(o for o in drive_opts if o is not None),
                     "-device",
-                    f"scsi-hd,drive={driveid},vendor=virtme,product=disk,serial={name}",
+                    ",".join(o for o in scsi_opts if o is not None),
+                    "-device",
+                    ",".join(o for o in device_opts if o is not None),
                 ]
             )
+
+            # any options that were not consumed are errors
+            if disk.opts:
+                raise ValueError(
+                    f"invalid --disk parameter: {d!r}\n(keys were not consumed: {disk.opts.keys()})"
+                )
 
     ret_path = None
 
