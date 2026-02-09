@@ -1302,6 +1302,12 @@ class KernelSource:
         else:
             self.virtme_param["gdb"] = ""
 
+    def _get_virtme_qmp(self, args):
+        if args.debug:
+            self.virtme_param["qmp"] = "--qmp"
+        else:
+            self.virtme_param["qmp"] = ""
+
     def _get_virtme_snaps(self, args):
         if args.snaps:
             self.virtme_param["snaps"] = "--snaps"
@@ -1339,14 +1345,8 @@ class KernelSource:
             self.virtme_param["nvgpu"] = ""
 
     def _get_virtme_qemu_opts(self, args):
-        qemu_args = ""
-        if args.debug or args.pin:
-            # Enable debug mode and QMP (to trigger memory dump via `vng --dump`)
-            qemu_args += "-qmp tcp:localhost:3636,server,nowait "
         if args.qemu_opts is not None:
-            qemu_args += " ".join(args.qemu_opts)
-        if qemu_args != "":
-            self.virtme_param["qemu_opts"] = "--qemu-opts " + qemu_args
+            self.virtme_param["qemu_opts"] = "--qemu-opts " + " ".join(args.qemu_opts)
         else:
             self.virtme_param["qemu_opts"] = ""
 
@@ -1394,6 +1394,7 @@ class KernelSource:
         self._get_virtme_numa_distance(args)
         self._get_virtme_balloon(args)
         self._get_virtme_gdb(args)
+        self._get_virtme_qmp(args)
         self._get_virtme_snaps(args)
         self._get_virtme_empty_passwords(args)
         self._get_virtme_busybox(args)
@@ -1447,6 +1448,7 @@ class KernelSource:
             + f"{self.virtme_param['numa_distance']} "
             + f"{self.virtme_param['balloon']} "
             + f"{self.virtme_param['gdb']} "
+            + f"{self.virtme_param['qmp']} "
             + f"{self.virtme_param['snaps']} "
             + f"{self.virtme_param['busybox']} "
             + f"{self.virtme_param['nvgpu']} "
