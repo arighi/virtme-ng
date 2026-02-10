@@ -131,6 +131,15 @@ def make_parser() -> argparse.ArgumentParser:
         help="Open a GDB server on TCP to connect to the guest",
     )
     g.add_argument(
+        "--qmp",
+        action="store",
+        nargs="?",
+        type=int,
+        const=3636,
+        metavar="PORT",
+        help="Enable QMP (QEMU Machine Protocol) support on TCP",
+    )
+    g.add_argument(
         "--graphics",
         action="store",
         nargs="?",
@@ -1641,6 +1650,9 @@ def do_it() -> int:
     if args.gdb_server is not None:
         qemuargs.extend(["-gdb", f"tcp:localhost:{args.gdb_server}"])
         kernelargs.extend(["-a", "nokaslr"])
+
+    if args.qmp is not None:
+        qemuargs.extend(["-qmp", f"tcp:localhost:{args.qmp},server,nowait"])
 
     ret_path = None
 
