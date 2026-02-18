@@ -605,7 +605,7 @@ inside a build chroot called `chroot:lunar-amd64`). To do so, add the
     "default_opts": {
         "build_host": "kathleen",
         "build_host_exec_prefix": "schroot -c chroot:lunar-amd64 --"
-    },
+    }
 }
 ```
 
