@@ -1490,8 +1490,9 @@ def do_it() -> int:
         # Check if paths are accessible both on the host and the guest.
         if not os.path.exists(hostpath):
             arg_fail(f"error: cannot access {hostpath} on the host")
-        # Guest path must be defined inside one of the overlays
-        guest_path_ok = False
+        # Guest path must be defined inside a valid overlay (root or overlay_rwdir).
+        # The root is always mounted in the guest, so any path under root is valid.
+        guest_path_ok = not os.path.normpath(guestpath).startswith("..")
         for d in args.overlay_rwdir:
             if os.path.exists(guestpath) or is_subpath(guestpath, d):
                 guest_path_ok = True
