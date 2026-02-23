@@ -755,7 +755,8 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
     String::from_utf8(BASE64.decode(encoded_cmd).ok()?).ok()
 }
 
-fn run_user_script(uid: u32) {
+/// Returns true if the script was run (and will poweroff), false if script I/O ports are missing.
+fn run_user_script(uid: u32) -> bool {
     if !Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !Path::new("/dev/virtio-ports/virtme.stderr").exists()
@@ -763,7 +764,9 @@ fn run_user_script(uid: u32) {
         || !Path::new("/dev/virtio-ports/virtme.dev_stderr").exists()
     {
         log!("virtme-init: cannot find script I/O ports; make sure virtio-serial is available",);
-    } else {
+        return false;
+    }
+    {
         // Re-create stdout/stderr to connect to the virtio-serial ports.
         let io_files = [
             ("/dev/virtio-ports/virtme.ret", "/dev/virtme.ret"),
@@ -830,21 +833,77 @@ fn run_user_script(uid: u32) {
         }
         poweroff();
     }
+    true
 }
 
 fn create_user_script(cmd: &str) {
     utils::create_file(USER_SCRIPT, 0o0755, cmd).expect("Failed to create virtme-script file");
 }
 
-fn setup_user_script(uid: u32) {
+/// Run the user script with stdin/stdout/stderr on the serial console.
+/// Used when virtme.exec is set but script I/O virtio ports are not available (e.g. no PTS on host).
+fn run_user_script_on_console(consdev: &str, uid: u32) {
+    let flags = OFlag::O_RDWR;
+    let mode = Mode::empty();
+    let tty_fd = open(consdev, flags, mode).expect("failed to open console for script");
+
+    utils::do_chown(consdev, uid, None).ok();
+    clear_virtme_envs();
+
+    let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
+    let (cmd, args) = if user.is_empty() {
+        ("/bin/sh", vec![USER_SCRIPT])
+    } else {
+        ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
+    };
+
+    log!("starting script (console fallback)");
+    unsafe {
+        let ret = Command::new(cmd)
+            .args(&args)
+            .pre_exec(move || {
+                libc::setsid();
+                libc::close(libc::STDIN_FILENO);
+                libc::close(libc::STDOUT_FILENO);
+                libc::close(libc::STDERR_FILENO);
+                libc::dup2(tty_fd, libc::STDIN_FILENO);
+                libc::ioctl(libc::STDIN_FILENO, libc::TIOCSCTTY, 1);
+                libc::dup2(tty_fd, libc::STDOUT_FILENO);
+                libc::dup2(tty_fd, libc::STDERR_FILENO);
+                Ok(())
+            })
+            .output()
+            .expect("Failed to execute script on console");
+        if let Some(code) = ret.status.code() {
+            log!("script exited with code {}", code);
+            if let Ok(mut file) = OpenOptions::new()
+                .write(true)
+                .open("/dev/virtio-ports/virtme.ret")
+            {
+                let _ = file.write_all(code.to_string().as_bytes());
+            }
+        } else if let Ok(mut file) = OpenOptions::new()
+            .write(true)
+            .open("/dev/virtio-ports/virtme.ret")
+        {
+            let _ = file.write_all(b"-1");
+        }
+    }
+    poweroff();
+}
+
+/// Returns true if we are in script mode but could not run the script (script I/O ports missing).
+/// Caller should then run the script on the console and poweroff.
+fn setup_user_script(uid: u32) -> bool {
     if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
         if let Some(cmd) = extract_user_script(&cmdline) {
             create_user_script(&cmd);
-            if env::var("virtme_graphics").is_err() {
-                run_user_script(uid);
+            if env::var("virtme_graphics").is_err() && !run_user_script(uid) {
+                return true; // script mode but ports missing
             }
         }
     }
+    false
 }
 
 fn setup_root_home() {
@@ -1018,7 +1077,10 @@ fn run_user_session(consdev: &str, uid: u32) {
     let mode = Mode::empty();
     let tty_fd = open(consdev, flags, mode).expect("failed to open console");
 
-    setup_user_script(uid);
+    if setup_user_script(uid) {
+        // Script mode but script I/O ports were missing; run script on console and exit.
+        run_user_script_on_console(consdev, uid);
+    }
 
     if env::var("virtme_graphics").is_ok() {
         run_user_gui(tty_fd);

@@ -159,22 +159,24 @@ IMPORTANT NOTES FOR AI AGENTS:
    Example with complex script:
      run_kernel_cmd({"command": "cd /path && ./test.sh && dmesg | tail -50"})
 
-3. PTS (Pseudo-Terminal) Requirement
-   -----------------------------------
-   virtme-ng (vng) requires a valid pseudo-terminal (PTS) to run. In automated
-   environments without a real terminal, vng commands will fail with:
-     "ERROR: not a valid pts, try to run vng with a valid PTS (e.g., inside tmux or screen)"
+3. PTS (Pseudo-Terminal) and Automated Environments
+   -------------------------------------------------
+   In environments without a real terminal (e.g. AI agent sessions), vng runs
+   but prints a warning: stdin/stdout/stderr redirection may not work. For
+   many use cases (e.g. run_kernel_cmd with non-interactive commands) this is
+   fine and vng still works.
 
-   This MCP server's run_kernel_cmd tool automatically handles PTS requirements by wrapping
-   commands with 'script'.
-
-   For direct shell commands, use 'script' to provide a PTS:
+   If you need a valid PTS (interactive use, reliable output capture), wrap
+   vng with 'script':
      script -q -c "vng -- command" /dev/null 2>&1
 
    The 'script' command:
      -q: Quiet mode (no script start/stop messages)
      -c: Execute command and exit
      /dev/null: Discard the typescript file (we only need stdout/stderr)
+
+   This MCP server's run_kernel_cmd tool suggests 'script' in generated
+   commands when a PTS may be needed.
 
 4. Typical Workflow for Testing Kernel Changes
    ============================================
