@@ -19,6 +19,7 @@ use nix::libc;
 use nix::sys::reboot;
 use nix::sys::stat::Mode;
 use nix::sys::utsname::uname;
+use nix::sys::wait::wait;
 use nix::unistd::sethostname;
 use std::env;
 use std::fs::{File, OpenOptions};
@@ -201,6 +202,28 @@ fn poweroff() {
         Err(err) => {
             log!("error powering off: {}", err);
             exit(1);
+        }
+    }
+}
+
+fn wait_for_child(child: i32) -> Option<i32> {
+    loop {
+        match wait() {
+            Ok(status) => {
+                if status.pid().is_some_and(|p| p.as_raw() == child) {
+                    use nix::sys::wait::WaitStatus;
+                    match status {
+                        WaitStatus::Exited(_, code) => return Some(code),
+                        WaitStatus::Signaled(_, _, _) => return None,
+                        _ => return None,
+                    }
+                }
+            }
+            Err(nix::errno::Errno::EINTR) => continue,
+            Err(err) => {
+                log!("error waiting for child process: {}", err);
+                return None;
+            }
         }
     }
 }
@@ -771,6 +794,8 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
 }
 
 /// Returns true if the script was run (and will poweroff), false if script I/O ports are missing.
+// wait_for_child is used to wait for the script process.
+#[allow(clippy::zombie_processes)]
 fn run_user_script(uid: u32) -> bool {
     if !Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !Path::new("/dev/virtio-ports/virtme.stdout").exists()
@@ -817,7 +842,7 @@ fn run_user_script(uid: u32) -> bool {
         clear_virtme_envs();
         log!("starting script");
         unsafe {
-            let ret = Command::new(cmd)
+            let child = Command::new(cmd)
                 .args(&args)
                 .pre_exec(move || {
                     libc::setsid();
@@ -831,17 +856,19 @@ fn run_user_script(uid: u32) -> bool {
                     libc::dup2(tty_err, libc::STDERR_FILENO);
                     Ok(())
                 })
-                .output()
-                .expect("Failed to execute script");
+                .spawn()
+                .expect("Failed to start user script process");
+
+            let ret = wait_for_child(child.id() as i32);
 
             // Channel the return code to the host via /dev/virtme.ret
             if let Ok(mut file) = OpenOptions::new().write(true).open("/dev/virtme.ret") {
                 // Write the value of output.status.code() to the file
-                if let Some(code) = ret.status.code() {
+                if let Some(code) = ret {
                     file.write_all(code.to_string().as_bytes())
                         .expect("Failed to write to file");
                 } else {
-                    // Handle the case where output.status.code() is None
+                    // Handle the case where the return code is None
                     file.write_all(b"-1").expect("Failed to write to file");
                 }
             }
@@ -1001,16 +1028,19 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
+// wait_for_child is used to wait for the shell command.
+#[allow(clippy::zombie_processes)]
 fn run_shell(tty_fd: libc::c_int, cmd: &str, args: &[&str]) {
     unsafe {
-        Command::new(cmd)
+        let child = Command::new(cmd)
             .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
                 Ok(())
             })
-            .output()
+            .spawn()
             .expect("Failed to start shell session");
+        wait_for_child(child.id() as i32);
     }
 }
 
