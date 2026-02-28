@@ -19,6 +19,7 @@ use nix::libc;
 use nix::sys::reboot;
 use nix::sys::stat::Mode;
 use nix::sys::utsname::uname;
+use nix::sys::wait::wait;
 use nix::unistd::sethostname;
 use std::env;
 use std::fs::{File, OpenOptions};
@@ -201,6 +202,22 @@ fn poweroff() {
         Err(err) => {
             log!("error powering off: {}", err);
             exit(1);
+        }
+    }
+}
+
+fn wait_for_child(child: i32) {
+    loop {
+        match wait() {
+            Ok(status) => {
+                if status.pid().is_some_and(|p| p.as_raw() == child) {
+                    return;
+                }
+            }
+            Err(err) => {
+                log!("error waiting for child process: {}", err);
+                return;
+            }
         }
     }
 }
@@ -927,16 +944,20 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
+// wait_for_child is used to wait for both the shell command and all potential
+// zombie processes.
+#[allow(clippy::zombie_processes)]
 fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
     unsafe {
-        Command::new("bash")
+        let child = Command::new("bash")
             .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
                 Ok(())
             })
-            .output()
+            .spawn()
             .expect("Failed to start shell session");
+        wait_for_child(child.id() as i32);
     }
 }
 
