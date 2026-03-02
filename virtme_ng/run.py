@@ -758,6 +758,9 @@ class KernelSource:
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
         cmd = ["virtme-configkernel", "--defconfig"]
+        configkernel_dry_run = args.kconfig and args.dry_run
+        if configkernel_dry_run:
+            cmd.append("--dry-run")
         if args.verbose:
             cmd.append("--verbose")
         if not args.force and not args.kconfig:
@@ -780,7 +783,12 @@ class KernelSource:
         cmd += args.envs
         if args.verbose:
             print(f"cmd: {shlex.join(cmd)}")
-        check_call_cmd(cmd, quiet=not args.verbose, dry_run=args.dry_run)
+        quiet = not args.verbose and not configkernel_dry_run
+        check_call_cmd(
+            cmd,
+            quiet=quiet,
+            dry_run=args.dry_run and not configkernel_dry_run,
+        )
 
     def _make_remote(self, args, make_command):
         check_call_cmd(

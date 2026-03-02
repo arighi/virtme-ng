@@ -199,6 +199,11 @@ Examples
    $ vng --kconfig
    ```
 
+ - Print to stdout the kernel config flags set by virtme-ng:
+   ```shell
+   $ vng --kconfig --dry-run
+   ```
+
  - Run a kernel previously compiled from a local git repository in the current
    working directory:
    ```shell
