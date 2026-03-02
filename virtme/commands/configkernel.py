@@ -251,7 +251,7 @@ _GENERIC_CONFIG_OPTIONAL = [
     "# CONFIG_PPP is not set",
     "# CONFIG_PPPOE is not set",
     "# CONFIG_EXT2_FS is not set",
-    "# CONFIG_REISERFS_FS not set",
+    "# CONFIG_REISERFS_FS is not set",
     "# CONFIG_JFS_FS is not set",
     "# CONFIG_XFS_FS is not set",
     "# CONFIG_BTRFS_FS is not set",
