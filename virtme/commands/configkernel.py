@@ -71,6 +71,12 @@ def make_parser():
         help="get chatty about config assembled",
     )
 
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Print the resolved minimal virtme config flags to stdout and exit",
+    )
+
     g = parser.add_argument_group(title="Mode").add_mutually_exclusive_group()
 
     g.add_argument(
@@ -251,7 +257,7 @@ _GENERIC_CONFIG_OPTIONAL = [
     "# CONFIG_PPP is not set",
     "# CONFIG_PPPOE is not set",
     "# CONFIG_EXT2_FS is not set",
-    "# CONFIG_REISERFS_FS not set",
+    "# CONFIG_REISERFS_FS is not set",
     "# CONFIG_JFS_FS is not set",
     "# CONFIG_XFS_FS is not set",
     "# CONFIG_BTRFS_FS is not set",
@@ -310,7 +316,7 @@ def do_it():
             os.environ["KBUILD_OUTPUT"] = var[2:]
 
     config_dir = os.environ.get("KBUILD_OUTPUT")
-    if config_dir is not None:
+    if config_dir is not None and not args.dry_run:
         try:
             os.makedirs(config_dir, exist_ok=True)
         except Exception as exc:
@@ -319,7 +325,7 @@ def do_it():
         config = os.path.join(config_dir, config)
         makef = os.path.join(config_dir, makef)
 
-    if os.path.exists(config):
+    if not args.dry_run and os.path.exists(config):
         if args.no_update:
             print(f"{config} file exists: no modifications have been done")
             return 0
@@ -356,6 +362,11 @@ def do_it():
 
     if args.verbose:
         print(f"conf:\n{conf}")
+
+    if args.dry_run:
+        for conf_item in conf:
+            print(conf_item.rstrip("\n"))
+        return 0
 
     linuxname = shlex.quote(arch.linuxname)
     archargs = [f"ARCH={linuxname}"]
