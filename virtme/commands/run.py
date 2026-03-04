@@ -1264,6 +1264,8 @@ def do_it() -> int:
     if args.name:
         qemuargs.extend(["-name", args.name])
         kernelargs.append(f"virtme_hostname={args.name}")
+        if args.systemd:
+            kernelargs.append(f"systemd.hostname={args.name}")
 
     if args.memory:
         # If no memory suffix is specified, assume it's MB.
