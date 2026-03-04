@@ -1026,26 +1026,26 @@ class KernelSource:
             self.virtme_param["rwdir"] += f"--rwdir {item} "
 
     def _get_virtme_overlay_rwdir(self, args):
-        # Set default overlays if rootfs is mounted in read-only mode.
         if args.rw:
-            self.virtme_param["overlay_rwdir"] = ""
+            dirs = ["/tmp"]
         else:
-            self.virtme_param["overlay_rwdir"] = " ".join(
-                f"--overlay-rwdir {d}"
-                for d in (
-                    "/etc",
-                    "/lib",
-                    "/home",
-                    "/opt",
-                    "/srv",
-                    "/usr",
-                    "/var",
-                    "/tmp",
-                )
-            )
+            dirs = [
+                "/etc",
+                "/lib",
+                "/home",
+                "/opt",
+                "/srv",
+                "/usr",
+                "/var",
+                "/tmp",
+            ]
         # Add user-specified overlays.
-        for item in args.overlay_rwdir:
-            self.virtme_param["overlay_rwdir"] += " --overlay-rwdir " + item
+        dirs += args.overlay_rwdir
+        # De-duplicate
+        dirs = list(dict.fromkeys(dirs))
+        self.virtme_param["overlay_rwdir"] = " ".join(
+            f"--overlay-rwdir {d}" for d in dirs
+        )
 
     def _get_virtme_run(self, args):
         if args.run is not None:
