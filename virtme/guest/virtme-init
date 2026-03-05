@@ -419,6 +419,8 @@ poweroff_and_exit() {
     exit "$rc"
 }
 
+# Run the user script. Returns 1 if script I/O ports are missing (caller may use console fallback).
+# Does not return when ports exist (runs script and poweroff).
 run_user_script() {
     local uid=$1
 
@@ -428,7 +430,7 @@ run_user_script() {
         ! -e "/dev/virtio-ports/virtme.dev_stdout" ||
         ! -e "/dev/virtio-ports/virtme.dev_stderr" ]]; then
         log "virtme-init: cannot find script I/O ports; make sure virtio-serial is available"
-        poweroff_and_exit 1
+        return 1
     fi
 
     # Set proper ownership on the virtio-ports devices
@@ -479,8 +481,35 @@ run_user_script() {
     poweroff_and_exit 0
 }
 
+# Run the user script with stdin/stdout/stderr on the serial console.
+# Used when virtme.exec is set but script I/O virtio ports are not available (e.g. no PTS on host).
+run_user_script_on_console() {
+    local consdev=$1 uid=$2
+
+    chown -- "$uid" "/dev/$consdev"
+    clear_virtme_envs
+
+    log 'starting script (console fallback)'
+    if [[ -n ${virtme_user:-} ]]; then
+        chmod +x /run/tmp/.virtme-script
+        setsid su -c /run/tmp/.virtme-script -- "${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
+    else
+        setsid bash /run/tmp/.virtme-script 0<> "/dev/$consdev" 1>&0 2>&0
+    fi
+    ret=$?
+    log "script returned {$ret}"
+
+    if [ -e /dev/virtio-ports/virtme.ret ]; then
+        echo "$ret" > /dev/virtio-ports/virtme.ret
+    fi
+    poweroff_and_exit 0
+}
+
 setup_user_script() {
     local uid=$1
+
+    # Unset so we don't carry over from a previous run
+    unset -v script_ports_missing
 
     user_cmd=$(sed -ne "s/.*virtme.exec=\`\([^\`]*\)\`.*/\1/p" /proc/cmdline)
     if [[ -n ${user_cmd} ]]; then
@@ -488,8 +517,8 @@ setup_user_script() {
         printf -- '%s\n' "$user_cmd" | base64 -d > /run/tmp/.virtme-script
 
         if [[ -z ${virtme_graphics:-} ]]; then
-            # Start the script
-            run_user_script "$uid"
+            # Start the script (returns 1 if script I/O ports are missing)
+            run_user_script "$uid" || script_ports_missing=1
         fi
     fi
 }
@@ -642,6 +671,11 @@ run_user_session() {
     local consdev=$1 uid=$2
 
     setup_user_script "$uid"
+
+    # Script mode but script I/O ports were missing; run script on console and exit.
+    if [[ -n "${script_ports_missing:-}" ]]; then
+        run_user_script_on_console "$consdev" "$uid"
+    fi
 
     if [[ -n ${virtme_graphics:-} ]]; then
         run_user_gui "$consdev" "$uid"

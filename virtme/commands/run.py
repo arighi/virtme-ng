@@ -1674,80 +1674,103 @@ def do_it() -> int:
         except FileNotFoundError:
             return None
 
+    def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
+        """Add a chardev, virtio-serial device, and virtserialport for script I/O."""
+        qemuargs.extend(["-chardev", chardev_spec])
+        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
+        qemuargs.extend(
+            ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
+        )
+
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
         if args.graphics is None:
-            # Turn off default I/O
             if args.nvgpu is None:
                 qemuargs.extend(arch.qemu_nodisplay_args())
             else:
                 qemuargs.extend(arch.qemu_nodisplay_nvgpu_args())
 
-        # Check if we can redirect stdin/stdout/stderr.
-        if (
-            not can_access_file("/proc/self/fd/0")
-            or not can_access_file("/proc/self/fd/1")
-            or not can_access_file("/proc/self/fd/2")
-        ):
-            print(
-                "ERROR: not a valid pts, try to run vng with a valid PTS "
-                "(e.g., inside tmux or screen)",
-                file=sys.stderr,
-            )
-            sys.exit(1)
-
-        # Configure kernel console output
+        # Kernel console: where to send boot/console output.
         if show_boot_console:
-            output = "/proc/self/fd/2"
+            console_output = "/proc/self/fd/2"
             console_args = ()
         else:
-            output = "/dev/null"
+            console_output = "/dev/null"
             console_args = ["quiet", "loglevel=0"]
-        qemuargs.extend(arch.qemu_serial_console_args())
-        qemuargs.extend(["-chardev", f"file,id=console,path={output}"])
 
-        kernelargs.extend(["console=" + arg for arg in arch.serial_console_args()])
-        kernelargs.extend(arch.earlyconsole_args())
-        kernelargs.extend(console_args)
+        fds_accessible = all(can_access_file(f"/proc/self/fd/{i}") for i in (0, 1, 2))
+        if fds_accessible:
+            # Valid stdin/stdout/stderr: console & script I/O use host fds.
+            qemuargs.extend(arch.qemu_serial_console_args())
+            qemuargs.extend(["-chardev", f"file,id=console,path={console_output}"])
+            kernelargs.extend(["console=" + arg for arg in arch.serial_console_args()])
+            kernelargs.extend(arch.earlyconsole_args())
+            kernelargs.extend(console_args)
 
-        # Set up a virtserialport for script I/O
-        #
-        # NOTE: we need two additional I/O ports for /dev/stdout and
-        # /dev/stderr in the guest.
-        #
-        # This is needed because virtio serial ports are designed to support a
-        # single writer at a time, so any attempt to write directly to
-        # /dev/stdout or /dev/stderr in the guest will result in an -EBUSY
-        # error.
-        qemuargs.extend(["-chardev", "stdio,id=stdin,signal=on,mux=off"])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(["-device", "virtserialport,name=virtme.stdin,chardev=stdin"])
+            # Script I/O ports (guest /dev/stdout, /dev/stderr). Virtio serial
+            # allows only one writer per port, so we need separate ports for
+            # script stdout/stderr and for direct /dev/stdout/err writes.
+            add_serial_port("stdio,id=stdin,signal=on,mux=off", "stdin", "virtme.stdin")
+            add_serial_port(
+                "file,id=stdout,path=/proc/self/fd/1", "stdout", "virtme.stdout"
+            )
+            add_serial_port(
+                "file,id=stderr,path=/proc/self/fd/2", "stderr", "virtme.stderr"
+            )
+            add_serial_port(
+                "file,id=dev_stdout,path=/proc/self/fd/1",
+                "dev_stdout",
+                "virtme.dev_stdout",
+            )
+            add_serial_port(
+                "file,id=dev_stderr,path=/proc/self/fd/2",
+                "dev_stderr",
+                "virtme.dev_stderr",
+            )
+        else:
+            # No valid stdin/stdout/stderr: warn and use console only. QEMU
+            # allows one stdio chardev; with -v we use it for the console
+            # (guest uses console fallback). Without -v we use /dev/null
+            # for console and optionally add script I/O with stdio for
+            # stdout so command output is visible.
+            print(
+                "WARNING: stdin/stdout/stderr not accessible via /proc/self/fd, "
+                "falling back to limited redirection (stderr may be lost).\n"
+                "If full redirection is needed, run vng with: \n"
+                "script -q -c 'vng -- <command>'\n"
+                "(or use tmux/screen)",
+                file=sys.stderr,
+                flush=True,
+            )
+            if show_boot_console:
+                qemuargs.extend(["-chardev", "stdio,id=console,signal=off,mux=off"])
+            else:
+                qemuargs.extend(["-chardev", "file,id=console,path=/dev/null"])
+            qemuargs.extend(["-serial", "chardev:console"])
+            kernelargs.extend(["console=" + arg for arg in arch.serial_console_args()])
+            kernelargs.extend(arch.earlyconsole_args())
+            kernelargs.extend(console_args)
 
-        qemuargs.extend(["-chardev", "file,id=stdout,path=/proc/self/fd/1"])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(["-device", "virtserialport,name=virtme.stdout,chardev=stdout"])
+            if not show_boot_console:
+                add_serial_port("file,id=stdin,path=/dev/null", "stdin", "virtme.stdin")
+                add_serial_port(
+                    "stdio,id=stdout,signal=off,mux=off", "stdout", "virtme.stdout"
+                )
+                add_serial_port(
+                    "file,id=dev_stdout,path=/dev/null",
+                    "dev_stdout",
+                    "virtme.dev_stdout",
+                )
+                add_serial_port(
+                    "file,id=stderr,path=/dev/null", "stderr", "virtme.stderr"
+                )
+                add_serial_port(
+                    "file,id=dev_stderr,path=/dev/null",
+                    "dev_stderr",
+                    "virtme.dev_stderr",
+                )
 
-        qemuargs.extend(["-chardev", "file,id=stderr,path=/proc/self/fd/2"])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(["-device", "virtserialport,name=virtme.stderr,chardev=stderr"])
-
-        qemuargs.extend(["-chardev", "file,id=dev_stdout,path=/proc/self/fd/1"])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(
-            ["-device", "virtserialport,name=virtme.dev_stdout,chardev=dev_stdout"]
-        )
-
-        qemuargs.extend(["-chardev", "file,id=dev_stderr,path=/proc/self/fd/2"])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(
-            ["-device", "virtserialport,name=virtme.dev_stderr,chardev=dev_stderr"]
-        )
-
-        # Create a virtio serial device to channel the retcode of the script
-        # executed in the guest to the host.
         if ret_path is not None:
-            qemuargs.extend(["-chardev", f"file,id=ret,path={ret_path}"])
-            qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-            qemuargs.extend(["-device", "virtserialport,name=virtme.ret,chardev=ret"])
+            add_serial_port(f"file,id=ret,path={ret_path}", "ret", "virtme.ret")
 
         # Scripts shouldn't reboot and shouldn't hang on panic: make sure to
         # force an exit condition if a panic happens.
@@ -1793,8 +1816,11 @@ def do_it() -> int:
         )
 
     if args.script_exec is not None:
+        _, ret_path = tempfile.mkstemp(prefix="virtme_ret")
+        atexit.register(cleanup_script_retcode)
         do_script(
             shlex.quote(args.script_exec),
+            ret_path=ret_path,
             show_boot_console=args.show_boot_console,
         )
 
