@@ -10,11 +10,10 @@ use nix::unistd::{chown, Gid, Uid};
 use std::ffi::{CString, OsStr};
 use std::fmt::Arguments;
 use std::fs::{File, OpenOptions};
-use std::io::{self, Write};
+use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::process::{Command, Stdio};
-use uzers::get_user_by_name;
 
 macro_rules! log {
     ($($arg:tt)*) => {
@@ -54,7 +53,16 @@ pub fn log_impl(msg: Arguments<'_>) {
 }
 
 pub fn get_user_id(username: &str) -> Option<u32> {
-    Some(get_user_by_name(username)?.uid())
+    let file = File::open("/etc/passwd").ok()?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() >= 3 && parts[0] == username {
+            return parts[2].parse::<u32>().ok();
+        }
+    }
+    None
 }
 
 pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> io::Result<()> {
