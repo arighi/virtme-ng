@@ -652,18 +652,31 @@ run_user_gui() {
 }
 
 run_user_shell() {
-    local consdev=$1 uid=$2
+    local consdev=$1 uid=$2 session_shell
 
     print_logo
 
-    if [[ -n ${virtme_user:-} ]]; then
-        shell=""
-        if [[ -n ${virtme_shell:-} ]]; then
-            shell="-s ${virtme_shell}"
-        fi
-        setsid bash -c "su ${shell} -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
+    # If virtme_shell is set use it, otherwise use the shell defined in /etc/passwd.
+    if [[ -n ${virtme_shell:-} ]]; then
+        session_shell=$(command -v "${virtme_shell}" 2> /dev/null)
+        [[ -z "$session_shell" || ! -x "$session_shell" ]] && session_shell=$(getent passwd "${virtme_user:-root}" 2> /dev/null | cut -d: -f7)
+        [[ -z "$session_shell" || ! -x "$session_shell" ]] && session_shell=/bin/sh
     else
-        setsid bash 0<> "/dev/$consdev" 1>&0 2>&0
+        session_shell=$(getent passwd "${virtme_user:-root}" 2> /dev/null | cut -d: -f7)
+        [[ -z "$session_shell" || ! -x "$session_shell" ]] && session_shell=/bin/sh
+    fi
+
+    if [[ -n ${virtme_user:-} ]]; then
+        export session_shell virtme_user
+        if [[ -n ${virtme_shell:-} ]]; then
+            # shellcheck disable=SC2016
+            setsid sh -c 'su -s "$session_shell" -- "$virtme_user"' 0<> "/dev/$consdev" 1>&0 2>&0
+        else
+            # shellcheck disable=SC2016
+            setsid sh -c 'su -- "$virtme_user"' 0<> "/dev/$consdev" 1>&0 2>&0
+        fi
+    else
+        setsid "$session_shell" 0<> "/dev/$consdev" 1>&0 2>&0
     fi
 }
 
