@@ -18,6 +18,10 @@ if [ -z "${virtme_ssh_channel}" ]; then
     log "ssh: virtme_ssh_channel is not defined"
     exit 1
 fi
+if [[ ! -f /usr/sbin/sshd ]]; then
+    log "ssh: /usr/sbin/sshd does not exist."
+    exit 1
+fi
 
 rm -f /var/run/nologin
 
@@ -81,11 +85,6 @@ ARGS=(-f "${SSH_CONFIG}")
 for key in "${SSH_DIR}"/etc/ssh/ssh_host_*_key; do
     ARGS+=(-h "${key}")
 done
-
-if [[ ! -f /usr/sbin/sshd ]]; then
-    log "ssh: /usr/sbin/sshd does not exist."
-    exit 1
-fi
 
 if [[ ${virtme_ssh_channel} == "vsock" ]]; then
     # Make sure vsock (module) is loaded and active, otherwise the '/dev/vsock' device
