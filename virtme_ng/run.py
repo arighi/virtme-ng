@@ -961,6 +961,10 @@ class KernelSource:
         self.virtme_param["user"] = ""
         if args.exec and not args.graphics:
             self.virtme_param["user"] = ""
+        elif args.ssh_client is not None:
+            # In SSH client mode, prefer the user recorded in the generated
+            # ssh config unless --user is explicitly provided.
+            self.virtme_param["user"] = ""
         else:
             self.virtme_param["user"] = "--user " + get_username()
         # Override default user, if specified by the --user argument.

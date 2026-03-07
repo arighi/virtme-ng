@@ -1153,9 +1153,21 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     SSH_ETC_SSH_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
     subprocess.check_call(["ssh-keygen", "-A", "-f", f"{SSH_DIR}"])
 
-    # Tell virtme-ng-init / virtme-init to start sshd and use the current
-    # username keys/credentials.
-    username = get_username()
+    # Follow --user when specified for SSH logins and otherwise default
+    # to the host username.
+    username = args.user if args.user is not None else get_username()
+
+    identity_file = SSH_DIR.joinpath("id_virtme")
+    if not identity_file.exists() or not identity_file.with_suffix(".pub").exists():
+        subprocess.check_call(
+            ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", f"{identity_file}"]
+        )
+
+    if args.root == "/":
+        ssh_cache = str(SSH_DIR)
+    else:
+        ssh_cache = "/run/virtme/cache/.ssh"
+
     if can_use_ssh_over_vsock(args.ssh_tcp):
         qemuargs.extend(
             [
@@ -1185,7 +1197,7 @@ def ssh_server(args, arch, qemuargs, kernelargs):
         [
             "virtme.ssh",
             f"virtme_ssh_channel={ssh_channel_type}",
-            f"virtme_ssh_user={username}",
+            f"virtme_ssh_cache={ssh_cache}",
         ]
     )
 
@@ -1193,6 +1205,8 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     with open(SSH_CONF_FILE, "w", encoding="utf-8") as f:
         f.write(f"""Host {VIRTME_SSH_DESTINATION_NAME}*
     CheckHostIP no
+    User {username}
+    IdentityFile {identity_file}
 
     # Disable all kinds of host identity checks, since these addresses are generally ephemeral.
     StrictHostKeyChecking no

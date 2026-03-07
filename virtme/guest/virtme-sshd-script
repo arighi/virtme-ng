@@ -10,12 +10,16 @@ log() {
     fi
 }
 
-if [ -z "${virtme_ssh_user}" ]; then
-    log "ssh: virtme_ssh_user is not defined"
+if [ -z "${virtme_ssh_cache}" ]; then
+    log "ssh: virtme_ssh_cache is not defined"
     exit 1
 fi
 if [ -z "${virtme_ssh_channel}" ]; then
     log "ssh: virtme_ssh_channel is not defined"
+    exit 1
+fi
+if [[ ! -f /usr/sbin/sshd ]]; then
+    log "ssh: /usr/sbin/sshd does not exist."
     exit 1
 fi
 
@@ -24,22 +28,11 @@ rm -f /var/run/nologin
 # use an ssh location OUTSIDE of the users home directory to enable sharing
 # of host keys and authorized keys without dubious permission errors
 SSH_DIR=/run/sshd
-
-if grep -q "virtme.cache /run/virtme/cache" /proc/mounts; then
-    # If using args.root != '/', virtme.cache will be mounted.
-    # This way it becomes a central place for ssh files (including id_*.pub),
-    # which defaults to $HOME/.cache/virtme-ng/.ssh in the host.
+SSH_CACHE="${virtme_ssh_cache}"
+if [[ "${SSH_CACHE}" == "/run/virtme/cache/.ssh" ]]; then
     SSH_HOME=/run/virtme/cache
-    SSH_CACHE="${SSH_HOME}"/.ssh
 else
-    # use an ssh location INSIDE of the users home directory to communicate pre-
-    # created hostkeys and authorized keys
-    SSH_HOME="$(getent passwd "${virtme_ssh_user}" | cut -d: -f6)"
-    if [ ! -e "${SSH_HOME}" ]; then
-        # Setup an arbitrary ssh location, just to be able to start sshd.
-        SSH_HOME="${SSH_DIR}"
-    fi
-    SSH_CACHE="${SSH_HOME}"/.cache/virtme-ng/.ssh
+    SSH_HOME="${SSH_CACHE%/.cache/virtme-ng/.ssh}"
 fi
 
 # Generate ssh host keys (if they don't exist already).
@@ -50,10 +43,15 @@ ssh-keygen -A -f "${SSH_CACHE}"
 mkdir -p "${SSH_DIR}"/etc/ssh
 cp "${SSH_CACHE}"/etc/ssh/* "${SSH_DIR}"/etc/ssh
 
-# Generate authorized_keys in the virtme-ng cache directory and add all
-# current user's public keys.
+# Generate authorized_keys from the host user's public keys and id_virtme.
 SSH_AUTH_KEYS="${SSH_DIR}"/etc/ssh/authorized_keys
+: > "${SSH_AUTH_KEYS}"
+if [[ ! -r "${SSH_CACHE}"/id_virtme.pub ]]; then
+    log "ssh: missing ${SSH_CACHE}/id_virtme.pub"
+    exit 1
+fi
 cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_AUTH_KEYS}" 2> /dev/null
+cat "${SSH_CACHE}"/id_virtme.pub >> "${SSH_AUTH_KEYS}"
 
 # fixup permissions
 chown -R root:root "${SSH_DIR}"/etc/ssh
@@ -87,11 +85,6 @@ ARGS=(-f "${SSH_CONFIG}")
 for key in "${SSH_DIR}"/etc/ssh/ssh_host_*_key; do
     ARGS+=(-h "${key}")
 done
-
-if [[ ! -f /usr/sbin/sshd ]]; then
-    log "ssh: /usr/sbin/sshd does not exist."
-    exit 1
-fi
 
 if [[ ${virtme_ssh_channel} == "vsock" ]]; then
     # Make sure vsock (module) is loaded and active, otherwise the '/dev/vsock' device
