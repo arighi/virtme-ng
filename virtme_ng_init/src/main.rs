@@ -1138,10 +1138,17 @@ fn run_user_session(consdev: &str, uid: u32) {
 }
 
 fn setup_user_session() {
-    let uid = env::var("virtme_user")
-        .ok()
-        .and_then(|user| utils::get_user_id(&user))
-        .unwrap_or(0);
+    let uid = match env::var("virtme_user") {
+        Ok(ref user) => match utils::get_user_id(user) {
+            Some(id) => id,
+            None => {
+                log!("user '{}' not found in guest, falling back to root", user);
+                env::remove_var("virtme_user");
+                0
+            }
+        },
+        Err(_) => 0,
+    };
 
     let consdev = if let Some(console) = get_active_console() {
         console

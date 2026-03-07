@@ -689,7 +689,11 @@ setup_user_session() {
     local uid consdev
 
     if [[ -n ${virtme_user:-} ]]; then
-        uid="$(id -u -- "${virtme_user}")"
+        if ! uid="$(id -u -- "${virtme_user}" 2> /dev/null)"; then
+            log "user '${virtme_user}' not found in guest, falling back to root"
+            unset -v virtme_user
+            uid=0
+        fi
     else
         uid="$(id -u)"
     fi
