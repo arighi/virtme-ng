@@ -388,6 +388,13 @@ def make_parser() -> argparse.ArgumentParser:
         "--nvgpu", action="store", default=None, help="Set guest NVIDIA GPU."
     )
 
+    g.add_argument(
+        "--vfio-pci",
+        action="append",
+        default=[],
+        help="Pass through a PCI device using vfio-pci (can be used multiple times).",
+    )
+
     g = parser.add_argument_group(title="Remote Console")
     cli_srv_choices = ["console", "ssh"]
     g.add_argument(
@@ -1924,6 +1931,9 @@ def do_it() -> int:
 
     if args.nvgpu:
         qemuargs.extend(["-device", args.nvgpu])
+
+    for addr in args.vfio_pci:
+        qemuargs.extend(["-device", f"vfio-pci,host={addr}"])
 
     # If we are running as root on the host, or using root user within an
     # external root filesystem, pass this information to the guest (this can be

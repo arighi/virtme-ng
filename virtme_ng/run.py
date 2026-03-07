@@ -544,6 +544,14 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         help="Add a passthrough NVIDIA GPU",
     )
 
+    parser.add_argument(
+        "--vfio-pci",
+        action="append",
+        metavar="PCI_ADDRESS",
+        help="Pass through a PCI device using vfio-pci (can be used multiple times), "
+        "e.g. --vfio-pci 0000:ce:00.0",
+    )
+
     g_remote = parser.add_argument_group(title="Remote Console")
 
     g_remote.add_argument(
@@ -1352,6 +1360,15 @@ class KernelSource:
         else:
             self.virtme_param["nvgpu"] = ""
 
+    def _get_virtme_vfio_pci(self, args):
+        if args.vfio_pci is not None:
+            vfio_str = " ".join(
+                f"--vfio-pci {shlex.quote(addr)}" for addr in args.vfio_pci
+            )
+            self.virtme_param["vfio_pci"] = vfio_str
+        else:
+            self.virtme_param["vfio_pci"] = ""
+
     def _get_virtme_qemu_opts(self, args):
         if args.qemu_opts is not None:
             self.virtme_param["qemu_opts"] = "--qemu-opts " + " ".join(args.qemu_opts)
@@ -1407,6 +1424,7 @@ class KernelSource:
         self._get_virtme_empty_passwords(args)
         self._get_virtme_busybox(args)
         self._get_virtme_nvgpu(args)
+        self._get_virtme_vfio_pci(args)
         self._get_virtme_qemu(args)
         self._get_virtme_qemu_opts(args)
 
@@ -1460,6 +1478,7 @@ class KernelSource:
             + f"{self.virtme_param['snaps']} "
             + f"{self.virtme_param['busybox']} "
             + f"{self.virtme_param['nvgpu']} "
+            + f"{self.virtme_param['vfio_pci']} "
             + f"{self.virtme_param['qemu']} "
             + f"{self.virtme_param['qemu_opts']} "
             # Important: qemu_opts has to be the last one
