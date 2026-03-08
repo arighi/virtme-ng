@@ -65,6 +65,28 @@ pub fn get_user_id(username: &str) -> Option<u32> {
     None
 }
 
+/// Return the login shell for the given uid from /etc/passwd, if present and usable.
+pub fn get_shell_for_uid(uid: u32) -> Option<String> {
+    let file = File::open("/etc/passwd").ok()?;
+    let reader = BufReader::new(file);
+
+    for line in reader.lines().map_while(Result::ok) {
+        let parts: Vec<&str> = line.split(':').collect();
+        if parts.len() >= 7 {
+            if let Ok(entry_uid) = parts[2].parse::<u32>() {
+                if entry_uid == uid {
+                    let shell = parts[6].trim();
+                    if !shell.is_empty() && shell != "/bin/false" && shell != "/usr/sbin/nologin" {
+                        return Some(shell.to_string());
+                    }
+                    return None;
+                }
+            }
+        }
+    }
+    None
+}
+
 pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> io::Result<()> {
     let gid_option = gid.map(Gid::from_raw);
 
