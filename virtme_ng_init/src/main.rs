@@ -986,71 +986,17 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
-/// Fallback when preferred shell (virtme_shell or host $SHELL) is not present in the guest.
-const FALLBACK_SHELL: &str = "/bin/sh";
-
-/// Resolve the shell to use: virtme_shell (from --shell or host $SHELL) if it exists in the
-/// guest, otherwise /bin/sh so minimal rootfs work.
-fn resolve_shell() -> String {
-    let path_env =
-        env::var("PATH").unwrap_or_else(|_| "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin".into());
-    let paths: Vec<&str> = path_env.split(':').collect();
-
-    let preferred = match env::var("virtme_shell") {
-        Ok(s) if !s.is_empty() => s,
-        _ => return FALLBACK_SHELL.to_string(),
-    };
-
-    let resolved = if preferred.contains('/') {
-        let path = Path::new(&preferred);
-        if path.is_file() {
-            preferred
-        } else {
-            FALLBACK_SHELL.to_string()
-        }
-    } else {
-        let found = paths.iter().find_map(|dir| {
-            let candidate = Path::new(dir).join(&preferred);
-            if candidate.is_file() {
-                Some(candidate.to_string_lossy().into_owned())
-            } else {
-                None
-            }
-        });
-        found.unwrap_or_else(|| FALLBACK_SHELL.to_string())
-    };
-
-    // Final safeguard: ensure the chosen path exists (e.g. FALLBACK_SHELL on minimal rootfs).
-    if Path::new(&resolved).is_file() {
-        resolved
-    } else {
-        FALLBACK_SHELL.to_string()
-    }
-}
-
-fn run_shell(tty_fd: libc::c_int, shell: &str, args: &[&str]) {
-    let run = |s: &str| unsafe {
-        Command::new(s)
+fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
+    unsafe {
+        Command::new("bash")
             .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
                 Ok(())
             })
             .output()
-    };
-    let result = run(shell);
-    if let Err(ref e) = result {
-        if e.kind() == io::ErrorKind::NotFound && shell != FALLBACK_SHELL {
-            log!(
-                "shell {} not found, falling back to {}",
-                shell,
-                FALLBACK_SHELL
-            );
-            run(FALLBACK_SHELL).expect("Failed to start shell session");
-            return;
-        }
+            .expect("Failed to start shell session");
     }
-    result.expect("Failed to start shell session");
 }
 
 fn run_user_gui(tty_fd: libc::c_int) {
@@ -1066,11 +1012,10 @@ fn run_user_gui(tty_fd: libc::c_int) {
             }
         }
     }
-    let shell = resolve_shell();
     if let Err(err) = utils::create_file(
         xinitrc,
         0o0644,
-        &format!("{pre_exec_cmd}\n{shell} {USER_SCRIPT}"),
+        &format!("{pre_exec_cmd}\n/bin/bash {USER_SCRIPT}"),
     ) {
         log!("failed to generate {}: {}", xinitrc, err);
         return;
@@ -1082,10 +1027,10 @@ fn run_user_gui(tty_fd: libc::c_int) {
     if let Ok(user) = env::var("virtme_user") {
         // Try to fix permissions on the virtual consoles, we are starting X
         // directly here so we may need extra permissions on the tty devices.
-        utils::run_cmd("/bin/sh", &["-c", &format!("chown {user} /dev/char/*")]);
+        utils::run_cmd("bash", &["-c", &format!("chown {user} /dev/char/*")]);
 
         // Clean up any previous X11 state.
-        utils::run_cmd("/bin/sh", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
+        utils::run_cmd("bash", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
 
         // Start xinit directly.
         storage = format!("su -c 'xinit /run/tmp/.xinitrc' -- {user}");
@@ -1093,7 +1038,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
     } else {
         args.push("xinit /run/tmp/.xinitrc");
     }
-    run_shell(tty_fd, &shell, &args);
+    run_shell(tty_fd, &args);
 }
 
 fn init_xdg_runtime_dir(uid: u32) {
@@ -1106,18 +1051,25 @@ fn init_xdg_runtime_dir(uid: u32) {
 }
 
 fn run_user_shell(tty_fd: libc::c_int) {
-    let shell = resolve_shell();
     let mut args = vec![];
     let cmd;
 
     if let Ok(user) = env::var("virtme_user") {
-        cmd = format!("su -s {} -- {}", shell, user);
+        // Check if a shell override is defined.
+        let virtme_shell = env::var("virtme_shell").ok();
+
+        cmd = if let Some(shell) = virtme_shell {
+            format!("su -s {} -- {}", shell, user)
+        } else {
+            format!("su -- {}", user)
+        };
+
         args.push("-c");
         args.push(&cmd);
     }
 
     print_logo();
-    run_shell(tty_fd, &shell, &args);
+    run_shell(tty_fd, &args);
 }
 
 fn run_user_session(consdev: &str, uid: u32) {
@@ -1154,9 +1106,8 @@ fn setup_user_session() {
         console
     } else {
         log!("failed to determine console");
-        let shell = resolve_shell();
-        let err = Command::new(&shell).arg("-l").exec();
-        log!("failed to exec shell: {}", err);
+        let err = Command::new("bash").arg("-l").exec();
+        log!("failed to exec bash: {}", err);
         return;
     };
     configure_terminal(consdev.as_str(), uid);
