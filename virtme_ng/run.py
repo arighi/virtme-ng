@@ -1323,7 +1323,8 @@ class KernelSource:
             self.virtme_param["gdb"] = ""
 
     def _get_virtme_qmp(self, args):
-        if args.debug:
+        # QMP is needed for --debug (GDB/monitor) and for --pin (query-cpus-fast).
+        if args.debug or args.pin:
             self.virtme_param["qmp"] = "--qmp"
         else:
             self.virtme_param["qmp"] = ""
