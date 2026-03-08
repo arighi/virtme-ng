@@ -988,7 +988,7 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
 
 fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
     unsafe {
-        Command::new("bash")
+        Command::new("/bin/sh")
             .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
@@ -1027,10 +1027,10 @@ fn run_user_gui(tty_fd: libc::c_int) {
     if let Ok(user) = env::var("virtme_user") {
         // Try to fix permissions on the virtual consoles, we are starting X
         // directly here so we may need extra permissions on the tty devices.
-        utils::run_cmd("bash", &["-c", &format!("chown {user} /dev/char/*")]);
+        utils::run_cmd("/bin/sh", &["-c", &format!("chown {user} /dev/char/*")]);
 
         // Clean up any previous X11 state.
-        utils::run_cmd("bash", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
+        utils::run_cmd("/bin/sh", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
 
         // Start xinit directly.
         storage = format!("su -c 'xinit /run/tmp/.xinitrc' -- {user}");
@@ -1106,8 +1106,8 @@ fn setup_user_session() {
         console
     } else {
         log!("failed to determine console");
-        let err = Command::new("bash").arg("-l").exec();
-        log!("failed to exec bash: {}", err);
+        let err = Command::new("/bin/sh").arg("-l").exec();
+        log!("failed to exec /bin/sh: {}", err);
         return;
     };
     configure_terminal(consdev.as_str(), uid);
