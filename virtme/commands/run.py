@@ -1179,12 +1179,23 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     else:
         # Implicitly enable dhcp to automatically get an IP on the network
         # interface and prevent interface renaming.
-        kernelargs.extend(["virtme.dhcp", "net.ifnames=0", "biosdevname=0"])
-        # Setup a port forward network interface for the guest.
-        qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
-        qemuargs.extend(
-            ["-netdev", f"user,id=ssh,hostfwd=tcp:127.0.0.1:{args.port}-:22"]
-        )
+        for arg in ("virtme.dhcp", "net.ifnames=0", "biosdevname=0"):
+            if arg not in kernelargs:
+                kernelargs.append(arg)
+        hostfwd = f"hostfwd=tcp:127.0.0.1:{args.port}-:22"
+        # Reuse an existing user-mode NIC when available so DHCP and routing
+        # do not race across two slirp interfaces on the same default subnet.
+        for index, arg in enumerate(qemuargs):
+            if arg != "-netdev" or index + 1 >= len(qemuargs):
+                continue
+            netdev = qemuargs[index + 1]
+            if not netdev.startswith("user,") or "hostfwd=" in netdev:
+                continue
+            qemuargs[index + 1] = f"{netdev},{hostfwd}"
+            break
+        else:
+            qemuargs.extend(["-device", f"{arch.virtio_dev_type('net')},netdev=ssh"])
+            qemuargs.extend(["-netdev", f"user,id=ssh,{hostfwd}"])
         ssh_channel_type = "tcp"
 
     if ssh_channel_type != "vsock" and args.empty_passwords:
