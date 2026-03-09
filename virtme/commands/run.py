@@ -1938,8 +1938,6 @@ def do_it() -> int:
     if args.user and args.user != "root":
         kernelargs.append(f"virtme_user={args.user}")
 
-    # Pass shell for guest only when --shell is explicitly set, otherwise
-    # init uses /bin/sh.
     if args.shell is not None:
         kernelargs.append(f"virtme_shell={args.shell}")
 
