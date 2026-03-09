@@ -653,18 +653,13 @@ run_user_gui() {
 
 run_user_shell() {
     local consdev=$1 uid=$2
+    local args=()
 
     print_logo
 
-    if [[ -n ${virtme_user:-} ]]; then
-        shell=""
-        if [[ -n ${virtme_shell:-} ]]; then
-            shell="-s ${virtme_shell}"
-        fi
-        setsid bash -c "su ${shell} -- ${virtme_user}" 0<> "/dev/$consdev" 1>&0 2>&0
-    else
-        setsid bash 0<> "/dev/$consdev" 1>&0 2>&0
-    fi
+    [[ -n ${virtme_shell:-} ]] && args+=(-s "$virtme_shell")
+    [[ -n ${virtme_user:-} ]] && args+=(-- "$virtme_user")
+    setsid su "${args[@]}" 0<> "/dev/$consdev" 1>&0 2>&0
 }
 
 run_user_session() {

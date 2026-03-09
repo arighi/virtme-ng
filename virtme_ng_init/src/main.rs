@@ -986,9 +986,9 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
     }
 }
 
-fn run_shell(tty_fd: libc::c_int, args: &[&str]) {
+fn run_shell(tty_fd: libc::c_int, cmd: &str, args: &[&str]) {
     unsafe {
-        Command::new("bash")
+        Command::new(cmd)
             .args(args)
             .pre_exec(move || {
                 detach_from_terminal(tty_fd);
@@ -1027,10 +1027,10 @@ fn run_user_gui(tty_fd: libc::c_int) {
     if let Ok(user) = env::var("virtme_user") {
         // Try to fix permissions on the virtual consoles, we are starting X
         // directly here so we may need extra permissions on the tty devices.
-        utils::run_cmd("bash", &["-c", &format!("chown {user} /dev/char/*")]);
+        utils::run_cmd("/bin/sh", &["-c", &format!("chown {user} /dev/char/*")]);
 
         // Clean up any previous X11 state.
-        utils::run_cmd("bash", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
+        utils::run_cmd("/bin/sh", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
 
         // Start xinit directly.
         storage = format!("su -c 'xinit /run/tmp/.xinitrc' -- {user}");
@@ -1038,7 +1038,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
     } else {
         args.push("xinit /run/tmp/.xinitrc");
     }
-    run_shell(tty_fd, &args);
+    run_shell(tty_fd, "/bin/sh", &args);
 }
 
 fn init_xdg_runtime_dir(uid: u32) {
@@ -1052,24 +1052,20 @@ fn init_xdg_runtime_dir(uid: u32) {
 
 fn run_user_shell(tty_fd: libc::c_int) {
     let mut args = vec![];
-    let cmd;
 
-    if let Ok(user) = env::var("virtme_user") {
-        // Check if a shell override is defined.
-        let virtme_shell = env::var("virtme_shell").ok();
+    // Check if a shell override is defined.
+    let shell = env::var("virtme_shell").unwrap_or_else(|_| String::new());
+    if !shell.is_empty() {
+        args.extend(["-s", &shell]);
+    }
 
-        cmd = if let Some(shell) = virtme_shell {
-            format!("su -s {} -- {}", shell, user)
-        } else {
-            format!("su -- {}", user)
-        };
-
-        args.push("-c");
-        args.push(&cmd);
+    let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
+    if !user.is_empty() {
+        args.extend(["--", &user]);
     }
 
     print_logo();
-    run_shell(tty_fd, &args);
+    run_shell(tty_fd, "su", &args);
 }
 
 fn run_user_session(consdev: &str, uid: u32) {
@@ -1106,8 +1102,8 @@ fn setup_user_session() {
         console
     } else {
         log!("failed to determine console");
-        let err = Command::new("bash").arg("-l").exec();
-        log!("failed to exec bash: {}", err);
+        let err = Command::new("/bin/sh").arg("-l").exec();
+        log!("failed to exec /bin/sh: {}", err);
         return;
     };
     configure_terminal(consdev.as_str(), uid);
