@@ -665,6 +665,7 @@ ARCH_MAPPING = {
         "cross_compile": "s390x-linux-gnu-",
         "kernel_target": "bzImage",
         "kernel_image": "bzImage",
+        "max-cpus": 8,
     },
     "riscv64": {
         "qemu_name": "riscv64",
