@@ -335,9 +335,17 @@ class Arch_ppc(Arch):
         return ret
 
     @staticmethod
+    def serial_console_args():
+        return ["hvc0"]
+
+    @staticmethod
     def config_base():
         return [
+            "CONFIG_PPC64=y",
             "CONFIG_CPU_LITTLE_ENDIAN=y",
+            "CONFIG_ALTIVEC=y",
+            "CONFIG_VSX=y",
+            "CONFIG_HVC_CONSOLE=y",
             "CONFIG_PPC_POWERNV=n",
             "CONFIG_PPC_SUBPAGE_PROT=y",
             "CONFIG_KVM_BOOK3S_64=y",
