@@ -1138,6 +1138,8 @@ def ssh_client(args):
         remote_cmd = []
 
     cmd = ["ssh", "-F", f"{SSH_CONF_FILE}"]
+    if args.verbose:
+        cmd += ["-v"]
     if args.user:
         cmd += ["-l", f"{args.user}"]
     cmd += [ssh_destination] + remote_cmd
