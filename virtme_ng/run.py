@@ -172,13 +172,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--skip-config",
-        "-s",
-        action="store_true",
-        help="[deprecated] Do not re-generate kernel .config",
-    )
-
-    parser.add_argument(
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
