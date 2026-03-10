@@ -659,7 +659,7 @@ run_user_shell() {
 
     [[ -n ${virtme_shell:-} ]] && args+=(-s "$virtme_shell")
     [[ -n ${virtme_user:-} ]] && args+=(-- "$virtme_user")
-    setsid su "${args[@]}" 0<> "/dev/$consdev" 1>&0 2>&0
+    setsid bash -c "su ${args[*]}" 0<> "/dev/$consdev" 1>&0 2>&0
 }
 
 run_user_session() {
