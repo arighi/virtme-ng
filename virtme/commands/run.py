@@ -1030,6 +1030,13 @@ def get_console_path(port):
     return os.path.join(tempfile.gettempdir(), "virtme-console", f"{port}.sh")
 
 
+def get_guest_relative_path(path, root):
+    relpath = os.path.relpath(path, root)
+    if relpath.startswith(".."):
+        return None
+    return relpath
+
+
 def console_client(args):
     if which("socat") is None:
         arg_fail("socat tool is required, but not available")
@@ -1933,8 +1940,8 @@ def do_it() -> int:
             ssh_server(args, arch, qemuargs, kernelargs)
 
     if args.pwd:
-        rel_pwd = os.path.relpath(os.getcwd(), args.root)
-        if rel_pwd.startswith(".."):
+        rel_pwd = get_guest_relative_path(os.getcwd(), args.root)
+        if rel_pwd is None:
             print("current working directory is not contained in the root")
             return 1
         kernelargs.append(f"virtme_chdir={rel_pwd}")
@@ -1942,8 +1949,8 @@ def do_it() -> int:
     if args.cwd is not None:
         if args.pwd:
             arg_fail("--pwd and --cwd are mutually exclusive")
-        rel_cwd = os.path.relpath(args.cwd, args.root)
-        if rel_cwd.startswith(".."):
+        rel_cwd = get_guest_relative_path(args.cwd, args.root)
+        if rel_cwd is None:
             print("specified working directory is not contained in the root")
             return 1
         kernelargs.append(f"virtme_chdir={rel_cwd}")
