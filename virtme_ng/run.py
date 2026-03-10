@@ -346,12 +346,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--pwd",
-        action="store_true",
-        help="[deprecated] --pwd is set implicitly by default",
-    )
-
-    parser.add_argument(
         "--rodir",
         action="append",
         default=[],
@@ -1020,8 +1014,6 @@ class KernelSource:
 
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
-            if args.pwd:
-                arg_fail("--pwd and --cwd are mutually exclusive")
             self.virtme_param["cwd"] = "--cwd " + args.cwd
         elif args.root is None:
             self.virtme_param["cwd"] = "--pwd"
