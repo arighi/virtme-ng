@@ -1138,15 +1138,40 @@ def ssh_client(args):
         ssh_destination = f"{VIRTME_SSH_DESTINATION_NAME}{DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR}{args.port}"
     else:
         ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
-    if args.remote_cmd is not None:
+
+    force_tty = False
+    if args.cwd is not None:
+        cwd = get_guest_relative_path(args.cwd, args.root)
+        if cwd is None:
+            arg_fail("specified working directory is not contained in the root")
+    else:
+        cwd = get_guest_relative_path(os.getcwd(), args.root)
+
+    if cwd is not None:
+        guest_cwd = "/" if cwd == "." else f"/{cwd}"
+        remote_cmd_str = f"cd -- {shlex.quote(guest_cwd)}" + (
+            f" && {args.remote_cmd}"
+            if args.remote_cmd is not None
+            else ' && exec "${SHELL:-/bin/sh}" -i'
+        )
+        remote_cmd = [
+            "--",
+            "/bin/sh",
+            "-c",
+            shlex.quote(remote_cmd_str),
+        ]
+        force_tty = args.remote_cmd is None and sys.stdin.isatty()
+    elif args.remote_cmd is not None:
         exec_escaped = shlex.quote(args.remote_cmd)
-        remote_cmd = ["--", "bash", "-c", exec_escaped]
+        remote_cmd = ["--", "/bin/sh", "-c", exec_escaped]
     else:
         remote_cmd = []
 
     cmd = ["ssh", "-F", f"{SSH_CONF_FILE}"]
     if args.verbose:
         cmd += ["-v"]
+    if force_tty:
+        cmd += ["-t"]
     if args.user:
         cmd += ["-l", f"{args.user}"]
     cmd += [ssh_destination] + remote_cmd
