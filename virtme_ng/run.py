@@ -263,13 +263,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--compiler",
-        action="store",
-        help="[deprecated] Compiler to be used as CC when building the kernel. "
-        "Please set CC= and HOSTCC= variables in the virtme-ng command line instead.",
-    )
-
-    parser.add_argument(
         "--busybox",
         metavar="PATH_TO_BUSYBOX",
         action="store",
@@ -908,8 +901,6 @@ class KernelSource:
         if args.skip_modules:
             make_command += [target]
         make_command += ["LOCALVERSION=-virtme"]
-        if args.compiler:
-            make_command += [f"HOSTCC={args.compiler}", f"CC={args.compiler}"]
         if cross_compile and cross_arch:
             make_command += [f"CROSS_COMPILE={cross_compile}", f"ARCH={cross_arch}"]
         # Propagate additional Makefile variables
