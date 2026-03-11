@@ -1030,6 +1030,13 @@ def get_console_path(port):
     return os.path.join(tempfile.gettempdir(), "virtme-console", f"{port}.sh")
 
 
+def get_guest_relative_path(path, root):
+    relpath = os.path.relpath(path, root)
+    if relpath.startswith(".."):
+        return None
+    return relpath
+
+
 def console_client(args):
     if which("socat") is None:
         arg_fail("socat tool is required, but not available")
@@ -1131,15 +1138,40 @@ def ssh_client(args):
         ssh_destination = f"{VIRTME_SSH_DESTINATION_NAME}{DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR}{args.port}"
     else:
         ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
-    if args.remote_cmd is not None:
+
+    force_tty = False
+    if args.cwd is not None:
+        cwd = get_guest_relative_path(args.cwd, args.root)
+        if cwd is None:
+            arg_fail("specified working directory is not contained in the root")
+    else:
+        cwd = get_guest_relative_path(os.getcwd(), args.root)
+
+    if cwd is not None:
+        guest_cwd = "/" if cwd == "." else f"/{cwd}"
+        remote_cmd_str = f"cd -- {shlex.quote(guest_cwd)}" + (
+            f" && {args.remote_cmd}"
+            if args.remote_cmd is not None
+            else ' && exec "${SHELL:-/bin/sh}" -i'
+        )
+        remote_cmd = [
+            "--",
+            "/bin/sh",
+            "-c",
+            shlex.quote(remote_cmd_str),
+        ]
+        force_tty = args.remote_cmd is None and sys.stdin.isatty()
+    elif args.remote_cmd is not None:
         exec_escaped = shlex.quote(args.remote_cmd)
-        remote_cmd = ["--", "bash", "-c", exec_escaped]
+        remote_cmd = ["--", "/bin/sh", "-c", exec_escaped]
     else:
         remote_cmd = []
 
     cmd = ["ssh", "-F", f"{SSH_CONF_FILE}"]
     if args.verbose:
         cmd += ["-v"]
+    if force_tty:
+        cmd += ["-t"]
     if args.user:
         cmd += ["-l", f"{args.user}"]
     cmd += [ssh_destination] + remote_cmd
@@ -1933,8 +1965,8 @@ def do_it() -> int:
             ssh_server(args, arch, qemuargs, kernelargs)
 
     if args.pwd:
-        rel_pwd = os.path.relpath(os.getcwd(), args.root)
-        if rel_pwd.startswith(".."):
+        rel_pwd = get_guest_relative_path(os.getcwd(), args.root)
+        if rel_pwd is None:
             print("current working directory is not contained in the root")
             return 1
         kernelargs.append(f"virtme_chdir={rel_pwd}")
@@ -1942,8 +1974,8 @@ def do_it() -> int:
     if args.cwd is not None:
         if args.pwd:
             arg_fail("--pwd and --cwd are mutually exclusive")
-        rel_cwd = os.path.relpath(args.cwd, args.root)
-        if rel_cwd.startswith(".."):
+        rel_cwd = get_guest_relative_path(args.cwd, args.root)
+        if rel_cwd is None:
             print("specified working directory is not contained in the root")
             return 1
         kernelargs.append(f"virtme_chdir={rel_cwd}")
