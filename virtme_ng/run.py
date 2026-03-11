@@ -172,13 +172,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--skip-config",
-        "-s",
-        action="store_true",
-        help="[deprecated] Do not re-generate kernel .config",
-    )
-
-    parser.add_argument(
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
@@ -263,13 +256,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--compiler",
-        action="store",
-        help="[deprecated] Compiler to be used as CC when building the kernel. "
-        "Please set CC= and HOSTCC= variables in the virtme-ng command line instead.",
-    )
-
-    parser.add_argument(
         "--busybox",
         metavar="PATH_TO_BUSYBOX",
         action="store",
@@ -343,12 +329,6 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="store",
         help="Change guest working directory "
         + "(default is current working directory when possible)",
-    )
-
-    parser.add_argument(
-        "--pwd",
-        action="store_true",
-        help="[deprecated] --pwd is set implicitly by default",
     )
 
     parser.add_argument(
@@ -914,8 +894,6 @@ class KernelSource:
         if args.skip_modules:
             make_command += [target]
         make_command += ["LOCALVERSION=-virtme"]
-        if args.compiler:
-            make_command += [f"HOSTCC={args.compiler}", f"CC={args.compiler}"]
         if cross_compile and cross_arch:
             make_command += [f"CROSS_COMPILE={cross_compile}", f"ARCH={cross_arch}"]
         # Propagate additional Makefile variables
@@ -1020,8 +998,6 @@ class KernelSource:
 
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
-            if args.pwd:
-                arg_fail("--pwd and --cwd are mutually exclusive")
             self.virtme_param["cwd"] = "--cwd " + args.cwd
         elif args.root is None:
             self.virtme_param["cwd"] = "--pwd"
