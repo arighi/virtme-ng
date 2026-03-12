@@ -379,8 +379,25 @@ class Arch_riscv64(Arch):
         return ret
 
     @staticmethod
+    def earlyconsole_args() -> list[str]:
+        return ["earlycon=sbi"]
+
+    @staticmethod
     def serial_console_args():
         return ["ttyS0"]
+
+    @staticmethod
+    def config_base():
+        return [
+            "CONFIG_ARCH_VIRT=y",
+            "CONFIG_PCI=y",
+            "CONFIG_PCIEPORTBUS=y",
+            "CONFIG_PCI_HOST_GENERIC=y",
+            "CONFIG_SERIAL_8250=y",
+            "CONFIG_SERIAL_8250_CONSOLE=y",
+            "CONFIG_SERIAL_OF_PLATFORM=y",
+            "CONFIG_SERIAL_EARLYCON_RISCV_SBI=y",
+        ]
 
     def kimg_path(self):
         return "arch/riscv/boot/Image"
