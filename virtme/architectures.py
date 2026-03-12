@@ -5,8 +5,6 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
-import os
-
 
 class Arch:
     def __init__(self, name) -> None:
@@ -225,20 +223,12 @@ class Arch_arm(Arch):
     def __init__(self):
         Arch.__init__(self, "arm")
 
-        self.defconfig_target = "vexpress_defconfig"
+        self.defconfig_target = "multi_v7_defconfig"
 
     @staticmethod
     def qemuargs(is_native, use_kvm, use_gpu):
         ret = Arch.qemuargs(is_native, use_kvm, use_gpu)
-
-        # Emulate a vexpress-a15.
-        ret.extend(["-M", "vexpress-a15"])
-
-        # NOTE: consider adding a PCI bus (and figuring out how)
-        #
-        # This won't boot unless -dtb is set, but we need to figure out
-        # how to find the dtb file.
-
+        ret.extend(["-M", "virt"])
         return ret
 
     @staticmethod
@@ -257,15 +247,24 @@ class Arch_arm(Arch):
     def serial_console_args():
         return ["ttyAMA0"]
 
+    @staticmethod
+    def config_base():
+        return [
+            "CONFIG_ARCH_VIRT=y",
+            "CONFIG_VFP=y",
+            "CONFIG_VFPv3=y",
+            "CONFIG_NEON=y",
+            "CONFIG_SERIAL_AMBA_PL011=y",
+            "CONFIG_SERIAL_AMBA_PL011_CONSOLE=y",
+            "CONFIG_RTC_DRV_PL031=y",
+            "CONFIG_VIRTIO_MMIO=y",
+        ]
+
     def kimg_path(self):
         return "arch/arm/boot/zImage"
 
     @staticmethod
     def dtb_path():
-        if os.path.exists("arch/arm/boot/dts/arm/vexpress-v2p-ca15-tc1.dtb"):
-            return "arch/arm/boot/dts/arm/vexpress-v2p-ca15-tc1.dtb"
-        if os.path.exists("arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb"):
-            return "arch/arm/boot/dts/vexpress-v2p-ca15-tc1.dtb"
         return None
 
 
@@ -380,8 +379,25 @@ class Arch_riscv64(Arch):
         return ret
 
     @staticmethod
+    def earlyconsole_args() -> list[str]:
+        return ["earlycon=sbi"]
+
+    @staticmethod
     def serial_console_args():
         return ["ttyS0"]
+
+    @staticmethod
+    def config_base():
+        return [
+            "CONFIG_ARCH_VIRT=y",
+            "CONFIG_PCI=y",
+            "CONFIG_PCIEPORTBUS=y",
+            "CONFIG_PCI_HOST_GENERIC=y",
+            "CONFIG_SERIAL_8250=y",
+            "CONFIG_SERIAL_8250_CONSOLE=y",
+            "CONFIG_SERIAL_OF_PLATFORM=y",
+            "CONFIG_SERIAL_EARLYCON_RISCV_SBI=y",
+        ]
 
     def kimg_path(self):
         return "arch/riscv/boot/Image"
