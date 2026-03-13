@@ -1068,15 +1068,10 @@ fn run_user_shell(tty_fd: libc::c_int) {
     run_shell(tty_fd, "su", &args);
 }
 
-fn run_user_session(consdev: &str, uid: u32) {
+fn run_user_session(consdev: &str) {
     let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
     let mode = Mode::empty();
     let tty_fd = open(consdev, flags, mode).expect("failed to open console");
-
-    if setup_user_script(uid) {
-        // Script mode but script I/O ports were missing; run script on console and exit.
-        run_user_script_on_console(consdev, uid);
-    }
 
     if env::var("virtme_graphics").is_ok() {
         run_user_gui(tty_fd);
@@ -1098,6 +1093,9 @@ fn setup_user_session() {
         Err(_) => 0,
     };
 
+    init_xdg_runtime_dir(uid);
+    setup_root_home();
+
     let consdev = if let Some(console) = get_active_console() {
         console
     } else {
@@ -1106,13 +1104,17 @@ fn setup_user_session() {
         log!("failed to exec /bin/sh: {}", err);
         return;
     };
+
+    if setup_user_script(uid) {
+        // Script mode but script I/O ports were missing; run script on console and exit.
+        run_user_script_on_console(consdev.as_str(), uid);
+    }
+
     configure_terminal(consdev.as_str(), uid);
-    init_xdg_runtime_dir(uid);
-    setup_root_home();
 
     log!("initialization done");
 
-    run_user_session(consdev.as_str(), uid);
+    run_user_session(consdev.as_str());
 }
 
 fn run_sshd() {

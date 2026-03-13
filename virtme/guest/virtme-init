@@ -665,13 +665,6 @@ run_user_shell() {
 run_user_session() {
     local consdev=$1 uid=$2
 
-    setup_user_script "$uid"
-
-    # Script mode but script I/O ports were missing; run script on console and exit.
-    if [[ -n "${script_ports_missing:-}" ]]; then
-        run_user_script_on_console "$consdev" "$uid"
-    fi
-
     if [[ -n ${virtme_graphics:-} ]]; then
         run_user_gui "$consdev" "$uid"
         # Drop to console if the graphical app failed.
@@ -693,15 +686,23 @@ setup_user_session() {
         uid="$(id -u)"
     fi
 
+    init_xdg_runtime_dir "$uid"
+    setup_root_home
+
+    setup_user_script "$uid"
+
     get_active_console consdev
     if [[ -z $consdev ]]; then
         log "failed to determine console"
         exec bash --login # At least try to be helpful
     fi
 
+    # Script mode but script I/O ports were missing; run script on console and exit.
+    if [[ -n "${script_ports_missing:-}" ]]; then
+        run_user_script_on_console "$consdev" "$uid"
+    fi
+
     configure_terminal "$consdev" "$uid"
-    init_xdg_runtime_dir "$uid"
-    setup_root_home
 
     log "initialization done"
 
