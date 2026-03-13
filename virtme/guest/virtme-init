@@ -236,16 +236,19 @@ mount_cgroupfs() {
 
 # shellcheck disable=SC2034
 find_udevd() {
-    local -n udevd_ref=$1
+    local udevd_ref=$1
+    local found_udevd
 
     # Find udevd
     if [[ -x /usr/lib/systemd/systemd-udevd ]]; then
-        udevd_ref=/usr/lib/systemd/systemd-udevd
+        found_udevd=/usr/lib/systemd/systemd-udevd
     elif [[ -x /lib/systemd/systemd-udevd ]]; then
-        udevd_ref=/lib/systemd/systemd-udevd
+        found_udevd=/lib/systemd/systemd-udevd
     else
-        udevd_ref="$(command -v udevd)"
+        found_udevd="$(command -v udevd)"
     fi
+
+    printf -v "$udevd_ref" '%s' "$found_udevd"
 }
 
 run_udevd() {
@@ -277,16 +280,11 @@ run_udevd() {
 }
 
 symlink_fds() {
-    declare -r -A fdlinks=(
-        ["/dev/fd"]="/proc/self/fd"
-        ["/dev/stdin"]="/proc/self/fd/0"
-        ["/dev/stdout"]="/proc/self/fd/1"
-        ["/dev/stderr"]="/proc/self/fd/2")
-
     # Install /proc/self/fd symlinks into /dev if not already present
-    for p in "${!fdlinks[@]}"; do
-        [[ -e $p ]] || ln -s "${fdlinks[$p]}" "$p"
-    done
+    [[ -e /dev/fd ]] || ln -s /proc/self/fd /dev/fd
+    [[ -e /dev/stdin ]] || ln -s /proc/self/fd/0 /dev/stdin
+    [[ -e /dev/stdout ]] || ln -s /proc/self/fd/1 /dev/stdout
+    [[ -e /dev/stderr ]] || ln -s /proc/self/fd/2 /dev/stderr
 }
 
 configure_hostname() {
@@ -525,14 +523,17 @@ setup_user_script() {
 
 # shellcheck disable=SC2034
 get_active_console() {
-    local -n consdev_ref=$1
+    local consdev_ref=$1
+    local found_consdev
 
     # Figure out what the main console is
     if [[ -n ${virtme_console:-} ]]; then
-        consdev_ref=${virtme_console}
+        found_consdev=${virtme_console}
     else
-        consdev_ref="$(grep ' ... (.C' /proc/consoles | cut -d' ' -f1)"
+        read -r found_consdev _ < /proc/consoles
     fi
+
+    printf -v "$consdev_ref" '%s' "$found_consdev"
 }
 
 redirect_console() {
