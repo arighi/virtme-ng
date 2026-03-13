@@ -35,23 +35,43 @@ else
     SSH_HOME="${SSH_CACHE%/.cache/virtme-ng/.ssh}"
 fi
 
-# Generate ssh host keys (if they don't exist already).
-mkdir -p "${SSH_CACHE}"/etc/ssh
-ssh-keygen -A -f "${SSH_CACHE}"
+generate_host_key() {
+    local key_type="$1"
+    local key_path="$2"
 
-# copy hostkeys to server location
+    if [[ -r ${key_path} && -r ${key_path}.pub ]]; then
+        return 0
+    fi
+
+    rm -f "${key_path}" "${key_path}.pub"
+    ssh-keygen -q -N "" -t "${key_type}" -f "${key_path}" &> /dev/null
+}
+
+# Generate host keys inside the guest to match the guest's sshd/key format.
 mkdir -p "${SSH_DIR}"/etc/ssh
-cp "${SSH_CACHE}"/etc/ssh/* "${SSH_DIR}"/etc/ssh
+for spec in \
+    "rsa:ssh_host_rsa_key" \
+    "dsa:ssh_host_dsa_key" \
+    "ecdsa:ssh_host_ecdsa_key" \
+    "ed25519:ssh_host_ed25519_key"; do
+    key_type="${spec%%:*}"
+    key_name="${spec##*:}"
+    generate_host_key "${key_type}" "${SSH_DIR}/etc/ssh/${key_name}" || true
+done
 
 # Generate authorized_keys from the host user's public keys and id_virtme.
 SSH_AUTH_KEYS="${SSH_DIR}"/etc/ssh/authorized_keys
 : > "${SSH_AUTH_KEYS}"
-if [[ ! -r "${SSH_CACHE}"/id_virtme.pub ]]; then
-    log "ssh: missing ${SSH_CACHE}/id_virtme.pub"
+if [[ ! -r "${SSH_CACHE}"/id_virtme.pub && ! -r "${SSH_CACHE}"/id_virtme_rsa.pub ]]; then
+    log "ssh: missing ${SSH_CACHE}/id_virtme.pub or ${SSH_CACHE}/id_virtme_rsa.pub"
     exit 1
 fi
 cat "${SSH_HOME}"/.ssh/id_*.pub >> "${SSH_AUTH_KEYS}" 2> /dev/null
-cat "${SSH_CACHE}"/id_virtme.pub >> "${SSH_AUTH_KEYS}"
+for key in "${SSH_CACHE}"/id_virtme.pub "${SSH_CACHE}"/id_virtme_rsa.pub; do
+    if [[ -r ${key} ]]; then
+        cat "${key}" >> "${SSH_AUTH_KEYS}"
+    fi
+done
 
 # fixup permissions
 chown -R root:root "${SSH_DIR}"/etc/ssh
@@ -84,9 +104,17 @@ SSH_CONFIG="${SSH_DIR}"/etc/ssh/sshd_config
 
 # Start sshd.
 ARGS=(-f "${SSH_CONFIG}")
+host_key_count=0
 for key in "${SSH_DIR}"/etc/ssh/ssh_host_*_key; do
+    [[ -f ${key} ]] || continue
     ARGS+=(-h "${key}")
+    host_key_count=$((host_key_count + 1))
 done
+
+if ((host_key_count == 0)); then
+    log "ssh: unable to generate any SSH host key"
+    exit 1
+fi
 
 if [[ ${virtme_ssh_channel} == "vsock" ]]; then
     # Make sure vsock (module) is loaded and active, otherwise the '/dev/vsock' device
