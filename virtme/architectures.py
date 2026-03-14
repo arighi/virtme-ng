@@ -309,6 +309,13 @@ class Arch_aarch64(Arch):
     def serial_console_args():
         return ["ttyAMA0"]
 
+    @staticmethod
+    def config_base():
+        return [
+            "CONFIG_SERIAL_AMBA_PL011=y",
+            "CONFIG_SERIAL_AMBA_PL011_CONSOLE=y",
+        ]
+
     def kimg_path(self):
         return "arch/arm64/boot/Image"
 
