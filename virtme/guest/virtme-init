@@ -264,9 +264,12 @@ run_udevd() {
             echo '' > /sys/kernel/uevent_helper
         fi
         log "starting udevd"
-        udev_out=$("$udevd" --daemon 2>&1)
-        if ! grep -q "quiet" /proc/cmdline; then
-            log "udev: $udev_out"
+        if "$udevd" --daemon 2> /run/tmp/udevd.err; then
+            if ! grep -q "quiet" /proc/cmdline && [[ -s /run/tmp/udevd.err ]]; then
+                log "udev: $(< /run/tmp/udevd.err)"
+            fi
+        else
+            log "udevd failed: $(< /run/tmp/udevd.err)"
         fi
         log "triggering udev coldplug"
         udevadm trigger --type=subsystems --action=add > /dev/null 2>&1
