@@ -241,7 +241,7 @@ class Arch_arm(Arch):
 
     @staticmethod
     def earlyconsole_args():
-        return ["earlyprintk=serial,ttyAMA0,115200"]
+        return ["earlycon=pl011,0x9000000"]
 
     @staticmethod
     def serial_console_args():
@@ -303,7 +303,7 @@ class Arch_aarch64(Arch):
 
     @staticmethod
     def earlyconsole_args():
-        return ["earlyprintk=serial,ttyAMA0,115200"]
+        return ["earlycon=pl011,0x9000000"]
 
     @staticmethod
     def serial_console_args():
