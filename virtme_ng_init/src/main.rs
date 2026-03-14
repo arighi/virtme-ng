@@ -685,6 +685,7 @@ fn get_network_handle(
     let network_dev_str = network_dev.unwrap();
     log!("setting up network device {}", network_dev_str);
     Some(thread::spawn(move || {
+        utils::run_cmd("ip", &["link", "set", "dev", &network_dev_str, "up"]);
         let script = format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap());
         let mut args = vec![
             "udhcpc",

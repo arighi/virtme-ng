@@ -117,6 +117,8 @@ def arg_fail(message):
 
 _GENERIC_CONFIG = [
     "##: Generic",
+    "CONFIG_EXPERIMENTAL=y",
+    "CONFIG_SMP=y",
     "CONFIG_UEVENT_HELPER=n",  # Obsolete and slow
     "CONFIG_VIRTIO=y",
     "CONFIG_VIRTIO_PCI=y",
