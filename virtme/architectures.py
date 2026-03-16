@@ -241,7 +241,7 @@ class Arch_arm(Arch):
 
     @staticmethod
     def earlyconsole_args():
-        return ["earlyprintk=serial,ttyAMA0,115200"]
+        return ["earlycon=pl011,0x9000000"]
 
     @staticmethod
     def serial_console_args():
@@ -303,11 +303,18 @@ class Arch_aarch64(Arch):
 
     @staticmethod
     def earlyconsole_args():
-        return ["earlyprintk=serial,ttyAMA0,115200"]
+        return ["earlycon=pl011,0x9000000"]
 
     @staticmethod
     def serial_console_args():
         return ["ttyAMA0"]
+
+    @staticmethod
+    def config_base():
+        return [
+            "CONFIG_SERIAL_AMBA_PL011=y",
+            "CONFIG_SERIAL_AMBA_PL011_CONSOLE=y",
+        ]
 
     def kimg_path(self):
         return "arch/arm64/boot/Image"
