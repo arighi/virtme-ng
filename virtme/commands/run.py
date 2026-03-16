@@ -28,6 +28,7 @@ from typing import Any, NoReturn
 from virtme_ng.utils import (
     CACHE_DIR,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
+    KERNEL_CMDLINE_MAX,
     SERIAL_GETTY_DIR,
     SERIAL_GETTY_FILE,
     SSH_CONF_FILE,
@@ -926,6 +927,25 @@ def quote_karg(arg: str) -> str:
     if " " in arg:
         return f'"{arg}"'
     return arg
+
+
+def create_guest_init_script(root: str, initsh: str) -> str | None:
+    try:
+        script_fd, script_host_path = tempfile.mkstemp(
+            prefix="virtme-init-",
+            dir=root,
+            text=True,
+        )
+        with os.fdopen(script_fd, "w", encoding="utf-8") as script_file:
+            script_file.write(f"{initsh}\n")
+        os.chmod(script_host_path, 0o644)
+        atexit.register(
+            lambda path=script_host_path: os.path.exists(path) and os.unlink(path)
+        )
+    except OSError:
+        return None
+
+    return f"/{os.path.basename(script_host_path)}"
 
 
 # Validate name=path arguments from --disk and --blk-disk
@@ -2111,6 +2131,20 @@ def do_it() -> int:
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
     kernelargs.extend(args.kopt)
+
+    # Check if kernel cmdline exceed limit when using external roots.
+    # This can happen quite easily in architectures such as legacy s390:
+    #   qemu-system-s390x: kernel command line exceeds maximum size: 1232 > 896
+    # Other architectures such as riscv and arm have 1024 (which currently makes most
+    # sense to be used with --root, too), while the rest will have at least 2048.
+    # This should be safe overall for the regular x86_64 args.root == / workflow,
+    # otherwise this guard could be lifted in the future.
+    if args.root != "/":
+        projected_cmdline = " ".join(quote_karg(arg) for arg in kernelargs + initcmds)
+        if len(projected_cmdline.encode("utf-8")) > KERNEL_CMDLINE_MAX:
+            guest_initsh = create_guest_init_script(args.root, "; ".join(initsh))
+            if guest_initsh is not None:
+                initcmds = ["init=/bin/sh", guest_initsh]
 
     # Unknown options get turned into arguments to init, which is annoying
     # because we're explicitly passing '--' to set the arguments directly.
