@@ -264,8 +264,14 @@ fn configure_limits() {
 fn configure_hostname() {
     if let Ok(hostname) = env::var("virtme_hostname") {
         log!("Setting hostname to {hostname}...");
-        if let Err(err) = sethostname(hostname) {
-            log!("failed to change hostname: {}", err);
+        if let Err(err) = sethostname(&hostname) {
+            log!(
+                "sethostname failed ({}), trying /proc/sys/kernel/hostname",
+                err
+            );
+            if let Err(e) = std::fs::write("/proc/sys/kernel/hostname", hostname.as_bytes()) {
+                log!("failed to set hostname via /proc: {}", e);
+            }
         }
     } else {
         log!("virtme_hostname is not defined");

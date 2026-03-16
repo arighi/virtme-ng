@@ -292,7 +292,7 @@ symlink_fds() {
 configure_hostname() {
     if [[ -n ${virtme_hostname:-} ]]; then
         log "Setting hostname to $virtme_hostname..."
-        hostname "$virtme_hostname"
+        hostname "$virtme_hostname" 2> /dev/null || echo "$virtme_hostname" > /proc/sys/kernel/hostname
     else
         log "virtme_hostname is not defined"
     fi
