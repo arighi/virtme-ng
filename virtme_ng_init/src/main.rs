@@ -385,19 +385,27 @@ fn override_system_files() {
     generate_lvm().ok();
 }
 
+fn can_run_busybox(path: &str) -> bool {
+    let status = Command::new(path)
+        .arg("true")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    matches!(status, Ok(status) if status.success())
+}
+
 fn find_busybox() -> Option<String> {
+    if let Ok(path) = env::var("virtme_busybox") {
+        if can_run_busybox(&path) {
+            return Some(path);
+        }
+    }
+
     let binaries = ["busybox-static", "busybox"];
     for bin in binaries {
-        let status = Command::new(bin)
-            .arg("true")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        match status {
-            Ok(_) => return Some(bin.to_string()),
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(_) => continue,
+        if can_run_busybox(bin) {
+            return Some(bin.to_string());
         }
     }
     None

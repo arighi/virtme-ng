@@ -331,7 +331,9 @@ override_system_files() {
 }
 
 find_busybox() {
-    if command -v busybox-static &> /dev/null; then
+    if [[ -n ${virtme_busybox:-} ]] && "$virtme_busybox" true &> /dev/null; then
+        echo "$virtme_busybox"
+    elif command -v busybox-static &> /dev/null; then
         echo busybox-static
     elif command -v busybox &> /dev/null; then
         echo busybox

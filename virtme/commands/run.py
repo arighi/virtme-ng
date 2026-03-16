@@ -1476,6 +1476,17 @@ def do_it() -> int:
             [f"systemd.mask={unit}" for unit in get_conf("systemd.masks") or []]
         )
 
+    host_busybox = None
+    busybox_guest_path = None
+    if args.busybox is not None:
+        host_busybox = os.path.realpath(os.path.abspath(args.busybox))
+        if not os.path.isfile(host_busybox):
+            print(f"busybox {host_busybox} does not exist", file=sys.stderr)
+            raise SilentError()
+        rel_busybox = get_guest_relative_path(host_busybox, args.root)
+        if rel_busybox is not None:
+            busybox_guest_path = os.path.join("/", rel_busybox)
+
     if args.root == "/":
         if args.systemd:
             fstab_path = get_conf("systemd.fstab")
@@ -1511,6 +1522,23 @@ def do_it() -> int:
             + "virtme.guesttools /run/virtme/guesttools",
             f"mount --bind {fstab_path} /etc/fstab",
         ]
+        if host_busybox is not None and busybox_guest_path is None:
+            export_virtfs(
+                qemu,
+                arch,
+                qemuargs,
+                VirtFSConfig(os.path.dirname(host_busybox), "virtme.busybox"),
+            )
+            initsh.extend(
+                [
+                    "mkdir -p /run/virtme/busybox",
+                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
+                    + "virtme.busybox /run/virtme/busybox",
+                ]
+            )
+            busybox_guest_path = os.path.join(
+                "/run/virtme/busybox", os.path.basename(host_busybox)
+            )
         if args.systemd:
             initsh.extend(
                 [
@@ -2001,6 +2029,8 @@ def do_it() -> int:
         and os.access(os.path.join(args.root, "root"), os.R_OK | os.W_OK | os.X_OK)
     ):
         kernelargs.append("virtme_root_user=1")
+    if busybox_guest_path is not None:
+        kernelargs.append(f"virtme_busybox={busybox_guest_path}")
 
     initrdpath: str | None
 
