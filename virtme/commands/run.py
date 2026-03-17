@@ -2160,7 +2160,11 @@ def save_terminal_settings():
 
 def restore_terminal_settings(settings):
     if settings is not None:
-        termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, settings)
+        old = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
+        try:
+            termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, settings)
+        finally:
+            signal.signal(signal.SIGTTOU, old)
 
 
 def signal_handler(_signum, _frame):
