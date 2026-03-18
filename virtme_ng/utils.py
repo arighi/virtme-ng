@@ -19,6 +19,11 @@ CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
 SERIAL_GETTY_DIR = Path(CACHE_DIR, "serial-getty@.service.d")
 SERIAL_GETTY_FILE = Path(SERIAL_GETTY_DIR, "virtme-ng.conf")
 
+# When using external rootfs, the kernel cmdline should be kept under 896 bytes
+# to maximize compatibility with old systems. This number is the legacy hardlimit
+# for s390x hosts.
+KERNEL_CMDLINE_MAX = 896
+
 # NOTE: this must stay in sync with README.md
 CONF_DEFAULT = {
     "default_opts": {},

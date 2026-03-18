@@ -28,6 +28,7 @@ from typing import Any, NoReturn
 from virtme_ng.utils import (
     CACHE_DIR,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
+    KERNEL_CMDLINE_MAX,
     SERIAL_GETTY_DIR,
     SERIAL_GETTY_FILE,
     SSH_CONF_FILE,
@@ -928,6 +929,25 @@ def quote_karg(arg: str) -> str:
     return arg
 
 
+def create_guest_init_script(root: str, initsh: str) -> str | None:
+    try:
+        script_fd, script_host_path = tempfile.mkstemp(
+            prefix="virtme-init-",
+            dir=root,
+            text=True,
+        )
+        with os.fdopen(script_fd, "w", encoding="utf-8") as script_file:
+            script_file.write(f"{initsh}\n")
+        os.chmod(script_host_path, 0o644)
+        atexit.register(
+            lambda path=script_host_path: os.path.exists(path) and os.unlink(path)
+        )
+    except OSError:
+        return None
+
+    return f"/{os.path.basename(script_host_path)}"
+
+
 # Validate name=path arguments from --disk and --blk-disk
 def sanitize_disk_args(func: str, arg: str) -> tuple[str, str]:
     namefile = arg.split("=", 1)
@@ -1476,6 +1496,17 @@ def do_it() -> int:
             [f"systemd.mask={unit}" for unit in get_conf("systemd.masks") or []]
         )
 
+    host_busybox = None
+    busybox_guest_path = None
+    if args.busybox is not None:
+        host_busybox = os.path.realpath(os.path.abspath(args.busybox))
+        if not os.path.isfile(host_busybox):
+            print(f"busybox {host_busybox} does not exist", file=sys.stderr)
+            raise SilentError()
+        rel_busybox = get_guest_relative_path(host_busybox, args.root)
+        if rel_busybox is not None:
+            busybox_guest_path = os.path.join("/", rel_busybox)
+
     if args.root == "/":
         if args.systemd:
             fstab_path = get_conf("systemd.fstab")
@@ -1511,6 +1542,23 @@ def do_it() -> int:
             + "virtme.guesttools /run/virtme/guesttools",
             f"mount --bind {fstab_path} /etc/fstab",
         ]
+        if host_busybox is not None and busybox_guest_path is None:
+            export_virtfs(
+                qemu,
+                arch,
+                qemuargs,
+                VirtFSConfig(os.path.dirname(host_busybox), "virtme.busybox"),
+            )
+            initsh.extend(
+                [
+                    "mkdir -p /run/virtme/busybox",
+                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
+                    + "virtme.busybox /run/virtme/busybox",
+                ]
+            )
+            busybox_guest_path = os.path.join(
+                "/run/virtme/busybox", os.path.basename(host_busybox)
+            )
         if args.systemd:
             initsh.extend(
                 [
@@ -2001,6 +2049,8 @@ def do_it() -> int:
         and os.access(os.path.join(args.root, "root"), os.R_OK | os.W_OK | os.X_OK)
     ):
         kernelargs.append("virtme_root_user=1")
+    if busybox_guest_path is not None:
+        kernelargs.append(f"virtme_busybox={busybox_guest_path}")
 
     initrdpath: str | None
 
@@ -2081,6 +2131,20 @@ def do_it() -> int:
     # Now that we're done setting up kernelargs, append user-specified args
     # and then initargs
     kernelargs.extend(args.kopt)
+
+    # Check if kernel cmdline exceed limit when using external roots.
+    # This can happen quite easily in architectures such as legacy s390:
+    #   qemu-system-s390x: kernel command line exceeds maximum size: 1232 > 896
+    # Other architectures such as riscv and arm have 1024 (which currently makes most
+    # sense to be used with --root, too), while the rest will have at least 2048.
+    # This should be safe overall for the regular x86_64 args.root == / workflow,
+    # otherwise this guard could be lifted in the future.
+    if args.root != "/":
+        projected_cmdline = " ".join(quote_karg(arg) for arg in kernelargs + initcmds)
+        if len(projected_cmdline.encode("utf-8")) > KERNEL_CMDLINE_MAX:
+            guest_initsh = create_guest_init_script(args.root, "; ".join(initsh))
+            if guest_initsh is not None:
+                initcmds = ["init=/bin/sh", guest_initsh]
 
     # Unknown options get turned into arguments to init, which is annoying
     # because we're explicitly passing '--' to set the arguments directly.

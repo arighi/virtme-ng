@@ -629,7 +629,7 @@ ARCH_MAPPING = {
         "cross_compile": "arm-linux-gnueabihf-",
         "kernel_target": "",
         "kernel_image": "zImage",
-        "max-cpus": 4,
+        "max-cpus": 1,
     },
     "ppc64el": {
         "qemu_name": "ppc64",

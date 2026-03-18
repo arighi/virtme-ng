@@ -264,8 +264,14 @@ fn configure_limits() {
 fn configure_hostname() {
     if let Ok(hostname) = env::var("virtme_hostname") {
         log!("Setting hostname to {hostname}...");
-        if let Err(err) = sethostname(hostname) {
-            log!("failed to change hostname: {}", err);
+        if let Err(err) = sethostname(&hostname) {
+            log!(
+                "sethostname failed ({}), trying /proc/sys/kernel/hostname",
+                err
+            );
+            if let Err(e) = std::fs::write("/proc/sys/kernel/hostname", hostname.as_bytes()) {
+                log!("failed to set hostname via /proc: {}", e);
+            }
         }
     } else {
         log!("virtme_hostname is not defined");
@@ -385,19 +391,27 @@ fn override_system_files() {
     generate_lvm().ok();
 }
 
+fn can_run_busybox(path: &str) -> bool {
+    let status = Command::new(path)
+        .arg("true")
+        .stdin(Stdio::null())
+        .stdout(Stdio::null())
+        .stderr(Stdio::null())
+        .status();
+    matches!(status, Ok(status) if status.success())
+}
+
 fn find_busybox() -> Option<String> {
+    if let Ok(path) = env::var("virtme_busybox") {
+        if can_run_busybox(&path) {
+            return Some(path);
+        }
+    }
+
     let binaries = ["busybox-static", "busybox"];
     for bin in binaries {
-        let status = Command::new(bin)
-            .arg("true")
-            .stdin(Stdio::null())
-            .stdout(Stdio::null())
-            .stderr(Stdio::null())
-            .status();
-        match status {
-            Ok(_) => return Some(bin.to_string()),
-            Err(err) if err.kind() == io::ErrorKind::NotFound => continue,
-            Err(_) => continue,
+        if can_run_busybox(bin) {
+            return Some(bin.to_string());
         }
     }
     None
@@ -685,6 +699,7 @@ fn get_network_handle(
     let network_dev_str = network_dev.unwrap();
     log!("setting up network device {}", network_dev_str);
     Some(thread::spawn(move || {
+        utils::run_cmd("ip", &["link", "set", "dev", &network_dev_str, "up"]);
         let script = format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap());
         let mut args = vec![
             "udhcpc",
