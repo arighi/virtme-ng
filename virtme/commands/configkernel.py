@@ -6,11 +6,13 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import argparse
+import io
 import multiprocessing
 import os
 import platform
 import shlex
 import shutil
+import stat
 import subprocess
 import sys
 
@@ -18,10 +20,36 @@ from .. import architectures
 from ..util import SilentError
 
 
-def check_file_arg(filepath):
-    if not os.path.isfile(filepath):
-        raise argparse.ArgumentTypeError(f"'{filepath}' is not a valid file.")
-    return filepath
+def is_readable(path: str) -> str:
+    """Validate path is a readable file (no directories or sockets)."""
+    try:
+        st = os.stat(path)
+    except OSError as error:
+        raise argparse.ArgumentTypeError(
+            f"'{path}' does not exist or is not accessible: {error}"
+        ) from error
+
+    if stat.S_ISDIR(st.st_mode):
+        raise argparse.ArgumentTypeError(f"'{path}' is a directory")
+
+    if stat.S_ISSOCK(st.st_mode):
+        raise argparse.ArgumentTypeError(f"'{path}' is a socket")
+
+    try:
+        fd = os.open(path, os.O_RDONLY | os.O_NONBLOCK)
+    except OSError as error:
+        raise argparse.ArgumentTypeError(
+            f"'{path}' is not readable via os.open(): {error}"
+        ) from error
+    os.close(fd)
+    return path
+
+
+def check_file_arg(filepath: str) -> str:
+    """Accept a config file path or '-' for stdin."""
+    if filepath == "-":
+        return "-"
+    return is_readable(filepath)
 
 
 def make_parser():
@@ -49,7 +77,7 @@ def make_parser():
         action="append",
         type=check_file_arg,
         metavar="CUSTOM",
-        help="Use a custom config snippet file to override specific config options",
+        help="Use a custom config snippet file (or '-' for stdin) to override config",
     )
 
     parser.add_argument(
@@ -333,10 +361,16 @@ def do_it():
 
     # else we make a fresh config
     custom_conf = []
+    stdin_content = None
     if args.custom:
         for conf_chunk in args.custom:
-            with open(conf_chunk, encoding="utf-8") as fd:
-                custom_conf += fd.readlines()
+            if conf_chunk == "-":
+                if stdin_content is None:
+                    stdin_content = sys.stdin.read()
+                custom_conf += io.StringIO(stdin_content).readlines()
+            else:
+                with open(conf_chunk, encoding="utf-8") as fd:
+                    custom_conf += fd.readlines()
 
     if args.verbose:
         print(f"custom:\n{custom_conf}")

@@ -35,7 +35,7 @@ from virtme_ng.utils import get_conf, spinner_decorator
 from virtme_ng.version import VERSION
 
 
-def check_call_cmd(command, quiet=False, dry_run=False):
+def check_call_cmd(command, quiet=False, dry_run=False, pass_stdin=False):
     if dry_run:
         print(shlex.join(command))
         return
@@ -44,7 +44,7 @@ def check_call_cmd(command, quiet=False, dry_run=False):
         command,
         stdout=PIPE,
         stderr=PIPE,
-        stdin=DEVNULL,
+        stdin=None if pass_stdin else DEVNULL,
     ) as process:
         process.stdout.flush()
         process.stderr.flush()
@@ -244,8 +244,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--custom",
         "-f",
         action="append",
-        help="Use one (or more) specific kernel .config snippet "
-        "to override default config settings",
+        help="Use one (or more) kernel .config snippet files, or '-' for stdin",
     )
 
     parser.add_argument(
@@ -777,6 +776,7 @@ class KernelSource:
             cmd,
             quiet=quiet,
             dry_run=args.dry_run and not configkernel_dry_run,
+            pass_stdin="-" in (args.config or []),
         )
 
     def _make_remote(self, args, make_command):
