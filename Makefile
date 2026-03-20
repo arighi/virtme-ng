@@ -7,7 +7,7 @@ GIT_DESCRIBE := $(shell git describe --always --long --dirty)
 
 all: init
 
-virtme/guest/bin/virtme-ng-init: virtme_ng_init/src/*.rs
+virtme/guest/bin/virtme-ng-init: virtme_ng_init/src/*.rs virtme_ng_init/Cargo.*
 	BUILD_VIRTME_NG_INIT=1 python3 setup.py build
 
 init: virtme/guest/bin/virtme-ng-init
