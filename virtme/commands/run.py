@@ -490,11 +490,15 @@ class Kernel:
 
 def get_rootfs_from_kernel_path(path):
     while path and path != "/" and not os.path.exists(path + "/lib/modules"):
+        # Some packages (e.g. .debs) might use /usr without /lib
+        if os.path.exists(path + "/usr/lib/modules"):
+            path += "/usr"
+            break
         path, _ = os.path.split(path)
     # If a distro, like openSUSE Tumbleweed, has /lib symlinked to /usr/lib,
     # the rootfs may be mistakenly identified as /usr. In such cases, ensure to
     # get the rootfs from one level higher.
-    if path.endswith("/usr"):
+    if path.endswith("/usr") and os.path.islink(path + "/../lib"):
         path, _ = os.path.split(path)
     return os.path.abspath(path)
 
