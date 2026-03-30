@@ -629,6 +629,9 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 if not os.path.exists(mod_file):
                     depmod = find_binary_or_raise(["depmod"])
 
+                    if args.verbose:
+                        sys.stderr.write("virtme: generating modules.dep file\n")
+
                     # Try to refresh modules directory. Some packages (e.g., debs)
                     # don't ship all the required modules information, so we
                     # need to refresh the modules directory using depmod.
