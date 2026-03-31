@@ -1200,11 +1200,18 @@ class KernelSource:
             self.virtme_param["remote_cmd"] = ""
 
     def _get_virtme_disk(self, args):
+        def ensure_name(dsk: str) -> str:
+            if "=" not in dsk:
+                return f"{dsk}={dsk}"
+            return dsk
+
         disk_str = ""
         for dsk in args.scsi_disk:
-            disk_str += f"--scsi-disk {dsk}={dsk} "
+            dsk = ensure_name(dsk)
+            disk_str += f"--scsi-disk {shlex.quote(dsk)} "
         for dsk in args.blk_disk:
-            disk_str += f"--blk-disk {dsk}={dsk} "
+            dsk = ensure_name(dsk)
+            disk_str += f"--blk-disk {shlex.quote(dsk)} "
         self.virtme_param["disk"] = disk_str
 
     def _get_virtme_sound(self, args):
