@@ -405,12 +405,31 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         + "The last octet will be incremented for the next network devices.",
     )
 
+    # legacy alias (`vng --disk` and `virtme-run --disk` behavior is historically inconsistent)
     parser.add_argument(
         "--disk",
-        "-D",
+        # "-D",  # explicitly moved to `--blk-disk` to preserve behavior
         action="append",
+        default=[],
+        metavar="PATH",
+        help=argparse.SUPPRESS,
+    )
+
+    parser.add_argument(
+        "--scsi-disk",
+        action="append",
+        default=[],
         metavar="PATH",
         help="Add a file as virtio-scsi disk (can be used multiple times)",
+    )
+
+    parser.add_argument(
+        "--blk-disk",
+        "-D",
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Add a file as virtio-blk disk (can be used multiple times)",
     )
 
     parser.add_argument(
@@ -1181,13 +1200,12 @@ class KernelSource:
             self.virtme_param["remote_cmd"] = ""
 
     def _get_virtme_disk(self, args):
-        if args.disk is not None:
-            disk_str = ""
-            for dsk in args.disk:
-                disk_str += f"--blk-disk {dsk}={dsk} "
-            self.virtme_param["disk"] = disk_str
-        else:
-            self.virtme_param["disk"] = ""
+        disk_str = ""
+        for dsk in args.scsi_disk:
+            disk_str += f"--scsi-disk {dsk}={dsk} "
+        for dsk in args.blk_disk:
+            disk_str += f"--blk-disk {dsk}={dsk} "
+        self.virtme_param["disk"] = disk_str
 
     def _get_virtme_sound(self, args):
         if args.sound:
@@ -1628,6 +1646,13 @@ def do_it() -> int:
     """Main body."""
     argcomplete.autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
+
+    if args.disk:
+        sys.stderr.write(
+            "warning: `--disk` is deprecated, use `--blk-disk` instead.\n"
+        )
+        args.blk_disk.extend(args.disk)
+        args.disk = []
 
     # Handle --mcp option early (it's a server mode, not a normal
     # operation).
