@@ -20,6 +20,7 @@ import sys
 import tempfile
 import termios
 from base64 import b64encode
+from dataclasses import dataclass
 from pathlib import Path
 from shutil import which
 from time import sleep
@@ -966,18 +967,26 @@ def create_guest_init_script(root: str, initsh: str) -> str | None:
     return f"/{os.path.basename(script_host_path)}"
 
 
-# Validate name=path arguments from --disk and --blk-disk
-def sanitize_disk_args(func: str, arg: str) -> tuple[str, str]:
-    namefile = arg.split("=", 1)
-    if len(namefile) != 2:
-        arg_fail(f"invalid argument to {func}")
-    name, fn = namefile
-    if "=" in fn or "," in fn:
-        arg_fail(f"{func} filenames cannot contain '=' or ','")
-    if "=" in name or "," in name:
-        arg_fail(f"{func} device names cannot contain '=' or ','")
+@dataclass(kw_only=True)
+class DiskArg:
+    name: str
+    path: str
 
-    return name, fn
+    # Validate name=path arguments to --scsi-disk and --blk-disk
+    @classmethod
+    def parse(cls, func: str, arg: str) -> "DiskArg":
+        name, sep, fn = arg.partition("=")
+        if not (name and sep and fn):
+            arg_fail(f"invalid argument to {func}: {arg}")
+        if "=" in fn or "," in fn:
+            arg_fail(f"{func} filenames cannot contain '=' or ',': {fn}")
+        if "=" in name or "," in name:
+            arg_fail(f"{func} device names cannot contain '=' or ',': {name}")
+
+        return cls(
+            name=name,
+            path=fn,
+        )
 
 
 def can_access_file(path):
@@ -1763,15 +1772,25 @@ def do_it() -> int:
     if args.blk_disk:
         for i, d in enumerate(args.blk_disk):
             driveid = f"blk-disk{i}"
-            name, fn = sanitize_disk_args("--blk-disk", d)
+            disk = DiskArg.parse("--blk-disk", d)
+
+            drive_opts = [
+                "if=none",
+                f"id={driveid}",
+                f"file={disk.path}",
+            ]
+            device_opts = [
+                arch.virtio_dev_type("blk"),
+                f"drive={driveid}",
+                f"serial={disk.name}",
+            ]
+
             qemuargs.extend(
                 [
                     "-drive",
-                    f"if=none,id={driveid},file={fn}",
+                    ",".join(o for o in drive_opts if o is not None),
                     "-device",
-                    "{},drive={},serial={}".format(
-                        arch.virtio_dev_type("blk"), driveid, name
-                    ),
+                    ",".join(o for o in device_opts if o is not None),
                 ]
             )
 
@@ -1780,13 +1799,27 @@ def do_it() -> int:
 
         for i, d in enumerate(args.scsi_disk):
             driveid = f"disk{i}"
-            name, fn = sanitize_disk_args("--scsi-disk", d)
+            disk = DiskArg.parse("--scsi-disk", d)
+
+            drive_opts = [
+                "if=none",
+                f"id={driveid}",
+                f"file={disk.path}",
+            ]
+            device_opts = [
+                "scsi-hd",
+                f"drive={driveid}",
+                "vendor=virtme",
+                "product=disk",
+                f"serial={disk.name}",
+            ]
+
             qemuargs.extend(
                 [
                     "-drive",
-                    f"if=none,id={driveid},file={fn}",
+                    ",".join(o for o in drive_opts if o is not None),
                     "-device",
-                    f"scsi-hd,drive={driveid},vendor=virtme,product=disk,serial={name}",
+                    ",".join(o for o in device_opts if o is not None),
                 ]
             )
 
