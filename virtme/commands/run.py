@@ -192,8 +192,16 @@ def make_parser() -> argparse.ArgumentParser:
     g.add_argument(
         "--snaps", action="store_true", help="Allow to execute snaps inside virtme-ng"
     )
+    # legacy alias (`vng --disk` and `virtme-run --disk` behavior is historically inconsistent)
     g.add_argument(
         "--disk",
+        action="append",
+        default=[],
+        metavar="NAME=PATH",
+        help=argparse.SUPPRESS,  # hidden from --help
+    )
+    g.add_argument(
+        "--scsi-disk",
         action="append",
         default=[],
         metavar="NAME=PATH",
@@ -1308,6 +1316,13 @@ _RWDIR_RE = re.compile(f"^({_SAFE_PATH_PATTERN})(?:=({_SAFE_PATH_PATTERN}))?$")
 def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
+    if args.disk:
+        sys.stderr.write(
+            "warning: `--disk` is deprecated, use `--scsi-disk` instead.\n"
+        )
+        args.scsi_disk.extend(args.disk)
+        args.disk = []
+
     if args.client is not None:
         if args.server is not None:
             arg_fail("--client cannot be used with --server.")
@@ -1760,12 +1775,12 @@ def do_it() -> int:
                 ]
             )
 
-    if args.disk:
+    if args.scsi_disk:
         qemuargs.extend(["-device", "{},id=scsi".format(arch.virtio_dev_type("scsi"))])
 
-        for i, d in enumerate(args.disk):
+        for i, d in enumerate(args.scsi_disk):
             driveid = f"disk{i}"
-            name, fn = sanitize_disk_args("--disk", d)
+            name, fn = sanitize_disk_args("--scsi-disk", d)
             qemuargs.extend(
                 [
                     "-drive",
