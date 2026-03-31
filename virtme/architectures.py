@@ -125,7 +125,7 @@ class Arch_x86(Arch):
 
             ret.extend(["-cpu", cpu_str])
         else:
-            ret.extend(["-machine", "q35"])
+            ret.extend(["-machine", "q35", "-cpu", "max"])
 
         return ret
 
