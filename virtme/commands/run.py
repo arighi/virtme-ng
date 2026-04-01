@@ -1272,6 +1272,7 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     CheckHostIP no
     User {username}
     IdentityFile {identity_file}
+    IdentitiesOnly yes
 
     # Disable all kinds of host identity checks, since these addresses are generally ephemeral.
     StrictHostKeyChecking no
