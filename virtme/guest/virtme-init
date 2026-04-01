@@ -313,7 +313,7 @@ generate_sudoers() {
         printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
     fi
     chmod 440 "$tmpfile"
-    if [ ! -f "$real_sudoers" ]; then
+    if [[ ! -f $real_sudoers ]]; then
         touch "$real_sudoers"
     fi
     mount --bind "$tmpfile" "$real_sudoers"
