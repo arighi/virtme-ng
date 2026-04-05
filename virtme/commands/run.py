@@ -490,11 +490,15 @@ class Kernel:
 
 def get_rootfs_from_kernel_path(path):
     while path and path != "/" and not os.path.exists(path + "/lib/modules"):
+        # Some packages (e.g. .debs) might use /usr without /lib
+        if os.path.exists(path + "/usr/lib/modules"):
+            path += "/usr"
+            break
         path, _ = os.path.split(path)
     # If a distro, like openSUSE Tumbleweed, has /lib symlinked to /usr/lib,
     # the rootfs may be mistakenly identified as /usr. In such cases, ensure to
     # get the rootfs from one level higher.
-    if path.endswith("/usr"):
+    if path.endswith("/usr") and os.path.islink(path + "/../lib"):
         path, _ = os.path.split(path)
     return os.path.abspath(path)
 
@@ -624,6 +628,9 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 mod_file = os.path.join(kernel.moddir, "modules.dep")
                 if not os.path.exists(mod_file):
                     depmod = find_binary_or_raise(["depmod"])
+
+                    if args.verbose:
+                        sys.stderr.write("virtme: generating modules.dep file\n")
 
                     # Try to refresh modules directory. Some packages (e.g., debs)
                     # don't ship all the required modules information, so we
