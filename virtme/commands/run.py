@@ -150,7 +150,10 @@ def make_parser() -> argparse.ArgumentParser:
         + "An argument can be optionally specified to start a graphical application.",
     )
     g.add_argument(
-        "--verbose", action="store_true", help="Increase console output verbosity."
+        "--verbose",
+        action="count",
+        default=0,
+        help="Increase console output verbosity.",
     )
     g.add_argument(
         "--net",
@@ -2130,8 +2133,10 @@ def do_it() -> int:
         )
         initrdpath = None
 
-    if args.verbose:
+    if args.verbose >= 2:
         kernelargs.append("debug")
+    elif args.verbose:
+        kernelargs.append("loglevel=7")
     else:
         kernelargs.append("quiet")
         kernelargs.append("loglevel=1")
