@@ -472,6 +472,14 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--jobs",
+        "-j",
+        metavar="N",
+        type=int,
+        help="Build kernel with N jobs (default: number of cores).",
+    )
+
+    parser.add_argument(
         "--build-host",
         action="store",
         help="Perform kernel build on a remote server (ssh access required)",
@@ -661,7 +669,7 @@ REMOTE_BUILD_SCRIPT = """#!/bin/bash
 cd ~/.virtme
 git reset --hard __virtme__
 [ -f debian/rules ] && fakeroot debian/rules clean
-{} {}
+{} {} -j{}
 """
 
 
@@ -812,7 +820,8 @@ class KernelSource:
             tmp.write(
                 REMOTE_BUILD_SCRIPT.format(
                     args.build_host_exec_prefix or "",
-                    shlex.join(make_command) + " -j$(nproc --all)",
+                    shlex.join(make_command),
+                    args.jobs if args.jobs else "$(nproc --all)",
                 )
             )
             tmp.flush()
@@ -901,7 +910,7 @@ class KernelSource:
         make_command += args.envs
         if args.build_host is None:
             # Build the kernel locally
-            make_command += ["-j", self.cpus]
+            make_command += ["-j", str(args.jobs) if args.jobs else self.cpus]
             if args.verbose:
                 print(f"cmd: {shlex.join(make_command)}")
             check_call_cmd(make_command, quiet=not args.verbose, dry_run=args.dry_run)
