@@ -234,6 +234,8 @@ _GENERIC_CONFIG_OPTIONAL = [
     "CONFIG_DRM_VIRTIO_GPU_KMS=y",
     "CONFIG_DRM_BOCHS=y",
     "CONFIG_VIRTIO_IOMMU=y",
+    "###: Graphics -> fbdev support (kernel console, vng --fb)",
+    "CONFIG_DRM_FBDEV_EMULATION=y",
     "##: Sound support",
     "CONFIG_SOUND=y",
     "CONFIG_SND=y",

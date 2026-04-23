@@ -42,8 +42,8 @@ from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, v
 from ..util import SilentError, find_binary_or_raise, get_username
 
 
-def make_parser() -> argparse.ArgumentParser:
-    parser = argparse.ArgumentParser(
+def make_parser() -> "VirtmeArgumentParser":
+    parser = VirtmeArgumentParser(
         description="Virtualize your system (or another) under a kernel image",
     )
 
@@ -148,6 +148,11 @@ def make_parser() -> argparse.ArgumentParser:
         const="",
         help="Show graphical output instead of using a console. "
         + "An argument can be optionally specified to start a graphical application.",
+    )
+    g.add_argument(
+        "--fb",
+        action="store_true",
+        help="Show graphical console, but do not start any graphics server.",
     )
     g.add_argument(
         "--verbose",
@@ -439,6 +444,23 @@ def make_parser() -> argparse.ArgumentParser:
     )
 
     return parser
+
+
+# pylint: disable=no-member
+class VirtmeNamespace(argparse.Namespace):
+    @property
+    def video(self) -> bool:
+        return self.graphics is not None or self.fb
+
+
+class VirtmeArgumentParser(argparse.ArgumentParser):
+    def parse_args(  # type: ignore[override], pylint: disable=arguments-differ
+        self, args=None
+    ) -> VirtmeNamespace:
+        return super().parse_args(
+            args=args,
+            namespace=VirtmeNamespace(),
+        )
 
 
 _ARGPARSER = make_parser()
@@ -1664,7 +1686,7 @@ def do_it() -> int:
 
     kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
 
-    if args.graphics is None and not args.script_sh and not args.script_exec:
+    if not args.script_sh and not args.script_exec:
         qemuargs.extend(["-echr", "1"])
 
         if args.systemd:
@@ -1680,6 +1702,9 @@ def do_it() -> int:
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
             kernelargs.extend(["console=hvc0"])
+            if args.video:
+                # however, redirect the "main" console back to VT so that guest init would spawn the session there
+                kernelargs.extend(["virtme_console=tty1"])
         else:
             print(
                 "WARNING: unable to write kernel messages, try to run vng with a valid PTS "
@@ -1706,6 +1731,7 @@ def do_it() -> int:
         if not args.disable_monitor:
             qemuargs.extend(["-mon", "chardev=console"])
 
+    if not args.video and not args.script_sh and not args.script_exec:
         if args.nvgpu is None:
             qemuargs.extend(arch.qemu_nodisplay_args())
         else:
@@ -1808,7 +1834,7 @@ def do_it() -> int:
         )
 
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
-        if args.graphics is None:
+        if not args.video:
             if args.nvgpu is None:
                 qemuargs.extend(arch.qemu_nodisplay_args())
             else:
@@ -1949,7 +1975,7 @@ def do_it() -> int:
             show_boot_console=args.show_boot_console,
         )
 
-    if args.graphics is not None and args.nvgpu is None:
+    if args.video and args.nvgpu is None:
         video_args = arch.qemu_display_args()
         if video_args:
             qemuargs.extend(video_args)
