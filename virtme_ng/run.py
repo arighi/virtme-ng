@@ -407,12 +407,34 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         + "The last octet will be incremented for the next network devices.",
     )
 
+    # legacy alias (`vng --disk` and `virtme-run --disk` behavior is historically inconsistent)
     parser.add_argument(
         "--disk",
-        "-D",
+        # "-D",  # explicitly moved to `--blk-disk` to preserve behavior
         action="append",
         metavar="PATH",
-        help="Add a file as virtio-scsi disk (can be used multiple times)",
+        help=argparse.SUPPRESS,
+    )
+
+    parser.add_argument(
+        "--scsi-disk",
+        action="append",
+        metavar="[NAME=]PATH[,OPT...]",
+        help="Add a file as virtio-scsi disk (can be used multiple times), "
+        + "available at /dev/disk/by-id/scsi-0virtme_disk_NAME. "
+        + "OPTs are comma-separated KEY[=VALUE] pairs; "
+        + "pass 'help' to list them.",
+    )
+
+    parser.add_argument(
+        "--blk-disk",
+        "-D",
+        action="append",
+        metavar="[NAME=]PATH[,OPT...]",
+        help="Add a file as virtio-blk disk (can be used multiple times), "
+        + "available at /dev/disk/by-id/virtio-virtme_disk_blk_NAME. "
+        + "OPTs are comma-separated KEY[=VALUE] pairs; "
+        + "pass 'help' to list them.",
     )
 
     parser.add_argument(
@@ -1183,13 +1205,30 @@ class KernelSource:
             self.virtme_param["remote_cmd"] = ""
 
     def _get_virtme_disk(self, args):
-        if args.disk is not None:
-            disk_str = ""
-            for dsk in args.disk:
-                disk_str += f"--blk-disk {dsk}={dsk} "
-            self.virtme_param["disk"] = disk_str
-        else:
-            self.virtme_param["disk"] = ""
+        def ensure_name(dsk: str) -> str:
+            """
+            `dsk` is a comma-separated list of disk options (KEY=VAL), with the first
+            option specifying the disk name and path (NAME=PATH). As an exception,
+            NAME can be omitted (but the underlying implementation does not know that).
+            This function ensures that the first option has a NAME, and adds one
+            equal to the PATH if it is missing.
+            """
+            items = dsk.split(",")
+            first = items[0]
+            if "=" not in first:
+                return f"{first}={dsk}"
+            return dsk
+
+        disk_str = ""
+        if args.scsi_disk is not None:
+            for dsk in args.scsi_disk:
+                dsk = ensure_name(dsk)
+                disk_str += f"--scsi-disk {shlex.quote(dsk)} "
+        if args.blk_disk is not None:
+            for dsk in args.blk_disk:
+                dsk = ensure_name(dsk)
+                disk_str += f"--blk-disk {shlex.quote(dsk)} "
+        self.virtme_param["disk"] = disk_str
 
     def _get_virtme_sound(self, args):
         if args.sound:
@@ -1731,6 +1770,11 @@ def do_it() -> int:
     """Main body."""
     argcomplete.autocomplete(_ARGPARSER)
     args = _ARGPARSER.parse_args()
+
+    if args.disk:
+        sys.stderr.write("warning: `--disk` is deprecated, use `--blk-disk` instead.\n")
+        args.blk_disk.extend(args.disk)
+        args.disk = []
 
     # Handle --mcp option early (it's a server mode, not a normal
     # operation).
