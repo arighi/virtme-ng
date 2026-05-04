@@ -250,7 +250,7 @@ Examples
    $ vng --net user
    ```
 
- - Run the previously compiled kernel adding an additional virtio-scsi device:
+ - Run the previously compiled kernel adding an additional virtio-blk device:
    ```shell
    $ qemu-img create -f qcow2 /tmp/disk.img 8G
    $ vng --disk /tmp/disk.img
