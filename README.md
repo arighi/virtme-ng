@@ -29,29 +29,29 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>
 Quick start
 ===========
 
-```shell
- $ uname -r
- 5.19.0-23-generic
- $ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
- $ cd linux
- $ vng --build --commit v6.2-rc4
- ...
- $ vng
-           _      _
-    __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
-    \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |
-     \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |
-      \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
-                                                 |___/
-    kernel version: 6.2.0-rc4-virtme x86_64
+```console
+$ uname -r
+5.19.0-23-generic
+$ git clone git://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git
+$ cd linux
+$ vng --build --commit v6.2-rc4
+...
+$ vng
+          _      _
+   __   _(_)_ __| |_ _ __ ___   ___       _ __   __ _
+   \ \ / / |  __| __|  _   _ \ / _ \_____|  _ \ / _  |
+    \ V /| | |  | |_| | | | | |  __/_____| | | | (_| |
+     \_/ |_|_|   \__|_| |_| |_|\___|     |_| |_|\__  |
+                                                |___/
+   kernel version: 6.2.0-rc4-virtme x86_64
 
- $ uname -r
- 6.2.0-rc4-virtme
- ^
- |___ Now you have a shell inside a virtualized copy of your entire system,
-      that is running the new kernel! \o/
+$ uname -r
+6.2.0-rc4-virtme
+^
+|___ Now you have a shell inside a virtualized copy of your entire system,
+     that is running the new kernel! \o/
 
- Then simply type "exit" to return back to the real system.
+Then simply type "exit" to return back to the real system.
 ```
 
 Installation
@@ -67,7 +67,7 @@ Installation
 * The latest stable version is also published on
   [pypi](https://pypi.org/project/virtme-ng/):
 
-  ```shell
+  ```console
   $ pip install virtme-ng
   ```
 
@@ -78,7 +78,7 @@ Installation
 
   To install virtme-ng from source, you can clone this git repository and build
   a standalone virtme-ng running the following commands:
-  ```shell
+  ```console
   $ git clone https://github.com/arighi/virtme-ng.git
   $ cd virtme-ng
   $ BUILD_VIRTME_NG_INIT=1 pip3 install .
@@ -87,12 +87,12 @@ Installation
   There are some extra dependences on top of the ones mentioned in the
   [Requirements](#requirements) section. If you are on Debian/Ubuntu, you may
   need to install the following packages to build virtme-ng from source properly:
-  ```shell
+  ```console
   $ sudo apt install python3-pip flake8 pylint cargo rustc qemu-system-x86
   ```
 
   If you'd prefer to use `uv`:
-  ```shell
+  ```console
   $ BUILD_VIRTME_NG_INIT=1 uv tool install .
   ```
 
@@ -102,7 +102,7 @@ Installation
   requirements installed (optionally you can build `virtme-ng-init` for a faster
   boot, by running `make`), then from the source directory simply run any
   virtme-ng command, such as:
-  ```shell
+  ```console
   $ ./vng --help
   ```
 
@@ -141,7 +141,7 @@ Requirements
 
  * Optionally, if the shell completion is not available (e.g. when installed
    from pip or from source), you can install `shtab` and run:
-   ```shell
+   ```console
    # Bash
    $ mkdir -p ~/.local/share/bash-completion/completions/
    $ shtab --shell=bash -u virtme_ng.run.make_parser > ~/.local/share/bash-completion/completions/vng
@@ -185,51 +185,51 @@ Examples
  - Build a kernel from a clean local kernel source directory (if a `.config` is
    not available virtme-ng will automatically create a minimum `.config` with
    all the required feature to boot the instance):
-   ```shell
+   ```console
    $ vng -b
    ```
 
  - Build tag v6.1-rc3 from a local kernel git repository:
-   ```shell
+   ```console
    $ vng -b -c v6.1-rc3
    ```
 
  - Generate a minimal kernel `.config` in the current kernel build directory:
-   ```shell
+   ```console
    $ vng --kconfig
    ```
 
  - Print to stdout the kernel config flags set by virtme-ng:
-   ```shell
+   ```console
    $ vng --kconfig --dry-run
    ```
 
  - Run a kernel previously compiled from a local git repository in the current
    working directory:
-   ```shell
+   ```console
    $ vng
    ```
 
  - Run an interactive virtme-ng session using the same kernel as the host:
-   ```shell
+   ```console
    $ vng -r
    ```
 
  - Test installed kernel 6.2.0-21-generic kernel
    (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
-   ```shell
+   ```console
    $ vng -r 6.2.0-21-generic
    ```
 
  - Run a pre-compiled vanilla v6.6 kernel fetched from the Ubuntu mainline
    builds repository (useful to test a specific kernel version directly and
    save a lot of build time):
-   ```shell
+   ```console
    $ vng -r v6.6
    ```
 
  - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
-   ```shell
+   ```console
    $ mkdir test
    $ cd test
    $ apt download linux-image-6.2.0-1003-lowlatency linux-modules-6.2.0-1003-lowlatency
@@ -239,19 +239,19 @@ Examples
 
  - Build the tip of the latest kernel on a remote build host called "builder",
    running make inside a specific build chroot (managed remotely by schroot):
-   ```shell
+   ```console
    $ vng --build --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
    ```
 
  - Run the previously compiled kernel from the current working directory and
    enable networking:
-   ```shell
+   ```console
    $ vng --net user
    ```
 
  - Run the previously compiled kernel adding an additional virtio-blk device:
-   ```shell
+   ```console
    $ qemu-img create -f qcow2 /tmp/disk.img 8G
    $ vng --disk /tmp/disk.img
    ```
@@ -259,42 +259,42 @@ Examples
  - Use a disk VM built using Nix as a package manager (example [here](tools))
    and containing tools, e.g. to run the tests in a more reproducible way:
 
-   ```shell
+   ```console
    # mkdir -p /nix/store
    $ vng -r --disk nix-store.erofs.disk
-     > sudo mount /dev/vda /nix/store
-     > PATH="/nix/store/tools/bin:${PATH}"
-     > hello
-     Hello, world!
+   > sudo mount /dev/vda /nix/store
+   > PATH="/nix/store/tools/bin:${PATH}"
+   > hello
+   Hello, world!
    ```
 
  - Recompile the kernel passing some env variables to enable Rust support
    (using specific versions of the Rust toolchain binaries):
-   ```shell
+   ```console
    $ vng --build RUSTC=rustc-1.62 BINDGEN=bindgen-0.56 RUSTFMT=rustfmt-1.62
    ```
 
  - Build the arm64 kernel (using a separate chroot in /opt/chroot/arm64 as the
    main filesystem):
-   ```shell
+   ```console
    $ vng --build --arch arm64 --root /opt/chroot/arm64/
    ```
 
  - Build the kernel using a separate build directory, and run it, in verbose:
-   ```shell
+   ```console
    $ export KBUILD_OUTPUT=.virtme/build
    $ vng --build --verbose
    $ vng --verbose
    ```
 
  - Same example, but using `O=`:
-   ```shell
+   ```console
    $ vng --build --verbose -- O=.virtme/build
    $ vng --verbose -- O=.virtme/build
    ```
 
  - Accelerate the kernel rebuilds using CCache (if installed):
-   ```shell
+   ```console
    $ PATH="/usr/lib/ccache:${PATH}" \
        KBUILD_BUILD_TIMESTAMP=0 \
        vng --build
@@ -303,7 +303,7 @@ Examples
 
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
-   ```shell
+   ```console
    $ vng -- uname -r | cowsay
     __________________
    < 6.1.0-rc6-virtme >
@@ -319,7 +319,7 @@ Examples
    kernels installed in the system, passing each other their stdout/stdin and
    return all the generated output back to the host (also measure the total
    elapsed time):
-   ```shell
+   ```console
    $ time true | \
    > vng -r 5.19.0-38-generic -e "cat && uname -r" | \
    > vng -r 6.2.0-19-generic  -e "cat && uname -r" | \
@@ -344,7 +344,7 @@ Examples
    ```
 
  - Run the vanilla v6.7-rc5 kernel with an Ubuntu 22.04 rootfs:
-   ```shell
+   ```console
    $ vng -r v6.7-rc5 --user root --root ./rootfs/22.04 --root-release jammy -- cat /etc/lsb-release /proc/version
    ...
    DISTRIB_ID=Ubuntu
@@ -355,7 +355,7 @@ Examples
    ```
 
  - Run with systemd as init:
-   ```shell
+   ```console
    $ sudo vng -r --systemd --exec "systemctl status | head"
    ● virtme-ng
       State: starting
@@ -370,7 +370,7 @@ Examples
    ```
 
  - Run with systemd as init in an external rootfs:
-   ```shell
+   ```console
    $ vng -r --systemd --user root --root ./rootfs/sid --exec "systemctl status | head"
    ● virtme-ng
       State: degraded
@@ -386,7 +386,7 @@ Examples
 
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
-   ```shell
+   ```console
    $ vng -r -m 4G --numa 1G,cpus=0-1,cpus=3 --numa 3G,cpus=2,cpus=4-7 -- numactl -H
    available: 2 nodes (0-1)
    node 0 cpus: 0 1 3
@@ -404,7 +404,7 @@ Examples
  - Run the current kernel creating 4 NUMA nodes of 1GB each and assign
    different distance costs between the NUMA nodes to simulate non-uniform
    memory access:
-   ```shell
+   ```console
    $ vng -r --cpu 8 -m 4G \
    >     --numa 1G,cpus=0-1 --numa 1G,cpus=2-3 \
    >     --numa 1G,cpus=4-5 --numa 1G,cpus=6-7 \
@@ -433,7 +433,7 @@ Examples
    ```
 
  - Run `glxgears` inside a kernel recompiled in the current directory:
-   ```shell
+   ```console
    $ vng -g -- glxgears
 
    (virtme-ng is started in graphical mode)
@@ -441,7 +441,7 @@ Examples
 
  - Execute an `awesome` window manager session with kernel
    6.2.0-1003-lowlatency (installed in the system):
-   ```shell
+   ```console
    $ vng -r 6.2.0-1003-lowlatency -g -- awesome
 
    (virtme-ng is started in graphical mode)
@@ -449,7 +449,7 @@ Examples
 
  - Run the `steam` snap (tested in Ubuntu) inside a virtme-ng instance using
    the 6.2.0-1003-lowlatency kernel:
-   ```shell
+   ```console
    $ vng -r 6.2.0-1003-lowlatency --snaps --net user -g -- /snap/bin/steam
 
    (virtme-ng is started in graphical mode)
@@ -457,7 +457,7 @@ Examples
 
  - Generate a memory dump of a running instance and read 'jiffies' from the
    memory dump using the `drgn` debugger:
-   ```shell
+   ```console
    # Start the vng instance in debug mode
    $ vng --debug
 
@@ -476,7 +476,7 @@ Examples
    ```
 
  - Attach a GDB session to a running instance started with `--debug`:
-   ```shell
+   ```console
    # Start the vng instance in debug mode
    $ vng --debug
 
@@ -495,7 +495,7 @@ Examples
    ```
 
  - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
-   ```shell
+   ```console
    # Start the vng instance with server support:
    $ vng --console
 
@@ -504,7 +504,7 @@ Examples
    ```
 
  - Enable SSH in the vng guest:
-   ```shell
+   ```console
    # Start the vng instance with ssh server support:
    $ vng --ssh
 
@@ -513,7 +513,7 @@ Examples
    ```
  - Generate some results inside the vng guest and copy them back to the
    host using SCP:
-   ```shell
+   ```console
    # Start the vng instance with SSH server support:
    arighi@host~> vng --ssh
    ...
@@ -532,7 +532,7 @@ Examples
    ```
 
  - Run virtme-ng inside a docker container:
-   ```shell
+   ```console
    $ docker run -it --privileged ubuntu:latest /bin/bash
    # apt update
    # echo 'debconf debconf/frontend select Noninteractive' | debconf-set-selections
@@ -548,7 +548,7 @@ Examples
    virtme-ng inside docker.
 
  - Run virtme-ng with GPU passthrough:
-   ```shell
+   ```console
    # Confirm host kernel has VFIO and IOMMU support
    # Check if NVIDIA module is installed on the host
    $ modinfo nvidia
@@ -650,12 +650,12 @@ Starting the MCP Server
 The MCP server can be started in two ways:
 
 1. **Using the vng-mcp binary directly:**
-   ```shell
+   ```console
    $ vng-mcp
    ```
 
 2. **Using the vng command:**
-   ```shell
+   ```console
    $ vng --mcp
    ```
 
@@ -711,7 +711,7 @@ Troubleshooting
 
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:
-   ```shell
+   ```console
    $ groups | grep "kvm\|libvirt"
    ```
 
@@ -726,7 +726,7 @@ Troubleshooting
 
    To fix this you need to add `allow all` to `/etc/qemu/bridge.conf` and set
    the `CAP_NET_ADMIN` capability to `qemu-bridge-helper`, as following:
-   ```shell
+   ```console
    $ sudo filecap /usr/lib/qemu/qemu-bridge-helper net_admin
    ```
 
@@ -740,13 +740,13 @@ Troubleshooting
 
    If the chroot doesn't exist in your system virtme-ng will automatically
    create it using the latest daily build Ubuntu cloud image:
-   ```shell
+   ```console
    $ vng --build --arch riscv64 --root ./tmproot
    ```
 
  - If the build on a remote build host is failing unexpectedly you may want to
    try cleaning up the remote git repository, running:
-   ```shell
+   ```console
    $ vng --clean --build-host HOSTNAME
    ```
 
@@ -767,13 +767,13 @@ Troubleshooting
    especially with stdin/stdout/stderr redirections, make sure that you have
    `udev` installed in your docker image and run the following command before
    using `vng`:
-   ```shell
+   ```console
    $ udevadm trigger --subsystem-match --action=change
    ```
 
  - To mount the legacy CGroup filesystem (v1) layout, add
    `SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1` to the kernel boot options:
-   ```shell
+   ```console
    $ vng -r --append "SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1" -- 'df -T /sys/fs/cgroup/*'
    Filesystem     Type   1K-blocks  Used Available Use% Mounted on
    blkio          cgroup         0     0         0    - /sys/fs/cgroup/blkio
@@ -791,7 +791,7 @@ Troubleshooting
    these errors, but host-side file changes may not be immediately visible
    in the guest. If you observe out-of-sync filesystem issues, you can
    simply force a resync by invalidating the page cache in the guest:
-   ```shell
+   ```console
    # echo 3 > /proc/sys/vm/drop_caches
    ```
 
@@ -804,7 +804,7 @@ virtme-ng uses [pre-commit](https://pre-commit.com/) to perform some checks,
 e.g. code formatting and linting. Therefore it is recommended to set up
 pre-commit for development:
 
-```shell
+```console
 $ cd "$VIRTME_NG"
 $ # Activate pre-commit hooks for virtme-ng
 $ pre-commit install
