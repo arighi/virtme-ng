@@ -256,6 +256,18 @@ Examples
    $ vng --disk /tmp/disk.img
    ```
 
+ - Use a disk VM built using Nix as a package manager (example [here](tools))
+   and containing tools, e.g. to run the tests in a more reproducible way:
+
+   ```shell
+   # mkdir -p /nix/store
+   $ vng -r --disk nix-store.erofs.disk
+     > sudo mount /dev/vda /nix/store
+     > PATH="/nix/store/tools/bin:${PATH}"
+     > hello
+     Hello, world!
+   ```
+
  - Recompile the kernel passing some env variables to enable Rust support
    (using specific versions of the Rust toolchain binaries):
    ```shell
