@@ -15,6 +15,7 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
@@ -30,6 +31,7 @@ from typing import Any, NoReturn
 
 from virtme_ng.utils import (
     CACHE_DIR,
+    DEFAULT_ROOT_GUESTTOOLS,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
     KERNEL_CMDLINE_MAX,
     SERIAL_GETTY_DIR,
@@ -371,6 +373,17 @@ def make_parser() -> "VirtmeArgumentParser":
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
+    )
+    g.add_argument(
+        "--root-guesttools",
+        action="store",
+        nargs="?",
+        const=DEFAULT_ROOT_GUESTTOOLS,
+        metavar="PATH",
+        help=(
+            "Copy guest tools into the guest rootfs at PATH and run them from there "
+            f"(default: {DEFAULT_ROOT_GUESTTOOLS})"
+        ),
     )
     g.add_argument(
         "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
@@ -1558,6 +1571,23 @@ def do_it() -> int:
         if rel_busybox is not None:
             busybox_guest_path = os.path.join("/", rel_busybox)
 
+    rootfs_guesttools = None
+    if args.root_guesttools is not None:
+        if args.root == "/":
+            arg_fail("--root-guesttools requires an external --root")
+        if not os.path.isabs(args.root_guesttools):
+            arg_fail("--root-guesttools must be an absolute guest path")
+        if args.systemd:
+            arg_fail("--root-guesttools cannot be used with --systemd")
+
+        rootfs_guesttools = os.path.normpath(args.root_guesttools)
+        rootfs_guesttools_host = os.path.join(args.root, rootfs_guesttools.lstrip("/"))
+        shutil.copytree(guest_tools_path, rootfs_guesttools_host, dirs_exist_ok=True)
+        rootfs_init = os.path.join(rootfs_guesttools_host, virtme_init_cmd)
+        if not os.path.exists(rootfs_init):
+            rootfs_init_guest = os.path.join(rootfs_guesttools, virtme_init_cmd)
+            arg_fail(f"{rootfs_init_guest} not found in --root")
+
     if args.root == "/":
         if args.systemd:
             fstab_path = get_conf("systemd.fstab")
@@ -1569,6 +1599,14 @@ def do_it() -> int:
             ]
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
+    elif rootfs_guesttools is not None:
+        fstab_path = get_conf("systemd.fstab")
+        initsh = [
+            "mount -t tmpfs run /run",
+            f"mount --bind {fstab_path} /etc/fstab",
+            f"exec {rootfs_guesttools}/{virtme_init_cmd}",
+        ]
+        initcmds = ["init=/bin/sh", "--", "-c", "; ".join(initsh)]
     else:
         os.makedirs(CACHE_DIR, exist_ok=True)
         virtfs_config = VirtFSConfig(

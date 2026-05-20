@@ -29,7 +29,7 @@ import argcomplete
 
 from virtme.util import SilentError, get_username
 from virtme_ng.mainline import KernelDownloader
-from virtme_ng.utils import get_conf, spinner_decorator
+from virtme_ng.utils import DEFAULT_ROOT_GUESTTOOLS, get_conf, spinner_decorator
 from virtme_ng.version import VERSION
 
 
@@ -286,6 +286,18 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="store",
         help="Pass a specific chroot to use inside the virtualized kernel "
         + "(useful with --arch)",
+    )
+
+    parser.add_argument(
+        "--root-guesttools",
+        action="store",
+        nargs="?",
+        const=DEFAULT_ROOT_GUESTTOOLS,
+        metavar="PATH",
+        help=(
+            "Copy guest tools into the guest rootfs at PATH and run them from there "
+            f"(default: {DEFAULT_ROOT_GUESTTOOLS})"
+        ),
     )
 
     parser.add_argument(
@@ -998,6 +1010,14 @@ class KernelSource:
         else:
             self.virtme_param["root"] = ""
 
+    def _get_virtme_root_guesttools(self, args):
+        if args.root_guesttools is not None:
+            self.virtme_param["root_guesttools"] = "--root-guesttools " + shlex.quote(
+                args.root_guesttools
+            )
+        else:
+            self.virtme_param["root_guesttools"] = ""
+
     def _get_virtme_systemd(self, args):
         if args.systemd:
             self.virtme_param["systemd"] = "--systemd"
@@ -1392,6 +1412,7 @@ class KernelSource:
         self._get_virtme_shell(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
+        self._get_virtme_root_guesttools(args)
         self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_rodir(args)
@@ -1447,6 +1468,7 @@ class KernelSource:
             + f"{self.virtme_param['shell']} "
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
+            + f"{self.virtme_param['root_guesttools']} "
             + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['rodir']} "
