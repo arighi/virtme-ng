@@ -853,7 +853,7 @@ class VirtioFS:
         os.system(
             f"{virtiofsd_path} --syslog --no-announce-submounts {acl_opt}"
             + f"--socket-path {self.sock} --shared-dir {path} "
-            + f"--sandbox none -o cache={cache} {stderr} &"
+            + f"--sandbox none --cache {cache} {stderr} &"
         )
         max_attempts = 5
         check_duration = 0.1
