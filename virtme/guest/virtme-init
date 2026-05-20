@@ -306,17 +306,25 @@ setup_network_lo() {
 generate_sudoers() {
     # Setup sudoers
     real_sudoers=/etc/sudoers
-    if [ ! -e ${real_sudoers} ]; then
-        touch ${real_sudoers}
+    # if /etc/sudoers.d exists and is included from /etc/sudoers
+    # (and both are readable by the current user!),
+    # write a drop-in instead of overwriting /etc/sudoers
+    if [[ -f /etc/sudoers && -r /etc/sudoers ]] &&
+        [[ -d /etc/sudoers.d && -r /etc/sudoers.d ]] &&
+        ! find /etc/sudoers.d -maxdepth 1 -type f -not -readable -quit &&
+        grep -q -Fx '@includedir /etc/sudoers.d' /etc/sudoers; then
+        real_sudoers=/etc/sudoers.d/99-virtme
     fi
     tmpfile="$(mktemp --tmpdir=/run/tmp)"
-    echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
+    if [[ $real_sudoers == /etc/sudoers ]]; then
+        echo 'Defaults secure_path="/usr/sbin:/usr/bin:/sbin:/bin"' > "$tmpfile"
+    fi
     echo "root ALL = (ALL) NOPASSWD: ALL" >> "$tmpfile"
     if [[ -n ${virtme_user:-} ]]; then
         printf -- '%s ALL = (ALL) NOPASSWD: ALL\n' "${virtme_user}" >> "$tmpfile"
     fi
     chmod 440 "$tmpfile"
-    if [ ! -f "$real_sudoers" ]; then
+    if [[ ! -f $real_sudoers ]]; then
         touch "$real_sudoers"
     fi
     mount --bind "$tmpfile" "$real_sudoers"
