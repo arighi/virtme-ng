@@ -14,6 +14,7 @@ SSH_CONF_FILE = SSH_DIR.joinpath("virtme-ng-ssh.conf")
 VIRTME_SSH_DESTINATION_NAME = "virtme-ng"
 VIRTME_SSH_HOSTNAME_CID_SEPARATORS = ("%", "/")
 DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR = VIRTME_SSH_HOSTNAME_CID_SEPARATORS[0]
+DEFAULT_ROOT_GUESTTOOLS = "/opt/virtme/guesttools"
 CONF_PATH = Path(Path.home(), ".config", "virtme-ng")
 CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
 SERIAL_GETTY_DIR = Path(CACHE_DIR, "serial-getty@.service.d")
