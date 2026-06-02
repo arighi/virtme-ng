@@ -414,6 +414,31 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--debian",
+        action="store_true",
+        help="Use Debian cloud image for build/run. "
+        "With --build: run 'make bindeb-pkg' and install into the image. "
+        "Without --build: boot the Debian image with the built kernel, "
+        "mounting the current kernel directory as /home/debian/vng/.",
+    )
+
+    parser.add_argument(
+        "--resize",
+        action="store",
+        metavar="SIZE",
+        help="Resize the Debian cloud image disk (e.g. 20G, 50G). "
+        "Used with --build --debian.",
+    )
+
+    parser.add_argument(
+        "--target",
+        action="store",
+        metavar="PATH",
+        help="Path to the Debian cloud image qcow2 file. "
+        "Default: ~/.cache/vng-debian/debian-14-generic-amd64-daily.qcow2",
+    )
+
+    parser.add_argument(
         "--exec",
         "-e",
         action="store",
@@ -720,7 +745,10 @@ def get_host_arch():
     return arch_map.get(arch, None)
 
 
-class KernelSource:
+from virtme_ng.debian import DebianMixin
+
+
+class KernelSource(DebianMixin):
     """Main class that implement actions to perform on a kernel source directory."""
 
     def __init__(self):
@@ -1672,12 +1700,18 @@ def do_it() -> int:
         elif args.dump is not None:
             dump(kern_source, args)
         elif args.build or args.kconfig:
-            if args.commit:
-                checkout(kern_source, args)
-            config(kern_source, args)
-            if args.kconfig:
-                return 0
-            make(kern_source, args)
+            if hasattr(args, "debian") and args.debian:
+                kern_source._debian_build(args)
+            else:
+                if args.commit:
+                    checkout(kern_source, args)
+                config(kern_source, args)
+                if args.kconfig:
+                    return 0
+                make(kern_source, args)
+        elif hasattr(args, "debian") and args.debian:
+            kern_source._debian_run(args)
+            return 0
         else:
             try:
                 run(kern_source, args)
