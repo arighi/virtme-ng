@@ -164,11 +164,12 @@ class DebianMixin:
         deb_basename = os.path.basename(deb_file)
 
         print("=== Installing kernel .deb into VM ===")
+        home = str(Path.home())
+        rel_kernel = os.path.relpath(kernel_dir, home)
         install_script = (
             "set -e && "
-            "mkdir -p /home/debian/vng && "
-            "mount -t 9p -o trans=virtio vngshare /home/debian/vng && "
-            f"dpkg -i /home/debian/vng/.virtme_debian/{deb_basename} && "
+            "mount -t 9p -o trans=virtio homeshare /root && "
+            f"dpkg -i /root/{rel_kernel}/.virtme_debian/{deb_basename} && "
             f"update-initramfs -c -k {kver} 2>/dev/null || true && "
             f"grub-set-default 0 && update-grub && "
             "echo INSTALL_OK"
@@ -203,7 +204,6 @@ class DebianMixin:
             )
 
         qemu = self._debian_find_qemu(args)
-        kernel_dir = os.getcwd()
 
         if not check_port_available(SSH_PORT):
             arg_fail(
@@ -228,7 +228,7 @@ class DebianMixin:
             "-net",
             f"user,hostfwd=tcp::{SSH_PORT}-:22",
             "-virtfs",
-            f"local,path={kernel_dir},mount_tag=vngshare,security_model=none",
+            f"local,path={str(Path.home())},mount_tag=homeshare,security_model=none",
         ]
 
         if args.sound:
@@ -356,6 +356,10 @@ chpasswd: {{ expire: False }}
 runcmd:
   - sed -i 's/^#*PermitRootLogin.*/PermitRootLogin yes/' /etc/ssh/sshd_config
   - systemctl restart ssh
+  - echo 'homeshare /root 9p trans=virtio,nofail 0 0' >> /etc/fstab
+  - mkdir -p /etc/systemd/system/serial-getty@ttyS0.service.d
+  - printf '[Service]\nExecStart=\nExecStart=-/sbin/agetty --autologin root --noclear %I 115200 linux\n' > /etc/systemd/system/serial-getty@ttyS0.service.d/autologin.conf
+  - systemctl daemon-reload
 """)
         meta_data = os.path.join(get_debian_dir(), "meta-data")
         Path(meta_data).touch()
@@ -418,7 +422,7 @@ runcmd:
             "-net",
             f"user,hostfwd=tcp::{SSH_PORT}-:22",
             "-virtfs",
-            f"local,path={share_path},mount_tag=vngshare,security_model=none",
+            f"local,path={str(Path.home())},mount_tag=homeshare,security_model=none",
             "-display",
             "none",
             "-vga",
@@ -519,7 +523,14 @@ runcmd:
         print(
             f"  (To stop VM:   ssh -i {get_ssh_key_path()} -p {SSH_PORT} root@localhost poweroff)"
         )
-        os.execvp("ssh", ["ssh"] + ssh_opts + ["root@localhost"])
+        home = str(Path.home())
+        rel_kernel = os.path.relpath(os.getcwd(), home)
+        os.execvp(
+            "ssh",
+            ["ssh"]
+            + ssh_opts
+            + ["-t", "root@localhost", f"cd /root/{rel_kernel}; exec bash -l"],
+        )
 
     def _debian_run_gui(self, qemu_cmd, args):
         """Launch VM with graphical display."""
@@ -568,8 +579,7 @@ runcmd:
                 + [
                     "bash",
                     "-c",
-                    "mkdir -p /home/debian/vng && "
-                    "mount -t 9p -o trans=virtio vngshare /home/debian/vng 2>/dev/null || true",
+                    "mount -t 9p -o trans=virtio homeshare /root 2>/dev/null || true",
                 ],
                 stdout=DEVNULL,
                 stderr=DEVNULL,
@@ -577,13 +587,15 @@ runcmd:
         except CalledProcessError:
             pass
 
+        home = str(Path.home())
+        rel_kernel = os.path.relpath(os.getcwd(), home)
         exec_cmd = args.exec
         if exec_cmd.startswith("./"):
-            exec_cmd = "/home/debian/vng/" + exec_cmd[2:]
+            exec_cmd = f"/root/{rel_kernel}/" + exec_cmd[2:]
 
         ret = 0
         try:
-            check_call(ssh_cmd + ["bash", "-c", f"cd /home/debian/vng && {exec_cmd}"])
+            check_call(ssh_cmd + ["bash", "-c", f"cd /root/{rel_kernel} && {exec_cmd}"])
         except CalledProcessError as e:
             ret = e.returncode
 
