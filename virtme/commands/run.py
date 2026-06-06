@@ -879,22 +879,43 @@ class VirtioFSConfig:
         self,
         path: str,
         mount_tag: str,
-        guest_tools_path=None,
-        memory=None,
         rw=False,
         posix_acl=False,
     ):
         self.path = path
         self.mount_tag = mount_tag
-        self.guest_tools_path = guest_tools_path
-        self.memory = memory
         self.rw = rw
         self.posix_acl = posix_acl
+
+
+class VirtioFSState:
+    def __init__(self, guest_tools_path, memory=None, memory_configured=False):
+        self.guest_tools_path = guest_tools_path
+        self.memory = memory
+        self.memory_configured = memory_configured
+
+
+def ensure_virtiofs_memory(
+    arch: architectures.Arch,
+    qemuargs: list[str],
+    state: VirtioFSState,
+) -> None:
+    if state.memory_configured:
+        return
+
+    memory = state.memory if state.memory is not None else "128M"
+    qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
+    if arch.numa_support():
+        qemuargs.extend(["-numa", "node,memdev=mem"])
+    else:
+        qemuargs.extend(["-machine", "memory-backend=mem"])
+    state.memory_configured = True
 
 
 def export_virtiofs(
     arch: architectures.Arch,
     qemuargs: list[str],
+    state: VirtioFSState,
     config: VirtioFSConfig,
     verbose=False,
 ) -> bool:
@@ -904,7 +925,7 @@ def export_virtiofs(
     cache = "auto" if config.rw else "always"
 
     # Try to start virtiofsd daemon
-    virtio_fs = VirtioFS(config.guest_tools_path)
+    virtio_fs = VirtioFS(state.guest_tools_path)
     ret = virtio_fs.start(config.path, verbose, cache, config.posix_acl)
     if not ret:
         return False
@@ -918,16 +939,7 @@ def export_virtiofs(
         ["-device", f"{vhost_dev_type},chardev=char{fsid},tag={config.mount_tag}"]
     )
 
-    memory = config.memory if config.memory is not None else "128M"
-    if memory == 0:
-        return True
-
-    qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
-    if arch.numa_support():
-        qemuargs.extend(["-numa", "node,memdev=mem"])
-    else:
-        qemuargs.extend(["-machine", "memory-backend=mem"])
-
+    ensure_virtiofs_memory(arch, qemuargs, state)
     return True
 
 
@@ -1485,6 +1497,13 @@ def do_it() -> int:
     if args.force_9p:
         use_virtiofs = False
     else:
+        # When --numa is used, the memory backend is already configured by the
+        # user-provided NUMA layout.
+        virtiofs_state = VirtioFSState(
+            guest_tools_path,
+            memory=args.memory,
+            memory_configured=bool(args.numa),
+        )
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
         if can_use_microvm(args):
@@ -1494,11 +1513,6 @@ def do_it() -> int:
         virtiofs_config = VirtioFSConfig(
             path=args.root,
             mount_tag="ROOTFS",
-            guest_tools_path=guest_tools_path,
-            # virtiofsd requires a NUMA not, if --numa is specified simply use
-            # the user-defined NUMA node, otherwise create a NUMA node with all
-            # the memory.
-            memory=0 if args.numa else args.memory,
             rw=args.rw,
             # Only enable POSIX ACLs when using an external root filesystem.
             # When sharing the host root (/), --posix-acl breaks UID/GID
@@ -1508,6 +1522,7 @@ def do_it() -> int:
         use_virtiofs = export_virtiofs(
             virt_arch,
             qemuargs,
+            virtiofs_state,
             virtiofs_config,
             verbose=args.verbose,
         )
