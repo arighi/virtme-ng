@@ -75,6 +75,26 @@ mount_virtme_overlays() {
     done
 }
 
+mount_hostfs() {
+    local fstype="$1"
+    local access="$2"
+    local source="$3"
+    local target="$4"
+
+    case "$fstype" in
+    virtiofs)
+        mount -t virtiofs -o "$access" "$source" "$target"
+        ;;
+    9p)
+        mount -t 9p -o version=9p2000.L,trans=virtio,access=any,msize=524288 "$source" "$target"
+        ;;
+    *)
+        log "unsupported hostfs type: $fstype"
+        return 1
+        ;;
+    esac
+}
+
 mount_kernel_modules() {
     local kver
 
@@ -196,11 +216,24 @@ generate_lvm() {
 }
 
 mount_virtme_initmounts() {
+    local access_var
+    local fstype_var
+    local suffix
+
     for tag in "${!virtme_initmount@}"; do
+        # Ignore per-mount metadata variables such as virtme_initmount0_fstype.
+        [[ $tag =~ ^virtme_initmount[0-9]+$ ]] || continue
+        suffix="${tag:16}"
         if [[ ! -d ${!tag} ]]; then
             mkdir -p "${!tag}"
         fi
-        mount -t 9p -o version=9p2000.L,trans=virtio,access=any,msize=524288 "virtme.initmount${tag:16}" "${!tag}" || exit 1
+        fstype_var="${tag}_fstype"
+        access_var="${tag}_access"
+        mount_hostfs \
+            "${!fstype_var:-9p}" \
+            "${!access_var:-rw}" \
+            "virtme.initmount${suffix}" \
+            "${!tag}" || exit 1
     done
 }
 
@@ -397,11 +430,16 @@ run_snapd() {
 }
 
 setup_socat_console() {
+    local access
+    local fstype
+
     vsock_exec=$(sed -ne "s/.*virtme.vsockexec=\`\(.*\)\`.*/\1/p" /proc/cmdline)
     if [[ -n ${vsock_exec} ]]; then
         if [[ -n ${virtme_vsockmount:-} ]]; then
             mkdir -p "${virtme_vsockmount}"
-            mount -t 9p -o version=9p2000.L,trans=virtio,access=any,msize=524288 "virtme.vsockmount" "${virtme_vsockmount}"
+            fstype="${virtme_vsockmount_fstype:-9p}"
+            access="${virtme_vsockmount_access:-ro}"
+            mount_hostfs "$fstype" "$access" virtme.vsockmount "${virtme_vsockmount}"
         fi
         socat "VSOCK-LISTEN:1024,reuseaddr,fork" \
             "EXEC:\"${vsock_exec}\",pty,stderr,setsid,sigint,sane,echo=0" &

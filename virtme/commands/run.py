@@ -1226,7 +1226,9 @@ def console_client(args):
         os.execvp("socat", ["socat", socat_in, socat_out])
 
 
-def console_server(args, qemu, arch, qemuargs, kernelargs):
+def console_server(  # pylint: disable=R0917
+    args, qemu, arch, qemuargs, kernelargs, virtiofs_state
+):
     console_script_path = get_console_path(args.port)
     if os.path.exists(console_script_path):
         arg_fail(
@@ -1249,12 +1251,18 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
     else:
         console_exec = console_script_path
         if args.root != "/":
-            virtfs_config = VirtFSConfig(
+            vsockmount_fstype = export_hostfs(
+                qemu,
+                arch,
+                qemuargs,
+                virtiofs_state,
                 path=console_script_dir,
                 mount_tag="virtme.vsockmount",
+                verbose=args.verbose,
             )
-            export_virtfs(qemu, arch, qemuargs, virtfs_config)
             kernelargs.append(f"virtme_vsockmount={console_script_dir}")
+            kernelargs.append(f"virtme_vsockmount_fstype={vsockmount_fstype}")
+            kernelargs.append("virtme_vsockmount_access=ro")
 
     kernelargs.extend([f"virtme.vsockexec=`{console_exec}`"])
     qemuargs.extend(
@@ -1754,13 +1762,20 @@ def do_it() -> int:
         idx = mount_index
         mount_index += 1
         tag = f"virtme.initmount{idx}"
-        virtfs_config = VirtFSConfig(
+        readonly = dirtype != "rwdir"
+        fstype = export_hostfs(
+            qemu,
+            arch,
+            qemuargs,
+            virtiofs_state,
             path=hostpath,
             mount_tag=tag,
-            readonly=(dirtype != "rwdir"),
+            readonly=readonly,
+            verbose=args.verbose,
         )
-        export_virtfs(qemu, arch, qemuargs, virtfs_config)
         kernelargs.append(f"virtme_initmount{idx}={guestpath}")
+        kernelargs.append(f"virtme_initmount{idx}_fstype={fstype}")
+        kernelargs.append(f"virtme_initmount{idx}_access={'ro' if readonly else 'rw'}")
 
     for i, d in enumerate(args.overlay_rwdir):
         kernelargs.append(f"virtme_rw_overlay{i}={d}")
@@ -2149,7 +2164,7 @@ def do_it() -> int:
 
     if args.server is not None:
         if args.server == "console":
-            console_server(args, qemu, arch, qemuargs, kernelargs)
+            console_server(args, qemu, arch, qemuargs, kernelargs, virtiofs_state)
         elif args.server == "ssh":
             ssh_server(args, arch, qemuargs, kernelargs)
 
