@@ -926,7 +926,12 @@ def export_virtiofs(
 
     # Try to start virtiofsd daemon
     virtio_fs = VirtioFS(state.guest_tools_path)
-    ret = virtio_fs.start(config.path, verbose, cache, config.posix_acl)
+    ret = virtio_fs.start(
+        config.path,
+        verbose,
+        cache,
+        config.posix_acl,
+    )
     if not ret:
         return False
 
@@ -980,6 +985,48 @@ def export_virtfs(
             ),
         ]
     )
+
+
+def export_hostfs(  # pylint: disable=R0917
+    qemu: qemu_helpers.Qemu,
+    arch: architectures.Arch,
+    qemuargs: list[str],
+    virtiofs_state: VirtioFSState | None,
+    path: str,
+    mount_tag: str,
+    readonly=True,
+    verbose=False,
+) -> str:
+    if virtiofs_state is not None:
+        virtiofs_config = VirtioFSConfig(
+            path=path,
+            mount_tag=mount_tag,
+            rw=not readonly,
+        )
+        if export_virtiofs(arch, qemuargs, virtiofs_state, virtiofs_config, verbose):
+            return "virtiofs"
+
+    virtfs_config = VirtFSConfig(
+        path=path,
+        mount_tag=mount_tag,
+        readonly=readonly,
+    )
+    export_virtfs(qemu, arch, qemuargs, virtfs_config)
+    return "9p"
+
+
+def hostfs_mount_cmd(fstype: str, access: str, mount_tag: str, mountpoint: str) -> str:
+    if fstype == "virtiofs":
+        return f"/bin/mount -n -t virtiofs -o {access} {mount_tag} {mountpoint}"
+
+    if fstype == "9p":
+        return (
+            f"/bin/mount -n -t 9p -o {access},"
+            "version=9p2000.L,trans=virtio,access=any,msize=524288 "
+            f"{mount_tag} {mountpoint}"
+        )
+
+    raise ValueError(f"unsupported hostfs type: {fstype}")
 
 
 def quote_karg(arg: str) -> str:
@@ -1494,6 +1541,7 @@ def do_it() -> int:
 
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
     # is forced.
+    virtiofs_state = None
     if args.force_9p:
         use_virtiofs = False
     else:
@@ -1586,40 +1634,58 @@ def do_it() -> int:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
         os.makedirs(CACHE_DIR, exist_ok=True)
-        virtfs_config = VirtFSConfig(
+        cache_fstype = export_hostfs(
+            qemu,
+            arch,
+            qemuargs,
+            virtiofs_state,
             path=str(CACHE_DIR),
             mount_tag="virtme.cache",
             readonly=False,
+            verbose=args.verbose,
         )
-        export_virtfs(qemu, arch, qemuargs, virtfs_config)
-        virtfs_config = VirtFSConfig(
+        guesttools_fstype = export_hostfs(
+            qemu,
+            arch,
+            qemuargs,
+            virtiofs_state,
             path=guest_tools_path,
             mount_tag="virtme.guesttools",
+            verbose=args.verbose,
         )
         fstab_path = get_conf("systemd.fstab")
-        export_virtfs(qemu, arch, qemuargs, virtfs_config)
         initsh = [
             "mount -t tmpfs run /run",
             "mkdir -p /run/virtme/cache",
-            "/bin/mount -n -t 9p -o rw,version=9p2000.L,trans=virtio,access=any,msize=524288 "
-            + "virtme.cache /run/virtme/cache",
+            hostfs_mount_cmd(cache_fstype, "rw", "virtme.cache", "/run/virtme/cache"),
             "mkdir -p /run/virtme/guesttools",
-            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
-            + "virtme.guesttools /run/virtme/guesttools",
+            hostfs_mount_cmd(
+                guesttools_fstype,
+                "ro",
+                "virtme.guesttools",
+                "/run/virtme/guesttools",
+            ),
             f"mount --bind {fstab_path} /etc/fstab",
         ]
         if host_busybox is not None and busybox_guest_path is None:
-            export_virtfs(
+            busybox_fstype = export_hostfs(
                 qemu,
                 arch,
                 qemuargs,
-                VirtFSConfig(os.path.dirname(host_busybox), "virtme.busybox"),
+                virtiofs_state,
+                path=os.path.dirname(host_busybox),
+                mount_tag="virtme.busybox",
+                verbose=args.verbose,
             )
             initsh.extend(
                 [
                     "mkdir -p /run/virtme/busybox",
-                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
-                    + "virtme.busybox /run/virtme/busybox",
+                    hostfs_mount_cmd(
+                        busybox_fstype,
+                        "ro",
+                        "virtme.busybox",
+                        "/run/virtme/busybox",
+                    ),
                 ]
             )
             busybox_guest_path = os.path.join(
