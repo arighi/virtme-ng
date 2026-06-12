@@ -1,9 +1,10 @@
-import os
 # -*- mode: python -*-
 # Copyright 2023 Andrea Righi
 
 """virtme-ng: UI spinner class."""
 
+import os
+import re
 import sys
 import threading
 import time
@@ -49,7 +50,15 @@ class Spinner:
     def __init__(self, message=""):
         self.message = message
         self.spin_info = os.environ.get("VNG_SPINNER_INFO", "")
-        self.spinner_str = "▁▂▃▄▅▆▇██▇▆▅▄▃▂▁"
+        self.spinner_width = 3
+        if self.spin_info:
+            m = re.match(r"^(\d+):(.*)$", self.spin_info)
+            if m:
+                self.spinner_width = int(m.group(1))
+                self.spin_info = m.group(2)
+        one_wave = "▁▂▃▄▅▆▇██▇▆▅▄▃▂▁"
+        repeats = self.spinner_width // len(one_wave) + 1
+        self.spinner_str = one_wave * repeats
         self.pos = 0
 
         self.stop_event = threading.Event()
@@ -102,7 +111,7 @@ class Spinner:
         spinner = self.spinner_str[self.pos :] + self.spinner_str[: self.pos]
         delta_t = int(time.time()) - self.start_time
         info = f" [{self.spin_info}]" if self.spin_info else ""
-        header = f"{spinner[:3]} {self.message}{info} ({delta_t} sec)\033[?25l"
+        header = f"{spinner[: self.spinner_width]} {self.message}{info} ({delta_t} sec)\033[?25l"
         spacer = f"\r{' ' * len(header)}\r"
 
         stdout = self.original_streams["stdout"]
