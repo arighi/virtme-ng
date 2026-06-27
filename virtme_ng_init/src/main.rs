@@ -536,17 +536,37 @@ fn mount_virtme_overlays() {
     }
 }
 
-fn mount_virtme_initmounts() {
-    for (key, path) in env::vars() {
-        if key.starts_with("virtme_initmount") {
-            utils::do_mkdir(&path);
+fn mount_hostfs(source: &str, target: &str, fstype: &str, access: &str) {
+    match fstype {
+        "virtiofs" => utils::do_mount(source, target, "virtiofs", 0, access),
+        "9p" => {
             utils::do_mount(
-                &key.replace('_', "."),
-                &path,
+                source,
+                target,
                 "9p",
                 0,
                 "version=9p2000.L,trans=virtio,access=any,msize=524288",
             );
+        }
+        _ => log!("unsupported hostfs type: {fstype}"),
+    }
+}
+
+fn mount_virtme_initmounts() {
+    for (key, path) in env::vars() {
+        if let Some(suffix) = key.strip_prefix("virtme_initmount") {
+            // Ignore per-mount metadata variables such as virtme_initmount0_fstype.
+            if !suffix.chars().all(|c| c.is_ascii_digit()) {
+                continue;
+            }
+
+            let fstype_key = format!("{key}_fstype");
+            let access_key = format!("{key}_access");
+            let fstype = env::var(fstype_key).unwrap_or_else(|_| "9p".to_string());
+            let access = env::var(access_key).unwrap_or_else(|_| "rw".to_string());
+
+            utils::do_mkdir(&path);
+            mount_hostfs(&key.replace('_', "."), &path, &fstype, &access);
         }
     }
 }
@@ -1223,14 +1243,13 @@ fn setup_socat_console() {
                 log!("setting up vsock proxy executing {}", exec);
                 let key = "virtme_vsockmount";
                 if let Ok(path) = env::var(key) {
+                    let fstype_key = format!("{key}_fstype");
+                    let access_key = format!("{key}_access");
+                    let fstype = env::var(fstype_key).unwrap_or_else(|_| "9p".to_string());
+                    let access = env::var(access_key).unwrap_or_else(|_| "ro".to_string());
+
                     utils::do_mkdir(&path);
-                    utils::do_mount(
-                        &key.replace('_', "."),
-                        &path,
-                        "9p",
-                        0,
-                        "version=9p2000.L,trans=virtio,access=any,msize=524288",
-                    );
+                    mount_hostfs(&key.replace('_', "."), &path, &fstype, &access);
                 }
 
                 let from = "VSOCK-LISTEN:1024,reuseaddr,fork";

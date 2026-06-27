@@ -879,22 +879,43 @@ class VirtioFSConfig:
         self,
         path: str,
         mount_tag: str,
-        guest_tools_path=None,
-        memory=None,
         rw=False,
         posix_acl=False,
     ):
         self.path = path
         self.mount_tag = mount_tag
-        self.guest_tools_path = guest_tools_path
-        self.memory = memory
         self.rw = rw
         self.posix_acl = posix_acl
+
+
+class VirtioFSState:
+    def __init__(self, guest_tools_path, memory=None, memory_configured=False):
+        self.guest_tools_path = guest_tools_path
+        self.memory = memory
+        self.memory_configured = memory_configured
+
+
+def ensure_virtiofs_memory(
+    arch: architectures.Arch,
+    qemuargs: list[str],
+    state: VirtioFSState,
+) -> None:
+    if state.memory_configured:
+        return
+
+    memory = state.memory if state.memory is not None else "128M"
+    qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
+    if arch.numa_support():
+        qemuargs.extend(["-numa", "node,memdev=mem"])
+    else:
+        qemuargs.extend(["-machine", "memory-backend=mem"])
+    state.memory_configured = True
 
 
 def export_virtiofs(
     arch: architectures.Arch,
     qemuargs: list[str],
+    state: VirtioFSState,
     config: VirtioFSConfig,
     verbose=False,
 ) -> bool:
@@ -904,8 +925,13 @@ def export_virtiofs(
     cache = "auto" if config.rw else "always"
 
     # Try to start virtiofsd daemon
-    virtio_fs = VirtioFS(config.guest_tools_path)
-    ret = virtio_fs.start(config.path, verbose, cache, config.posix_acl)
+    virtio_fs = VirtioFS(state.guest_tools_path)
+    ret = virtio_fs.start(
+        config.path,
+        verbose,
+        cache,
+        config.posix_acl,
+    )
     if not ret:
         return False
 
@@ -918,16 +944,7 @@ def export_virtiofs(
         ["-device", f"{vhost_dev_type},chardev=char{fsid},tag={config.mount_tag}"]
     )
 
-    memory = config.memory if config.memory is not None else "128M"
-    if memory == 0:
-        return True
-
-    qemuargs.extend(["-object", f"memory-backend-memfd,id=mem,size={memory},share=on"])
-    if arch.numa_support():
-        qemuargs.extend(["-numa", "node,memdev=mem"])
-    else:
-        qemuargs.extend(["-machine", "memory-backend=mem"])
-
+    ensure_virtiofs_memory(arch, qemuargs, state)
     return True
 
 
@@ -968,6 +985,48 @@ def export_virtfs(
             ),
         ]
     )
+
+
+def export_hostfs(  # pylint: disable=R0917
+    qemu: qemu_helpers.Qemu,
+    arch: architectures.Arch,
+    qemuargs: list[str],
+    virtiofs_state: VirtioFSState | None,
+    path: str,
+    mount_tag: str,
+    readonly=True,
+    verbose=False,
+) -> str:
+    if virtiofs_state is not None:
+        virtiofs_config = VirtioFSConfig(
+            path=path,
+            mount_tag=mount_tag,
+            rw=not readonly,
+        )
+        if export_virtiofs(arch, qemuargs, virtiofs_state, virtiofs_config, verbose):
+            return "virtiofs"
+
+    virtfs_config = VirtFSConfig(
+        path=path,
+        mount_tag=mount_tag,
+        readonly=readonly,
+    )
+    export_virtfs(qemu, arch, qemuargs, virtfs_config)
+    return "9p"
+
+
+def hostfs_mount_cmd(fstype: str, access: str, mount_tag: str, mountpoint: str) -> str:
+    if fstype == "virtiofs":
+        return f"/bin/mount -n -t virtiofs -o {access} {mount_tag} {mountpoint}"
+
+    if fstype == "9p":
+        return (
+            f"/bin/mount -n -t 9p -o {access},"
+            "version=9p2000.L,trans=virtio,access=any,msize=524288 "
+            f"{mount_tag} {mountpoint}"
+        )
+
+    raise ValueError(f"unsupported hostfs type: {fstype}")
 
 
 def quote_karg(arg: str) -> str:
@@ -1167,7 +1226,9 @@ def console_client(args):
         os.execvp("socat", ["socat", socat_in, socat_out])
 
 
-def console_server(args, qemu, arch, qemuargs, kernelargs):
+def console_server(  # pylint: disable=R0917
+    args, qemu, arch, qemuargs, kernelargs, virtiofs_state
+):
     console_script_path = get_console_path(args.port)
     if os.path.exists(console_script_path):
         arg_fail(
@@ -1190,12 +1251,18 @@ def console_server(args, qemu, arch, qemuargs, kernelargs):
     else:
         console_exec = console_script_path
         if args.root != "/":
-            virtfs_config = VirtFSConfig(
+            vsockmount_fstype = export_hostfs(
+                qemu,
+                arch,
+                qemuargs,
+                virtiofs_state,
                 path=console_script_dir,
                 mount_tag="virtme.vsockmount",
+                verbose=args.verbose,
             )
-            export_virtfs(qemu, arch, qemuargs, virtfs_config)
             kernelargs.append(f"virtme_vsockmount={console_script_dir}")
+            kernelargs.append(f"virtme_vsockmount_fstype={vsockmount_fstype}")
+            kernelargs.append("virtme_vsockmount_access=ro")
 
     kernelargs.extend([f"virtme.vsockexec=`{console_exec}`"])
     qemuargs.extend(
@@ -1482,9 +1549,17 @@ def do_it() -> int:
 
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
     # is forced.
+    virtiofs_state = None
     if args.force_9p:
         use_virtiofs = False
     else:
+        # When --numa is used, the memory backend is already configured by the
+        # user-provided NUMA layout.
+        virtiofs_state = VirtioFSState(
+            guest_tools_path,
+            memory=args.memory,
+            memory_configured=bool(args.numa),
+        )
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.
         if can_use_microvm(args):
@@ -1494,11 +1569,6 @@ def do_it() -> int:
         virtiofs_config = VirtioFSConfig(
             path=args.root,
             mount_tag="ROOTFS",
-            guest_tools_path=guest_tools_path,
-            # virtiofsd requires a NUMA not, if --numa is specified simply use
-            # the user-defined NUMA node, otherwise create a NUMA node with all
-            # the memory.
-            memory=0 if args.numa else args.memory,
             rw=args.rw,
             # Only enable POSIX ACLs when using an external root filesystem.
             # When sharing the host root (/), --posix-acl breaks UID/GID
@@ -1508,6 +1578,7 @@ def do_it() -> int:
         use_virtiofs = export_virtiofs(
             virt_arch,
             qemuargs,
+            virtiofs_state,
             virtiofs_config,
             verbose=args.verbose,
         )
@@ -1571,40 +1642,58 @@ def do_it() -> int:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
         os.makedirs(CACHE_DIR, exist_ok=True)
-        virtfs_config = VirtFSConfig(
+        cache_fstype = export_hostfs(
+            qemu,
+            arch,
+            qemuargs,
+            virtiofs_state,
             path=str(CACHE_DIR),
             mount_tag="virtme.cache",
             readonly=False,
+            verbose=args.verbose,
         )
-        export_virtfs(qemu, arch, qemuargs, virtfs_config)
-        virtfs_config = VirtFSConfig(
+        guesttools_fstype = export_hostfs(
+            qemu,
+            arch,
+            qemuargs,
+            virtiofs_state,
             path=guest_tools_path,
             mount_tag="virtme.guesttools",
+            verbose=args.verbose,
         )
         fstab_path = get_conf("systemd.fstab")
-        export_virtfs(qemu, arch, qemuargs, virtfs_config)
         initsh = [
             "mount -t tmpfs run /run",
             "mkdir -p /run/virtme/cache",
-            "/bin/mount -n -t 9p -o rw,version=9p2000.L,trans=virtio,access=any,msize=524288 "
-            + "virtme.cache /run/virtme/cache",
+            hostfs_mount_cmd(cache_fstype, "rw", "virtme.cache", "/run/virtme/cache"),
             "mkdir -p /run/virtme/guesttools",
-            "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
-            + "virtme.guesttools /run/virtme/guesttools",
+            hostfs_mount_cmd(
+                guesttools_fstype,
+                "ro",
+                "virtme.guesttools",
+                "/run/virtme/guesttools",
+            ),
             f"mount --bind {fstab_path} /etc/fstab",
         ]
         if host_busybox is not None and busybox_guest_path is None:
-            export_virtfs(
+            busybox_fstype = export_hostfs(
                 qemu,
                 arch,
                 qemuargs,
-                VirtFSConfig(os.path.dirname(host_busybox), "virtme.busybox"),
+                virtiofs_state,
+                path=os.path.dirname(host_busybox),
+                mount_tag="virtme.busybox",
+                verbose=args.verbose,
             )
             initsh.extend(
                 [
                     "mkdir -p /run/virtme/busybox",
-                    "/bin/mount -n -t 9p -o ro,version=9p2000.L,trans=virtio,access=any,msize=524288 "
-                    + "virtme.busybox /run/virtme/busybox",
+                    hostfs_mount_cmd(
+                        busybox_fstype,
+                        "ro",
+                        "virtme.busybox",
+                        "/run/virtme/busybox",
+                    ),
                 ]
             )
             busybox_guest_path = os.path.join(
@@ -1673,13 +1762,20 @@ def do_it() -> int:
         idx = mount_index
         mount_index += 1
         tag = f"virtme.initmount{idx}"
-        virtfs_config = VirtFSConfig(
+        readonly = dirtype != "rwdir"
+        fstype = export_hostfs(
+            qemu,
+            arch,
+            qemuargs,
+            virtiofs_state,
             path=hostpath,
             mount_tag=tag,
-            readonly=(dirtype != "rwdir"),
+            readonly=readonly,
+            verbose=args.verbose,
         )
-        export_virtfs(qemu, arch, qemuargs, virtfs_config)
         kernelargs.append(f"virtme_initmount{idx}={guestpath}")
+        kernelargs.append(f"virtme_initmount{idx}_fstype={fstype}")
+        kernelargs.append(f"virtme_initmount{idx}_access={'ro' if readonly else 'rw'}")
 
     for i, d in enumerate(args.overlay_rwdir):
         kernelargs.append(f"virtme_rw_overlay{i}={d}")
@@ -2068,7 +2164,7 @@ def do_it() -> int:
 
     if args.server is not None:
         if args.server == "console":
-            console_server(args, qemu, arch, qemuargs, kernelargs)
+            console_server(args, qemu, arch, qemuargs, kernelargs, virtiofs_state)
         elif args.server == "ssh":
             ssh_server(args, arch, qemuargs, kernelargs)
 
