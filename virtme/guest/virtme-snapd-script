@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Initialize a snap cgroup to emulate a systemd environment, tricking snapd
 # into recognizing our system as a valid one.

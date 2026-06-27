@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # virtme-init: virtme's basic init (PID 1) process
 # Copyright © 2014 Andy Lutomirski
 # Licensed under the GPLv2, which is available in the virtme distribution

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 #
 # Initialize ssh server for remote connections (option `--server ssh`)
 

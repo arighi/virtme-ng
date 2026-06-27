@@ -669,7 +669,7 @@ ARCH_MAPPING = {
     # adding a new arch? Please also update get_host_arch().
 }
 
-REMOTE_BUILD_SCRIPT = """#!/bin/bash
+REMOTE_BUILD_SCRIPT = """#!/usr/bin/env bash
 cd ~/.virtme
 git reset --hard __virtme__
 [ -f debian/rules ] && fakeroot debian/rules clean
