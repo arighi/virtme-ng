@@ -1028,9 +1028,11 @@ fn configure_terminal(consdev: &str, uid: u32) {
             .stdin(File::open(consdev).unwrap())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
-            // Replace the current init process with a shell session.
             .output();
-        log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
+        match output {
+            Ok(output) => log!("{}", String::from_utf8_lossy(&output.stderr)),
+            Err(e) => log!("WARNING: failed to run: stty (error: {})", e),
+        }
     }
 }
 
