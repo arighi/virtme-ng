@@ -760,6 +760,9 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     return kernel
 
 
+_VIRTIOFSD_READONLY_SUPPORT: dict[str, bool | None] = {"value": None}
+
+
 class VirtioFS:
     def __init__(self, guest_tools_path):
         self.sock = None
@@ -826,7 +829,30 @@ class VirtioFS:
                     pass
         return None
 
-    def start(self, path, verbose=True, cache="always", posix_acl=False):
+    @staticmethod
+    def _supports_readonly(path):
+        if _VIRTIOFSD_READONLY_SUPPORT["value"] is not None:
+            return _VIRTIOFSD_READONLY_SUPPORT["value"]
+
+        try:
+            result = subprocess.run(
+                [path, "--help"],
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                check=False,
+            )
+        except OSError:
+            supported = False
+        else:
+            supported = result.returncode == 0 and "--readonly" in result.stdout
+
+        _VIRTIOFSD_READONLY_SUPPORT["value"] = supported
+        return supported
+
+    def start(
+        self, path, verbose=True, cache="always", posix_acl=False, readonly=False
+    ):
         virtiofsd_path = self._get_virtiofsd_path()
         if virtiofsd_path is None:
             return False
@@ -850,8 +876,13 @@ class VirtioFS:
         # which causes authentication failures (e.g., unix_chkpwd cannot obtain
         # user info).
         acl_opt = "--posix-acl " if posix_acl else ""
+        readonly_opt = (
+            "--readonly "
+            if readonly and self._supports_readonly(virtiofsd_path)
+            else ""
+        )
         os.system(
-            f"{virtiofsd_path} --syslog --no-announce-submounts {acl_opt}"
+            f"{virtiofsd_path} --syslog --no-announce-submounts {acl_opt}{readonly_opt}"
             + f"--socket-path {self.sock} --shared-dir {path} "
             + f"--sandbox none --cache {cache} {stderr} &"
         )
@@ -874,7 +905,6 @@ class VirtioFS:
 
 
 class VirtioFSConfig:
-    # allow more than 4 arguments: pylint: disable=R0917
     def __init__(
         self,
         path: str,
@@ -886,6 +916,7 @@ class VirtioFSConfig:
         self.mount_tag = mount_tag
         self.rw = rw
         self.posix_acl = posix_acl
+        self.readonly = not rw
 
 
 class VirtioFSState:
@@ -931,6 +962,7 @@ def export_virtiofs(
         verbose,
         cache,
         config.posix_acl,
+        config.readonly,
     )
     if not ret:
         return False
