@@ -229,7 +229,11 @@ fn wait_for_child(child: i32) -> Option<i32> {
 }
 
 fn configure_environment() {
-    env::set_var("PATH", "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin");
+    let defaults = "/run/current-system/sw/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin";
+    match env::var("PATH") {
+        Ok(path) if !path.is_empty() => env::set_var("PATH", format!("{path}:{defaults}")),
+        _ => env::set_var("PATH", defaults),
+    }
 }
 
 fn get_kernel_version(show_machine: bool) -> String {
