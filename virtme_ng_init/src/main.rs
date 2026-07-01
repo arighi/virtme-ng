@@ -20,6 +20,7 @@ use nix::sys::reboot;
 use nix::sys::stat::Mode;
 use nix::sys::utsname::uname;
 use nix::sys::wait::wait;
+use nix::unistd::{AccessFlags, access};
 use nix::unistd::sethostname;
 use std::env;
 use std::fs::{File, OpenOptions};
@@ -365,16 +366,60 @@ fn generate_shadow() -> io::Result<()> {
 
 fn generate_sudoers() -> io::Result<()> {
     let fname = "/run/tmp/sudoers";
-    let mut content = "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n".to_string();
+    let mut content = String::new();
     content += "root ALL = (ALL) NOPASSWD: ALL\n";
     if let Ok(user) = env::var("virtme_user") {
         content += &format!("{user} ALL = (ALL) NOPASSWD: ALL\n");
     }
-    if !Path::new("/etc/sudoers").exists() {
-        utils::create_file("/etc/sudoers", 0o0440, "").unwrap_or(());
+
+    let sudoers_d = Path::new("/etc/sudoers.d");
+    let sudoers = Path::new("/etc/sudoers");
+
+    // Check if /etc/sudoers is readable by current user (as the VM runs unprivileged)
+    // and includes /etc/sudoers.d
+    let sudoers_includes_d = std::fs::read_to_string(sudoers)
+        .map(|content| {
+            content
+                .split("\n")
+                .any(|line| line == "@includedir /etc/sudoers.d")
+        })
+        .unwrap_or(false);
+
+    // Check if the contents of /etc/sudoers.d are readable by current user
+    let sudoers_d_readable = std::fs::read_dir(sudoers_d)
+        .map(|mut entries| {
+            entries.all(|entry| {
+                entry
+                    .map(|e| e.path())
+                    .and_then(|p|
+                        access(&p, AccessFlags::R_OK)
+                            .map_err(Into::into)
+                    )
+                    .is_ok()
+            })
+        })
+        .unwrap_or(false);
+
+    // If /etc/sudoers.d is usable, then create a drop-in instead of overwriting sudoers
+    let path = if sudoers_includes_d && sudoers_d_readable {
+        &sudoers_d.join("99-virtme")
+    } else {
+        // Only set a conservative default $PATH if we are writing a full sudoers
+        // (if not, we assume it is already configured as intended)
+        content += "Defaults secure_path=\"/usr/sbin:/usr/bin:/sbin:/bin\"\n";
+        sudoers
+    };
+    if !path.exists() {
+        utils::create_file(path.to_str().unwrap(), 0o0440, "").unwrap_or(());
     }
     utils::create_file(fname, 0o0440, &content).ok();
-    utils::do_mount(fname, "/etc/sudoers", "", libc::MS_BIND as usize, "");
+    utils::do_mount(
+        fname,
+        path.to_str().unwrap(),
+        "",
+        libc::MS_BIND as usize,
+        "",
+    );
     Ok(())
 }
 
