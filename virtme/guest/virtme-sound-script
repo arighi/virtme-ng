@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 if [ -n "$(command -v pipewire)" ]; then
     # Start audio system services.

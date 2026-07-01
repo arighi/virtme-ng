@@ -1784,7 +1784,7 @@ async def run_kselftest_handler(args: dict) -> list[TextContent]:
 
     # Build script with conditional rebuild step
     script_parts = [
-        f"""#!/bin/bash
+        f"""#!/usr/bin/env bash
 set -e  # Exit on any error
 
 echo "======================================================================"

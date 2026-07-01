@@ -229,7 +229,11 @@ fn wait_for_child(child: i32) -> Option<i32> {
 }
 
 fn configure_environment() {
-    env::set_var("PATH", "/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin");
+    let defaults = "/run/current-system/sw/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin";
+    match env::var("PATH") {
+        Ok(path) if !path.is_empty() => env::set_var("PATH", format!("{path}:{defaults}")),
+        _ => env::set_var("PATH", defaults),
+    }
 }
 
 fn get_kernel_version(show_machine: bool) -> String {
@@ -464,6 +468,25 @@ fn symlink_fds() {
     }
 }
 
+// Symlinks under /run that must survive the tmpfs mount on /run. On NixOS the whole userland is
+// reached through /run/current-system, so losing it breaks PATH, the login shell, etc.
+const PRESERVED_RUN_SYMLINKS: &[&str] = &["/run/current-system", "/run/booted-system"];
+
+fn save_run_symlinks() -> Vec<(&'static str, PathBuf)> {
+    PRESERVED_RUN_SYMLINKS
+        .iter()
+        .filter_map(|link| std::fs::read_link(link).ok().map(|target| (*link, target)))
+        .collect()
+}
+
+fn restore_run_symlinks(links: &[(&'static str, PathBuf)]) {
+    for (link, target) in links {
+        if let Err(e) = std::os::unix::fs::symlink(target, link) {
+            log!("WARNING: failed to restore symlink {link}: {e}");
+        }
+    }
+}
+
 fn mount_kernel_filesystems() {
     for mount_info in KERNEL_MOUNTS {
         // In the case where a rootfs is specified when launching virtme-ng, it
@@ -473,6 +496,10 @@ fn mount_kernel_filesystems() {
         //
         // Note, get_test_tools_dir() relies on /proc, so that must be mounted
         // prior to /run.
+
+        // The fresh tmpfs hides anything the rootfs kept under /run; save the
+        // symlinks the guest userland depends on so they can be restored after.
+        let mut saved_run_symlinks = Vec::new();
         if mount_info.target == "/run" {
             if id() != 1 {
                 // systemd is the current init, skip mounting /run
@@ -484,6 +511,7 @@ fn mount_kernel_filesystems() {
                     continue;
                 }
             }
+            saved_run_symlinks = save_run_symlinks();
         }
         utils::do_mount(
             mount_info.source,
@@ -492,6 +520,9 @@ fn mount_kernel_filesystems() {
             mount_info.flags,
             mount_info.fsdata,
         );
+        if mount_info.target == "/run" {
+            restore_run_symlinks(&saved_run_symlinks);
+        }
     }
 }
 
@@ -1028,9 +1059,11 @@ fn configure_terminal(consdev: &str, uid: u32) {
             .stdin(File::open(consdev).unwrap())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())
-            // Replace the current init process with a shell session.
             .output();
-        log!("{}", String::from_utf8_lossy(&output.unwrap().stderr));
+        match output {
+            Ok(output) => log!("{}", String::from_utf8_lossy(&output.stderr)),
+            Err(e) => log!("WARNING: failed to run: stty (error: {})", e),
+        }
     }
 }
 

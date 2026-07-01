@@ -709,6 +709,11 @@ Troubleshooting
    currently not shipping `virtme-ng-init` tool, which runs faster than the Bash
    init script, used as fallback.
 
+ - The guest helper scripts use a `#!/usr/bin/env bash` shebang, so the guest
+   root filesystem needs `/usr/bin/env`. This is present on virtually every
+   distribution, including minimal ones such as Alpine, but may be missing from
+   a hand-built `--root` chroot.
+
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:
    ```console
