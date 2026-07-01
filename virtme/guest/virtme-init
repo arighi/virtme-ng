@@ -6,7 +6,8 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 configure_environment() {
-    export PATH=/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+    local defaults=/run/current-system/sw/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin
+    export PATH="${PATH:+$PATH:}$defaults"
 }
 
 log() {
@@ -25,8 +26,33 @@ mount_kernel_filesystems() {
     if [[ $$ -eq 1 ]]; then
         # only mount /run if systemd is not the init
         if ! grep -q "run /run" /proc/mounts; then
+            # The fresh tmpfs hides whatever the rootfs kept under /run. On NixOS
+            # the userland is reached through /run/current-system (a symlink into
+            # the Nix store), so save and restore it across the mount; without it
+            # PATH, the login shell, etc. break.
+            local link target ln_cmd=""
+            local -a preserve=()
+            for link in /run/current-system /run/booted-system; do
+                if target=$(readlink "$link" 2> /dev/null); then
+                    preserve+=("$link" "$target")
+                fi
+            done
+            if ((${#preserve[@]})); then
+                # `ln` lives in /run/current-system/sw/bin on NixOS, which the
+                # mount hides. Resolve its directory out of /run but keep the
+                # `ln` name, so a coreutils multi-call binary still acts as ln.
+                ln_cmd=$(command -v ln)
+                ln_cmd="$(readlink -f "${ln_cmd%/*}")/${ln_cmd##*/}"
+            fi
+
             # Mount tmpfs dirs
             mount -t tmpfs -o mode=0755 run /run/
+
+            local i
+            for ((i = 0; i < ${#preserve[@]}; i += 2)); do
+                "$ln_cmd" -s -- "${preserve[i + 1]}" "${preserve[i]}" ||
+                    log "WARNING: failed to restore symlink ${preserve[i]}"
+            done
         fi
     fi
 
