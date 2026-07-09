@@ -302,6 +302,15 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--no-root-posix-acl",
+        action="store_true",
+        help=(
+            "Disable POSIX ACL support for external root virtiofs exports "
+            "(ignored with 9p or host root)"
+        ),
+    )
+
+    parser.add_argument(
         "--force-9p", action="store_true", help="Use legacy 9p filesystem as rootfs"
     )
 
@@ -1010,6 +1019,12 @@ class KernelSource:
         else:
             self.virtme_param["rw"] = ""
 
+    def _get_virtme_no_root_posix_acl(self, args):
+        if args.no_root_posix_acl:
+            self.virtme_param["no_root_posix_acl"] = "--no-root-posix-acl"
+        else:
+            self.virtme_param["no_root_posix_acl"] = ""
+
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
             self.virtme_param["cwd"] = "--cwd " + args.cwd
@@ -1394,6 +1409,7 @@ class KernelSource:
         self._get_virtme_root(args)
         self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
+        self._get_virtme_no_root_posix_acl(args)
         self._get_virtme_rodir(args)
         self._get_virtme_rwdir(args)
         self._get_virtme_overlay_rwdir(args)
@@ -1449,6 +1465,7 @@ class KernelSource:
             + f"{self.virtme_param['root']} "
             + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
+            + f"{self.virtme_param['no_root_posix_acl']} "
             + f"{self.virtme_param['rodir']} "
             + f"{self.virtme_param['rwdir']} "
             + f"{self.virtme_param['overlay_rwdir']} "
