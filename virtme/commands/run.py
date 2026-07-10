@@ -41,7 +41,15 @@ from virtme_ng.utils import (
     get_conf,
 )
 
-from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
+from .. import (
+    architectures,
+    kernel_image,
+    mkinitramfs,
+    modfinder,
+    qemu_helpers,
+    resources,
+    virtmods,
+)
 from ..util import SilentError, find_binary_or_raise, get_username
 
 
@@ -642,10 +650,17 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             if not os.path.exists(kimg):
                 arg_fail(f"{args.kimg} does not exist")
 
+        try:
+            boot_kimg = kernel_image.normalize_kernel_image(
+                arch, kimg, CACHE_DIR, verbose=args.verbose
+            )
+        except kernel_image.KernelImageError as exc:
+            arg_fail(str(exc))
+
         # The for loop is a workaround for s390x to detect the version number
         # from the filename.
         for img_name in arch.img_name():
-            kver = get_kernel_version(kimg, img_name)
+            kver = get_kernel_version(boot_kimg, img_name)
             if kver is not None:
                 break
         else:
@@ -655,17 +670,17 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             args.mods = "none"
             sys.stderr.write(
                 "warning: failed to retrieve kernel version from: "
-                + kimg
+                + boot_kimg
                 + " (modules may not work)\n"
             )
         kernel.version = kver
-        kernel.kimg = kimg
+        kernel.kimg = boot_kimg
         if args.mods == "none":
             kernel.modfiles = []
             kernel.moddir = None
         else:
             # Try to automatically detect modules' path
-            root_dir = get_rootfs_from_kernel_path(kernel.kimg)
+            root_dir = get_rootfs_from_kernel_path(kimg)
             # If we are using the entire host filesystem or if we are using
             # a chroot (via --root) we don't have to do anything special action
             # the modules, just rely on /lib/modules in the target rootfs.
