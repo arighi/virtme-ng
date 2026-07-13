@@ -8,7 +8,10 @@ from pathlib import Path
 
 from virtme_ng.spinner import Spinner
 
+# Host-trusted cache data must remain outside of any guest-writable export.
 CACHE_DIR = Path(Path.home(), ".cache", "virtme-ng")
+# Only fresh per-invocation children of this directory are exported to guests.
+GUEST_CACHE_ROOT = Path(CACHE_DIR, "guest")
 SSH_DIR = Path(CACHE_DIR, ".ssh")
 SSH_CONF_FILE = SSH_DIR.joinpath("virtme-ng-ssh.conf")
 VIRTME_SSH_DESTINATION_NAME = "virtme-ng"
@@ -16,9 +19,6 @@ VIRTME_SSH_HOSTNAME_CID_SEPARATORS = ("%", "/")
 DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR = VIRTME_SSH_HOSTNAME_CID_SEPARATORS[0]
 CONF_PATH = Path(Path.home(), ".config", "virtme-ng")
 CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
-SERIAL_GETTY_DIR = Path(CACHE_DIR, "serial-getty@.service.d")
-SERIAL_GETTY_FILE = Path(SERIAL_GETTY_DIR, "virtme-ng.conf")
-
 # When using external rootfs, the kernel cmdline should be kept under 896 bytes
 # to maximize compatibility with old systems. This number is the legacy hardlimit
 # for s390x hosts.
