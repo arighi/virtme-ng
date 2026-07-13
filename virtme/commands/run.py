@@ -117,6 +117,14 @@ def make_parser() -> "VirtmeArgumentParser":
         help="Give the guest read-write access to its root filesystem",
     )
     g.add_argument(
+        "--no-root-posix-acl",
+        action="store_true",
+        help=(
+            "Disable POSIX ACL support for external root virtiofs exports "
+            "(ignored with 9p or host root)"
+        ),
+    )
+    g.add_argument(
         "--gdb",
         action="store",
         nargs="?",
@@ -1602,10 +1610,11 @@ def do_it() -> int:
             path=args.root,
             mount_tag="ROOTFS",
             rw=args.rw,
-            # Only enable POSIX ACLs when using an external root filesystem.
+            # Keep POSIX ACLs enabled by default for external roots, but let
+            # guests whose virtiofs client cannot negotiate ACLs opt out.
             # When sharing the host root (/), --posix-acl breaks UID/GID
             # translation which causes authentication failures.
-            posix_acl=(args.root != "/"),
+            posix_acl=(args.root != "/" and not args.no_root_posix_acl),
         )
         use_virtiofs = export_virtiofs(
             virt_arch,

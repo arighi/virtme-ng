@@ -714,6 +714,12 @@ Troubleshooting
    distribution, including minimal ones such as Alpine, but may be missing from
    a hand-built `--root` chroot.
 
+ - Some guest kernels may fail to mount an external virtiofs root filesystem
+   when POSIX ACL support is enabled. This can show up as the root filesystem
+   mount apparently succeeding, followed by `switch_root` failing with
+   `Connection refused` and the guest panicking. In this case, try disabling
+   ACLs on the root virtiofs export with `--no-root-posix-acl`.
+
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:
    ```console
