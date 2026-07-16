@@ -57,11 +57,43 @@ def normalize_kernel_image(arch, path: str, cache_dir: Path, verbose=False) -> s
 
     image = Path(path)
     try:
+        with image.open("rb") as stream:
+            header = stream.read(ARM64_IMAGE_MAGIC_OFFSET + len(ARM64_IMAGE_MAGIC))
+    except OSError as exc:
+        raise KernelImageError(f"failed to read kernel image {image}: {exc}") from exc
+
+    # Avoid reading and hashing the complete file in the common case where QEMU
+    # can consume an already-plain arm64 Image directly.
+    if _is_arm64_image(header):
+        return path
+
+    output = _cached_image_path(cache_dir, image)
+    if output.is_file():
+        if verbose:
+            print(
+                f"virtme: using normalized arm64 kernel image {output}",
+                file=sys.stderr,
+            )
+        return str(output)
+
+    try:
         data = image.read_bytes()
     except OSError as exc:
         raise KernelImageError(f"failed to read kernel image {image}: {exc}") from exc
 
-    output = _cached_image_path(cache_dir, data)
+    # The image may have been replaced after the streaming hash above. Derive
+    # the publication path from the exact bytes that will be normalized so the
+    # cache remains content-addressed. This also notices a cache entry published
+    # by a concurrent invocation after the first lookup.
+    output = _cached_image_path_from_digest(cache_dir, hashlib.sha256(data).hexdigest())
+    if output.is_file():
+        if verbose:
+            print(
+                f"virtme: using normalized arm64 kernel image {output}",
+                file=sys.stderr,
+            )
+        return str(output)
+
     if not _prepare_arm64_image(data, image, output):
         return path
 
@@ -295,8 +327,18 @@ def _decompressed_image_too_large(image: Path) -> KernelImageError:
     )
 
 
-def _cached_image_path(cache_dir: Path, data: bytes) -> Path:
-    digest = hashlib.sha256(data).hexdigest()
+def _cached_image_path(cache_dir: Path, image: Path) -> Path:
+    digest = hashlib.sha256()
+    try:
+        with image.open("rb") as stream:
+            for chunk in iter(lambda: stream.read(1024 * 1024), b""):
+                digest.update(chunk)
+    except OSError as exc:
+        raise KernelImageError(f"failed to read kernel image {image}: {exc}") from exc
+    return _cached_image_path_from_digest(cache_dir, digest.hexdigest())
+
+
+def _cached_image_path_from_digest(cache_dir: Path, digest: str) -> Path:
     return Path(cache_dir, "kernel-images", "arm64", digest, "Image")
 
 
