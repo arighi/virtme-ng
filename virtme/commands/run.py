@@ -24,16 +24,15 @@ import termios
 import threading
 from base64 import b64encode
 from pathlib import Path
-from shutil import which
+from shutil import copyfile, copytree, which
 from time import sleep
 from typing import Any, NoReturn
 
 from virtme_ng.utils import (
     CACHE_DIR,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
+    GUEST_CACHE_ROOT,
     KERNEL_CMDLINE_MAX,
-    SERIAL_GETTY_DIR,
-    SERIAL_GETTY_FILE,
     SSH_CONF_FILE,
     SSH_DIR,
     VIRTME_SSH_DESTINATION_NAME,
@@ -41,7 +40,15 @@ from virtme_ng.utils import (
     get_conf,
 )
 
-from .. import architectures, mkinitramfs, modfinder, qemu_helpers, resources, virtmods
+from .. import (
+    architectures,
+    kernel_image,
+    mkinitramfs,
+    modfinder,
+    qemu_helpers,
+    resources,
+    virtmods,
+)
 from ..util import SilentError, find_binary_or_raise, get_username
 
 
@@ -642,10 +649,17 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             if not os.path.exists(kimg):
                 arg_fail(f"{args.kimg} does not exist")
 
+        try:
+            boot_kimg = kernel_image.normalize_kernel_image(
+                arch, kimg, CACHE_DIR, verbose=args.verbose
+            )
+        except kernel_image.KernelImageError as exc:
+            arg_fail(str(exc))
+
         # The for loop is a workaround for s390x to detect the version number
         # from the filename.
         for img_name in arch.img_name():
-            kver = get_kernel_version(kimg, img_name)
+            kver = get_kernel_version(boot_kimg, img_name)
             if kver is not None:
                 break
         else:
@@ -655,17 +669,17 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             args.mods = "none"
             sys.stderr.write(
                 "warning: failed to retrieve kernel version from: "
-                + kimg
+                + boot_kimg
                 + " (modules may not work)\n"
             )
         kernel.version = kver
-        kernel.kimg = kimg
+        kernel.kimg = boot_kimg
         if args.mods == "none":
             kernel.modfiles = []
             kernel.moddir = None
         else:
             # Try to automatically detect modules' path
-            root_dir = get_rootfs_from_kernel_path(kernel.kimg)
+            root_dir = get_rootfs_from_kernel_path(kimg)
             # If we are using the entire host filesystem or if we are using
             # a chroot (via --root) we don't have to do anything special action
             # the modules, just rely on /lib/modules in the target rootfs.
@@ -1358,8 +1372,11 @@ def ssh_client(args):
         os.execvp("ssh", cmd)
 
 
-def ssh_server(args, arch, qemuargs, kernelargs):
-    # Check if we need to generate the SSH host keys for the guest.
+def ssh_server(args, arch, qemuargs, kernelargs, guest_cache_dir):
+    # Keep host-consumed SSH client state outside of the guest-writable cache.
+    SSH_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
+
+    # Generate persistent SSH host keys in the host-only cache.
     SSH_ETC_SSH_DIR = SSH_DIR.joinpath("etc", "ssh")
     SSH_ETC_SSH_DIR.mkdir(mode=0o755, parents=True, exist_ok=True)
     subprocess.check_call(["ssh-keygen", "-A", "-f", f"{SSH_DIR}"])
@@ -1377,6 +1394,19 @@ def ssh_server(args, arch, qemuargs, kernelargs):
     if args.root == "/":
         ssh_cache = str(SSH_DIR)
     else:
+        assert guest_cache_dir is not None
+        # Populate the per-invocation guest cache with the server host keys and
+        # public client key. Never expose the private client key or host SSH
+        # configuration, and never reuse files after the guest could modify them.
+        guest_ssh_dir = guest_cache_dir.joinpath(".ssh")
+        copytree(
+            SSH_ETC_SSH_DIR,
+            guest_ssh_dir.joinpath("etc", "ssh"),
+        )
+        copyfile(
+            identity_file.with_suffix(".pub"),
+            guest_ssh_dir.joinpath("id_virtme.pub"),
+        )
         ssh_cache = "/run/virtme/cache/.ssh"
 
     if can_use_ssh_over_vsock(args.ssh_tcp):
@@ -1464,6 +1494,22 @@ def do_it() -> int:
         elif args.client == "ssh":
             ssh_client(args)
         sys.exit(0)
+
+    guest_cache_dir = None
+    serial_getty_dir = None
+    serial_getty_file = None
+    needs_guest_cache = args.systemd or (args.root != "/" and args.server == "ssh")
+    if needs_guest_cache:
+        # Export only a fresh per-invocation directory to the guest. Keeping it
+        # unique prevents one guest from planting files or symlinks that a later
+        # host invocation might trust or overwrite.
+        GUEST_CACHE_ROOT.mkdir(mode=0o755, parents=True, exist_ok=True)
+        guest_cache = tempfile.TemporaryDirectory(prefix="run-", dir=GUEST_CACHE_ROOT)
+        guest_cache_dir = Path(guest_cache.name)
+        os.chmod(guest_cache_dir, 0o755)
+        atexit.register(guest_cache.cleanup)
+        serial_getty_dir = guest_cache_dir.joinpath("serial-getty@.service.d")
+        serial_getty_file = serial_getty_dir.joinpath("virtme-ng.conf")
 
     arch = architectures.get(args.arch)
     is_native = args.arch == platform.machine()
@@ -1672,27 +1718,41 @@ def do_it() -> int:
 
     if args.root == "/":
         if args.systemd:
+            assert guest_cache_dir is not None
             fstab_path = get_conf("systemd.fstab")
             initcmds = [
                 "init=/bin/sh",
                 "--",
                 "-c",
-                f"mount --bind {fstab_path} /etc/fstab && SYSTEMD_UNIT_PATH={CACHE_DIR}: exec /sbin/init;",
+                f"mount --bind {fstab_path} /etc/fstab && SYSTEMD_UNIT_PATH={guest_cache_dir}: exec /sbin/init;",
             ]
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
-        os.makedirs(CACHE_DIR, exist_ok=True)
-        cache_fstype = export_hostfs(
-            qemu,
-            arch,
-            qemuargs,
-            virtiofs_state,
-            path=str(CACHE_DIR),
-            mount_tag="virtme.cache",
-            readonly=False,
-            verbose=args.verbose,
-        )
+        initsh = ["mount -t tmpfs run /run"]
+        if needs_guest_cache:
+            assert guest_cache_dir is not None
+            guest_cache_fstype = export_hostfs(
+                qemu,
+                arch,
+                qemuargs,
+                virtiofs_state,
+                path=str(guest_cache_dir),
+                mount_tag="virtme.cache",
+                readonly=False,
+                verbose=args.verbose,
+            )
+            initsh.extend(
+                [
+                    "mkdir -p /run/virtme/cache",
+                    hostfs_mount_cmd(
+                        guest_cache_fstype,
+                        "rw",
+                        "virtme.cache",
+                        "/run/virtme/cache",
+                    ),
+                ]
+            )
         guesttools_fstype = export_hostfs(
             qemu,
             arch,
@@ -1703,19 +1763,18 @@ def do_it() -> int:
             verbose=args.verbose,
         )
         fstab_path = get_conf("systemd.fstab")
-        initsh = [
-            "mount -t tmpfs run /run",
-            "mkdir -p /run/virtme/cache",
-            hostfs_mount_cmd(cache_fstype, "rw", "virtme.cache", "/run/virtme/cache"),
-            "mkdir -p /run/virtme/guesttools",
-            hostfs_mount_cmd(
-                guesttools_fstype,
-                "ro",
-                "virtme.guesttools",
-                "/run/virtme/guesttools",
-            ),
-            f"mount --bind {fstab_path} /etc/fstab",
-        ]
+        initsh.extend(
+            [
+                "mkdir -p /run/virtme/guesttools",
+                hostfs_mount_cmd(
+                    guesttools_fstype,
+                    "ro",
+                    "virtme.guesttools",
+                    "/run/virtme/guesttools",
+                ),
+                f"mount --bind {fstab_path} /etc/fstab",
+            ]
+        )
         if host_busybox is not None and busybox_guest_path is None:
             busybox_fstype = export_hostfs(
                 qemu,
@@ -2207,7 +2266,7 @@ def do_it() -> int:
         if args.server == "console":
             console_server(args, qemu, arch, qemuargs, kernelargs, virtiofs_state)
         elif args.server == "ssh":
-            ssh_server(args, arch, qemuargs, kernelargs)
+            ssh_server(args, arch, qemuargs, kernelargs, guest_cache_dir)
 
     if args.pwd:
         rel_pwd = get_guest_relative_path(os.getcwd(), args.root)
@@ -2355,14 +2414,16 @@ def do_it() -> int:
     qemuargs.extend(["-kernel", kernel.kimg])
     if kernelargs:
         if args.systemd:
+            assert serial_getty_dir is not None
+            assert serial_getty_file is not None
             init_environment_vars = []
             for arg in kernelargs:
                 match = re.match(r"(virtme_.*)=(.*)", arg)
                 if not match:
                     continue
                 init_environment_vars.append(f"{match.group(1)}={match.group(2)}")
-            os.makedirs(SERIAL_GETTY_DIR, exist_ok=True)
-            with open(SERIAL_GETTY_FILE, "w", encoding="utf-8") as f:
+            os.makedirs(serial_getty_dir, exist_ok=True)
+            with open(serial_getty_file, "w", encoding="utf-8") as f:
                 f.write(
                     f"""[Service]
 StandardInput=tty
