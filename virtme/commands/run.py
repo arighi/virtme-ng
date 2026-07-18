@@ -1729,7 +1729,10 @@ def do_it() -> int:
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
-        initsh = ["mount -t tmpfs run /run"]
+        initsh = [
+            "mount -t tmpfs run /run",
+            "mount -t devtmpfs devtmpfs /dev 2>/dev/null",
+        ]
         if needs_guest_cache:
             assert guest_cache_dir is not None
             guest_cache_fstype = export_hostfs(
