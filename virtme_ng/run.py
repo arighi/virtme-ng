@@ -281,11 +281,21 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         help="Override the default user shell",
     )
 
-    parser.add_argument(
+    _root_group = parser.add_mutually_exclusive_group()
+    _root_group.add_argument(
         "--root",
         action="store",
         help="Pass a specific chroot to use inside the virtualized kernel "
         + "(useful with --arch)",
+    )
+    _root_group.add_argument(
+        "--root-disk",
+        action="store",
+        default=None,
+        metavar="PATH",
+        help="Use a pre-existing disk image as the guest root filesystem. "
+        "Mutually exclusive with --root. Kernel modules from the booted kernel "
+        "are exported to the guest automatically.",
     )
 
     parser.add_argument(
@@ -987,8 +997,12 @@ class KernelSource:
                     f"available: {' '.join(ARCH_MAPPING)}",
                     show_usage=False,
                 )
-            if args.root is None and get_host_arch() != args.arch:
-                arg_fail("--arch used without --root")
+            if (
+                args.root is None
+                and args.root_disk is None
+                and get_host_arch() != args.arch
+            ):
+                arg_fail("--arch used without --root or --root-disk")
             if "max-cpus" in ARCH_MAPPING[args.arch]:
                 self.cpus = ARCH_MAPPING[args.arch]["max-cpus"]
             self.virtme_param["arch"] = "--arch " + ARCH_MAPPING[args.arch]["qemu_name"]
@@ -1006,6 +1020,16 @@ class KernelSource:
             self.virtme_param["root"] = f"--root {args.root}"
         else:
             self.virtme_param["root"] = ""
+
+    def _get_virtme_root_disk(self, args):
+        if args.root_disk is not None:
+            # The final command is run through a shell, so quote the path to
+            # keep spaces intact and neutralize shell metacharacters.
+            self.virtme_param["root_disk"] = (
+                f"--root-disk {shlex.quote(args.root_disk)}"
+            )
+        else:
+            self.virtme_param["root_disk"] = ""
 
     def _get_virtme_systemd(self, args):
         if args.systemd:
@@ -1028,7 +1052,8 @@ class KernelSource:
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
             self.virtme_param["cwd"] = "--cwd " + args.cwd
-        elif args.root is None:
+        elif args.root is None and args.root_disk is None:
+            # No explicit root: propagate cwd from host into the guest
             self.virtme_param["cwd"] = "--pwd"
         else:
             self.virtme_param["cwd"] = ""
@@ -1407,6 +1432,7 @@ class KernelSource:
         self._get_virtme_shell(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
+        self._get_virtme_root_disk(args)
         self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_no_root_posix_acl(args)
@@ -1463,6 +1489,7 @@ class KernelSource:
             + f"{self.virtme_param['shell']} "
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
+            + f"{self.virtme_param['root_disk']} "
             + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['no_root_posix_acl']} "
