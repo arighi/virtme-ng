@@ -497,6 +497,10 @@ fn mount_kernel_filesystems() {
         // Note, get_test_tools_dir() relies on /proc, so that must be mounted
         // prior to /run.
 
+        if (mount_info.target == "/proc" || mount_info.target == "/sys") && id() != 1 {
+            continue;
+        }
+
         // The fresh tmpfs hides anything the rootfs kept under /run; save the
         // symlinks the guest userland depends on so they can be restored after.
         let mut saved_run_symlinks = Vec::new();
@@ -1323,7 +1327,9 @@ fn main() {
     configure_environment();
     mount_kernel_filesystems();
     configure_hostname();
-    mount_cgroupfs();
+    if id() == 1 {
+        mount_cgroupfs();
+    }
     configure_limits();
     mount_virtme_overlays();
     mount_sys_filesystems();
