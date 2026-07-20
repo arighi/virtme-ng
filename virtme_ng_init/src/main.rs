@@ -396,8 +396,15 @@ fn generate_lvm() -> io::Result<()> {
 
 fn generate_hosts() -> io::Result<()> {
     if let Ok(hostname) = env::var("virtme_hostname") {
-        std::fs::copy("/etc/hosts", "/run/tmp/hosts")?;
-        let mut h = OpenOptions::new().append(true).open("/run/tmp/hosts")?;
+        if Path::new("/etc/hosts").exists() {
+            std::fs::copy("/etc/hosts", "/run/tmp/hosts")?;
+        } else {
+            utils::create_file("/etc/hosts", 0o0644, "")?;
+        }
+        let mut h = OpenOptions::new()
+            .append(true)
+            .create(true)
+            .open("/run/tmp/hosts")?;
         writeln!(h, "\n127.0.0.1 {hostname}\n::1 {hostname}")?;
         utils::do_mount(
             "/run/tmp/hosts",

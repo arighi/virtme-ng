@@ -192,7 +192,11 @@ generate_fstab() {
 
 generate_hosts() {
     if [[ -n ${virtme_hostname:-} ]]; then
-        cp /etc/hosts /run/tmp/hosts
+        if [[ -e /etc/hosts ]]; then
+            cp /etc/hosts /run/tmp/hosts
+        else
+            touch /etc/hosts
+        fi
         printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /run/tmp/hosts
         mount --bind /run/tmp/hosts /etc/hosts
     fi
