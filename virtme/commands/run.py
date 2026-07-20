@@ -1331,12 +1331,14 @@ def ssh_client(args):
         ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
 
     force_tty = False
-    if args.cwd is not None:
+    if args.pwd:
+        cwd = get_guest_relative_path(os.getcwd(), args.root)
+    elif args.cwd is not None:
         cwd = get_guest_relative_path(args.cwd, args.root)
         if cwd is None:
             arg_fail("specified working directory is not contained in the root")
     else:
-        cwd = get_guest_relative_path(os.getcwd(), args.root)
+        cwd = None
 
     if cwd is not None:
         guest_cwd = "/" if cwd == "." else f"/{cwd}"

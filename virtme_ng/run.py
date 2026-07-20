@@ -1028,7 +1028,7 @@ class KernelSource:
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
             self.virtme_param["cwd"] = "--cwd " + args.cwd
-        elif args.root is None:
+        elif args.root is None or args.ssh_client is not None:
             self.virtme_param["cwd"] = "--pwd"
         else:
             self.virtme_param["cwd"] = ""
