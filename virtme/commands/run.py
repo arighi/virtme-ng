@@ -125,6 +125,16 @@ def make_parser() -> "VirtmeArgumentParser":
         "are exported to the guest automatically via 9p.",
     )
     g.add_argument(
+        "--root-disk-partition",
+        action="store",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Mount partition N of the --root-disk image (e.g. /dev/vdaN) as the "
+        "guest root, instead of the whole disk. Required for partitioned images "
+        "such as cloud images.",
+    )
+    g.add_argument(
         "--systemd",
         action="store_true",
         help="Execute systemd as init (EXPERIMENTAL)",
@@ -1540,6 +1550,10 @@ def do_it() -> int:
     if args.root_disk is not None:
         if not os.path.exists(args.root_disk):
             arg_fail(f"root disk image not found: {args.root_disk}")
+        if args.root_disk_partition is not None and args.root_disk_partition < 1:
+            arg_fail("--root-disk-partition must be a positive integer")
+    elif args.root_disk_partition is not None:
+        arg_fail("--root-disk-partition requires --root-disk")
 
     needs_guest_cache = (
         args.systemd
@@ -1582,6 +1596,9 @@ def do_it() -> int:
 
     if args.root_disk is not None:
         config.root_disk = True
+        # The root disk lands on /dev/vda; a partition of it is /dev/vdaN.
+        if args.root_disk_partition is not None:
+            config.root_disk_dev = f"/dev/vda{args.root_disk_partition}"
         need_initramfs = True
 
     if args.gdb is not None:

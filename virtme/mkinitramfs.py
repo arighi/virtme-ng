@@ -154,9 +154,10 @@ _INIT_MOUNT_DISK = r"""
 log 'mounting devtmpfs...'
 /bin/mount -n -t devtmpfs devtmpfs /dev 2>/dev/null
 
-# Device probing can be asynchronous; wait for /dev/vda to show up.
+# Device probing (including partition scanning) can be asynchronous; wait for
+# the root device node to show up.
 i=0
-while [ ! -b /dev/vda ] && [ $i -lt 5 ]; do
+while [ ! -b {rootdev} ] && [ $i -lt 5 ]; do
   sleep 1
   i=$((i + 1))
 done
@@ -168,7 +169,7 @@ log 'mounting root disk...'
 # per attempt avoids depending on /proc/filesystems, which is not mounted yet.
 mounted=
 for fstype in {fstypes}; do
-  if /bin/mount -n -t $fstype -o {access} /dev/vda /newroot/ 2>/dev/null; then
+  if /bin/mount -n -t $fstype -o {access} {rootdev} /newroot/ 2>/dev/null; then
     mounted=1
     break
   fi
@@ -219,6 +220,7 @@ def generate_init(config) -> bytes:
         out.write(
             _INIT_MOUNT_DISK.format(
                 access=config.access,
+                rootdev=config.root_disk_dev,
                 fstypes=" ".join(ROOT_DISK_FSTYPES),
             )
         )
@@ -236,6 +238,7 @@ class Config:
         "busybox",
         "access",
         "root_disk",
+        "root_disk_dev",
     ]
 
     def __init__(self):
@@ -245,6 +248,7 @@ class Config:
         self.busybox: str | None = None
         self.access = "ro"
         self.root_disk: bool = False
+        self.root_disk_dev = "/dev/vda"
 
 
 def mkinitramfs(out, config) -> None:

@@ -299,6 +299,17 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--root-disk-partition",
+        action="store",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Mount partition N of the --root-disk image (e.g. /dev/vdaN) as the "
+        "guest root, instead of the whole disk. Required for partitioned images "
+        "such as cloud images.",
+    )
+
+    parser.add_argument(
         "--root-release",
         action="store",
         help="Use a target Ubuntu release to create a new chroot (used with --root)",
@@ -1031,6 +1042,14 @@ class KernelSource:
         else:
             self.virtme_param["root_disk"] = ""
 
+    def _get_virtme_root_disk_partition(self, args):
+        if args.root_disk_partition is not None:
+            self.virtme_param["root_disk_partition"] = (
+                f"--root-disk-partition {args.root_disk_partition}"
+            )
+        else:
+            self.virtme_param["root_disk_partition"] = ""
+
     def _get_virtme_systemd(self, args):
         if args.systemd:
             self.virtme_param["systemd"] = "--systemd"
@@ -1433,6 +1452,7 @@ class KernelSource:
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
         self._get_virtme_root_disk(args)
+        self._get_virtme_root_disk_partition(args)
         self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_no_root_posix_acl(args)
@@ -1490,6 +1510,7 @@ class KernelSource:
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
             + f"{self.virtme_param['root_disk']} "
+            + f"{self.virtme_param['root_disk_partition']} "
             + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['no_root_posix_acl']} "
