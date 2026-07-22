@@ -396,9 +396,13 @@ fn generate_lvm() -> io::Result<()> {
 
 fn generate_hosts() -> io::Result<()> {
     if let Ok(hostname) = env::var("virtme_hostname") {
-        std::fs::copy("/etc/hosts", "/run/tmp/hosts")?;
+        File::create("/run/tmp/hosts")?;
+        std::fs::copy("/etc/hosts", "/run/tmp/hosts").ok();
         let mut h = OpenOptions::new().append(true).open("/run/tmp/hosts")?;
         writeln!(h, "\n127.0.0.1 {hostname}\n::1 {hostname}")?;
+        if !Path::new("/etc/hosts").exists() {
+            utils::create_file("/etc/hosts", 0o0644, "").unwrap_or(());
+        }
         utils::do_mount(
             "/run/tmp/hosts",
             "/etc/hosts",
@@ -496,6 +500,10 @@ fn mount_kernel_filesystems() {
         //
         // Note, get_test_tools_dir() relies on /proc, so that must be mounted
         // prior to /run.
+
+        if (mount_info.target == "/proc" || mount_info.target == "/sys") && id() != 1 {
+            continue;
+        }
 
         // The fresh tmpfs hides anything the rootfs kept under /run; save the
         // symlinks the guest userland depends on so they can be restored after.
@@ -1323,7 +1331,9 @@ fn main() {
     configure_environment();
     mount_kernel_filesystems();
     configure_hostname();
-    mount_cgroupfs();
+    if id() == 1 {
+        mount_cgroupfs();
+    }
     configure_limits();
     mount_virtme_overlays();
     mount_sys_filesystems();

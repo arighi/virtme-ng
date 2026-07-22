@@ -12,6 +12,14 @@ import tempfile
 
 from . import cpiowriter, util
 
+# Filesystem types the --root-disk init template probes, in order, when it
+# doesn't know the on-disk filesystem.
+ROOT_DISK_FSTYPES = ("ext4", "ext3", "ext2", "btrfs", "xfs", "f2fs")
+
+# Kernel modules to pull into the initramfs so the above filesystems (and the virtio
+# block driver) are mountable. run.py imports this for the --root-disk module list.
+ROOT_DISK_MODULES = ("virtio_blk", "ext4", "btrfs", "xfs", "f2fs")
+
 
 def make_base_layout(cw):
     for d in (
@@ -107,13 +115,17 @@ def install_modules(cw, modfiles):
     cw.write_file(name=b"modules/load_all.sh", body=script.encode("ascii"), mode=0o644)
 
 
-_INIT = r"""#!/bin/sh
+_INIT_HEAD = r"""#!/bin/sh
 
 {logfunc}
 
 source /modules/load_all.sh
 
-log 'mounting hostfs...'
+"""
+
+# Mounts the host-exported root filesystem (virtiofs, falling back to 9p) on
+# /newroot.  Used for the default --root/--overlay-rwdir boot path.
+_INIT_MOUNT_HOSTFS = r"""log 'mounting hostfs...'
 
 if ! /bin/mount -n -t virtiofs -o {access} ROOTFS /newroot/ 2>/dev/null; then
   if ! /bin/mount -n -t 9p -o {access},version=9p2000.L,trans=virtio,access=any,msize=524288 /dev/root /newroot/; then
@@ -132,7 +144,55 @@ if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
 else
   umount /newroot/proc  # Don't leave garbage behind
 fi
+"""
 
+# Mounts a pre-existing disk image exposed over virtio-blk on /newroot.
+# Used for the --root-disk boot path.
+_INIT_MOUNT_DISK = r"""
+# Built-in virtio_blk creates the block device internally, but nothing
+# populates /dev in this minimal initramfs unless devtmpfs is mounted.
+log 'mounting devtmpfs...'
+/bin/mount -n -t devtmpfs devtmpfs /dev 2>/dev/null
+
+# Device probing (including partition scanning) can be asynchronous; wait for
+# the root device node to show up.
+i=0
+while [ ! -b {rootdev} ] && [ $i -lt 5 ]; do
+  sleep 1
+  i=$((i + 1))
+done
+
+log 'mounting root disk...'
+
+# The image filesystem is unknown to the host (ext4, btrfs, xfs, ...), so try
+# each supported type in turn and mount the first that succeeds.  Explicit -t
+# per attempt avoids depending on /proc/filesystems, which is not mounted yet.
+mounted=
+for fstype in {fstypes}; do
+  if /bin/mount -n -t $fstype -o {access} {rootdev} /newroot/ 2>/dev/null; then
+    mounted=1
+    break
+  fi
+done
+
+if [ -z "$mounted" ]; then
+  echo "Failed to mount root disk {rootdev} (tried {fstypes})."
+  echo "Available virtio-blk devices/partitions:"
+  found=
+  for d in /dev/vd*; do
+    if [ -b "$d" ]; then
+      echo "  $d"
+      found=1
+    fi
+  done
+  [ -z "$found" ] && echo "  (none found)"
+  echo "We are stuck."
+  sleep 5
+  exit 1
+fi
+"""
+
+_INIT_TAIL = r"""
 # Find init
 mount -t proc none /proc
 for arg in `cat /proc/cmdline`; do
@@ -155,12 +215,31 @@ exec /bin/switch_root /newroot "$init" "$@"
 
 def generate_init(config) -> bytes:
     out = io.StringIO()
-    out.write(_INIT.format(logfunc=_LOGFUNC, access=config.access))
+    out.write(_INIT_HEAD.format(logfunc=_LOGFUNC))
+    if config.root_disk:
+        out.write(
+            _INIT_MOUNT_DISK.format(
+                access=config.access,
+                rootdev=config.root_disk_dev,
+                fstypes=" ".join(ROOT_DISK_FSTYPES),
+            )
+        )
+    else:
+        out.write(_INIT_MOUNT_HOSTFS.format(access=config.access))
+    out.write(_INIT_TAIL.format())
     return out.getvalue().encode("utf-8")
 
 
 class Config:
-    __slots__ = ["modfiles", "virtme_data", "virtme_init_path", "busybox", "access"]
+    __slots__ = [
+        "modfiles",
+        "virtme_data",
+        "virtme_init_path",
+        "busybox",
+        "access",
+        "root_disk",
+        "root_disk_dev",
+    ]
 
     def __init__(self):
         self.modfiles: list[str] = []
@@ -168,6 +247,8 @@ class Config:
         self.virtme_init_path: str | None = None
         self.busybox: str | None = None
         self.access = "ro"
+        self.root_disk: bool = False
+        self.root_disk_dev = "/dev/vda"
 
 
 def mkinitramfs(out, config) -> None:

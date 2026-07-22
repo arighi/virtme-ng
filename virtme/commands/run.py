@@ -15,6 +15,7 @@ import os
 import platform
 import re
 import shlex
+import shutil
 import signal
 import socket
 import subprocess
@@ -110,8 +111,28 @@ def make_parser() -> "VirtmeArgumentParser":
     )
 
     g = parser.add_argument_group(title="Common guest options")
-    g.add_argument(
+    _root = g.add_mutually_exclusive_group()
+    _root.add_argument(
         "--root", action="store", default="/", help="Local path to use as guest root"
+    )
+    _root.add_argument(
+        "--root-disk",
+        action="store",
+        default=None,
+        metavar="PATH",
+        help="Use a pre-existing disk image as the guest root filesystem. "
+        "Mutually exclusive with --root. The kernel modules from the booted kernel "
+        "are exported to the guest automatically via 9p.",
+    )
+    g.add_argument(
+        "--root-disk-partition",
+        action="store",
+        type=int,
+        default=None,
+        metavar="N",
+        help="Mount partition N of the --root-disk image (e.g. /dev/vdaN) as the "
+        "guest root, instead of the whole disk. Required for partitioned images "
+        "such as cloud images.",
     )
     g.add_argument(
         "--systemd",
@@ -1304,7 +1325,7 @@ def console_server(  # pylint: disable=R0917
         console_exec = args.remote_cmd
     else:
         console_exec = console_script_path
-        if args.root != "/":
+        if args.root != "/" or args.root_disk is not None:
             vsockmount_fstype = export_hostfs(
                 qemu,
                 arch,
@@ -1331,12 +1352,16 @@ def ssh_client(args):
         ssh_destination = f"ssh://{VIRTME_SSH_DESTINATION_NAME}:{args.port}"
 
     force_tty = False
-    if args.cwd is not None:
+    if args.pwd:
+        cwd = get_guest_relative_path(os.getcwd(), args.root)
+        if cwd is None:
+            arg_fail("current working directory is not contained in the root")
+    elif args.cwd is not None:
         cwd = get_guest_relative_path(args.cwd, args.root)
         if cwd is None:
             arg_fail("specified working directory is not contained in the root")
     else:
-        cwd = get_guest_relative_path(os.getcwd(), args.root)
+        cwd = None
 
     if cwd is not None:
         guest_cwd = "/" if cwd == "." else f"/{cwd}"
@@ -1391,7 +1416,7 @@ def ssh_server(args, arch, qemuargs, kernelargs, guest_cache_dir):
             ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", f"{identity_file}"]
         )
 
-    if args.root == "/":
+    if args.root == "/" and args.root_disk is None:
         ssh_cache = str(SSH_DIR)
     else:
         assert guest_cache_dir is not None
@@ -1482,6 +1507,34 @@ _SAFE_PATH_PATTERN = "[a-zA-Z0-9_+ /.-]+"
 _RWDIR_RE = re.compile(f"^({_SAFE_PATH_PATTERN})(?:=({_SAFE_PATH_PATTERN}))?$")
 
 
+def detect_disk_format(path: str, verbose: bool = False) -> str:
+    """Return the QEMU disk image format for PATH using qemu-img, or 'raw' on failure.
+
+    Falling back to 'raw' for a non-raw image (e.g. qcow2) produces a confusing
+    guest-side mount failure, so warn when the probe fails for any reason other
+    than qemu-img simply not reporting a format.
+    """
+    try:
+        out = subprocess.check_output(
+            ["qemu-img", "info", "--output=json", path],
+            stderr=subprocess.DEVNULL,
+        )
+        return json.loads(out).get("format", "raw")
+    except FileNotFoundError:
+        if verbose:
+            sys.stderr.write(
+                f"virtme: qemu-img not found; assuming raw disk format for {path}\n"
+            )
+        return "raw"
+    except (subprocess.CalledProcessError, json.JSONDecodeError, AttributeError) as exc:
+        if verbose:
+            sys.stderr.write(
+                f"virtme: could not detect disk format for {path} ({exc}); "
+                "assuming raw\n"
+            )
+        return "raw"
+
+
 def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
@@ -1498,7 +1551,19 @@ def do_it() -> int:
     guest_cache_dir = None
     serial_getty_dir = None
     serial_getty_file = None
-    needs_guest_cache = args.systemd or (args.root != "/" and args.server == "ssh")
+    if args.root_disk is not None:
+        if not os.path.exists(args.root_disk):
+            arg_fail(f"root disk image not found: {args.root_disk}")
+        if args.root_disk_partition is not None and args.root_disk_partition < 1:
+            arg_fail("--root-disk-partition must be a positive integer")
+    elif args.root_disk_partition is not None:
+        arg_fail("--root-disk-partition requires --root-disk")
+
+    needs_guest_cache = (
+        args.systemd
+        or args.root_disk is not None
+        or ((args.root != "/" or args.root_disk is not None) and args.server == "ssh")
+    )
     if needs_guest_cache:
         # Export only a fresh per-invocation directory to the guest. Keeping it
         # unique prevents one guest from planting files or symlinks that a later
@@ -1525,9 +1590,19 @@ def do_it() -> int:
     if len(args.overlay_rwdir) > 0:
         virtmods.MODALIASES.append("overlay")
 
+    if args.root_disk is not None:
+        virtmods.MODALIASES.extend(mkinitramfs.ROOT_DISK_MODULES)
+
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles
     if config.modfiles:
+        need_initramfs = True
+
+    if args.root_disk is not None:
+        config.root_disk = True
+        # The root disk lands on /dev/vda; a partition of it is /dev/vdaN.
+        if args.root_disk_partition is not None:
+            config.root_disk_dev = f"/dev/vda{args.root_disk_partition}"
         need_initramfs = True
 
     if args.gdb is not None:
@@ -1634,11 +1709,25 @@ def do_it() -> int:
         raise ValueError("couldn't find guest tools -- virtme is installed incorrectly")
 
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
-    # is forced.
+    # is forced. Skip all of this when --root-disk is used.
     virtiofs_state = None
-    if args.force_9p:
-        use_virtiofs = False
-    else:
+    use_virtiofs = False
+    if args.root_disk is not None:
+        # Root comes from a virtio-blk disk image; no host filesystem export needed.
+        root_disk_driveid = "root-disk"
+        root_disk_fmt = detect_disk_format(args.root_disk, verbose=args.verbose)
+        root_disk_ro = ",readonly=on" if not args.rw else ""
+        root_disk_optarg = qemu.quote_optarg(args.root_disk)
+        qemuargs.extend(
+            [
+                "-drive",
+                f"if=none,id={root_disk_driveid},file={root_disk_optarg},"
+                f"format={root_disk_fmt}{root_disk_ro}",
+                "-device",
+                f"{arch.virtio_dev_type('blk')},drive={root_disk_driveid}",
+            ]
+        )
+    elif not args.force_9p:
         # When --numa is used, the memory backend is already configured by the
         # user-provided NUMA layout.
         virtiofs_state = VirtioFSState(
@@ -1673,7 +1762,7 @@ def do_it() -> int:
             if args.verbose:
                 sys.stderr.write("virtme: use 'microvm' QEMU architecture\n")
             arch = virt_arch
-    if not use_virtiofs:
+    if args.root_disk is None and not use_virtiofs:
         virtfs_config = VirtFSConfig(
             path=args.root,
             mount_tag="/dev/root",
@@ -1716,7 +1805,99 @@ def do_it() -> int:
         if rel_busybox is not None:
             busybox_guest_path = os.path.join("/", rel_busybox)
 
-    if args.root == "/":
+    if args.root_disk is not None:
+        assert guest_cache_dir is not None
+        fstab_path = get_conf("systemd.fstab")
+        if fstab_path == "/dev/null":
+            guest_fstab_path = "/dev/null"
+        else:
+            shutil.copyfile(fstab_path, guest_cache_dir.joinpath("fstab"))
+            guest_fstab_path = "/run/virtme/cache/fstab"
+        initsh = [
+            "mount -t tmpfs run /run",
+            "mount -t devtmpfs devtmpfs /dev 2>/dev/null",
+        ]
+        # Always use 9p for guesttools, modules, and the guest cache in disk
+        # mode: no virtiofsd needed, and 9p works on all archs. guesttools and
+        # the cache are always small; the modules mount is too, except for
+        # --kdir builds, where the whole kdir has to be exported (see below).
+        export_virtfs(
+            qemu,
+            arch,
+            qemuargs,
+            VirtFSConfig(path=guest_tools_path, mount_tag="virtme.guesttools"),
+        )
+        initsh.extend(
+            [
+                "mkdir -p /run/virtme/guesttools",
+                hostfs_mount_cmd(
+                    "9p", "ro", "virtme.guesttools", "/run/virtme/guesttools"
+                ),
+            ]
+        )
+        if kernel.moddir is not None:
+            if args.kdir is not None and not kernel.use_root_mods:
+                # kernel.moddir's symlinks (from virtme-prep-kdir-mods) climb
+                # back out to args.kdir; exporting kernel.moddir alone would
+                # leave them dangling at the mount boundary. Export args.kdir
+                # instead, like the --root DIR branch below does.
+                export_virtfs(
+                    qemu,
+                    arch,
+                    qemuargs,
+                    VirtFSConfig(path=args.kdir, mount_tag="virtme.modules"),
+                )
+                initsh.extend(
+                    [
+                        "mkdir -p /run/virtme/kdir",
+                        hostfs_mount_cmd(
+                            "9p", "ro", "virtme.modules", "/run/virtme/kdir"
+                        ),
+                    ]
+                )
+                kernelargs.append(
+                    "virtme_link_mods=/run/virtme/kdir/"
+                    + qemu.quote_optarg(os.path.relpath(kernel.moddir, args.kdir))
+                )
+            else:
+                export_virtfs(
+                    qemu,
+                    arch,
+                    qemuargs,
+                    VirtFSConfig(path=kernel.moddir, mount_tag="virtme.modules"),
+                )
+                initsh.extend(
+                    [
+                        "mkdir -p /run/virtme/modules",
+                        hostfs_mount_cmd(
+                            "9p", "ro", "virtme.modules", "/run/virtme/modules"
+                        ),
+                    ]
+                )
+                kernelargs.append("virtme_link_mods=/run/virtme/modules")
+        export_virtfs(
+            qemu,
+            arch,
+            qemuargs,
+            VirtFSConfig(
+                path=str(guest_cache_dir),
+                mount_tag="virtme.cache",
+                readonly=False,
+            ),
+        )
+        initsh.extend(
+            [
+                "mkdir -p /run/virtme/cache",
+                hostfs_mount_cmd("9p", "rw", "virtme.cache", "/run/virtme/cache"),
+                f"mount --bind {guest_fstab_path} /etc/fstab",
+            ]
+        )
+        if args.systemd:
+            initsh.append("SYSTEMD_UNIT_PATH=/run/virtme/cache: exec /sbin/init")
+        else:
+            initsh.append(f"exec /run/virtme/guesttools/{virtme_init_cmd}")
+        initcmds = ["init=/bin/sh", "--", "-c", "; ".join(initsh)]
+    elif args.root == "/":
         if args.systemd:
             assert guest_cache_dir is not None
             fstab_path = get_conf("systemd.fstab")
@@ -1729,7 +1910,10 @@ def do_it() -> int:
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
-        initsh = ["mount -t tmpfs run /run"]
+        initsh = [
+            "mount -t tmpfs run /run",
+            "mount -t devtmpfs devtmpfs /dev 2>/dev/null",
+        ]
         if needs_guest_cache:
             assert guest_cache_dir is not None
             guest_cache_fstype = export_hostfs(
@@ -1809,22 +1993,25 @@ def do_it() -> int:
             initsh.append(f"exec /run/virtme/guesttools/{virtme_init_cmd}")
         initcmds = ["init=/bin/sh", "--", "-c", "; ".join(initsh)]
 
-    # Arrange for modules to end up in the right place
-    if kernel.moddir is not None:
-        if kernel.use_root_mods:
-            # Tell virtme-init to use the root /lib/modules
-            kernelargs.append("virtme_root_mods=1")
+    # Arrange for modules to end up in the right place.
+    # For --root-disk, modules are exported via 9p and virtme_link_mods is
+    # already set in the initcmds block above; skip this handling entirely.
+    if args.root_disk is None:
+        if kernel.moddir is not None:
+            if kernel.use_root_mods:
+                # Tell virtme-init to use the root /lib/modules
+                kernelargs.append("virtme_root_mods=1")
+            else:
+                # We're grabbing modules from somewhere other than /lib/modules.
+                # Rather than mounting it separately, symlink it in the guest.
+                # This allows symlinks within the module directory to resolve
+                # correctly in the guest.
+                kernelargs.append(
+                    f"virtme_link_mods=/{qemu.quote_optarg(os.path.relpath(kernel.moddir, args.root))}"
+                )
         else:
-            # We're grabbing modules from somewhere other than /lib/modules.
-            # Rather than mounting it separately, symlink it in the guest.
-            # This allows symlinks within the module directory to resolve
-            # correctly in the guest.
-            kernelargs.append(
-                f"virtme_link_mods=/{qemu.quote_optarg(os.path.relpath(kernel.moddir, args.root))}"
-            )
-    else:
-        # No modules are available.  virtme-init will hide /lib/modules/KVER
-        pass
+            # No modules are available.  virtme-init will hide /lib/modules/KVER
+            pass
 
     # Set up mounts
     mount_index = 0
@@ -2434,7 +2621,7 @@ TTYVHangup=yes
 Environment={shlex.join(init_environment_vars)}
 ExecStart="""
                 )
-                if args.root == "/":
+                if args.root_disk is None and args.root == "/":
                     f.write(f"\nExecStart={guest_tools_path}/{virtme_init_cmd}")
                 else:
                     f.write(f"\nExecStart=/run/virtme/guesttools/{virtme_init_cmd}")

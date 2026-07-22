@@ -19,11 +19,11 @@ log() {
 }
 
 mount_kernel_filesystems() {
-    # Mount procfs and sysfs (needed for stat, sadly)
-    mount -t proc -o nosuid,noexec,nodev proc /proc/
-    mount -t sysfs -o nosuid,noexec,nodev sys /sys/
-
     if [[ $$ -eq 1 ]]; then
+        # Mount procfs and sysfs (needed for stat, sadly).
+        mount -t proc -o nosuid,noexec,nodev proc /proc/
+        mount -t sysfs -o nosuid,noexec,nodev sys /sys/
+
         # only mount /run if systemd is not the init
         if ! grep -q "run /run" /proc/mounts; then
             # The fresh tmpfs hides whatever the rootfs kept under /run. On NixOS
@@ -192,8 +192,10 @@ generate_fstab() {
 
 generate_hosts() {
     if [[ -n ${virtme_hostname:-} ]]; then
-        cp /etc/hosts /run/tmp/hosts
+        : > /run/tmp/hosts
+        [ -e /etc/hosts ] && cp /etc/hosts /run/tmp/hosts
         printf '\n127.0.0.1 %s\n::1 %s\n' "$virtme_hostname" "$virtme_hostname" >> /run/tmp/hosts
+        touch /etc/hosts
         mount --bind /run/tmp/hosts /etc/hosts
     fi
 }
@@ -780,7 +782,9 @@ setup_user_session() {
 configure_environment
 mount_kernel_filesystems
 configure_hostname
-mount_cgroupfs
+if [[ $$ -eq 1 ]]; then
+    mount_cgroupfs
+fi
 configure_limits
 mount_virtme_overlays
 mount_sys_filesystems
