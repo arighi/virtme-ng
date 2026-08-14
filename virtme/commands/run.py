@@ -683,7 +683,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
             # If we are using the entire host filesystem or if we are using
             # a chroot (via --root) we don't have to do anything special action
             # the modules, just rely on /lib/modules in the target rootfs.
-            if root_dir == "/" or args.root != "/":
+            if root_dir == "/" or has_external_root(args):
                 kernel.use_root_mods = True
             kernel.moddir = f"{root_dir}/lib/modules/{kver}"
             if not os.path.exists(kernel.moddir):
@@ -733,7 +733,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         if modmode == "none":
             pass
         elif modmode in ("use", "auto"):
-            if args.root != "/":
+            if has_external_root(args):
                 kernel.use_root_mods = True
                 kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
                 if not os.path.exists(kernel.moddir):
@@ -1220,6 +1220,11 @@ def get_guest_relative_path(path, root):
     return relpath
 
 
+def has_external_root(args) -> bool:
+    """Return True if the guest root is not the host root filesystem."""
+    return args.root != "/"
+
+
 def console_client(args):
     if which("socat") is None:
         arg_fail("socat tool is required, but not available")
@@ -1304,7 +1309,7 @@ def console_server(  # pylint: disable=R0917
         console_exec = args.remote_cmd
     else:
         console_exec = console_script_path
-        if args.root != "/":
+        if has_external_root(args):
             vsockmount_fstype = export_hostfs(
                 qemu,
                 arch,
@@ -1391,7 +1396,7 @@ def ssh_server(args, arch, qemuargs, kernelargs, guest_cache_dir):
             ["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-f", f"{identity_file}"]
         )
 
-    if args.root == "/":
+    if not has_external_root(args):
         ssh_cache = str(SSH_DIR)
     else:
         assert guest_cache_dir is not None
@@ -1498,7 +1503,9 @@ def do_it() -> int:
     guest_cache_dir = None
     serial_getty_dir = None
     serial_getty_file = None
-    needs_guest_cache = args.systemd or (args.root != "/" and args.server == "ssh")
+    needs_guest_cache = args.systemd or (
+        has_external_root(args) and args.server == "ssh"
+    )
     if needs_guest_cache:
         # Export only a fresh per-invocation directory to the guest. Keeping it
         # unique prevents one guest from planting files or symlinks that a later
@@ -1597,7 +1604,7 @@ def do_it() -> int:
             qemuargs.extend(["-numa", f"dist,{arg}"])
 
     if args.snaps:
-        if args.root == "/":
+        if not has_external_root(args):
             snapd_state = "/var/lib/snapd/state.json"
             if os.path.exists(snapd_state):
                 username = get_username()
@@ -1660,7 +1667,7 @@ def do_it() -> int:
             # guests whose virtiofs client cannot negotiate ACLs opt out.
             # When sharing the host root (/), --posix-acl breaks UID/GID
             # translation which causes authentication failures.
-            posix_acl=(args.root != "/" and not args.no_root_posix_acl),
+            posix_acl=(has_external_root(args) and not args.no_root_posix_acl),
         )
         use_virtiofs = export_virtiofs(
             virt_arch,
@@ -1716,7 +1723,7 @@ def do_it() -> int:
         if rel_busybox is not None:
             busybox_guest_path = os.path.join("/", rel_busybox)
 
-    if args.root == "/":
+    if not has_external_root(args):
         if args.systemd:
             assert guest_cache_dir is not None
             fstab_path = get_conf("systemd.fstab")
@@ -2301,7 +2308,7 @@ def do_it() -> int:
     # useful to properly support running virtme-ng instances inside docker)
     if os.geteuid() == 0 or (
         args.user == "root"
-        and args.root != "/"
+        and has_external_root(args)
         and os.access(os.path.join(args.root, "root"), os.R_OK | os.W_OK | os.X_OK)
     ):
         kernelargs.append("virtme_root_user=1")
@@ -2397,7 +2404,7 @@ def do_it() -> int:
     # sense to be used with --root, too), while the rest will have at least 2048.
     # This should be safe overall for the regular x86_64 args.root == / workflow,
     # otherwise this guard could be lifted in the future.
-    if args.root != "/":
+    if has_external_root(args):
         projected_cmdline = " ".join(quote_karg(arg) for arg in kernelargs + initcmds)
         if len(projected_cmdline.encode("utf-8")) > KERNEL_CMDLINE_MAX:
             guest_initsh = create_guest_init_script(args.root, "; ".join(initsh))
@@ -2434,7 +2441,7 @@ TTYVHangup=yes
 Environment={shlex.join(init_environment_vars)}
 ExecStart="""
                 )
-                if args.root == "/":
+                if not has_external_root(args):
                     f.write(f"\nExecStart={guest_tools_path}/{virtme_init_cmd}")
                 else:
                     f.write(f"\nExecStart=/run/virtme/guesttools/{virtme_init_cmd}")
