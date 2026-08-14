@@ -107,12 +107,8 @@ def install_modules(cw, modfiles):
     cw.write_file(name=b"modules/load_all.sh", body=script.encode("ascii"), mode=0o644)
 
 
-_INIT = r"""#!/bin/sh
-
-{logfunc}
-
-source /modules/load_all.sh
-
+# Export the guest rootfs from a host directory through virtiofs or 9p
+_MOUNT_ROOT_HOST = r"""
 log 'mounting hostfs...'
 
 if ! /bin/mount -n -t virtiofs -o {access} ROOTFS /newroot/ 2>/dev/null; then
@@ -132,15 +128,38 @@ if ! mount -t proc -o nosuid,noexec,nodev proc /newroot/proc 2>/dev/null; then
 else
   umount /newroot/proc  # Don't leave garbage behind
 fi
+"""
+
+# Export the guest rootfs from a disk image through virtio-blk
+_MOUNT_ROOT_DISK = r"""
+log "mounting root disk $root..."
+
+/bin/mount -n -t devtmpfs devtmpfs /dev 2>/dev/null
+
+if ! /bin/mount -n -o {access} "$root" /newroot/; then
+  echo "Failed to mount $root.  We are stuck."
+  sleep 5
+  exit 1
+fi
+"""
+
+
+_INIT = r"""#!/bin/sh
+
+{logfunc}
 
 # Find init
 mount -t proc none /proc
 for arg in `cat /proc/cmdline`; do
-  if [[ "${{arg%%=*}}" = "init" ]]; then
-    init="${{arg#init=}}"
-    break
-  fi
+  case "${{arg%%=*}}" in
+    init) init="${{arg#init=}}" ;;
+    root) root="${{arg#root=}}" ;;
+  esac
 done
+
+source /modules/load_all.sh
+
+{mount_root}
 umount /proc
 
 if [[ -z "$init" ]]; then
@@ -154,13 +173,25 @@ exec /bin/switch_root /newroot "$init" "$@"
 
 
 def generate_init(config) -> bytes:
+    if config.root_disk:
+        mount_root = _MOUNT_ROOT_DISK.format(access=config.access)
+    else:
+        mount_root = _MOUNT_ROOT_HOST.format(access=config.access)
+
     out = io.StringIO()
-    out.write(_INIT.format(logfunc=_LOGFUNC, access=config.access))
+    out.write(_INIT.format(logfunc=_LOGFUNC, mount_root=mount_root))
     return out.getvalue().encode("utf-8")
 
 
 class Config:
-    __slots__ = ["modfiles", "virtme_data", "virtme_init_path", "busybox", "access"]
+    __slots__ = [
+        "modfiles",
+        "virtme_data",
+        "virtme_init_path",
+        "busybox",
+        "access",
+        "root_disk",
+    ]
 
     def __init__(self):
         self.modfiles: list[str] = []
@@ -168,6 +199,7 @@ class Config:
         self.virtme_init_path: str | None = None
         self.busybox: str | None = None
         self.access = "ro"
+        self.root_disk = False
 
 
 def mkinitramfs(out, config) -> None:

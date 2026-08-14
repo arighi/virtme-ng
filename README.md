@@ -422,14 +422,20 @@ Examples
 
    The image is attached read-only unless `--rw` is given.
 
-   The kernel has to be able to reach the disk on its own, so it needs
-   `CONFIG_VIRTIO_BLK` and the filesystem of the image built in, along with
-   the virtio transports virtme-ng exports the guest tools over. Filesystems
-   are not part of the generic virtme-ng kernel configuration, so pick the one
-   matching your image:
+   The kernel (or the initramfs) has to be able to reach the disk, so it needs
+   `CONFIG_VIRTIO_BLK` and the filesystem of the image enabled (either builtin
+   or as a module), along with the virtio transports virtme-ng exports the
+   guest tools over. Filesystems are not part of the generic virtme-ng kernel
+   configuration, so pick the one matching your image:
    ```console
    $ vng --kconfig --configitem CONFIG_EXT4_FS=y
    $ vng --build
+   ```
+
+   If the filesystem is only available as a module, pass `--root-fstype` so
+   the initramfs loads it instead of requiring it built in:
+   ```console
+   $ vng --run ./bzImage --root-disk ./tumbleweed.raw --root-fstype ext4
    ```
 
  - Boot a partitioned disk image, such as a cloud image, by naming the
@@ -438,8 +444,23 @@ Examples
    $ vng --run ./bzImage --root-disk ./cloud.qcow2 --root-dev /dev/vda3
    ```
 
-   `--root-dev` accepts anything the kernel accepts in `root=`, so
-   `PARTUUID=<uuid>` and `PARTLABEL=<label>` work as well.
+   `--root-disk` always attaches the image first, so it is reliably `/dev/vda`
+   and its partitions `/dev/vda1`, `/dev/vda2`, and so on, regardless of what
+   else is attached to the guest.
+
+ - Boot a foreign riscv64 Debian kernel using a Debian sid image as root
+   filesystem:
+   ```console
+   $ wget https://cloud.debian.org/images/cloud/sid/daily/latest/debian-sid-nocloud-riscv64-daily.qcow2
+   $ wget http://security.debian.org/debian-security/pool/updates/main/l/linux/linux-image-6.12.107+deb13-riscv64_6.12.107-1_riscv64.deb
+   $ dpkg -x linux-image-6.12.107+deb13-riscv64_6.12.107-1_riscv64.deb debian
+   $ vng --arch riscv64 \
+   >     --run ./debian/boot/vmlinux-6.12.107+deb13-riscv64 \
+   >     --root-disk ./debian-sid-nocloud-riscv64-daily.qcow2 \
+   >     --root-dev /dev/vda1 \
+   >     --root-fstype ext4 \
+   >     --busybox /path/to/static/riscv64-busybox
+   ```
 
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:

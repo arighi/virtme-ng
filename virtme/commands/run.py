@@ -120,19 +120,24 @@ def make_parser() -> "VirtmeArgumentParser":
         default=None,
         metavar="IMAGE",
         help="Boot from a disk image attached over virtio-blk instead of "
-        "exporting a host directory as the guest root. The kernel must be "
-        "able to reach the disk on its own: CONFIG_VIRTIO_BLK, the "
-        "filesystem of the image and the virtio transports must all be "
-        "built in.",
+        "exporting a host directory as the guest root (useful with --arch).",
     )
     g.add_argument(
         "--root-dev",
         action="store",
         default=None,
         metavar="DEVICE",
-        help="Guest device holding the root filesystem of --root-disk "
-        "(default: /dev/vda). Anything the kernel accepts in root= works "
-        "here, e.g. /dev/vda3 or PARTUUID=<uuid> for partitioned images.",
+        help="Guest device holding the root filesystem of --root-disk, e.g. "
+        "/dev/vda for the whole image, or /dev/vda3 for its third partition "
+        "(default: /dev/vda).",
+    )
+    g.add_argument(
+        "--root-fstype",
+        action="store",
+        default=None,
+        metavar="FSTYPE",
+        help="Filesystem of --root-disk's root device, e.g. ext4, so its module "
+        "can be loaded instead of requiring it built into the kernel.",
     )
     g.add_argument(
         "--systemd",
@@ -1570,6 +1575,9 @@ def do_it() -> int:
     if args.root_dev is not None and args.root_disk is None:
         arg_fail("--root-dev requires --root-disk")
 
+    if args.root_fstype is not None and args.root_disk is None:
+        arg_fail("--root-fstype requires --root-disk")
+
     guest_cache_dir = None
     serial_getty_dir = None
     serial_getty_file = None
@@ -1602,18 +1610,23 @@ def do_it() -> int:
     if len(args.overlay_rwdir) > 0:
         virtmods.MODALIASES.append("overlay")
 
+    if args.root_disk is not None:
+        virtmods.MODALIASES.append("virtio_blk")
+        if args.root_fstype is not None:
+            virtmods.MODALIASES.append(f"fs-{args.root_fstype}")
+
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles
     if config.modfiles:
         need_initramfs = True
 
-    if args.root_disk is not None and need_initramfs:
-        # An initramfs takes over the root mount from the kernel, and this one
-        # only knows how to mount a host export.
+    config.root_disk = args.root_disk is not None and need_initramfs
+
+    if config.root_disk and not is_native and args.busybox is None:
         arg_fail(
-            "--root-disk needs a kernel that can reach the root device "
-            "without an initramfs: build CONFIG_VIRTIO_BLK, the filesystem of "
-            "the image and the virtio transports into it"
+            "--root-disk needs an explicit --busybox for a foreign --arch: "
+            "there is no guest rootfs to find one in, and the host's own "
+            "busybox does not run in the guest"
         )
 
     if args.gdb is not None:
@@ -2456,6 +2469,18 @@ def do_it() -> int:
     if busybox_guest_path is not None:
         kernelargs.append(f"virtme_busybox={busybox_guest_path}")
 
+    if args.root_disk is not None:
+        # Let the kernel find, probe and mount the root device by itself,
+        # exactly like it would on real hardware. Without rootfstype= it
+        # tries every filesystem it has, and it lists the partitions it
+        # can see if none of them works out.
+        kernelargs.extend(
+            [
+                f"root={qemu.quote_optarg(args.root_dev or '/dev/vda')}",
+                "rootwait",  # not honored by the initramfs init script yet.
+            ]
+        )
+
     initrdpath: str | None
 
     if need_initramfs:
@@ -2504,31 +2529,21 @@ def do_it() -> int:
         # No initramfs!  Warning: this is slower than using an initramfs
         # because the kernel will wait for device probing to finish.
         # Sigh.
-        if args.root_disk is not None:
-            # Let the kernel find, probe and mount the root device by itself,
-            # exactly like it would on real hardware. Without rootfstype= it
-            # tries every filesystem it has, and it lists the partitions it
-            # can see if none of them works out.
-            kernelargs.extend(
-                [
-                    f"root={qemu.quote_optarg(args.root_dev or '/dev/vda')}",
-                    "rootwait",
-                ]
-            )
-        elif use_virtiofs:
-            kernelargs.extend(
-                [
-                    "rootfstype=virtiofs",
-                    "root=ROOTFS",
-                ]
-            )
-        else:
-            kernelargs.extend(
-                [
-                    "rootfstype=9p",
-                    "rootflags=version=9p2000.L,trans=virtio,access=any,msize=524288",
-                ]
-            )
+        if args.root_disk is None:
+            if use_virtiofs:
+                kernelargs.extend(
+                    [
+                        "rootfstype=virtiofs",
+                        "root=ROOTFS",
+                    ]
+                )
+            else:
+                kernelargs.extend(
+                    [
+                        "rootfstype=9p",
+                        "rootflags=version=9p2000.L,trans=virtio,access=any,msize=524288",
+                    ]
+                )
         kernelargs.extend(
             [
                 "raid=noautodetect",
