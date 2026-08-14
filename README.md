@@ -401,6 +401,46 @@ Examples
             ├─init.scope
    ```
 
+ - Run a kernel against a disk image instead of a host directory:
+   ```console
+   $ vng --run ./bzImage --root-disk ./tumbleweed.raw -- findmnt /
+   TARGET SOURCE   FSTYPE OPTIONS
+   /      /dev/vda ext4  ro,relatime
+   ```
+
+   `--root-disk` attaches the image to the guest over virtio-blk and lets the
+   kernel mount it as the root filesystem, the same way it would on real
+   hardware, instead of exporting a host directory over virtiofs or 9p. This
+   gives the guest a real block-backed root, which is what you want when the
+   code under test cares about the block layer, when the filesystem semantics
+   of virtiofs and 9p get in the way (mmap, hardlinks, file locking), or when
+   testing a foreign architecture, where virtiofs is often unavailable.
+
+   The kernel under test still comes from the host, and so do its modules and
+   the virtme-ng guest tools: they are exported read-only on mounts of their
+   own, so the image never needs to know anything about the kernel it boots.
+
+   The image is attached read-only unless `--rw` is given.
+
+   The kernel has to be able to reach the disk on its own, so it needs
+   `CONFIG_VIRTIO_BLK` and the filesystem of the image built in, along with
+   the virtio transports virtme-ng exports the guest tools over. Filesystems
+   are not part of the generic virtme-ng kernel configuration, so pick the one
+   matching your image:
+   ```console
+   $ vng --kconfig --configitem CONFIG_EXT4_FS=y
+   $ vng --build
+   ```
+
+ - Boot a partitioned disk image, such as a cloud image, by naming the
+   partition holding the root filesystem:
+   ```console
+   $ vng --run ./bzImage --root-disk ./cloud.qcow2 --root-dev /dev/vda3
+   ```
+
+   `--root-dev` accepts anything the kernel accepts in `root=`, so
+   `PARTUUID=<uuid>` and `PARTLABEL=<label>` work as well.
+
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
    ```console
@@ -764,7 +804,8 @@ Troubleshooting
 
  - If you're testing a kernel for an architecture different from the host, keep
    in mind that you need to use also `--root DIR` to use a specific chroot with
-   the binaries compatible with the architecture that you're testing.
+   the binaries compatible with the architecture that you're testing, or
+   `--root-disk IMAGE` to boot a disk image for that architecture.
 
    If the chroot doesn't exist in your system virtme-ng will automatically
    create it using the latest daily build Ubuntu cloud image:
