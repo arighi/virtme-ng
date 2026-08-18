@@ -19,11 +19,11 @@ log() {
 }
 
 mount_kernel_filesystems() {
-    # Mount procfs and sysfs (needed for stat, sadly)
-    mount -t proc -o nosuid,noexec,nodev proc /proc/
-    mount -t sysfs -o nosuid,noexec,nodev sys /sys/
-
     if [[ $$ -eq 1 ]]; then
+        # Mount procfs and sysfs (needed for stat, sadly).
+        mount -t proc -o nosuid,noexec,nodev proc /proc/
+        mount -t sysfs -o nosuid,noexec,nodev sys /sys/
+
         # only mount /run if systemd is not the init
         if ! grep -q "run /run" /proc/mounts; then
             # The fresh tmpfs hides whatever the rootfs kept under /run. On NixOS
@@ -277,6 +277,10 @@ run_systemd_tmpfiles() {
 mount_cgroupfs() {
     # Set up cgroup mount points (mount cgroupv2 hierarchy by default)
     #
+    if [[ $$ -ne 1 ]]; then
+        # systemd is the current init, skip mounting cgroup
+        return
+    fi
     # If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's
     # behavior and mount the legacy cgroup v1 layout.
     if grep -q -E '(^| )SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1($| )' /proc/cmdline; then

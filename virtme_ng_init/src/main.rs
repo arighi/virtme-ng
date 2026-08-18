@@ -497,6 +497,10 @@ fn mount_kernel_filesystems() {
         // Note, get_test_tools_dir() relies on /proc, so that must be mounted
         // prior to /run.
 
+        if (mount_info.target == "/proc" || mount_info.target == "/sys") && id() != 1 {
+            continue;
+        }
+
         // The fresh tmpfs hides anything the rootfs kept under /run; save the
         // symlinks the guest userland depends on so they can be restored after.
         let mut saved_run_symlinks = Vec::new();
@@ -527,6 +531,10 @@ fn mount_kernel_filesystems() {
 }
 
 fn mount_cgroupfs() {
+    if id() != 1 {
+        // systemd is the current init, skip mounting cgroup
+        return;
+    }
     // If SYSTEMD_CGROUP_ENABLE_LEGACY_FORCE=1 is passed we can mimic systemd's behavior and mount
     // the legacy cgroup v1 layout.
     let cmdline = std::fs::read_to_string("/proc/cmdline").unwrap();
