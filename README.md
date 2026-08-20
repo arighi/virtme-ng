@@ -210,6 +210,23 @@ Examples
    $ vng
    ```
 
+ - Use `kexec` inside an x86 virtme-ng guest to reboot into the same kernel.
+   Start the guest with an initramfs and retain it after boot:
+   ```console
+   $ vng --force-initramfs --append retain_initrd
+   ```
+   Then, inside the guest, load and execute the kernel using the retained
+   initramfs:
+   ```console
+   $ sudo kexec --load arch/x86/boot/bzImage \
+       --initrd=/sys/firmware/initrd --reuse-cmdline
+   $ sudo kexec --exec
+   ```
+   The retained initramfs must be compatible with the kernel being loaded. This
+   is the case here because `vng` boots `arch/x86/boot/bzImage` by default.
+   This requires `CONFIG_KEXEC=y` and `CONFIG_BLK_DEV_INITRD=y`, which are both
+   enabled in the default virtme-ng kernel configuration.
+
  - Run an interactive virtme-ng session using the same kernel as the host:
    ```console
    $ vng -r
