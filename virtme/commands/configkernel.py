@@ -405,6 +405,10 @@ def do_it():
             print(conf_item.rstrip("\n"))
         return 0
 
+    if shutil.which("make") is None:
+        sys.stderr.write("Error: 'make' is not installed or not found in PATH.\n")
+        return 1
+
     linuxname = shlex.quote(arch.linuxname)
     archargs = [f"ARCH={linuxname}"]
 

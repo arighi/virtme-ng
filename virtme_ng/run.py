@@ -921,6 +921,17 @@ class KernelSource:
             make_command += [f"CROSS_COMPILE={cross_compile}", f"ARCH={cross_arch}"]
         # Propagate additional Makefile variables
         make_command += args.envs
+
+        if (
+            not args.dry_run
+            and (args.build_host is None or not args.skip_modules)
+            and shutil.which("make") is None
+        ):
+            arg_fail(
+                "Error: 'make' is not installed or not found in PATH.",
+                show_usage=False,
+            )
+
         if args.build_host is None:
             # Build the kernel locally
             make_command += ["-j", str(args.jobs) if args.jobs else self.cpus]
