@@ -691,28 +691,31 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 kernel.moddir = None
             else:
                 mod_file = os.path.join(kernel.moddir, "modules.dep")
-                if not os.path.exists(mod_file):
-                    depmod = find_binary_or_raise(["depmod"])
+                with modfinder.get_mod_path(kernel.moddir, kver) as mod_path:
+                    if not os.path.exists(mod_file):
+                        depmod = find_binary_or_raise(["depmod"])
 
-                    if args.verbose:
-                        sys.stderr.write("virtme: generating modules.dep file\n")
+                        if args.verbose:
+                            sys.stderr.write("virtme: generating modules.dep file\n")
 
-                    # Try to refresh modules directory. Some packages (e.g., debs)
-                    # don't ship all the required modules information, so we
-                    # need to refresh the modules directory using depmod.
-                    ret = subprocess.call(
-                        [depmod, "-a", "-b", root_dir, kver],
-                        stderr=subprocess.DEVNULL,
-                    )
-                    if ret != 0 or not os.path.exists(mod_file):
-                        sys.stderr.write(
-                            "virtme: warning: depmod failed to generate "
-                            f"modules.dep for {kernel.moddir} (exit {ret}); "
-                            "module auto-detection may not work\n"
+                        # Try to refresh modules directory. Some packages (e.g., debs)
+                        # don't ship all the required modules information, so we
+                        # need to refresh the modules directory using depmod.
+                        ret = subprocess.call(
+                            [depmod, "-a", "-b", mod_path, kver],
+                            stderr=subprocess.DEVNULL,
                         )
-                kernel.modfiles = modfinder.find_modules_from_install(
-                    virtmods.MODALIASES, root=root_dir, kver=kver
-                )
+                        if ret != 0 or not os.path.exists(mod_file):
+                            sys.stderr.write(
+                                "virtme: warning: depmod failed to generate "
+                                f"modules.dep for {kernel.moddir} (exit {ret}); "
+                                "module auto-detection may not work\n"
+                            )
+                    modfiles = modfinder.find_modules_from_install(
+                        virtmods.MODALIASES, root=mod_path, kver=kver
+                    )
+                    # Resolve out of mod_path before it's removed after `with` block
+                    kernel.modfiles = [os.path.realpath(path) for path in modfiles]
         kernel.dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())

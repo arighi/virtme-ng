@@ -11,10 +11,13 @@ sort of hotplug.  Instead it generates a topological order and loads
 everything.  The idea is to require very few modules.
 """
 
+import contextlib
 import itertools
+import os
 import platform
 import re
 import subprocess
+import tempfile
 
 from . import util
 
@@ -67,3 +70,24 @@ def find_modules_from_install(aliases, root=None, kver=None, moddir=None):
     return merge_mods(
         resolve_dep(a, root=root, kver=kver, moddir=moddir) for a in aliases
     )
+
+
+@contextlib.contextmanager
+def get_mod_path(moddir, kver):
+    """
+    Context manager yielding a basedir suitable for `depmod -b <basedir>
+    <kver>` and `modprobe -d <basedir> -S <kver>` that resolves to
+    `moddir`, exposing it under both usr/lib/modules/<kver> and
+    lib/modules/<kver> since different kmod builds only search one or the
+    other.
+    """
+    if not kver or os.path.basename(kver) != kver or kver in (".", ".."):
+        raise ValueError(f"invalid kernel version: {kver!r}")
+
+    with tempfile.TemporaryDirectory(prefix="virtme-moddir-") as compat_root:
+        compat_moduledir = os.path.join(compat_root, "usr", "lib", "modules")
+        os.makedirs(compat_moduledir, exist_ok=True)
+        os.symlink(os.path.realpath(moddir), os.path.join(compat_moduledir, kver))
+        os.symlink(os.path.join("usr", "lib"), os.path.join(compat_root, "lib"))
+
+        yield compat_root
