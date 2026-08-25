@@ -690,8 +690,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 kernel.modfiles = []
                 kernel.moddir = None
             else:
-                mod_file = os.path.join(kernel.moddir, "modules.dep")
-                if not os.path.exists(mod_file):
+                mod_path = modfinder.get_mod_path(root_dir, kver)
+                if not Path(kernel.moddir, "modules.dep").exists():
                     depmod = find_binary_or_raise(["depmod"])
 
                     if args.verbose:
@@ -701,11 +701,11 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                     # don't ship all the required modules information, so we
                     # need to refresh the modules directory using depmod.
                     subprocess.call(
-                        [depmod, "-a", "-b", root_dir, kver],
+                        [depmod, "-a", "-b", mod_path, kver],
                         stderr=subprocess.DEVNULL,
                     )
                 kernel.modfiles = modfinder.find_modules_from_install(
-                    virtmods.MODALIASES, root=root_dir, kver=kver
+                    virtmods.MODALIASES, root=mod_path, kver=kver
                 )
         kernel.dtb = None  # For now
     elif args.kdir is not None:

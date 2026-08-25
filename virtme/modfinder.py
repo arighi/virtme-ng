@@ -12,11 +12,12 @@ everything.  The idea is to require very few modules.
 """
 
 import itertools
+import os
 import platform
 import re
 import subprocess
 
-from . import util
+from . import util, virtmods
 
 _INSMOD_RE = re.compile("insmod (.*[^ ]) *$")
 
@@ -67,3 +68,34 @@ def find_modules_from_install(aliases, root=None, kver=None, moddir=None):
     return merge_mods(
         resolve_dep(a, root=root, kver=kver, moddir=moddir) for a in aliases
     )
+
+
+def get_mod_path(path, kver):
+    """
+    There are cases where the path to the modules dir can conflictn with
+    depmod. For example, if root_dir points to /../dir/usr, and the default
+    depmod module path is /usr/lib/modules, it won't find the modules path
+    to create modules.dep inside /../dir/usr/usr/lib/modules/, and making
+    depmod/modprobe to not work properly.
+
+    Execute modprobe, using the first of the virtmods, on the given path until
+    it find a working directory.
+    """
+    modprobe = util.find_binary_or_raise(["modprobe"])
+
+    while path and path != "/":
+        try:
+            subprocess.run(
+                [modprobe, "--show-depends", "-C", "/var/empty", "-d", path, "-S", kver, "--",
+                    virtmods.MODALIASES[0]],
+                check=True, stderr=subprocess.DEVNULL, stdout=subprocess.DEVNULL
+            )
+
+            return path
+
+        except subprocess.CalledProcessError:
+            pass  # This is most likely because the module is built in.
+
+        path, _ = os.path.split(path)
+
+    return None
