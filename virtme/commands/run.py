@@ -700,10 +700,16 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                     # Try to refresh modules directory. Some packages (e.g., debs)
                     # don't ship all the required modules information, so we
                     # need to refresh the modules directory using depmod.
-                    subprocess.call(
+                    ret = subprocess.call(
                         [depmod, "-a", "-b", root_dir, kver],
                         stderr=subprocess.DEVNULL,
                     )
+                    if ret != 0 or not os.path.exists(mod_file):
+                        sys.stderr.write(
+                            "virtme: warning: depmod failed to generate "
+                            f"modules.dep for {kernel.moddir} (exit {ret}); "
+                            "module auto-detection may not work\n"
+                        )
                 kernel.modfiles = modfinder.find_modules_from_install(
                     virtmods.MODALIASES, root=root_dir, kver=kver
                 )
