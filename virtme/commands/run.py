@@ -1356,10 +1356,10 @@ def ssh_client(args):
 
     if cwd is not None:
         guest_cwd = "/" if cwd == "." else f"/{cwd}"
-        remote_cmd_str = f"cd -- {shlex.quote(guest_cwd)}" + (
-            f" && {args.remote_cmd}"
+        remote_cmd_str = f"cd -- {shlex.quote(guest_cwd)} ; " + (
+            f"{args.remote_cmd}"
             if args.remote_cmd is not None
-            else ' && exec "${SHELL:-/bin/sh}" -i'
+            else 'exec "${SHELL:-/bin/sh}" -i'
         )
         remote_cmd = [
             "--",
