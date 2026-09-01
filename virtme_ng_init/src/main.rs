@@ -1143,7 +1143,7 @@ fn run_user_gui(tty_fd: libc::c_int) {
         utils::run_cmd("/bin/sh", &["-c", &format!("chown {user} /dev/char/*")]);
 
         // Clean up any previous X11 state.
-        utils::run_cmd("/bin/sh", &["-c", "rm -f /tmp/.X11*/* /tmp/.X11-lock"]);
+        utils::run_cmd("/bin/sh", &["-c", "rm -f /tmp/.X11*/* /tmp/.X*-lock"]);
 
         // Start xinit directly.
         storage = format!("su -c 'xinit /run/tmp/.xinitrc' -- {user}");

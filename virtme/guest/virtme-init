@@ -709,7 +709,7 @@ run_user_gui() {
     fi
 
     # Clean up any previous X11 state.
-    rm -f /tmp/.X11*/* /tmp/.X11-lock
+    rm -f /tmp/.X11*/* /tmp/.X*-lock
 
     # Create a .xinitrc to start the requested graphical application.
     xinit_rc=/run/tmp/.xinitrc
