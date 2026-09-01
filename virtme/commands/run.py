@@ -1964,7 +1964,10 @@ def do_it() -> int:
         )
         qemuargs.extend(["-serial", "chardev:console"])
         if not args.disable_monitor:
-            qemuargs.extend(["-mon", "chardev=console"])
+            if qemu.has_monitor_object:
+                qemuargs.extend(["-object", "monitor-hmp,id=monitor,chardev=console"])
+            else:
+                qemuargs.extend(["-mon", "chardev=console"])
 
     if not args.video and not args.script_sh and not args.script_exec:
         if args.nvgpu is None:

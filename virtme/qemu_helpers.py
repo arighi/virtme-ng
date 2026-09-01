@@ -20,6 +20,7 @@ class Qemu:
         self.arch = arch
         self.has_multidevs = None
         self.cannot_overmount_virtfs = None
+        self.has_monitor_object = None
 
         if not qemubin:
             qemubin = shutil.which(f"qemu-system-{arch}")
@@ -49,6 +50,14 @@ class Qemu:
             self.has_multidevs = (
                 re.search(r"version (?:1\.|2\.|3\.|4\.[01][^\d])", self.version) is None
             )
+
+            # QEMU 11.1+ supports -object monitor-hmp/monitor-qmp as
+            # replacement for the deprecated -mon option
+            match = re.search(r"version (\d+)\.(\d+)", self.version)
+            self.has_monitor_object = match is not None and (
+                int(match.group(1)),
+                int(match.group(2)),
+            ) >= (11, 1)
 
     def quote_optarg(self, a: str) -> str:
         """Quote an argument to an option."""
