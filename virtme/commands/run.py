@@ -1921,7 +1921,11 @@ def do_it() -> int:
 
     kernelargs.extend(["virtme_console=" + arg for arg in arch.serial_console_args()])
 
-    if not args.script_sh and not args.script_exec:
+    # Do not break old syntax "-g command"
+    if args.graphics is not None and args.script_sh is None:
+        args.script_sh = args.graphics
+
+    if args.script_sh is None and args.script_exec is None:
         qemuargs.extend(["-echr", "1"])
 
         if args.systemd:
@@ -1966,7 +1970,7 @@ def do_it() -> int:
         if not args.disable_monitor:
             qemuargs.extend(["-mon", "chardev=console"])
 
-    if not args.video and not args.script_sh and not args.script_exec:
+    if not args.video and args.script_sh is None and args.script_exec is None:
         if args.nvgpu is None:
             qemuargs.extend(arch.qemu_nodisplay_args())
         else:
@@ -2194,10 +2198,6 @@ def do_it() -> int:
 
         # Ask virtme-init to run the script
         kernelargs.append(f"virtme.exec=`{shellcmd}`")
-
-    # Do not break old syntax "-g command"
-    if args.graphics is not None and args.script_sh is None:
-        args.script_sh = args.graphics
 
     if args.script_sh is not None:
         _, ret_path = tempfile.mkstemp(prefix="virtme_ret")
