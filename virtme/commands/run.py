@@ -110,8 +110,29 @@ def make_parser() -> "VirtmeArgumentParser":
     )
 
     g = parser.add_argument_group(title="Common guest options")
-    g.add_argument(
+    root = g.add_mutually_exclusive_group()
+    root.add_argument(
         "--root", action="store", default="/", help="Local path to use as guest root"
+    )
+    root.add_argument(
+        "--root-disk",
+        action="store",
+        default=None,
+        metavar="IMAGE",
+        help="Boot from a disk image attached over virtio-blk instead of "
+        "exporting a host directory as the guest root. The kernel must be "
+        "able to reach the disk on its own: CONFIG_VIRTIO_BLK, the "
+        "filesystem of the image and the virtio transports must all be "
+        "built in.",
+    )
+    g.add_argument(
+        "--root-dev",
+        action="store",
+        default=None,
+        metavar="DEVICE",
+        help="Guest device holding the root filesystem of --root-disk "
+        "(default: /dev/vda). Anything the kernel accepts in root= works "
+        "here, e.g. /dev/vda3 or PARTUUID=<uuid> for partitioned images.",
     )
     g.add_argument(
         "--systemd",
@@ -128,7 +149,7 @@ def make_parser() -> "VirtmeArgumentParser":
         action="store_true",
         help=(
             "Disable POSIX ACL support for external root virtiofs exports "
-            "(ignored with 9p or host root)"
+            "(ignored with 9p, host root, or --root-disk)"
         ),
     )
     g.add_argument(
@@ -742,7 +763,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         if modmode == "none":
             pass
         elif modmode in ("use", "auto"):
-            if has_external_root(args):
+            if args.root != "/":
                 kernel.use_root_mods = True
                 kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
                 if not os.path.exists(kernel.moddir):
@@ -1231,7 +1252,39 @@ def get_guest_relative_path(path, root):
 
 def has_external_root(args) -> bool:
     """Return True if the guest root is not the host root filesystem."""
-    return args.root != "/"
+    return args.root != "/" or args.root_disk is not None
+
+
+def detect_disk_format(path: str, verbose: bool = False) -> str:
+    """Return the QEMU image format of PATH, defaulting to raw."""
+    try:
+        out = subprocess.check_output(
+            ["qemu-img", "info", "--output=json", "--", path],
+            stderr=subprocess.DEVNULL,
+        )
+        return json.loads(out).get("format", "raw")
+    except (OSError, subprocess.CalledProcessError, json.JSONDecodeError) as exc:
+        if verbose:
+            sys.stderr.write(
+                f"virtme: could not detect the format of {path} ({exc}), assuming raw\n"
+            )
+        return "raw"
+
+
+def export_root_disk(qemu, arch, qemuargs, args) -> None:
+    """Attach the --root-disk image as the first virtio-blk device."""
+    fmt = detect_disk_format(args.root_disk, verbose=args.verbose)
+    readonly = "" if args.rw else ",readonly=on"
+    qemuargs.extend(
+        [
+            "-drive",
+            f"if=none,id=virtme-root,"
+            f"file={qemu.quote_optarg(args.root_disk)},"
+            f"format={fmt}{readonly}",
+            "-device",
+            f"{arch.virtio_dev_type('blk')},drive=virtme-root",
+        ]
+    )
 
 
 def console_client(args):
@@ -1511,6 +1564,12 @@ def do_it() -> int:
             ssh_client(args)
         sys.exit(0)
 
+    if args.root_disk is not None and not os.path.exists(args.root_disk):
+        arg_fail(f"{args.root_disk} does not exist")
+
+    if args.root_dev is not None and args.root_disk is None:
+        arg_fail("--root-dev requires --root-disk")
+
     guest_cache_dir = None
     serial_getty_dir = None
     serial_getty_file = None
@@ -1547,6 +1606,15 @@ def do_it() -> int:
     config.modfiles = kernel.modfiles
     if config.modfiles:
         need_initramfs = True
+
+    if args.root_disk is not None and need_initramfs:
+        # An initramfs takes over the root mount from the kernel, and this one
+        # only knows how to mount a host export.
+        arg_fail(
+            "--root-disk needs a kernel that can reach the root device "
+            "without an initramfs: build CONFIG_VIRTIO_BLK, the filesystem of "
+            "the image and the virtio transports into it"
+        )
 
     if args.gdb is not None:
         if kernel.version:
@@ -1654,9 +1722,8 @@ def do_it() -> int:
     # Try to use virtio-fs first, in case of failure fallback to 9p, unless 9p
     # is forced.
     virtiofs_state = None
-    if args.force_9p:
-        use_virtiofs = False
-    else:
+    use_virtiofs = False
+    if not args.force_9p:
         # When --numa is used, the memory backend is already configured by the
         # user-provided NUMA layout.
         virtiofs_state = VirtioFSState(
@@ -1670,28 +1737,33 @@ def do_it() -> int:
             virt_arch = architectures.get("microvm")
         else:
             virt_arch = arch
-        virtiofs_config = VirtioFSConfig(
-            path=args.root,
-            mount_tag="ROOTFS",
-            rw=args.rw,
-            # Keep POSIX ACLs enabled by default for external roots, but let
-            # guests whose virtiofs client cannot negotiate ACLs opt out.
-            # When sharing the host root (/), --posix-acl breaks UID/GID
-            # translation which causes authentication failures.
-            posix_acl=(has_external_root(args) and not args.no_root_posix_acl),
-        )
-        use_virtiofs = export_virtiofs(
-            virt_arch,
-            qemuargs,
-            virtiofs_state,
-            virtiofs_config,
-            verbose=args.verbose,
-        )
+        if args.root_disk is None:
+            virtiofs_config = VirtioFSConfig(
+                path=args.root,
+                mount_tag="ROOTFS",
+                rw=args.rw,
+                # Keep POSIX ACLs enabled by default for external roots, but let
+                # guests whose virtiofs client cannot negotiate ACLs opt out.
+                # When sharing the host root (/), --posix-acl breaks UID/GID
+                # translation which causes authentication failures.
+                posix_acl=(has_external_root(args) and not args.no_root_posix_acl),
+            )
+            use_virtiofs = export_virtiofs(
+                virt_arch,
+                qemuargs,
+                virtiofs_state,
+                virtiofs_config,
+                verbose=args.verbose,
+            )
         if can_use_microvm(args) and use_virtiofs:
             if args.verbose:
                 sys.stderr.write("virtme: use 'microvm' QEMU architecture\n")
             arch = virt_arch
-    if not use_virtiofs:
+    if args.root_disk is not None:
+        # The guest root comes from a block device; there is no host directory
+        # to export. Guest tools and modules are exported separately below.
+        export_root_disk(qemu, arch, qemuargs, args)
+    elif not use_virtiofs:
         virtfs_config = VirtFSConfig(
             path=args.root,
             mount_tag="/dev/root",
@@ -1730,9 +1802,20 @@ def do_it() -> int:
         if not os.path.isfile(host_busybox):
             print(f"busybox {host_busybox} does not exist", file=sys.stderr)
             raise SilentError()
-        rel_busybox = get_guest_relative_path(host_busybox, args.root)
+        # A host path says nothing about the contents of a disk image, so
+        # always export busybox to disk-backed roots.
+        rel_busybox = (
+            None
+            if args.root_disk is not None
+            else get_guest_relative_path(host_busybox, args.root)
+        )
         if rel_busybox is not None:
             busybox_guest_path = os.path.join("/", rel_busybox)
+
+    # Guest path of the module directory of the kernel under test, when it is
+    # exported on a mount of its own instead of being reachable through the
+    # guest root.
+    module_link_path = None
 
     if not has_external_root(args):
         if args.systemd:
@@ -1796,6 +1879,41 @@ def do_it() -> int:
                 f"mount --bind {fstab_path} /etc/fstab",
             ]
         )
+        if args.root_disk is not None and kernel.moddir is not None:
+            # A disk image is unrelated to the kernel under test, so its
+            # modules cannot be reached through the guest root and need a
+            # mount of their own.
+            if args.kdir is not None and not kernel.use_root_mods:
+                # virtme-prep-kdir-mods fills kernel.moddir with symlinks
+                # pointing back into the kdir, which would dangle at the mount
+                # boundary, so export the whole kdir instead.
+                modules_path = args.kdir
+                module_link_path = os.path.join(
+                    "/run/virtme/modules", os.path.relpath(kernel.moddir, args.kdir)
+                )
+            else:
+                modules_path = kernel.moddir
+                module_link_path = "/run/virtme/modules"
+            modules_fstype = export_hostfs(
+                qemu,
+                arch,
+                qemuargs,
+                virtiofs_state,
+                path=modules_path,
+                mount_tag="virtme.modules",
+                verbose=args.verbose,
+            )
+            initsh.extend(
+                [
+                    "mkdir -p /run/virtme/modules",
+                    hostfs_mount_cmd(
+                        modules_fstype,
+                        "ro",
+                        "virtme.modules",
+                        "/run/virtme/modules",
+                    ),
+                ]
+            )
         if host_busybox is not None and busybox_guest_path is None:
             busybox_fstype = export_hostfs(
                 qemu,
@@ -1831,7 +1949,10 @@ def do_it() -> int:
         initcmds = ["init=/bin/sh", "--", "-c", "; ".join(initsh)]
 
     # Arrange for modules to end up in the right place
-    if kernel.moddir is not None:
+    if module_link_path is not None:
+        # Exported on a mount of their own, see above.
+        kernelargs.append(f"virtme_link_mods={qemu.quote_optarg(module_link_path)}")
+    elif kernel.moddir is not None:
         if kernel.use_root_mods:
             # Tell virtme-init to use the root /lib/modules
             kernelargs.append("virtme_root_mods=1")
@@ -2326,7 +2447,10 @@ def do_it() -> int:
     if os.geteuid() == 0 or (
         args.user == "root"
         and has_external_root(args)
-        and os.access(os.path.join(args.root, "root"), os.R_OK | os.W_OK | os.X_OK)
+        and (
+            args.root_disk is not None
+            or os.access(os.path.join(args.root, "root"), os.R_OK | os.W_OK | os.X_OK)
+        )
     ):
         kernelargs.append("virtme_root_user=1")
     if busybox_guest_path is not None:
@@ -2380,7 +2504,18 @@ def do_it() -> int:
         # No initramfs!  Warning: this is slower than using an initramfs
         # because the kernel will wait for device probing to finish.
         # Sigh.
-        if use_virtiofs:
+        if args.root_disk is not None:
+            # Let the kernel find, probe and mount the root device by itself,
+            # exactly like it would on real hardware. Without rootfstype= it
+            # tries every filesystem it has, and it lists the partitions it
+            # can see if none of them works out.
+            kernelargs.extend(
+                [
+                    f"root={qemu.quote_optarg(args.root_dev or '/dev/vda')}",
+                    "rootwait",
+                ]
+            )
+        elif use_virtiofs:
             kernelargs.extend(
                 [
                     "rootfstype=virtiofs",
@@ -2421,7 +2556,7 @@ def do_it() -> int:
     # sense to be used with --root, too), while the rest will have at least 2048.
     # This should be safe overall for the regular x86_64 args.root == / workflow,
     # otherwise this guard could be lifted in the future.
-    if has_external_root(args):
+    if has_external_root(args) and args.root_disk is None:
         projected_cmdline = " ".join(quote_karg(arg) for arg in kernelargs + initcmds)
         if len(projected_cmdline.encode("utf-8")) > KERNEL_CMDLINE_MAX:
             guest_initsh = create_guest_init_script(args.root, "; ".join(initsh))

@@ -281,11 +281,32 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         help="Override the default user shell",
     )
 
-    parser.add_argument(
+    root = parser.add_mutually_exclusive_group()
+    root.add_argument(
         "--root",
         action="store",
         help="Pass a specific chroot to use inside the virtualized kernel "
         + "(useful with --arch)",
+    )
+
+    root.add_argument(
+        "--root-disk",
+        action="store",
+        metavar="IMAGE",
+        help="Boot from a disk image attached over virtio-blk, instead of "
+        + "exporting a host directory as the guest root (useful with "
+        + "--arch). The kernel must be able to reach the disk on its own: "
+        + "CONFIG_VIRTIO_BLK, the filesystem of the image and the virtio "
+        + "transports must all be built in.",
+    )
+
+    parser.add_argument(
+        "--root-dev",
+        action="store",
+        metavar="DEVICE",
+        help="Guest device holding the root filesystem of --root-disk "
+        + "(default: /dev/vda). Anything the kernel accepts in root= works "
+        + "here, e.g. /dev/vda3 or PARTUUID=<uuid> for partitioned images.",
     )
 
     parser.add_argument(
@@ -306,7 +327,7 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         action="store_true",
         help=(
             "Disable POSIX ACL support for external root virtiofs exports "
-            "(ignored with 9p or host root)"
+            "(ignored with 9p, host root, or --root-disk)"
         ),
     )
 
@@ -515,7 +536,8 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--arch",
         action="store",
         help="Generate and test a kernel for a specific architecture "
-        "(default is host architecture ; if set, to be used with --root)",
+        "(default is host architecture ; if set, to be used with --root "
+        "or --root-disk)",
     )
 
     parser.add_argument(
@@ -998,8 +1020,12 @@ class KernelSource:
                     f"available: {' '.join(ARCH_MAPPING)}",
                     show_usage=False,
                 )
-            if args.root is None and get_host_arch() != args.arch:
-                arg_fail("--arch used without --root")
+            if (
+                args.root is None
+                and args.root_disk is None
+                and get_host_arch() != args.arch
+            ):
+                arg_fail("--arch used without --root or --root-disk")
             if "max-cpus" in ARCH_MAPPING[args.arch]:
                 self.cpus = ARCH_MAPPING[args.arch]["max-cpus"]
             self.virtme_param["arch"] = "--arch " + ARCH_MAPPING[args.arch]["qemu_name"]
@@ -1017,6 +1043,18 @@ class KernelSource:
             self.virtme_param["root"] = f"--root {args.root}"
         else:
             self.virtme_param["root"] = ""
+
+    def _get_virtme_root_disk(self, args):
+        opts = []
+        if args.root_disk is not None:
+            if not os.path.exists(args.root_disk):
+                arg_fail(f"{args.root_disk} does not exist", show_usage=False)
+            opts.append(f"--root-disk {shlex.quote(args.root_disk)}")
+        elif args.root_dev is not None:
+            arg_fail("--root-dev requires --root-disk", show_usage=False)
+        if args.root_dev is not None:
+            opts.append(f"--root-dev {shlex.quote(args.root_dev)}")
+        self.virtme_param["root_disk"] = " ".join(opts)
 
     def _get_virtme_systemd(self, args):
         if args.systemd:
@@ -1039,7 +1077,9 @@ class KernelSource:
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
             self.virtme_param["cwd"] = "--cwd " + args.cwd
-        elif args.root is None or args.ssh_client is not None:
+        elif (
+            args.root is None and args.root_disk is None or args.ssh_client is not None
+        ):
             self.virtme_param["cwd"] = "--pwd"
         else:
             self.virtme_param["cwd"] = ""
@@ -1418,6 +1458,7 @@ class KernelSource:
         self._get_virtme_shell(args)
         self._get_virtme_arch(args)
         self._get_virtme_root(args)
+        self._get_virtme_root_disk(args)
         self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_no_root_posix_acl(args)
@@ -1474,6 +1515,7 @@ class KernelSource:
             + f"{self.virtme_param['shell']} "
             + f"{self.virtme_param['arch']} "
             + f"{self.virtme_param['root']} "
+            + f"{self.virtme_param['root_disk']} "
             + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['no_root_posix_acl']} "
