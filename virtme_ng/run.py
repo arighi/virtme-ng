@@ -293,20 +293,25 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         "--root-disk",
         action="store",
         metavar="IMAGE",
-        help="Boot from a disk image attached over virtio-blk, instead of "
-        + "exporting a host directory as the guest root (useful with "
-        + "--arch). The kernel must be able to reach the disk on its own: "
-        + "CONFIG_VIRTIO_BLK, the filesystem of the image and the virtio "
-        + "transports must all be built in.",
+        help="Boot from a disk image attached over virtio-blk instead of "
+        "exporting a host directory as the guest root (useful with --arch).",
     )
 
     parser.add_argument(
         "--root-dev",
         action="store",
         metavar="DEVICE",
-        help="Guest device holding the root filesystem of --root-disk "
-        + "(default: /dev/vda). Anything the kernel accepts in root= works "
-        + "here, e.g. /dev/vda3 or PARTUUID=<uuid> for partitioned images.",
+        help="Guest device holding the root filesystem of --root-disk, e.g. "
+        "/dev/vda for the whole image, or /dev/vda3 for its third partition "
+        "(default: /dev/vda).",
+    )
+
+    parser.add_argument(
+        "--root-fstype",
+        action="store",
+        metavar="FSTYPE",
+        help="Filesystem of --root-disk's root device, e.g. ext4, so its module "
+        "can be loaded instead of requiring it built into the kernel.",
     )
 
     parser.add_argument(
@@ -1050,10 +1055,15 @@ class KernelSource:
             if not os.path.exists(args.root_disk):
                 arg_fail(f"{args.root_disk} does not exist", show_usage=False)
             opts.append(f"--root-disk {shlex.quote(args.root_disk)}")
-        elif args.root_dev is not None:
-            arg_fail("--root-dev requires --root-disk", show_usage=False)
+        else:
+            if args.root_dev is not None:
+                arg_fail("--root-dev requires --root-disk", show_usage=False)
+            if args.root_fstype is not None:
+                arg_fail("--root-fstype requires --root-disk", show_usage=False)
         if args.root_dev is not None:
             opts.append(f"--root-dev {shlex.quote(args.root_dev)}")
+        if args.root_fstype is not None:
+            opts.append(f"--root-fstype {shlex.quote(args.root_fstype)}")
         self.virtme_param["root_disk"] = " ".join(opts)
 
     def _get_virtme_systemd(self, args):
