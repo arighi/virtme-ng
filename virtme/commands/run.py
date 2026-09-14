@@ -1801,6 +1801,9 @@ def do_it() -> int:
         kernelargs.append("audit=off")
         # disable zram-generator: may hang at boot if CONFIG_ZRAM is not enabled
         kernelargs.append("systemd.zram=0")
+        if args.root_disk is not None:
+            # disable SELinux: virtiofs/9p mounts lack xattr support, so guests get denied
+            kernelargs.append("selinux=0")
         kernelargs.extend(
             [f"console={console}" for console in arch.serial_console_args() or []],
         )
