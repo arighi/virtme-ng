@@ -573,6 +573,7 @@ class Kernel:
 
 
 def get_rootfs_from_kernel_path(path):
+    path = os.path.abspath(path)
     while path and path != "/" and not os.path.exists(path + "/lib/modules"):
         # Some packages (e.g. .debs) might use /usr without /lib
         if os.path.exists(path + "/usr/lib/modules"):
