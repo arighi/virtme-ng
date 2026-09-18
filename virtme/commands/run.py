@@ -573,6 +573,7 @@ class Kernel:
 
 
 def get_rootfs_from_kernel_path(path):
+    path = os.path.abspath(path)
     while path and path != "/" and not os.path.exists(path + "/lib/modules"):
         # Some packages (e.g. .debs) might use /usr without /lib
         if os.path.exists(path + "/usr/lib/modules"):
@@ -1801,6 +1802,9 @@ def do_it() -> int:
         kernelargs.append("audit=off")
         # disable zram-generator: may hang at boot if CONFIG_ZRAM is not enabled
         kernelargs.append("systemd.zram=0")
+        if args.root_disk is not None:
+            # disable SELinux: virtiofs/9p mounts lack xattr support, so guests get denied
+            kernelargs.append("selinux=0")
         kernelargs.extend(
             [f"console={console}" for console in arch.serial_console_args() or []],
         )
@@ -1834,12 +1838,15 @@ def do_it() -> int:
         if args.systemd:
             assert guest_cache_dir is not None
             fstab_path = get_conf("systemd.fstab")
-            initcmds = [
-                "init=/bin/sh",
-                "--",
-                "-c",
-                f"mount --bind {fstab_path} /etc/fstab && SYSTEMD_UNIT_PATH={guest_cache_dir}: exec /sbin/init;",
-            ]
+            initsh = [f"mount --bind {fstab_path} /etc/fstab"]
+            if kernel.moddir is not None and not kernel.use_root_mods:
+                initsh += [
+                    "mkdir -p /lib/modules",
+                    "mount -n -t tmpfs none /lib/modules",
+                    f"ln -s {kernel.moddir} /lib/modules/$(uname -r)",
+                ]
+            initsh.append(f"SYSTEMD_UNIT_PATH={guest_cache_dir}: exec /sbin/init")
+            initcmds = ["init=/bin/sh", "--", "-c", " && ".join(initsh)]
         else:
             initcmds = [f"init={guest_tools_path}/{virtme_init_cmd}"]
     else:
@@ -1952,11 +1959,13 @@ def do_it() -> int:
                 "/run/virtme/busybox", os.path.basename(host_busybox)
             )
         if args.systemd:
-            initsh.extend(
-                [
-                    "SYSTEMD_UNIT_PATH=/run/virtme/cache: exec /sbin/init",
+            if module_link_path is not None:
+                initsh += [
+                    "mkdir -p /lib/modules",
+                    "mount -n -t tmpfs none /lib/modules",
+                    f"ln -s {module_link_path} /lib/modules/$(uname -r)",
                 ]
-            )
+            initsh.append("SYSTEMD_UNIT_PATH=/run/virtme/cache: exec /sbin/init")
         else:
             initsh.append(f"exec /run/virtme/guesttools/{virtme_init_cmd}")
         initcmds = ["init=/bin/sh", "--", "-c", "; ".join(initsh)]
@@ -1964,10 +1973,15 @@ def do_it() -> int:
     # Arrange for modules to end up in the right place
     if module_link_path is not None:
         # Exported on a mount of their own, see above.
-        kernelargs.append(f"virtme_link_mods={qemu.quote_optarg(module_link_path)}")
+        if args.systemd:
+            # Early initsh already set up the symlink; tell virtme-init to skip it.
+            kernelargs.append("virtme_root_mods=1")
+        else:
+            kernelargs.append(f"virtme_link_mods={qemu.quote_optarg(module_link_path)}")
     elif kernel.moddir is not None:
-        if kernel.use_root_mods:
-            # Tell virtme-init to use the root /lib/modules
+        if kernel.use_root_mods or args.systemd:
+            # use_root_mods: /lib/modules is already correct in the guest root.
+            # systemd: early initsh already set up the tmpfs+symlink.
             kernelargs.append("virtme_root_mods=1")
         else:
             # We're grabbing modules from somewhere other than /lib/modules.
