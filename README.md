@@ -462,6 +462,21 @@ Examples
    >     --busybox /path/to/static/riscv64-busybox
    ```
 
+ - Mirror the available host CPU socket/core/thread layout in the guest and
+   pin each guest vCPU to the corresponding host CPU:
+   ```console
+   $ vng -r --cpus host
+   ```
+
+   The CPUs available to `vng` are determined by its CPU affinity, so this
+   also works inside a cpuset. QEMU can only describe uniform topologies: if
+   the available CPUs have unequal numbers of cores per socket or threads per
+   core (e.g., hybrid CPUs with SMT performance cores and non-SMT efficiency
+   cores), `vng` picks a uniform layout that keeps SMT siblings together,
+   using as many host CPUs as possible (leaving out cores with fewer threads
+   or merging sockets if needed), and prints a warning. This option does not
+   copy host NUMA memory placement or cache topology into the guest.
+
  - Run the current kernel creating a 1GB NUMA node with CPUs 0,1,3 assigned
    and a 3GB NUMA node with CPUs 2,4,5,6,7 assigned:
    ```console

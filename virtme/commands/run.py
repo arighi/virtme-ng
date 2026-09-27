@@ -28,6 +28,7 @@ from shutil import copyfile, copytree, which
 from time import sleep
 from typing import Any, NoReturn
 
+from virtme.cpu_topology import TopologyError, host_cpu_topology
 from virtme_ng.utils import (
     CACHE_DIR,
     DEFAULT_VIRTME_SSH_HOSTNAME_CID_SEPARATOR,
@@ -1569,6 +1570,17 @@ def do_it() -> int:
         elif args.client == "ssh":
             ssh_client(args)
         sys.exit(0)
+
+    if args.cpus == "host":
+        if args.pin is not None:
+            arg_fail("error: --cpus host cannot be combined with --pin")
+        try:
+            args.cpus, pin, warning = host_cpu_topology()
+        except TopologyError as exc:
+            arg_fail(f"error: {exc}")
+        if warning:
+            sys.stderr.write(f"warning: {warning}\n")
+        args.pin = ",".join(map(str, pin))
 
     if args.root_disk is not None and not os.path.exists(args.root_disk):
         arg_fail(f"{args.root_disk} does not exist")
