@@ -388,7 +388,12 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
-        "--cpus", "-p", action="store", help="Set guest CPU count (qemu -smp flag)"
+        "--cpus",
+        "--cpu",
+        "-p",
+        action="store",
+        help="Set guest CPU count (qemu -smp flag), or 'host' to mirror the "
+        "available host CPU topology and pin each vCPU",
     )
 
     parser.add_argument(
