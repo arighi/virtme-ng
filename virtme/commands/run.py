@@ -290,7 +290,11 @@ def make_parser() -> "VirtmeArgumentParser":
         help="Define a distance between two NUMA nodes in the guest (src=ID,dst=ID,val=NUM).",
     )
     g.add_argument(
-        "--cpus", action="store", default=None, help="Set guest cpu and qemu -smp flag."
+        "--cpus",
+        action="store",
+        default=None,
+        help="Set guest CPU count (qemu -smp flag), or 'host' to mirror the "
+        "available host CPU topology and pin each vCPU.",
     )
     g.add_argument(
         "--name",
