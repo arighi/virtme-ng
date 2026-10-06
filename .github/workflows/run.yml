@@ -26,7 +26,7 @@ jobs:
       ### END DEPENDENCIES ###
 
       # Checkout git repository
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # Run `uname -r` using a vanilla v6.6 kernel
       - run: ./vng -r v6.6 -v -- uname -r
