@@ -910,6 +910,17 @@ Troubleshooting
    $ sudo chmod +r /boot/vmlinuz-*
    ```
 
+ - A kernel panic can be seen on custom built kernels, e.g.
+   ```console
+   $ vng -vr (...)/arch/x86_64/boot/bzImage  ## use -v to show all the errors
+   VFS: Cannot open root device "ROOTFS" or unknown-block(0,0): error -19
+   Please append a correct "root=" boot option; here are the available partitions:
+   (...)
+   Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+   ```
+   That's probably because some kernel config's are missing: the kernel should
+   be built with `vng --build` or `virtme-configkernel --update` should be used.
+
 Contributing
 ============
 
