@@ -900,6 +900,16 @@ Troubleshooting
    # echo 3 > /proc/sys/vm/drop_caches
    ```
 
+ - Running virtme-ng using the same kernel as the host might fail:
+   ```console
+   $ vng -r
+   unable to access /boot/vmlinuz-(...) (check for read permissions)
+   ```
+   Read access to the built kernel is required:
+   ```console
+   $ sudo chmod +r /boot/vmlinuz-*
+   ```
+
 Contributing
 ============
 
