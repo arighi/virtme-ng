@@ -611,7 +611,9 @@ fn mount_virtme_initmounts() {
             let fstype = env::var(fstype_key).unwrap_or_else(|_| "9p".to_string());
             let access = env::var(access_key).unwrap_or_else(|_| "rw".to_string());
 
-            utils::do_mkdir(&path);
+            // The guest path might be nested in directories that don't exist
+            // in the guest, so create all of them, like virtme-init does.
+            utils::do_mkdir_recursive(&path);
             mount_hostfs(&key.replace('_', "."), &path, &fstype, &access);
         }
     }
