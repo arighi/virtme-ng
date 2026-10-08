@@ -900,6 +900,45 @@ Troubleshooting
    # echo 3 > /proc/sys/vm/drop_caches
    ```
 
+ - Running virtme-ng using the same kernel as the host might fail:
+   ```console
+   $ vng -r
+   unable to access /boot/vmlinuz-(...) (check for read permissions)
+   ```
+   Read access to the built kernel is required:
+   ```console
+   $ sudo chmod +r /boot/vmlinuz-*
+   ```
+
+ - A kernel panic can be seen on custom built kernels, e.g.
+   ```console
+   $ vng -vr (...)/arch/x86_64/boot/bzImage  ## use -v to show all the errors
+   VFS: Cannot open root device "ROOTFS" or unknown-block(0,0): error -19
+   Please append a correct "root=" boot option; here are the available partitions:
+   (...)
+   Kernel panic - not syncing: VFS: Unable to mount root fs on unknown-block(0,0)
+   ```
+   That's probably because some kernel config's are missing: the kernel should
+   be built with `vng --build` or `virtme-configkernel --update` should be used.
+
+ - Using virtme-ng with the shell init script on Ubuntu using Rust CoreUtils
+   (UUtils) might fail:
+   ```console
+   $ vng -r --no-virtme-ng-init -v
+   (...)
+   Security violation: Requested utility `env` does not match executable name:
+     /usr/libexec/virtiofsd
+   [ 1.344090] Kernel panic - not syncing: Attempted to kill init! exitcode=0x00000100
+   [ 1.344221] CPU: 0 UID: 0 PID: 1 Comm: virtme-init Not tainted 7.0.0-22-generic #22-Ubuntu PREEMPT(lazy)
+   ```
+   That's because of a security patch only applied in Ubuntu, see this
+   [bug report](https://bugs.launchpad.net/ubuntu/+source/rust-coreutils/+bug/2137745).
+   A workaround:
+   ```console
+   $ sudo ln -sf gnuenv /usr/bin/env
+   ## revert with: sudo ln -sf ../lib/cargo/bin/coreutils/env /usr/bin/env
+   ```
+
 Contributing
 ============
 
