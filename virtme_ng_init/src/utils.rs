@@ -12,7 +12,7 @@ use std::fmt::Arguments;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, Write};
 use std::os::unix::fs;
-use std::os::unix::fs::PermissionsExt;
+use std::os::unix::fs::{DirBuilderExt, PermissionsExt};
 use std::process::{Command, Stdio};
 
 macro_rules! log {
@@ -76,6 +76,14 @@ pub fn do_chown(path: &str, uid: u32, gid: Option<u32>) -> io::Result<()> {
 pub fn do_mkdir(path: &str) {
     let dmask = Mode::S_IRWXU | Mode::S_IRGRP | Mode::S_IXGRP | Mode::S_IROTH | Mode::S_IXOTH;
     nix::unistd::mkdir(path, dmask).ok();
+}
+
+pub fn do_mkdir_recursive(path: &str) {
+    std::fs::DirBuilder::new()
+        .recursive(true)
+        .mode(0o755)
+        .create(path)
+        .ok();
 }
 
 pub fn do_unlink(path: &str) {
