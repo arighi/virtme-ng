@@ -7,7 +7,7 @@ import os
 from importlib.metadata import PackageNotFoundError, version
 from subprocess import DEVNULL, CalledProcessError, check_output
 
-PKG_VERSION = "1.41"
+PKG_VERSION = "1.42"
 
 
 def get_package_version():
