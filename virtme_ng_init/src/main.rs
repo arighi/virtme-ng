@@ -964,10 +964,17 @@ fn run_user_script(uid: u32) -> bool {
                     libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
                     libc::dup2(tty_out, libc::STDOUT_FILENO);
                     libc::dup2(tty_err, libc::STDERR_FILENO);
+                    libc::close(tty_in);
+                    libc::close(tty_out);
+                    libc::close(tty_err);
                     Ok(())
                 })
                 .spawn()
                 .expect("Failed to start user script process");
+
+            libc::close(tty_in);
+            libc::close(tty_out);
+            libc::close(tty_err);
 
             let ret = wait_for_child(child.id() as i32);
 
