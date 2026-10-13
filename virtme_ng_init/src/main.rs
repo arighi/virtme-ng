@@ -1138,6 +1138,7 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
         libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
         libc::dup2(tty_fd, libc::STDOUT_FILENO);
         libc::dup2(tty_fd, libc::STDERR_FILENO);
+        libc::close(tty_fd);
     }
 }
 
@@ -1153,6 +1154,7 @@ fn run_shell(tty_fd: libc::c_int, cmd: &str, args: &[&str]) {
             })
             .spawn()
             .expect("Failed to start shell session");
+        libc::close(tty_fd);
         wait_for_child(child.id() as i32);
     }
 }
