@@ -1029,10 +1029,14 @@ fn run_user_script_on_console(consdev: &str, uid: u32) {
                 libc::ioctl(libc::STDIN_FILENO, libc::TIOCSCTTY, 1);
                 libc::dup2(tty_fd, libc::STDOUT_FILENO);
                 libc::dup2(tty_fd, libc::STDERR_FILENO);
+                libc::close(tty_fd);
                 Ok(())
             })
             .output()
             .expect("Failed to execute script on console");
+
+        libc::close(tty_fd);
+
         if let Some(code) = ret.status.code() {
             log!("script exited with code {}", code);
             if let Ok(mut file) = OpenOptions::new()
