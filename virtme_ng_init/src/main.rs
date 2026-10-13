@@ -25,7 +25,7 @@ use nix::unistd::{access, AccessFlags};
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::os::fd::{AsRawFd, IntoRawFd};
+use std::os::fd::{AsRawFd, OwnedFd};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
@@ -1092,7 +1092,8 @@ fn redirect_console(consdev: &str) {
         .open(consdev)
         .expect("Failed to open console device");
 
-    let fd = file.into_raw_fd();
+    let owned_fd = OwnedFd::from(file);
+    let fd = owned_fd.as_raw_fd();
 
     let stdout = io::stdout();
     let handle = stdout.lock();
