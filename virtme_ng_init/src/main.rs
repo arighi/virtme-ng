@@ -25,7 +25,7 @@ use nix::unistd::{access, AccessFlags};
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::os::fd::{AsRawFd, IntoRawFd};
+use std::os::fd::{AsRawFd, OwnedFd};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
@@ -964,10 +964,17 @@ fn run_user_script(uid: u32) -> bool {
                     libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
                     libc::dup2(tty_out, libc::STDOUT_FILENO);
                     libc::dup2(tty_err, libc::STDERR_FILENO);
+                    libc::close(tty_in);
+                    libc::close(tty_out);
+                    libc::close(tty_err);
                     Ok(())
                 })
                 .spawn()
                 .expect("Failed to start user script process");
+
+            libc::close(tty_in);
+            libc::close(tty_out);
+            libc::close(tty_err);
 
             let ret = wait_for_child(child.id() as i32);
 
@@ -1022,10 +1029,14 @@ fn run_user_script_on_console(consdev: &str, uid: u32) {
                 libc::ioctl(libc::STDIN_FILENO, libc::TIOCSCTTY, 1);
                 libc::dup2(tty_fd, libc::STDOUT_FILENO);
                 libc::dup2(tty_fd, libc::STDERR_FILENO);
+                libc::close(tty_fd);
                 Ok(())
             })
             .output()
             .expect("Failed to execute script on console");
+
+        libc::close(tty_fd);
+
         if let Some(code) = ret.status.code() {
             log!("script exited with code {}", code);
             if let Ok(mut file) = OpenOptions::new()
@@ -1092,7 +1103,8 @@ fn redirect_console(consdev: &str) {
         .open(consdev)
         .expect("Failed to open console device");
 
-    let fd = file.into_raw_fd();
+    let owned_fd = OwnedFd::from(file);
+    let fd = owned_fd.as_raw_fd();
 
     let stdout = io::stdout();
     let handle = stdout.lock();
@@ -1137,6 +1149,7 @@ fn detach_from_terminal(tty_fd: libc::c_int) {
         libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
         libc::dup2(tty_fd, libc::STDOUT_FILENO);
         libc::dup2(tty_fd, libc::STDERR_FILENO);
+        libc::close(tty_fd);
     }
 }
 
@@ -1152,6 +1165,7 @@ fn run_shell(tty_fd: libc::c_int, cmd: &str, args: &[&str]) {
             })
             .spawn()
             .expect("Failed to start shell session");
+        libc::close(tty_fd);
         wait_for_child(child.id() as i32);
     }
 }
