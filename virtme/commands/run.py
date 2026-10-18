@@ -1801,13 +1801,17 @@ def do_it() -> int:
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
 
-    # Use the faster virtme-ng-init if we are running on a native architecture.
-    if (
-        is_native
-        and not args.no_virtme_ng_init
-        and os.path.exists(guest_tools_path + "/bin/virtme-ng-init")
+    # Use the faster virtme-ng-init if one is available for the guest
+    # architecture. The native build is bin/virtme-ng-init; static builds for
+    # other architectures can be installed as bin/virtme-ng-init-<arch>.
+    if is_native:
+        ng_init_cmd = "bin/virtme-ng-init"
+    else:
+        ng_init_cmd = f"bin/virtme-ng-init-{arch.virtmename}"
+    if not args.no_virtme_ng_init and os.path.exists(
+        os.path.join(guest_tools_path, ng_init_cmd)
     ):
-        virtme_init_cmd = "bin/virtme-ng-init"
+        virtme_init_cmd = ng_init_cmd
     else:
         virtme_init_cmd = "virtme-init"
 
