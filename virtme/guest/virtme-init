@@ -340,6 +340,7 @@ run_udevd() {
         log "udev is done"
     else
         log "udevd not found"
+        virtme_no_udev=1
         create_virtio_port_links
     fi
 }
@@ -348,14 +349,17 @@ run_udevd() {
 # script I/O relies on, so do what udev's default rule does:
 # SUBSYSTEM=="virtio-ports", KERNEL=="vport*", ATTR{name}=="?*", SYMLINK+="virtio-ports/$attr{name}"
 create_virtio_port_links() {
-    local port name
+    local port name link
 
     for port in /sys/class/virtio-ports/vport*; do
         [[ -r "$port/name" ]] || continue
         name=$(< "$port/name")
         [[ -n $name ]] || continue
-        mkdir -p /dev/virtio-ports
-        ln -sf "../${port##*/}" "/dev/virtio-ports/$name"
+        link="/dev/virtio-ports/$name"
+        # A link may precede its device node; keep it for subsequent scans.
+        [[ -L $link || -e $link ]] && continue
+        [[ -d /dev/virtio-ports ]] || mkdir -p /dev/virtio-ports
+        ln -s "../${port##*/}" "$link"
     done
 }
 
@@ -523,6 +527,36 @@ poweroff_and_exit() {
 # Does not return when ports exist (runs script and poweroff).
 run_user_script() {
     local uid=$1
+
+    if [[ ${virtme_no_udev:-} == 1 ]]; then
+        # Ports and their name attributes arrive asynchronously. Without udev,
+        # rescan until all script channels are ready, including the exit status.
+        local uptime deadline name ready
+        local -a ports=(virtme.stdin virtme.stdout virtme.stderr
+            virtme.dev_stdout virtme.dev_stderr virtme.ret)
+        # Retain the legacy channel set when used with an older host.
+        if [[ -v virtme_script_ports ]]; then
+            IFS=, read -r -a ports <<< "$virtme_script_ports"
+        fi
+        # /proc/uptime provides a monotonic clock with centisecond precision.
+        # Count elapsed time, including the cost of scans under emulation.
+        read -r uptime _ < /proc/uptime
+        deadline=$((10#${uptime/./} + 500))
+        while :; do
+            ready=1
+            for name in "${ports[@]}"; do
+                if [[ ! -e "/dev/virtio-ports/$name" ]]; then
+                    ready=0
+                    break
+                fi
+            done
+            ((ready)) && break
+            read -r uptime _ < /proc/uptime
+            ((10#${uptime/./} >= deadline)) && break
+            create_virtio_port_links
+            sleep 0.05
+        done
+    fi
 
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
         ! -e "/dev/virtio-ports/virtme.stdout" ||

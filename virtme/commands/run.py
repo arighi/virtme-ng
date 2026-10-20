@@ -2240,15 +2240,18 @@ def do_it() -> int:
         except FileNotFoundError:
             return None
 
-    def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
-        """Add a chardev, virtio-serial device, and virtserialport for script I/O."""
-        qemuargs.extend(["-chardev", chardev_spec])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(
-            ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
-        )
-
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
+        script_ports = []
+
+        def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
+            """Add a serial port and record the channel expected by the guest."""
+            qemuargs.extend(["-chardev", chardev_spec])
+            qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
+            qemuargs.extend(
+                ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
+            )
+            script_ports.append(port_name)
+
         if not args.video:
             if args.nvgpu is None:
                 qemuargs.extend(arch.qemu_nodisplay_args())
@@ -2337,6 +2340,10 @@ def do_it() -> int:
 
         if ret_path is not None:
             add_serial_port(f"file,id=ret,path={ret_path}", "ret", "virtme.ret")
+
+        # Console fallback has no script I/O channels, but may still have a
+        # return-code channel. Only wait for ports actually supplied by QEMU.
+        kernelargs.append(f"virtme_script_ports={','.join(script_ports)}")
 
         # Scripts shouldn't reboot and shouldn't hang on panic: make sure to
         # force an exit condition if a panic happens.

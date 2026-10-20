@@ -30,7 +30,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[macro_use]
 mod utils;
@@ -773,6 +773,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         Some(handle)
     } else {
         log!("unable to find udevd, skip udev.");
+        env::set_var("virtme_no_udev", "1");
         create_virtio_port_links();
         None
     }
@@ -798,7 +799,13 @@ fn create_virtio_port_links() {
             continue;
         }
         utils::do_mkdir("/dev/virtio-ports");
-        utils::do_symlink(&format!("../{port}"), &format!("/dev/virtio-ports/{name}"));
+        let dst = format!("/dev/virtio-ports/{name}");
+        // Repeated scans must tolerate links created by earlier passes.
+        match std::os::unix::fs::symlink(format!("../{port}"), &dst) {
+            Ok(()) => (),
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),
+            Err(err) => log!("failed to create symlink {}: {}", dst, err),
+        }
     }
 }
 
@@ -932,6 +939,29 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
 // wait_for_child is used to wait for the script process.
 #[allow(clippy::zombie_processes)]
 fn run_user_script(uid: u32) -> bool {
+    if env::var("virtme_no_udev").as_deref() == Ok("1") {
+        // Ports and their name attributes arrive asynchronously. Without udev,
+        // rescan until all script channels are ready, including the exit status.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        // Retain the legacy channel set when used with an older host.
+        let ports = env::var("virtme_script_ports").unwrap_or_else(|_| {
+            "virtme.stdin,virtme.stdout,virtme.stderr,virtme.dev_stdout,virtme.dev_stderr,virtme.ret"
+                .to_string()
+        });
+        let ports: Vec<_> = ports.split(',').filter(|name| !name.is_empty()).collect();
+        loop {
+            if ports
+                .iter()
+                .all(|name| Path::new("/dev/virtio-ports").join(name).exists())
+                || Instant::now() >= deadline
+            {
+                break;
+            }
+            create_virtio_port_links();
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
     if !Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !Path::new("/dev/virtio-ports/virtme.stderr").exists()
