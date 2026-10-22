@@ -926,6 +926,10 @@ class VirtioFS:
         return "--readonly" in VirtioFS._get_virtiofsd_help(path)
 
     @staticmethod
+    def _supports_fd(path):
+        return "--fd <FD>" in VirtioFS._get_virtiofsd_help(path)
+
+    @staticmethod
     def _is_socket(path):
         try:
             return stat.S_ISSOCK(os.stat(path).st_mode)
@@ -968,29 +972,55 @@ class VirtioFS:
             "--no-announce-submounts",
             *acl_opt,
             *readonly_opt,
-            f"--socket-path={self.sock}",
             f"--shared-dir={path}",
             "--sandbox=none",
             f"--cache={cache}",
-            f"--socket-group={grp.getgrgid(os.getgid()).gr_name}",
         ]
-        self.proc = subprocess.Popen(virtiofsd_cmd, stderr=stderr)
-        # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
-        # but avoid adding a full 100ms delay when the daemon starts quickly.
-        deadline = monotonic() + 3.1
-        waiting_logged = False
-        while not self._is_socket(self.sock):
-            remaining = deadline - monotonic()
-            if remaining <= 0:
-                if verbose:
-                    sys.stderr.write(
-                        "virtme-run: failed to start virtiofsd, fallback to 9p"
-                    )
-                return False
-            if verbose and not waiting_logged:
-                sys.stderr.write("virtme: waiting for virtiofsd to start\n")
-                waiting_logged = True
-            sleep(min(0.01, remaining))
+        if self._supports_fd(virtiofsd_path):
+            # Create and listen on the vhost-user socket ourselves and pass it
+            # to virtiofsd via --fd: the socket can accept QEMU's connection
+            # from the moment we listen(), i.e. before the daemon is even
+            # started, so the readiness race between the daemon startup and
+            # the QEMU launch is gone and there is nothing to wait for on the
+            # startup path. A daemon failing right away (e.g., due to invalid
+            # options) makes QEMU fail to connect, which is clearly visible.
+            listener = socket.socket(socket.AF_UNIX)
+            listener.bind(self.sock)
+            listener.listen()
+            # Same group access as --socket-group: allow QEMU to connect even
+            # if it is ever run as another user of the same group.
+            os.chmod(self.sock, 0o660)
+            virtiofsd_cmd.append(f"--fd={listener.fileno()}")
+            proc = subprocess.Popen(
+                virtiofsd_cmd, stderr=stderr, pass_fds=(listener.fileno(),)
+            )
+            self.proc = proc
+            listener.close()
+        else:
+            # Legacy virtiofsd without --fd support: let the daemon create the
+            # socket itself and wait for the socket to show up.
+            virtiofsd_cmd += [
+                f"--socket-path={self.sock}",
+                f"--socket-group={grp.getgrgid(os.getgid()).gr_name}",
+            ]
+            proc = subprocess.Popen(virtiofsd_cmd, stderr=stderr)
+            self.proc = proc
+            # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
+            # but avoid adding a full 100ms delay when the daemon starts quickly.
+            deadline = monotonic() + 3.1
+            waiting_logged = False
+            while not self._is_socket(self.sock):
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    if verbose:
+                        sys.stderr.write(
+                            "virtme-run: failed to start virtiofsd, fallback to 9p"
+                        )
+                    return False
+                if verbose and not waiting_logged:
+                    sys.stderr.write("virtme: waiting for virtiofsd to start\n")
+                    waiting_logged = True
+                sleep(min(0.01, remaining))
         return True
 
 
