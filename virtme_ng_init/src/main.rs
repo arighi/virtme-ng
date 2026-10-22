@@ -30,7 +30,7 @@ use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{exit, id, Command, Stdio};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 #[macro_use]
 mod utils;
@@ -307,6 +307,11 @@ fn configure_hostname() {
 }
 
 fn run_systemd_tmpfiles() {
+    if env::var("virtme_no_tmpfiles").as_deref() == Ok("1") {
+        log!("systemd-tmpfiles disabled; skipping tmpfiles setup");
+        return;
+    }
+
     if id() != 1 {
         return;
     }
@@ -758,7 +763,12 @@ fn find_udevd() -> Option<PathBuf> {
 }
 
 fn run_udevd() -> Option<thread::JoinHandle<()>> {
-    if let Some(udevd_path) = find_udevd() {
+    let udevd_path = if env::var("virtme_no_udev").as_deref() == Ok("1") {
+        None
+    } else {
+        find_udevd()
+    };
+    if let Some(udevd_path) = udevd_path {
         let handle = thread::spawn(move || {
             disable_uevent_helper();
             let args: &[&str] = &["--daemon"];
@@ -772,7 +782,8 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         });
         Some(handle)
     } else {
-        log!("unable to find udevd, skip udev.");
+        log!("udev disabled or udevd not found; skipping udev");
+        env::set_var("virtme_no_udev", "1");
         create_virtio_port_links();
         None
     }
@@ -798,7 +809,13 @@ fn create_virtio_port_links() {
             continue;
         }
         utils::do_mkdir("/dev/virtio-ports");
-        utils::do_symlink(&format!("../{port}"), &format!("/dev/virtio-ports/{name}"));
+        let dst = format!("/dev/virtio-ports/{name}");
+        // Repeated scans must tolerate links created by earlier passes.
+        match std::os::unix::fs::symlink(format!("../{port}"), &dst) {
+            Ok(()) => (),
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),
+            Err(err) => log!("failed to create symlink {}: {}", dst, err),
+        }
     }
 }
 
@@ -835,17 +852,32 @@ fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<Option<St
 }
 
 fn get_network_devices() -> Vec<Option<String>> {
-    let virtio_net_dir = "/sys/bus/virtio/drivers/virtio_net";
+    let devices = wait_for_network_devices(
+        Path::new("/sys/bus/virtio/drivers/virtio_net"),
+        Duration::from_secs(5),
+    );
+    if devices.is_empty() {
+        log!("no virtio network interfaces found; check that virtio_net is loaded, skipping DHCP");
+    }
+    devices
+}
+
+fn wait_for_network_devices(virtio_net_dir: &Path, timeout: Duration) -> Vec<Option<String>> {
+    let deadline = Instant::now() + timeout;
     loop {
-        match std::fs::read_dir(virtio_net_dir) {
-            Ok(entries) => {
-                return _get_network_devices_from_entries(entries);
-            }
-            Err(_) => {
-                // Wait a bit to make sure virtio-net is properly registered in the system.
-                thread::sleep(Duration::from_secs_f32(0.25));
+        if let Ok(entries) = std::fs::read_dir(virtio_net_dir) {
+            let devices = _get_network_devices_from_entries(entries);
+            if !devices.is_empty() {
+                return devices;
             }
         }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Vec::new();
+        }
+        // Registration can precede device probing. Wait for an interface, but
+        // never block boot indefinitely if the driver or device is missing.
+        thread::sleep(remaining.min(Duration::from_millis(250)));
     }
 }
 
@@ -932,6 +964,29 @@ fn extract_user_script(virtme_script: &str) -> Option<String> {
 // wait_for_child is used to wait for the script process.
 #[allow(clippy::zombie_processes)]
 fn run_user_script(uid: u32) -> bool {
+    if env::var("virtme_no_udev").as_deref() == Ok("1") {
+        // Ports and their name attributes arrive asynchronously. Without udev,
+        // rescan until all script channels are ready, including the exit status.
+        let deadline = Instant::now() + Duration::from_secs(5);
+        // Retain the legacy channel set when used with an older host.
+        let ports = env::var("virtme_script_ports").unwrap_or_else(|_| {
+            "virtme.stdin,virtme.stdout,virtme.stderr,virtme.dev_stdout,virtme.dev_stderr,virtme.ret"
+                .to_string()
+        });
+        let ports: Vec<_> = ports.split(',').filter(|name| !name.is_empty()).collect();
+        loop {
+            if ports
+                .iter()
+                .all(|name| Path::new("/dev/virtio-ports").join(name).exists())
+                || Instant::now() >= deadline
+            {
+                break;
+            }
+            create_virtio_port_links();
+            thread::sleep(Duration::from_millis(50));
+        }
+    }
+
     if !Path::new("/dev/virtio-ports/virtme.stdin").exists()
         || !Path::new("/dev/virtio-ports/virtme.stdout").exists()
         || !Path::new("/dev/virtio-ports/virtme.stderr").exists()

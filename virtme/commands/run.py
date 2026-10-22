@@ -9,6 +9,7 @@ import argparse
 import atexit
 import errno
 import fcntl
+import grp
 import itertools
 import json
 import os
@@ -17,6 +18,7 @@ import re
 import shlex
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -25,7 +27,7 @@ import threading
 from base64 import b64encode
 from pathlib import Path
 from shutil import copyfile, copytree, which
-from time import sleep
+from time import monotonic, sleep
 from typing import Any, NoReturn
 
 from virtme.cpu_topology import TopologyError, host_cpu_topology
@@ -417,6 +419,13 @@ def make_parser() -> "VirtmeArgumentParser":
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
+    )
+    g.add_argument(
+        "--fast-boot",
+        "-F",
+        action="store_true",
+        help="Skip udev and tmpfiles setup; default to 4 CPUs and 512M RAM; "
+        "explicit options override the preset",
     )
     g.add_argument(
         "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
@@ -823,31 +832,30 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     return kernel
 
 
-_VIRTIOFSD_READONLY_SUPPORT: dict[str, bool | None] = {"value": None}
+_VIRTIOFSD_HELP: dict[str, str | None] = {"value": None}
 
 
 class VirtioFS:
     def __init__(self, guest_tools_path):
         self.sock = None
-        self.pid = None
+        self.proc = None
         self.guest_tools_path = guest_tools_path
 
     def _cleanup_virtiofs_temp_files(self):
         # Make sure to kill virtiofsd instances that are still potentially running
-        if self.pid is not None:
+        if self.proc is not None:
             try:
-                with open(self.pid, encoding="utf-8") as fd:
-                    pid = int(fd.read().strip())
-                    os.kill(pid, signal.SIGTERM)
-            except (FileNotFoundError, ValueError, OSError):
+                self.proc.kill()
+            except PermissionError:
                 pass
-        # Clean up temp files
-        temp_files = [self.sock, self.pid]
-        for file_path in temp_files:
-            try:
-                os.remove(file_path)
-            except OSError:
-                pass
+        # Clean up temp files (virtiofsd creates a pid file next to the socket
+        # in --socket-path mode; remove it as well, even though it is unused)
+        if self.sock is not None:
+            for file_path in (self.sock, f"{self.sock}.pid"):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
 
     def _get_virtiofsd_path(self):
         # Define the possible virtiofsd paths.
@@ -893,25 +901,40 @@ class VirtioFS:
         return None
 
     @staticmethod
+    def _get_virtiofsd_help(path) -> str:
+        # Return the (cached) `--help` output of virtiofsd; several feature
+        # checks may need it, but it is enough to run virtiofsd only once.
+        # An empty string means the output could not be retrieved.
+        if _VIRTIOFSD_HELP["value"] is None:
+            try:
+                result = subprocess.run(
+                    [path, "--help"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                )
+            except OSError:
+                help_text = ""
+            else:
+                help_text = result.stdout if result.returncode == 0 else ""
+            _VIRTIOFSD_HELP["value"] = help_text
+        return _VIRTIOFSD_HELP["value"] or ""
+
+    @staticmethod
     def _supports_readonly(path):
-        if _VIRTIOFSD_READONLY_SUPPORT["value"] is not None:
-            return _VIRTIOFSD_READONLY_SUPPORT["value"]
+        return "--readonly" in VirtioFS._get_virtiofsd_help(path)
 
+    @staticmethod
+    def _supports_fd(path):
+        return "--fd <FD>" in VirtioFS._get_virtiofsd_help(path)
+
+    @staticmethod
+    def _is_socket(path):
         try:
-            result = subprocess.run(
-                [path, "--help"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
+            return stat.S_ISSOCK(os.stat(path).st_mode)
         except OSError:
-            supported = False
-        else:
-            supported = result.returncode == 0 and "--readonly" in result.stdout
-
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = supported
-        return supported
+            return False
 
     def start(
         self, path, verbose=True, cache="always", posix_acl=False, readonly=False
@@ -921,8 +944,7 @@ class VirtioFS:
             return False
 
         # virtiofsd located, try to start the daemon as non-privileged user.
-        _, self.sock = tempfile.mkstemp(prefix="virtme")
-        self.pid = self.sock + ".pid"
+        _, self.sock = tempfile.mkstemp(prefix="virtme", suffix=".sock")
 
         # Make sure to clean up temp files before starting the daemon and at exit.
         self._cleanup_virtiofs_temp_files()
@@ -930,40 +952,75 @@ class VirtioFS:
 
         # Export the whole root fs of the host, do not enable sandbox, otherwise we
         # would get permission errors.
-        if not verbose:
-            stderr = "2>/dev/null"
+        if verbose:
+            stderr = None
         else:
-            stderr = ""
+            stderr = subprocess.DEVNULL
         # Only enable --posix-acl when using an external root filesystem.
         # When sharing the host root (/), --posix-acl breaks UID/GID translation
         # which causes authentication failures (e.g., unix_chkpwd cannot obtain
         # user info).
-        acl_opt = "--posix-acl " if posix_acl else ""
+        acl_opt = ["--posix-acl"] if posix_acl else []
         readonly_opt = (
-            "--readonly "
+            ["--readonly"]
             if readonly and self._supports_readonly(virtiofsd_path)
-            else ""
+            else []
         )
-        os.system(
-            f"{virtiofsd_path} --syslog --no-announce-submounts {acl_opt}{readonly_opt}"
-            + f"--socket-path {self.sock} --shared-dir {path} "
-            + f"--sandbox none --cache {cache} {stderr} &"
-        )
-        max_attempts = 5
-        check_duration = 0.1
-        for _ in range(max_attempts):
-            if os.path.exists(self.pid):
-                break
-            if verbose:
-                sys.stderr.write("virtme: waiting for virtiofsd to start\n")
-            sleep(check_duration)
-            check_duration *= 2
+        virtiofsd_cmd = [
+            virtiofsd_path,
+            "--syslog",
+            "--no-announce-submounts",
+            *acl_opt,
+            *readonly_opt,
+            f"--shared-dir={path}",
+            "--sandbox=none",
+            f"--cache={cache}",
+        ]
+        if self._supports_fd(virtiofsd_path):
+            # Create and listen on the vhost-user socket ourselves and pass it
+            # to virtiofsd via --fd: the socket can accept QEMU's connection
+            # from the moment we listen(), i.e. before the daemon is even
+            # started, so the readiness race between the daemon startup and
+            # the QEMU launch is gone and there is nothing to wait for on the
+            # startup path. A daemon failing right away (e.g., due to invalid
+            # options) makes QEMU fail to connect, which is clearly visible.
+            listener = socket.socket(socket.AF_UNIX)
+            listener.bind(self.sock)
+            listener.listen()
+            # Same group access as --socket-group: allow QEMU to connect even
+            # if it is ever run as another user of the same group.
+            os.chmod(self.sock, 0o660)
+            virtiofsd_cmd.append(f"--fd={listener.fileno()}")
+            proc = subprocess.Popen(
+                virtiofsd_cmd, stderr=stderr, pass_fds=(listener.fileno(),)
+            )
+            self.proc = proc
+            listener.close()
         else:
-            if verbose:
-                sys.stderr.write(
-                    "virtme-run: failed to start virtiofsd, fallback to 9p"
-                )
-            return False
+            # Legacy virtiofsd without --fd support: let the daemon create the
+            # socket itself and wait for the socket to show up.
+            virtiofsd_cmd += [
+                f"--socket-path={self.sock}",
+                f"--socket-group={grp.getgrgid(os.getgid()).gr_name}",
+            ]
+            proc = subprocess.Popen(virtiofsd_cmd, stderr=stderr)
+            self.proc = proc
+            # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
+            # but avoid adding a full 100ms delay when the daemon starts quickly.
+            deadline = monotonic() + 3.1
+            waiting_logged = False
+            while not self._is_socket(self.sock):
+                remaining = deadline - monotonic()
+                if remaining <= 0:
+                    if verbose:
+                        sys.stderr.write(
+                            "virtme-run: failed to start virtiofsd, fallback to 9p"
+                        )
+                    return False
+                if verbose and not waiting_logged:
+                    sys.stderr.write("virtme: waiting for virtiofsd to start\n")
+                    waiting_logged = True
+                sleep(min(0.01, remaining))
         return True
 
 
@@ -1565,6 +1622,12 @@ _RWDIR_RE = re.compile(f"^({_SAFE_PATH_PATTERN})(?:=({_SAFE_PATH_PATTERN}))?$")
 def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
+    if args.fast_boot and not args.numa:
+        if args.cpus is None:
+            args.cpus = "4"
+        if args.memory is None:
+            args.memory = "512M"
+
     if args.client is not None:
         if args.server is not None:
             arg_fail("--client cannot be used with --server.")
@@ -1626,6 +1689,17 @@ def do_it() -> int:
 
     if len(args.overlay_rwdir) > 0:
         virtmods.MODALIASES.append("overlay")
+
+    if args.net or args.server == "ssh":
+        # Networking must also work without udev to load the driver.
+        virtmods.MODALIASES.append("virtio_net")
+
+    if args.server == "console" or (
+        args.server == "ssh" and can_use_ssh_over_vsock(args.ssh_tcp)
+    ):
+        # The vsock core alone cannot communicate with the host. Include the
+        # virtio transport and its dependencies without relying on coldplug.
+        virtmods.MODALIASES.append("virtio:d00000013v00001AF4")
 
     if args.root_disk is not None:
         virtmods.MODALIASES.append("virtio_blk")
@@ -2072,6 +2146,10 @@ def do_it() -> int:
     if args.empty_passwords:
         kernelargs.append("virtme_empty_passwords=1")
 
+    if args.fast_boot and not args.systemd:
+        kernelargs.append("virtme_no_udev=1")
+        kernelargs.append("virtme_no_tmpfiles=1")
+
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)
     if is_native:
@@ -2240,15 +2318,18 @@ def do_it() -> int:
         except FileNotFoundError:
             return None
 
-    def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
-        """Add a chardev, virtio-serial device, and virtserialport for script I/O."""
-        qemuargs.extend(["-chardev", chardev_spec])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(
-            ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
-        )
-
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
+        script_ports = []
+
+        def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
+            """Add a serial port and record the channel expected by the guest."""
+            qemuargs.extend(["-chardev", chardev_spec])
+            qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
+            qemuargs.extend(
+                ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
+            )
+            script_ports.append(port_name)
+
         if not args.video:
             if args.nvgpu is None:
                 qemuargs.extend(arch.qemu_nodisplay_args())
@@ -2337,6 +2418,10 @@ def do_it() -> int:
 
         if ret_path is not None:
             add_serial_port(f"file,id=ret,path={ret_path}", "ret", "virtme.ret")
+
+        # Console fallback has no script I/O channels, but may still have a
+        # return-code channel. Only wait for ports actually supplied by QEMU.
+        kernelargs.append(f"virtme_script_ports={','.join(script_ports)}")
 
         # Scripts shouldn't reboot and shouldn't hang on panic: make sure to
         # force an exit condition if a panic happens.
