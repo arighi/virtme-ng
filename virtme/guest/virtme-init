@@ -268,6 +268,11 @@ mount_virtme_initmounts() {
 }
 
 run_systemd_tmpfiles() {
+    if [[ ${virtme_no_tmpfiles:-} == 1 ]]; then
+        log "systemd-tmpfiles disabled; skipping tmpfiles setup"
+        return
+    fi
+
     if [[ $$ -ne 1 ]]; then
         return
     fi
@@ -318,7 +323,9 @@ find_udevd() {
 run_udevd() {
     local udevd=''
 
-    find_udevd udevd
+    if [[ ${virtme_no_udev:-} != 1 ]]; then
+        find_udevd udevd
+    fi
 
     # Try to get udevd to coldplug everything.
     if [[ -n $udevd ]]; then
@@ -339,7 +346,7 @@ run_udevd() {
         udevadm settle --timeout=300
         log "udev is done"
     else
-        log "udevd not found"
+        log "udev disabled or udevd not found; skipping udev"
         virtme_no_udev=1
         create_virtio_port_links
         create_disk_links
@@ -525,6 +532,21 @@ find_busybox() {
     fi
 }
 
+get_network_devices() {
+    local -n net_devices_ref=$1
+    local attempt
+
+    # Wait for driver registration and probing, but do not block boot if
+    # the driver or device is missing.
+    for ((attempt = 0; attempt < 100; attempt++)); do
+        net_devices_ref=(/sys/bus/virtio/drivers/virtio_net/virtio*/net/*)
+        [[ -d ${net_devices_ref[0]} ]] && return 0
+        sleep 0.05
+    done
+    log "no virtio network interfaces found; check that virtio_net is loaded, skipping DHCP"
+    return 1
+}
+
 setup_network() {
     local pids=()
 
@@ -540,8 +562,11 @@ setup_network() {
             return 1
         fi
 
+        local net_devices=()
+        get_network_devices net_devices || return 1
+
         # udev is liable to rename the interface out from under us.
-        for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
+        for d in "${net_devices[@]}"; do
             virtme_net=$(basename -- "${d}")
             ip link set dev "$virtme_net" up
             udhcpc_opts=(-i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script")

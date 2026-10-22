@@ -307,6 +307,11 @@ fn configure_hostname() {
 }
 
 fn run_systemd_tmpfiles() {
+    if env::var("virtme_no_tmpfiles").as_deref() == Ok("1") {
+        log!("systemd-tmpfiles disabled; skipping tmpfiles setup");
+        return;
+    }
+
     if id() != 1 {
         return;
     }
@@ -758,7 +763,12 @@ fn find_udevd() -> Option<PathBuf> {
 }
 
 fn run_udevd() -> Option<thread::JoinHandle<()>> {
-    if let Some(udevd_path) = find_udevd() {
+    let udevd_path = if env::var("virtme_no_udev").as_deref() == Ok("1") {
+        None
+    } else {
+        find_udevd()
+    };
+    if let Some(udevd_path) = udevd_path {
         let handle = thread::spawn(move || {
             disable_uevent_helper();
             let args: &[&str] = &["--daemon"];
@@ -772,7 +782,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         });
         Some(handle)
     } else {
-        log!("unable to find udevd, skip udev.");
+        log!("udev disabled or udevd not found; skipping udev");
         env::set_var("virtme_no_udev", "1");
         create_virtio_port_links();
         create_disk_links();
@@ -955,17 +965,32 @@ fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<String> {
 }
 
 fn get_network_devices() -> Vec<String> {
-    let virtio_net_dir = "/sys/bus/virtio/drivers/virtio_net";
+    let devices = wait_for_network_devices(
+        Path::new("/sys/bus/virtio/drivers/virtio_net"),
+        Duration::from_secs(5),
+    );
+    if devices.is_empty() {
+        log!("no virtio network interfaces found; check that virtio_net is loaded, skipping DHCP");
+    }
+    devices
+}
+
+fn wait_for_network_devices(virtio_net_dir: &Path, timeout: Duration) -> Vec<String> {
+    let deadline = Instant::now() + timeout;
     loop {
-        match std::fs::read_dir(virtio_net_dir) {
-            Ok(entries) => {
-                return _get_network_devices_from_entries(entries);
-            }
-            Err(_) => {
-                // Wait a bit to make sure virtio-net is properly registered in the system.
-                thread::sleep(Duration::from_secs_f32(0.25));
+        if let Ok(entries) = std::fs::read_dir(virtio_net_dir) {
+            let devices = _get_network_devices_from_entries(entries);
+            if !devices.is_empty() {
+                return devices;
             }
         }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return Vec::new();
+        }
+        // Registration can precede device probing. Wait for an interface, but
+        // never block boot indefinitely if the driver or device is missing.
+        thread::sleep(remaining.min(Duration::from_millis(250)));
     }
 }
 

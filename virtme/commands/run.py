@@ -419,6 +419,12 @@ def make_parser() -> "VirtmeArgumentParser":
         help="Fallback to the bash virtme-init (useful for debugging/development)",
     )
     g.add_argument(
+        "--fast-boot",
+        "-F",
+        action="store_true",
+        help="Skip udev and tmpfiles setup in the guest",
+    )
+    g.add_argument(
         "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
     )
 
@@ -2088,6 +2094,10 @@ def do_it() -> int:
 
     if args.empty_passwords:
         kernelargs.append("virtme_empty_passwords=1")
+
+    if args.fast_boot and not args.systemd:
+        kernelargs.append("virtme_no_udev=1")
+        kernelargs.append("virtme_no_tmpfiles=1")
 
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)
