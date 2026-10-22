@@ -89,7 +89,14 @@ class DaemonPatchMixin:
                 "virtme_ng.virtiofs.subprocess.Popen", side_effect=popen_side_effect
             ),
             mock.patch(
-                "virtme_ng.virtiofs.tempfile.mkstemp", return_value=(0, self.sock)
+                "virtme_ng.virtiofs.tempfile.mkstemp",
+                # start() closes the fd returned by mkstemp(): it must be a
+                # real one, or the close would corrupt the test process's
+                # own file descriptors (e.g. fd 0).
+                side_effect=lambda *_args, **_kwargs: (
+                    os.open(os.devnull, os.O_RDONLY),
+                    self.sock,
+                ),
             ),
         ]
         for patch in patches:
