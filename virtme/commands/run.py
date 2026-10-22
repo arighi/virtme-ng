@@ -25,7 +25,7 @@ import threading
 from base64 import b64encode
 from pathlib import Path
 from shutil import copyfile, copytree, which
-from time import sleep
+from time import monotonic, sleep
 from typing import Any, NoReturn
 
 from virtme.cpu_topology import TopologyError, host_cpu_topology
@@ -949,21 +949,22 @@ class VirtioFS:
             + f"--socket-path {self.sock} --shared-dir {path} "
             + f"--sandbox none --cache {cache} {stderr} &"
         )
-        max_attempts = 5
-        check_duration = 0.1
-        for _ in range(max_attempts):
-            if os.path.exists(self.pid):
-                break
-            if verbose:
+        # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
+        # but avoid adding a full 100ms delay when the daemon starts quickly.
+        deadline = monotonic() + 3.1
+        waiting_logged = False
+        while not os.path.exists(self.pid):
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                if verbose:
+                    sys.stderr.write(
+                        "virtme-run: failed to start virtiofsd, fallback to 9p"
+                    )
+                return False
+            if verbose and not waiting_logged:
                 sys.stderr.write("virtme: waiting for virtiofsd to start\n")
-            sleep(check_duration)
-            check_duration *= 2
-        else:
-            if verbose:
-                sys.stderr.write(
-                    "virtme-run: failed to start virtiofsd, fallback to 9p"
-                )
-            return False
+                waiting_logged = True
+            sleep(min(0.01, remaining))
         return True
 
 
