@@ -3,6 +3,7 @@
 import atexit
 import ctypes
 import os
+import re
 import signal
 import stat
 import subprocess
@@ -13,7 +14,7 @@ from time import monotonic, sleep
 
 from virtme import architectures
 
-_VIRTIOFSD_READONLY_SUPPORT: dict[str, bool | None] = {"value": None}
+_VIRTIOFSD_HELP: dict[str, str] = {}
 
 _PR_SET_PDEATHSIG = 1
 
@@ -117,25 +118,43 @@ class VirtioFS:
             return False
 
     @staticmethod
-    def _supports_readonly(path):
-        if _VIRTIOFSD_READONLY_SUPPORT["value"] is not None:
-            return _VIRTIOFSD_READONLY_SUPPORT["value"]
+    def _get_virtiofsd_help(path) -> str:
+        # Return the (cached) `--help` output of the virtiofsd at PATH;
+        # several feature checks may need it, but it is enough to run each
+        # daemon only once. An empty string means the output could not be
+        # retrieved.
+        if path not in _VIRTIOFSD_HELP:
+            try:
+                result = subprocess.run(
+                    [path, "--help"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                )
+            except OSError:
+                help_text = ""
+            else:
+                help_text = result.stdout if result.returncode == 0 else ""
+            _VIRTIOFSD_HELP[path] = help_text
+        return _VIRTIOFSD_HELP[path]
 
-        try:
-            result = subprocess.run(
-                [path, "--help"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
+    @staticmethod
+    def _supports_flag(path, flag) -> bool:
+        # Match FLAG as a whole flag: the exact --help formatting (spacing,
+        # wrapping) differs across virtiofsd versions and must not silently
+        # disable a feature, and a longer flag must not match as its
+        # shorter prefix (e.g. --readonly-mode is not --readonly).
+        return (
+            re.search(
+                rf"{re.escape(flag)}(?![\w-])", VirtioFS._get_virtiofsd_help(path)
             )
-        except OSError:
-            supported = False
-        else:
-            supported = result.returncode == 0 and "--readonly" in result.stdout
+            is not None
+        )
 
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = supported
-        return supported
+    @staticmethod
+    def _supports_readonly(path):
+        return VirtioFS._supports_flag(path, "--readonly")
 
     def _report_9p_fallback(self, verbose):
         if verbose:

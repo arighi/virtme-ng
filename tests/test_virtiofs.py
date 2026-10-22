@@ -12,7 +12,7 @@ import unittest
 from unittest import mock
 
 from virtme_ng.virtiofs import (
-    _VIRTIOFSD_READONLY_SUPPORT,
+    _VIRTIOFSD_HELP,
     VirtioFS,
     VirtioFSConfig,
     VirtioFSState,
@@ -49,7 +49,7 @@ class DaemonPatchMixin:
         super().setUp()
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = None
+        _VIRTIOFSD_HELP.clear()
         self.addCleanup(self._reset_readonly_cache)
 
         self.daemon = os.path.join(self.tempdir.name, "bin", "virtiofsd")
@@ -104,7 +104,7 @@ class DaemonPatchMixin:
             self.addCleanup(patch.stop)
 
     def _reset_readonly_cache(self):
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = None
+        _VIRTIOFSD_HELP.clear()
 
 
 class VirtioFSConfigTests(unittest.TestCase):
@@ -279,11 +279,11 @@ class GetVirtiofsdPathTests(unittest.TestCase):
 
 class SupportsReadonlyTests(unittest.TestCase):
     def setUp(self):
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = None
+        _VIRTIOFSD_HELP.clear()
         self.addCleanup(self._reset_cache)
 
     def _reset_cache(self):
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = None
+        _VIRTIOFSD_HELP.clear()
 
     def test_detects_flag_in_help_output(self):
         result = mock.MagicMock(returncode=0, stdout="--readonly\nusage: virtiofsd")
@@ -306,14 +306,23 @@ class SupportsReadonlyTests(unittest.TestCase):
         ):
             self.assertFalse(VirtioFS._supports_readonly("/usr/bin/virtiofsd"))
 
-    def test_result_is_cached(self):
+    def test_help_output_is_cached_per_path(self):
         result = mock.MagicMock(returncode=0, stdout="--readonly")
         with mock.patch(
             "virtme_ng.virtiofs.subprocess.run", return_value=result
         ) as run:
+            # Same path: the daemon is only spawned once.
             self.assertTrue(VirtioFS._supports_readonly("/usr/bin/virtiofsd"))
-            self.assertTrue(VirtioFS._supports_readonly("/another/virtiofsd"))
+            self.assertTrue(VirtioFS._supports_readonly("/usr/bin/virtiofsd"))
             run.assert_called_once()
+            # A different path is probed separately.
+            self.assertTrue(VirtioFS._supports_readonly("/another/virtiofsd"))
+            self.assertEqual(run.call_count, 2)
+
+    def test_help_empty_on_failure(self):
+        result = mock.MagicMock(returncode=1, stdout="--readonly")
+        with mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=result):
+            self.assertEqual(VirtioFS._get_virtiofsd_help("/usr/bin/virtiofsd"), "")
 
 
 class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
