@@ -419,6 +419,13 @@ def make_parser() -> "VirtmeArgumentParser":
         help="Fallback to the bash virtme-init (useful for debugging/development)",
     )
     g.add_argument(
+        "--fast-boot",
+        "-F",
+        action="store_true",
+        help="Skip udev and tmpfiles setup; default to 4 CPUs and 512M RAM; "
+        "explicit options override the preset",
+    )
+    g.add_argument(
         "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
     )
 
@@ -1566,6 +1573,12 @@ _RWDIR_RE = re.compile(f"^({_SAFE_PATH_PATTERN})(?:=({_SAFE_PATH_PATTERN}))?$")
 def do_it() -> int:
     args = _ARGPARSER.parse_args()
 
+    if args.fast_boot and not args.numa:
+        if args.cpus is None:
+            args.cpus = "4"
+        if args.memory is None:
+            args.memory = "512M"
+
     if args.client is not None:
         if args.server is not None:
             arg_fail("--client cannot be used with --server.")
@@ -2083,6 +2096,10 @@ def do_it() -> int:
 
     if args.empty_passwords:
         kernelargs.append("virtme_empty_passwords=1")
+
+    if args.fast_boot and not args.systemd:
+        kernelargs.append("virtme_no_udev=1")
+        kernelargs.append("virtme_no_tmpfiles=1")
 
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)
