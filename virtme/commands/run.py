@@ -9,6 +9,7 @@ import argparse
 import atexit
 import errno
 import fcntl
+import grp
 import itertools
 import json
 import os
@@ -967,6 +968,7 @@ class VirtioFS:
             f"--shared-dir={path}",
             "--sandbox=none",
             f"--cache={cache}",
+            f"--socket-group={grp.getgrgid(os.getgid()).gr_name}",
         ]
         self.proc = subprocess.Popen(virtiofsd_cmd, stderr=stderr)
         # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
