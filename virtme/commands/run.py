@@ -1628,6 +1628,17 @@ def do_it() -> int:
     if len(args.overlay_rwdir) > 0:
         virtmods.MODALIASES.append("overlay")
 
+    if args.net or args.server == "ssh":
+        # Networking must also work without udev to load the driver.
+        virtmods.MODALIASES.append("virtio_net")
+
+    if args.server == "console" or (
+        args.server == "ssh" and can_use_ssh_over_vsock(args.ssh_tcp)
+    ):
+        # The vsock core alone cannot communicate with the host. Include the
+        # virtio transport and its dependencies without relying on coldplug.
+        virtmods.MODALIASES.append("virtio:d00000013v00001AF4")
+
     if args.root_disk is not None:
         virtmods.MODALIASES.append("virtio_blk")
         if args.root_fstype is not None:
