@@ -936,7 +936,7 @@ class VirtioFS:
             return False
 
         # virtiofsd located, try to start the daemon as non-privileged user.
-        _, self.sock = tempfile.mkstemp(prefix="virtme")
+        _, self.sock = tempfile.mkstemp(prefix="virtme", suffix=".sock")
 
         # Make sure to clean up temp files before starting the daemon and at exit.
         self._cleanup_virtiofs_temp_files()
