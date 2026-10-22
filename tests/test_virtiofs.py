@@ -6,6 +6,7 @@
 
 import os
 import signal
+import socket
 import subprocess
 import tempfile
 import unittest
@@ -41,7 +42,8 @@ class DaemonPatchMixin:
 
     Creates a real (fake) executable at <tempdir>/bin/virtiofsd so that
     _get_virtiofsd_path() finds it as the first candidate, and patches
-    os.system to simulate the daemon by writing the pid file.
+    os.system to simulate the daemon by binding a unix socket at the
+    socket path, which is what the readiness poll waits for.
     """
 
     def setUp(self):
@@ -58,17 +60,17 @@ class DaemonPatchMixin:
         os.chmod(self.daemon, 0o755)
 
         self.sock = os.path.join(self.tempdir.name, "virtme.sock")
-        self.pid_file = self.sock + ".pid"
         self.system_calls = []
 
         def system_side_effect(cmd):
             self.system_calls.append(cmd)
-            if self.write_pid_file:
-                with open(self.pid_file, "w", encoding="utf-8") as fd:
-                    fd.write("12345")
+            if self.create_socket:
+                daemon_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+                daemon_sock.bind(self.sock)
+                daemon_sock.close()
             return 0
 
-        self.write_pid_file = True
+        self.create_socket = True
         patches = [
             mock.patch("virtme_ng.virtiofs.subprocess.check_call"),
             # _supports_readonly() must never spawn a real virtiofsd; default
@@ -334,7 +336,7 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         self.assertNotIn("2>/dev/null", self.system_calls[0])
 
     def test_timeout_returns_false(self):
-        self.write_pid_file = False
+        self.create_socket = False
         with (
             mock.patch("virtme_ng.virtiofs.monotonic", side_effect=[0.0, 100.0]),
             mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
@@ -355,6 +357,29 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         cmd = self.system_calls[0]
         self.assertIn("--posix-acl", cmd)
         self.assertIn("--readonly", cmd)
+
+
+class IsSocketTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+
+    def test_true_for_unix_socket(self):
+        path = os.path.join(self.tempdir.name, "sock")
+        daemon_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+        daemon_sock.bind(path)
+        daemon_sock.close()
+        self.assertTrue(VirtioFS._is_socket(path))
+
+    def test_false_for_regular_file(self):
+        path = os.path.join(self.tempdir.name, "file")
+        with open(path, "w", encoding="utf-8") as fd:
+            fd.write("")
+        self.assertFalse(VirtioFS._is_socket(path))
+
+    def test_false_for_missing_path(self):
+        path = os.path.join(self.tempdir.name, "nonexistent")
+        self.assertFalse(VirtioFS._is_socket(path))
 
 
 class CleanupTests(unittest.TestCase):

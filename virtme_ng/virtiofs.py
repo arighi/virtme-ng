@@ -3,6 +3,7 @@
 import atexit
 import os
 import signal
+import stat
 import subprocess
 import sys
 import tempfile
@@ -81,6 +82,13 @@ class VirtioFS:
         return None
 
     @staticmethod
+    def _is_socket(path):
+        try:
+            return stat.S_ISSOCK(os.stat(path).st_mode)
+        except OSError:
+            return False
+
+    @staticmethod
     def _supports_readonly(path):
         if _VIRTIOFSD_READONLY_SUPPORT["value"] is not None:
             return _VIRTIOFSD_READONLY_SUPPORT["value"]
@@ -141,7 +149,7 @@ class VirtioFS:
         # but avoid adding a full 100ms delay when the daemon starts quickly.
         deadline = monotonic() + 3.1
         waiting_logged = False
-        while not os.path.exists(self.pid):
+        while not self._is_socket(self.sock):
             remaining = deadline - monotonic()
             if remaining <= 0:
                 if verbose:
