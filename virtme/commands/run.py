@@ -832,7 +832,7 @@ def find_kernel_and_mods(arch, args) -> Kernel:
     return kernel
 
 
-_VIRTIOFSD_READONLY_SUPPORT: dict[str, bool | None] = {"value": None}
+_VIRTIOFSD_HELP: dict[str, str | None] = {"value": None}
 
 
 class VirtioFS:
@@ -901,25 +901,29 @@ class VirtioFS:
         return None
 
     @staticmethod
+    def _get_virtiofsd_help(path) -> str:
+        # Return the (cached) `--help` output of virtiofsd; several feature
+        # checks may need it, but it is enough to run virtiofsd only once.
+        # An empty string means the output could not be retrieved.
+        if _VIRTIOFSD_HELP["value"] is None:
+            try:
+                result = subprocess.run(
+                    [path, "--help"],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    check=False,
+                )
+            except OSError:
+                help_text = ""
+            else:
+                help_text = result.stdout if result.returncode == 0 else ""
+            _VIRTIOFSD_HELP["value"] = help_text
+        return _VIRTIOFSD_HELP["value"] or ""
+
+    @staticmethod
     def _supports_readonly(path):
-        if _VIRTIOFSD_READONLY_SUPPORT["value"] is not None:
-            return _VIRTIOFSD_READONLY_SUPPORT["value"]
-
-        try:
-            result = subprocess.run(
-                [path, "--help"],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                check=False,
-            )
-        except OSError:
-            supported = False
-        else:
-            supported = result.returncode == 0 and "--readonly" in result.stdout
-
-        _VIRTIOFSD_READONLY_SUPPORT["value"] = supported
-        return supported
+        return "--readonly" in VirtioFS._get_virtiofsd_help(path)
 
     @staticmethod
     def _is_socket(path):
