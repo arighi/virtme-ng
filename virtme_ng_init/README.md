@@ -71,6 +71,22 @@ e.g. when used as a submodule:
 cp target/release/virtme-ng-init ../virtme/guest/bin
 ```
 
+# Non-native architectures
+
+When running a guest of another architecture (`vng --arch <arch>`),
+virtme-ng uses `virtme/guest/bin/virtme-ng-init-<arch>` if present, where
+`<arch>` is the name passed to `--arch`, and falls back to the Bash init
+otherwise. Under emulation the Rust init noticeably speeds up booting.
+e.g. to cross-build it for `--arch riscv64`:
+```
+rustup target add riscv64gc-unknown-linux-musl
+RUSTFLAGS='-C target-feature=+crt-static' cargo build -r \
+    --target riscv64gc-unknown-linux-musl \
+    --config 'target.riscv64gc-unknown-linux-musl.linker = "rust-lld"'
+cp target/riscv64gc-unknown-linux-musl/release/virtme-ng-init \
+    ../virtme/guest/bin/virtme-ng-init-riscv64
+```
+
 # Credits
 
 Author: Andrea Righi <andrea.righi@canonical.com>
