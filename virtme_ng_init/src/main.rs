@@ -773,7 +773,32 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         Some(handle)
     } else {
         log!("unable to find udevd, skip udev.");
+        create_virtio_port_links();
         None
+    }
+}
+
+// Without udev nothing creates the /dev/virtio-ports/<name> links that the
+// script I/O relies on, so do what udev's default rule does:
+// SUBSYSTEM=="virtio-ports", KERNEL=="vport*", ATTR{name}=="?*", SYMLINK+="virtio-ports/$attr{name}"
+fn create_virtio_port_links() {
+    let Ok(entries) = std::fs::read_dir("/sys/class/virtio-ports") else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let port = entry.file_name().to_string_lossy().into_owned();
+        if !port.starts_with("vport") {
+            continue;
+        }
+        let Ok(name) = std::fs::read_to_string(entry.path().join("name")) else {
+            continue;
+        };
+        let name = name.trim();
+        if name.is_empty() {
+            continue;
+        }
+        utils::do_mkdir("/dev/virtio-ports");
+        utils::do_symlink(&format!("../{port}"), &format!("/dev/virtio-ports/{name}"));
     }
 }
 

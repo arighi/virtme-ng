@@ -340,7 +340,23 @@ run_udevd() {
         log "udev is done"
     else
         log "udevd not found"
+        create_virtio_port_links
     fi
+}
+
+# Without udev nothing creates the /dev/virtio-ports/<name> links that the
+# script I/O relies on, so do what udev's default rule does:
+# SUBSYSTEM=="virtio-ports", KERNEL=="vport*", ATTR{name}=="?*", SYMLINK+="virtio-ports/$attr{name}"
+create_virtio_port_links() {
+    local port name
+
+    for port in /sys/class/virtio-ports/vport*; do
+        [[ -r "$port/name" ]] || continue
+        name=$(< "$port/name")
+        [[ -n $name ]] || continue
+        mkdir -p /dev/virtio-ports
+        ln -sf "../${port##*/}" "/dev/virtio-ports/$name"
+    done
 }
 
 symlink_fds() {
