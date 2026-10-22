@@ -109,7 +109,7 @@ Installation
 Requirements
 ============
 
- * You need Python 3.8 or higher
+ * You need Python 3.11 or higher
 
  * QEMU 1.6 or higher is recommended (QEMU 1.4 and 1.5 are partially supported
    using a rather ugly kludge)
