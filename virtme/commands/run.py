@@ -1639,10 +1639,15 @@ def do_it() -> int:
         # virtio transport and its dependencies without relying on coldplug.
         virtmods.MODALIASES.append("virtio:d00000013v00001AF4")
 
-    if args.root_disk is not None:
+    # Disks must also show up without udev to load their drivers.
+    if args.disk:
+        virtmods.MODALIASES.extend(["virtio_scsi", "sd_mod"])
+
+    if args.blk_disk or args.root_disk is not None:
         virtmods.MODALIASES.append("virtio_blk")
-        if args.root_fstype is not None:
-            virtmods.MODALIASES.append(f"fs-{args.root_fstype}")
+
+    if args.root_disk is not None and args.root_fstype is not None:
+        virtmods.MODALIASES.append(f"fs-{args.root_fstype}")
 
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles

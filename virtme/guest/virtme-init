@@ -342,6 +342,7 @@ run_udevd() {
         log "udevd not found"
         virtme_no_udev=1
         create_virtio_port_links
+        create_disk_links
     fi
 }
 
@@ -390,6 +391,62 @@ wait_for_virtio_ports() {
         ((10#${uptime/./} >= deadline)) && break
         create_virtio_port_links
         sleep 0.05
+    done
+}
+
+# Sanitize an ID like udev: trim and squeeze whitespace into "_", then
+# replace characters that are not allowed in symlink names.
+udev_id() {
+    local id=$1
+
+    id="${id#"${id%%[![:space:]]*}"}"
+    id="${id%"${id##*[![:space:]]}"}"
+    id=$(tr -s '[:space:]' '_' <<< "$id")
+    id="${id%_}"
+    printf '%s' "${id//[^A-Za-z0-9#+.:=@_\/-]/_}"
+}
+
+# Link a block device and its partitions as /dev/disk/by-id/<id>[-partN].
+link_disk() {
+    local dev=$1 id=$2 part link up
+
+    for part in "$dev" "$dev/${dev##*/}"*; do
+        link="/dev/disk/by-id/$id"
+        if [[ $part != "$dev" ]]; then
+            [[ -r $part/partition ]] || continue
+            link+="-part$(< "$part/partition")"
+        fi
+        [[ -L $link || -e $link ]] && continue
+        # IDs may contain "/", which udev turns into subdirectories.
+        up="${id//[^\/]/}"
+        up="${up//\//../}"
+        mkdir -p "${link%/*}"
+        ln -s "../../$up${part##*/}" "$link"
+    done
+}
+
+# Without udev nothing creates the /dev/disk/by-id links documented for
+# --disk and --blk-disk, so do what udev's persistent storage rules do for
+# the disks provided by virtme.
+create_disk_links() {
+    local dev vendor model serial
+
+    for dev in /sys/block/vd*; do
+        [[ -r $dev/serial ]] || continue
+        serial=$(< "$dev/serial")
+        [[ -n $serial ]] || continue
+        link_disk "$dev" "virtio-$(udev_id "$serial")"
+    done
+
+    for dev in /sys/block/sd*; do
+        [[ -r $dev/device/vendor && -r $dev/device/vpd_pg80 ]] || continue
+        vendor=$(< "$dev/device/vendor")
+        [[ $vendor =~ ^virtme[[:space:]]*$ ]] || continue
+        model=$(< "$dev/device/model")
+        # Skip the 4-byte VPD page header.
+        serial=$(tail -c +5 "$dev/device/vpd_pg80")
+        [[ -n $serial ]] || continue
+        link_disk "$dev" "scsi-$(udev_id "0$vendor $model $serial")"
     done
 }
 

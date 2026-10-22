@@ -775,6 +775,7 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         log!("unable to find udevd, skip udev.");
         env::set_var("virtme_no_udev", "1");
         create_virtio_port_links();
+        create_disk_links();
         None
     }
 }
@@ -829,6 +830,95 @@ fn wait_for_virtio_ports() {
         }
         create_virtio_port_links();
         thread::sleep(Duration::from_millis(50));
+    }
+}
+
+// Sanitize an ID like udev: trim and squeeze whitespace into "_", then
+// replace characters that are not allowed in symlink names.
+fn udev_id(id: &str) -> String {
+    id.split_whitespace()
+        .collect::<Vec<_>>()
+        .join("_")
+        .chars()
+        .map(|c| {
+            if c.is_ascii_alphanumeric() || "#+-.:=@_/".contains(c) {
+                c
+            } else {
+                '_'
+            }
+        })
+        .collect()
+}
+
+// Link a block device and its partitions as /dev/disk/by-id/<id>[-partN].
+fn link_disk(dev: &Path, id: &str) {
+    let Some(name) = dev.file_name().map(|n| n.to_string_lossy().into_owned()) else {
+        return;
+    };
+    let mut targets = vec![(name.clone(), String::new())];
+    if let Ok(entries) = std::fs::read_dir(dev) {
+        for entry in entries.flatten() {
+            let part = entry.file_name().to_string_lossy().into_owned();
+            if !part.starts_with(&name) {
+                continue;
+            }
+            if let Ok(num) = std::fs::read_to_string(entry.path().join("partition")) {
+                targets.push((part, format!("-part{}", num.trim())));
+            }
+        }
+    }
+    // IDs may contain "/", which udev turns into subdirectories.
+    let up = "../".repeat(id.matches('/').count());
+    for (target, suffix) in targets {
+        let dst = format!("/dev/disk/by-id/{id}{suffix}");
+        if let Some(parent) = Path::new(&dst).parent() {
+            utils::do_mkdir_recursive(&parent.to_string_lossy());
+        }
+        match std::os::unix::fs::symlink(format!("../../{up}{target}"), &dst) {
+            Ok(()) => (),
+            Err(err) if err.kind() == io::ErrorKind::AlreadyExists => (),
+            Err(err) => log!("failed to create symlink {}: {}", dst, err),
+        }
+    }
+}
+
+// Without udev nothing creates the /dev/disk/by-id links documented for
+// --disk and --blk-disk, so do what udev's persistent storage rules do for
+// the disks provided by virtme.
+fn create_disk_links() {
+    let Ok(entries) = std::fs::read_dir("/sys/block") else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let name = entry.file_name().to_string_lossy().into_owned();
+        let dev = entry.path();
+        if name.starts_with("vd") {
+            let Ok(serial) = std::fs::read_to_string(dev.join("serial")) else {
+                continue;
+            };
+            if !serial.is_empty() {
+                link_disk(&dev, &format!("virtio-{}", udev_id(&serial)));
+            }
+        } else if name.starts_with("sd") {
+            let read = |attr: &str| std::fs::read(dev.join("device").join(attr)).ok();
+            let (Some(vendor), Some(model), Some(page)) =
+                (read("vendor"), read("model"), read("vpd_pg80"))
+            else {
+                continue;
+            };
+            let vendor = String::from_utf8_lossy(&vendor);
+            if vendor.trim() != "virtme" || page.len() <= 4 {
+                continue;
+            }
+            // Skip the 4-byte VPD page header.
+            let id = format!(
+                "0{} {} {}",
+                vendor,
+                String::from_utf8_lossy(&model),
+                String::from_utf8_lossy(&page[4..])
+            );
+            link_disk(&dev, &format!("scsi-{}", udev_id(&id)));
+        }
     }
 }
 
