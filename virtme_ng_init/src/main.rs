@@ -933,7 +933,7 @@ fn get_guest_tools_dir() -> Option<String> {
     )
 }
 
-fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<Option<String>> {
+fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<String> {
     let mut vec = Vec::new();
 
     // .flatten() ignores lines with reading errors
@@ -946,7 +946,7 @@ fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<Option<St
             // .flatten() ignores lines with reading errors
             if let Some(entry) = net_entries.flatten().next() {
                 if let Some(fname) = entry.path().file_name() {
-                    vec.push(Some(fname.to_string_lossy().to_string()));
+                    vec.push(fname.to_string_lossy().to_string());
                 }
             }
         }
@@ -954,7 +954,7 @@ fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<Option<St
     vec
 }
 
-fn get_network_devices() -> Vec<Option<String>> {
+fn get_network_devices() -> Vec<String> {
     let virtio_net_dir = "/sys/bus/virtio/drivers/virtio_net";
     loop {
         match std::fs::read_dir(virtio_net_dir) {
@@ -970,19 +970,18 @@ fn get_network_devices() -> Vec<Option<String>> {
 }
 
 fn get_network_handle(
-    network_dev: Option<String>,
+    network_dev: String,
     guest_tools_dir: Option<String>,
     busybox: String,
 ) -> Option<thread::JoinHandle<()>> {
-    let network_dev_str = network_dev.unwrap();
-    log!("setting up network device {}", network_dev_str);
+    log!("setting up network device {}", network_dev);
     Some(thread::spawn(move || {
-        utils::run_cmd("ip", &["link", "set", "dev", &network_dev_str, "up"]);
+        utils::run_cmd("ip", &["link", "set", "dev", &network_dev, "up"]);
         let script = format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap());
         let mut args = vec![
             "udhcpc",
             "-i",
-            &network_dev_str,
+            &network_dev,
             "-n",
             "-q",
             "-f",
