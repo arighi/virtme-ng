@@ -176,6 +176,14 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--fast-boot",
+        "-F",
+        action="store_true",
+        help="Skip udev and tmpfiles setup; default to 4 CPUs; "
+        "explicit options override the preset",
+    )
+
+    parser.add_argument(
         "--empty-passwords",
         action="store_true",
         help="Use empty passwords for all users",
@@ -649,6 +657,14 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     return parser
+
+
+def apply_fast_boot_defaults(args):
+    """Apply the fast boot preset without replacing explicit settings."""
+    if not args.fast_boot:
+        return
+    if not args.numa and args.cpus is None:
+        args.cpus = "4"
 
 
 _ARGPARSER = make_parser()
@@ -1175,6 +1191,9 @@ class KernelSource:
         else:
             self.virtme_param["no_virtme_ng_init"] = ""
 
+    def _get_virtme_fast_boot(self, args):
+        self.virtme_param["fast_boot"] = "--fast-boot" if args.fast_boot else ""
+
     def _get_virtme_network(self, args):
         if args.network is not None:
             network_str = " ".join([f"--net {network}" for network in args.network])
@@ -1484,6 +1503,7 @@ class KernelSource:
         self._get_virtme_run(args)
         self._get_virtme_dry_run(args)
         self._get_virtme_no_virtme_ng_init(args)
+        self._get_virtme_fast_boot(args)
         self._get_virtme_mods(args)
         self._get_virtme_network(args)
         self._get_virtme_no_dhcp(args)
@@ -1542,6 +1562,7 @@ class KernelSource:
             + f"{self.virtme_param['kdir']} "
             + f"{self.virtme_param['dry_run']} "
             + f"{self.virtme_param['no_virtme_ng_init']} "
+            + f"{self.virtme_param['fast_boot']} "
             + f"{self.virtme_param['mods']} "
             + f"{self.virtme_param['network']} "
             + f"{self.virtme_param['no_dhcp']} "
@@ -1744,10 +1765,18 @@ def do_it() -> int:
             return 1
 
     kern_source = KernelSource()
+    # Preserve explicit resource settings when merging configured defaults
+    # before applying the fast boot preset.
+    boot_overrides = {
+        opt for opt in ("cpus", "memory") if getattr(args, opt) is not None
+    }
     if kern_source.default_opts:
         for opt in kern_source.default_opts:
             val = kern_source.default_opts[opt]
-            setattr(args, opt, val)
+            if opt not in boot_overrides:
+                setattr(args, opt, val)
+
+    apply_fast_boot_defaults(args)
 
     if args.verbose and args.quiet:
         args.verbose = False
