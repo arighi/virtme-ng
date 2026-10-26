@@ -4,9 +4,9 @@
 //!
 //! Author: Andrea Righi <andrea.righi@canonical.com>
 
-use nix::mount::{mount, MsFlags};
+use nix::mount::{MsFlags, mount};
 use nix::sys::stat::Mode;
-use nix::unistd::{chown, Gid, Uid};
+use nix::unistd::{Gid, Uid, chown};
 use std::ffi::{CString, OsStr};
 use std::fmt::Arguments;
 use std::fs::{File, OpenOptions};
@@ -149,10 +149,10 @@ pub fn do_mount_check(
 
 pub fn do_mount(source: &str, target: &str, fstype: &str, flags: usize, fsdata: &str) {
     let result = do_mount_check(source, target, fstype, flags, fsdata);
-    if let Err(err) = result {
-        if err != nix::errno::Errno::ENOENT {
-            log!("mount {} -> {}: {}", source, target, err);
-        }
+    if let Err(err) = result
+        && err != nix::errno::Errno::ENOENT
+    {
+        log!("mount {} -> {}: {}", source, target, err);
     }
 }
 
