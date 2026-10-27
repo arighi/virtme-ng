@@ -34,19 +34,12 @@ build_virtme_ng_init = int(os.environ.get("BUILD_VIRTME_NG_INIT", 0))
 # Always include standard site-packages to PYTHONPATH
 os.environ["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
 
-# Produce static Rust binaries.
-#
-# This is required to use the same virtme-ng-init across different root
-# filesystems (when `--root DIR` is used).
-os.environ["RUSTFLAGS"] = "-C target-feature=+crt-static " + os.environ.get(
-    "RUSTFLAGS", ""
-)
-
 
 class BuildPy(build_py):
     def run(self):
         print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
-        # Build virtme-ng-init
+        # Build virtme-ng-init (static linking and linker settings are
+        # configured in virtme_ng_init/.cargo/config.toml)
         if build_virtme_ng_init:
             cwd = "virtme_ng_init"
             root = "../virtme/guest"
@@ -56,14 +49,7 @@ class BuildPy(build_py):
                 if machine == "arm64":
                     machine = "aarch64"
                 target = f"{machine}-unknown-linux-musl"
-                args.extend(
-                    [
-                        "--target",
-                        target,
-                        "--config",
-                        f'target.{target}.linker = "rust-lld"',
-                    ]
-                )
+                args.extend(["--target", target])
             subprocess.check_call(args, cwd="virtme_ng_init")
             subprocess.check_call(
                 ["strip", os.path.join(root, "bin", "virtme-ng-init")],

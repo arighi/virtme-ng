@@ -57,10 +57,11 @@ sys	0m0.795s
 # Building
 
 Static building is necessary as this binary is going to be executed
-before the file system is up and running.
+before the file system is up and running. This is configured in
+`.cargo/config.toml`, so a plain release build is enough:
 
 ```
-RUSTFLAGS='-C target-feature=+crt-static' cargo build -r
+cargo build --release
 ```
 
 # Local installation
@@ -80,9 +81,7 @@ otherwise. Under emulation the Rust init noticeably speeds up booting.
 e.g. to cross-build it for `--arch riscv64`:
 ```
 rustup target add riscv64gc-unknown-linux-musl
-RUSTFLAGS='-C target-feature=+crt-static' cargo build -r \
-    --target riscv64gc-unknown-linux-musl \
-    --config 'target.riscv64gc-unknown-linux-musl.linker = "rust-lld"'
+cargo build --release --target riscv64gc-unknown-linux-musl
 cp target/riscv64gc-unknown-linux-musl/release/virtme-ng-init \
     ../virtme/guest/bin/virtme-ng-init-riscv64
 ```

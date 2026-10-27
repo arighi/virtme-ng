@@ -1,0 +1,29 @@
+# virtme-ng-init must be a static binary: it is executed before the root
+# filesystem is available and it is reused across different root filesystems
+# (when `--root DIR` is used).
+[build]
+rustflags = ["-C", "target-feature=+crt-static"]
+
+# Cross-compiling to Linux (e.g. from macOS).
+[target.aarch64-unknown-linux-musl]
+linker = "rust-lld"
+
+# "arm" has no unsuffixed Rust target; the ABI must be encoded in the triple
+# (see the RUST_TARGET_arm mapping in the Makefile).
+[target.arm-unknown-linux-musleabihf]
+linker = "rust-lld"
+
+[target.x86_64-unknown-linux-musl]
+linker = "rust-lld"
+
+[target.riscv64gc-unknown-linux-musl]
+linker = "rust-lld"
+
+[target.i686-unknown-linux-musl]
+linker = "rust-lld"
+
+[target.powerpc64-unknown-linux-musl]
+linker = "rust-lld"
+
+[target.powerpc64le-unknown-linux-musl]
+linker = "rust-lld"
