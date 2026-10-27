@@ -78,9 +78,13 @@ When running a guest of another architecture (`vng --arch <arch>`),
 virtme-ng uses `virtme/guest/bin/virtme-ng-init-<arch>` if present, where
 `<arch>` is the name passed to `--arch`, and falls back to the Bash init
 otherwise. Under emulation the Rust init noticeably speeds up booting.
-e.g. to cross-build it for `--arch riscv64`:
+e.g. to cross-build it for `--arch riscv64` from the top-level directory:
 ```
 rustup target add riscv64gc-unknown-linux-musl
+make init-riscv64
+```
+or, manually:
+```
 cargo build --release --target riscv64gc-unknown-linux-musl
 cp target/riscv64gc-unknown-linux-musl/release/virtme-ng-init \
     ../virtme/guest/bin/virtme-ng-init-riscv64
