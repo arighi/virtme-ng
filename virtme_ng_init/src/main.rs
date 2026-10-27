@@ -1188,7 +1188,6 @@ fn run_user_script_on_console(consdev: &str, uid: u32) {
         .into_raw_fd();
 
     utils::do_chown(consdev, uid, None).ok();
-    clear_virtme_envs();
 
     let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
     let (cmd, args) = if user.is_empty() {
@@ -1197,6 +1196,7 @@ fn run_user_script_on_console(consdev: &str, uid: u32) {
         ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
     };
 
+    clear_virtme_envs();
     log!("starting script (console fallback)");
     unsafe {
         let ret = Command::new(cmd)
