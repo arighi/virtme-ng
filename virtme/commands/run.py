@@ -774,16 +774,8 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         if modmode == "none":
             pass
         elif modmode in ("use", "auto"):
-            if args.root != "/":
-                kernel.use_root_mods = True
-                kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
-                if not os.path.exists(kernel.moddir):
-                    kernel.moddir = f"{args.root}/lib/modules/{kernel.version}"
-                    if not os.path.exists(kernel.moddir):
-                        kernel.modfiles = []
-                        kernel.moddir = None
             # Check if modules.order exists, otherwise fallback to mods=none
-            elif os.path.exists(mod_file):
+            if os.path.exists(mod_file):
                 # Check if virtme's kernel modules directory needs to be updated
                 if not os.path.exists(virtme_mod_file) or is_file_more_recent(
                     mod_file, virtme_mod_file
@@ -1919,10 +1911,10 @@ def do_it() -> int:
                 f"mount --bind {fstab_path} /etc/fstab",
             ]
         )
-        if args.root_disk is not None and kernel.moddir is not None:
-            # A disk image is unrelated to the kernel under test, so its
-            # modules cannot be reached through the guest root and need a
-            # mount of their own.
+        if kernel.moddir is not None and (
+            args.root_disk is not None or not kernel.use_root_mods
+        ):
+            # Modules outside the guest root need a mount of their own.
             if args.kdir is not None and not kernel.use_root_mods:
                 # virtme-prep-kdir-mods fills kernel.moddir with symlinks
                 # pointing back into the kdir, which would dangle at the mount
