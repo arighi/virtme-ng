@@ -38,23 +38,16 @@ os.environ["PYTHONPATH"] = sysconfig.get_paths()["purelib"]
 class BuildPy(build_py):
     def run(self):
         print(f"BUILD_VIRTME_NG_INIT: {build_virtme_ng_init}")
-        # Build virtme-ng-init (static linking and linker settings are
-        # configured in virtme_ng_init/.cargo/config.toml)
+        # Build virtme-ng-init (static linking, stripping and linker settings
+        # are configured in virtme_ng_init/.cargo/config.toml and Cargo.toml)
         if build_virtme_ng_init:
-            cwd = "virtme_ng_init"
-            root = "../virtme/guest"
-            args = ["cargo", "install", "--path", ".", "--root", root]
+            args = ["cargo", "install", "--path", ".", "--root", "../virtme/guest"]
             if platform.system() == "Darwin":
                 machine = platform.machine()
                 if machine == "arm64":
                     machine = "aarch64"
-                target = f"{machine}-unknown-linux-musl"
-                args.extend(["--target", target])
+                args.extend(["--target", f"{machine}-unknown-linux-musl"])
             subprocess.check_call(args, cwd="virtme_ng_init")
-            subprocess.check_call(
-                ["strip", os.path.join(root, "bin", "virtme-ng-init")],
-                cwd=cwd,
-            )
 
         # Generate bash autocompletion scripts
         with open("virtme-ng-prompt", "w", encoding="utf-8") as f:
