@@ -15,6 +15,9 @@ unused = "warn"
 unused_import_braces = "warn"
 unused_qualifications = "warn"
 
+[profile.release]
+strip = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
