@@ -5,6 +5,14 @@
 # as a file called LICENSE with SHA-256 hash:
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
+import shlex
+import shutil
+import subprocess
+import sys
+import tempfile
+from pathlib import Path
+from typing import Any
+
 
 class Arch:
     def __init__(self, name) -> None:
@@ -67,6 +75,25 @@ class Arch:
     @staticmethod
     def qemu_vmcoreinfo_args() -> list[str]:
         return ["-device", "vmcoreinfo"]
+
+    @staticmethod
+    def qemu_confidential_guest_args(
+        is_native: bool, use_kvm: bool, **kwargs
+    ) -> list[str]:
+        raise RuntimeError("Confidential guest is not supported by the architecture")
+
+    # pylint: disable=unused-argument
+    def qemu_confidential_guest_img_preparation(
+        self,
+        *,
+        kernel: Path,
+        cmdline: str,
+        initrd: Path | None = None,
+        dry_run: bool = False,
+        verbose: bool = False,
+        confidential_guest_args: dict[str, list[str]] | None = None,
+    ) -> Any:
+        return None
 
     @staticmethod
     def qemu_serial_console_args() -> list[str]:
@@ -431,10 +458,26 @@ class Arch_sparc64(Arch):
 
 
 class Arch_s390x(Arch):
+    PV_DUMP_SUPPORT = 0x8000000000
+
     def __init__(self):
         Arch.__init__(self, "s390x")
 
         self.linuxname = "s390"
+
+    @staticmethod
+    def test_uv_support(value: int) -> bool:
+        try:
+            with open("/sys/firmware/uv/query/facilities", "rb") as f:
+                data = f.read().decode()
+        except FileNotFoundError:
+            return False
+
+        inst_call_list = data.splitlines()
+        if not inst_call_list:
+            return False
+        first_inst_call = int(inst_call_list[0], 16)
+        return bool(first_inst_call & value)
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -494,6 +537,104 @@ class Arch_s390x(Arch):
     @staticmethod
     def qemu_vmcoreinfo_args() -> list[str]:
         return []
+
+    @staticmethod
+    def qemu_confidential_guest_args(
+        is_native: bool, use_kvm: bool, **kwargs
+    ) -> list[str]:
+        if not is_native or not use_kvm:
+            raise RuntimeError("KVM must be used for Secure Execution")
+        try:
+            with open("/sys/firmware/uv/prot_virt_host", "rb") as f:
+                data = f.read().decode()
+        except FileNotFoundError:
+            raise RuntimeError(
+                "Secure Execution is not supported by your kernel/hardware."
+            ) from None
+        if int(data) != 1:
+            raise RuntimeError(
+                "Secure Execution is not supported on your system. 'prot_virt=1' missing?"
+            )
+
+        return [
+            "-object",
+            "s390-pv-guest,id=pv0",
+            "-machine",
+            "confidential-guest-support=pv0",
+        ]
+
+    def qemu_confidential_guest_img_preparation(
+        self,
+        *,
+        kernel: Path,
+        cmdline: str,
+        initrd: Path | None = None,
+        dry_run: bool = False,
+        verbose: bool = False,
+        confidential_guest_args: dict[str, list[str]] | None = None,
+    ) -> Any:
+        if (
+            not confidential_guest_args
+            or "host-key-document" not in confidential_guest_args
+        ):
+            raise RuntimeError(
+                "virtme-run: At least one host-key-document=$HKD must be specified"
+            )
+        if not shutil.which("pvimg"):
+            raise RuntimeError(
+                "'pvimg' must be installed for the Secure Execution guest image preparation"
+            )
+
+        pvimg_args = [
+            f"--{key}={value}"
+            for key, values in confidential_guest_args.items()
+            for value in values
+        ]
+        if "cck" in confidential_guest_args and self.test_uv_support(
+            self.PV_DUMP_SUPPORT
+        ):
+            if verbose:
+                sys.stderr.write(
+                    f"virtme: using CCK in '{confidential_guest_args['cck'][-1]}'\n"
+                )
+            pvimg_args += ["--enable-dump"]
+
+        # The image file has to outlive this function: QEMU reads it after
+        # we return, so the caller is responsible for closing (and thereby
+        # deleting) it once the guest has terminated.
+        # pylint: disable=consider-using-with
+        output = tempfile.NamedTemporaryFile(suffix="seimg")
+        prepare_cmd = [
+            "pvimg",
+            "create",
+            f"--kernel={kernel}",
+            f"--output={output.name}",
+            "--no-verify",
+            "--overwrite",
+        ] + pvimg_args
+        if initrd is not None:
+            prepare_cmd.append(f"--ramdisk={initrd}")
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(cmdline.encode("ascii"))
+            f.flush()
+            prepare_cmd.append(f"--parmfile={f.name}")
+            prepare_cmd_str = shlex.join(prepare_cmd)
+            if dry_run:
+                print(prepare_cmd_str)
+                output.close()
+                return None
+            result = subprocess.run(
+                prepare_cmd,
+                stderr=subprocess.PIPE,
+                text=True,
+                check=False,
+                close_fds=False,
+            )
+            if result.returncode != 0:
+                output.close()
+                sys.stderr.write(result.stderr)
+                raise RuntimeError(f"virtme-run: '{prepare_cmd_str}' failed")
+        return output
 
     def img_name(self) -> list[str]:
         return ["vmlinuz", "image"]
