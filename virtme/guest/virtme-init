@@ -268,6 +268,11 @@ mount_virtme_initmounts() {
 }
 
 run_systemd_tmpfiles() {
+    if [[ ${virtme_no_tmpfiles:-} == 1 ]]; then
+        log "systemd-tmpfiles disabled; skipping tmpfiles setup"
+        return
+    fi
+
     if [[ $$ -ne 1 ]]; then
         return
     fi
@@ -318,7 +323,9 @@ find_udevd() {
 run_udevd() {
     local udevd=''
 
-    find_udevd udevd
+    if [[ ${virtme_no_udev:-} != 1 ]]; then
+        find_udevd udevd
+    fi
 
     # Try to get udevd to coldplug everything.
     if [[ -n $udevd ]]; then
@@ -339,8 +346,10 @@ run_udevd() {
         udevadm settle --timeout=300
         log "udev is done"
     else
-        log "udevd not found"
+        log "udev disabled or udevd not found; skipping udev"
+        virtme_no_udev=1
         create_virtio_port_links
+        create_disk_links
     fi
 }
 
@@ -348,14 +357,103 @@ run_udevd() {
 # script I/O relies on, so do what udev's default rule does:
 # SUBSYSTEM=="virtio-ports", KERNEL=="vport*", ATTR{name}=="?*", SYMLINK+="virtio-ports/$attr{name}"
 create_virtio_port_links() {
-    local port name
+    local port name link
 
     for port in /sys/class/virtio-ports/vport*; do
         [[ -r "$port/name" ]] || continue
         name=$(< "$port/name")
         [[ -n $name ]] || continue
-        mkdir -p /dev/virtio-ports
-        ln -sf "../${port##*/}" "/dev/virtio-ports/$name"
+        link="/dev/virtio-ports/$name"
+        # A link may precede its device node; keep it for subsequent scans.
+        [[ -L $link || -e $link ]] && continue
+        [[ -d /dev/virtio-ports ]] || mkdir -p /dev/virtio-ports
+        ln -s "../${port##*/}" "$link"
+    done
+}
+
+# Ports and their name attributes arrive asynchronously. Without udev,
+# rescan until all script channels are ready, including the exit status.
+wait_for_virtio_ports() {
+    local uptime deadline name ready
+    local -a ports=(virtme.stdin virtme.stdout virtme.stderr
+        virtme.dev_stdout virtme.dev_stderr virtme.ret)
+    # Retain the legacy channel set when used with an older host.
+    if [[ -v virtme_script_ports ]]; then
+        IFS=, read -r -a ports <<< "$virtme_script_ports"
+    fi
+    # /proc/uptime provides a monotonic clock with centisecond precision.
+    # Count elapsed time, including the cost of scans under emulation.
+    read -r uptime _ < /proc/uptime
+    deadline=$((10#${uptime/./} + 500))
+    while :; do
+        ready=1
+        for name in "${ports[@]}"; do
+            if [[ ! -e "/dev/virtio-ports/$name" ]]; then
+                ready=0
+                break
+            fi
+        done
+        ((ready)) && break
+        read -r uptime _ < /proc/uptime
+        ((10#${uptime/./} >= deadline)) && break
+        create_virtio_port_links
+        sleep 0.05
+    done
+}
+
+# Sanitize an ID like udev: trim and squeeze whitespace into "_", then
+# replace characters that are not allowed in symlink names.
+udev_id() {
+    local id=$1
+
+    id="${id#"${id%%[![:space:]]*}"}"
+    id="${id%"${id##*[![:space:]]}"}"
+    id=$(tr -s '[:space:]' '_' <<< "$id")
+    id="${id%_}"
+    printf '%s' "${id//[^A-Za-z0-9#+.:=@_\/-]/_}"
+}
+
+# Link a block device and its partitions as /dev/disk/by-id/<id>[-partN].
+link_disk() {
+    local dev=$1 id=$2 part link up
+
+    for part in "$dev" "$dev/${dev##*/}"*; do
+        link="/dev/disk/by-id/$id"
+        if [[ $part != "$dev" ]]; then
+            [[ -r $part/partition ]] || continue
+            link+="-part$(< "$part/partition")"
+        fi
+        [[ -L $link || -e $link ]] && continue
+        # IDs may contain "/", which udev turns into subdirectories.
+        up="${id//[^\/]/}"
+        up="${up//\//../}"
+        mkdir -p "${link%/*}"
+        ln -s "../../$up${part##*/}" "$link"
+    done
+}
+
+# Without udev nothing creates the /dev/disk/by-id links documented for
+# --disk and --blk-disk, so do what udev's persistent storage rules do for
+# the disks provided by virtme.
+create_disk_links() {
+    local dev vendor model serial
+
+    for dev in /sys/block/vd*; do
+        [[ -r $dev/serial ]] || continue
+        serial=$(< "$dev/serial")
+        [[ -n $serial ]] || continue
+        link_disk "$dev" "virtio-$(udev_id "$serial")"
+    done
+
+    for dev in /sys/block/sd*; do
+        [[ -r $dev/device/vendor && -r $dev/device/vpd_pg80 ]] || continue
+        vendor=$(< "$dev/device/vendor")
+        [[ $vendor =~ ^virtme[[:space:]]*$ ]] || continue
+        model=$(< "$dev/device/model")
+        # Skip the 4-byte VPD page header.
+        serial=$(tail -c +5 "$dev/device/vpd_pg80")
+        [[ -n $serial ]] || continue
+        link_disk "$dev" "scsi-$(udev_id "0$vendor $model $serial")"
     done
 }
 
@@ -434,6 +532,21 @@ find_busybox() {
     fi
 }
 
+get_network_devices() {
+    local -n net_devices_ref=$1
+    local attempt
+
+    # Wait for driver registration and probing, but do not block boot if
+    # the driver or device is missing.
+    for ((attempt = 0; attempt < 100; attempt++)); do
+        net_devices_ref=(/sys/bus/virtio/drivers/virtio_net/virtio*/net/*)
+        ((${#net_devices_ref[@]} > 0)) && [[ -d ${net_devices_ref[0]} ]] && return 0
+        sleep 0.05
+    done
+    log "no virtio network interfaces found; check that virtio_net is loaded, skipping DHCP"
+    return 1
+}
+
 setup_network() {
     local pids=()
 
@@ -449,8 +562,11 @@ setup_network() {
             return 1
         fi
 
+        local net_devices=()
+        get_network_devices net_devices || return 1
+
         # udev is liable to rename the interface out from under us.
-        for d in /sys/bus/virtio/drivers/virtio_net/virtio*/net/*; do
+        for d in "${net_devices[@]}"; do
             virtme_net=$(basename -- "${d}")
             ip link set dev "$virtme_net" up
             udhcpc_opts=(-i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script")
@@ -523,6 +639,10 @@ poweroff_and_exit() {
 # Does not return when ports exist (runs script and poweroff).
 run_user_script() {
     local uid=$1
+
+    if [[ ${virtme_no_udev:-} == 1 ]]; then
+        wait_for_virtio_ports
+    fi
 
     if [[ ! -e "/dev/virtio-ports/virtme.stdin" ||
         ! -e "/dev/virtio-ports/virtme.stdout" ||

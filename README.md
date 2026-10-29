@@ -232,6 +232,31 @@ Examples
    $ vng -r
    ```
 
+ - Use a fast boot preset for small test workloads:
+   ```console
+   $ vng -r --fast-boot -- uname -r
+   ```
+   `--fast-boot` can also be written as `-F`. This skips `udev` and `tmpfiles`
+   setup and defaults to 4 CPUs.  It works with both guest inits and requires
+   kernel `devtmpfs` support.  An explicit CPU setting overrides the preset
+   regardless of argument order:
+   ```console
+   $ vng -r --fast-boot --cpus host -m 8G --network user --ssh
+   ```
+   With `--systemd`, `udev` and `tmpfiles` setup stay enabled. With `--numa`,
+   the preset leaves CPU sizing at its normal default unless supplied
+   explicitly, so it does not change the requested topology.
+
+   In fast boot mode, device permission rules, `udev` module loading and
+   hotplug rules are unavailable, and files, directories, permissions, and
+   symlinks normally configured by `tmpfiles` may be missing.
+
+   virtme-ng creates script I/O and `/dev/disk/by-id` links, and preloads
+   the virtio disk drivers for `--disk` and the virtio network and vsock
+   drivers for networking, SSH, or the remote console. Ensure other
+   required drivers are built in or loaded by the initramfs. Omit
+   `--fast-boot` if the workload needs the normal setup.
+
  - Test installed kernel 6.2.0-21-generic kernel
    (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
    ```console

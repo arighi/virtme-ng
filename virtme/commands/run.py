@@ -25,7 +25,7 @@ import threading
 from base64 import b64encode
 from pathlib import Path
 from shutil import copyfile, copytree, which
-from time import sleep
+from time import monotonic, sleep
 from typing import Any, NoReturn
 
 from virtme.cpu_topology import TopologyError, host_cpu_topology
@@ -417,6 +417,12 @@ def make_parser() -> "VirtmeArgumentParser":
         "--no-virtme-ng-init",
         action="store_true",
         help="Fallback to the bash virtme-init (useful for debugging/development)",
+    )
+    g.add_argument(
+        "--fast-boot",
+        "-F",
+        action="store_true",
+        help="Skip udev and tmpfiles setup in the guest",
     )
     g.add_argument(
         "--disable-monitor", action="store_true", help="Disable QEMU STDIO monitor"
@@ -949,21 +955,22 @@ class VirtioFS:
             + f"--socket-path {self.sock} --shared-dir {path} "
             + f"--sandbox none --cache {cache} {stderr} &"
         )
-        max_attempts = 5
-        check_duration = 0.1
-        for _ in range(max_attempts):
-            if os.path.exists(self.pid):
-                break
-            if verbose:
+        # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
+        # but avoid adding a full 100ms delay when the daemon starts quickly.
+        deadline = monotonic() + 3.1
+        waiting_logged = False
+        while not os.path.exists(self.pid):
+            remaining = deadline - monotonic()
+            if remaining <= 0:
+                if verbose:
+                    sys.stderr.write(
+                        "virtme-run: failed to start virtiofsd, fallback to 9p"
+                    )
+                return False
+            if verbose and not waiting_logged:
                 sys.stderr.write("virtme: waiting for virtiofsd to start\n")
-            sleep(check_duration)
-            check_duration *= 2
-        else:
-            if verbose:
-                sys.stderr.write(
-                    "virtme-run: failed to start virtiofsd, fallback to 9p"
-                )
-            return False
+                waiting_logged = True
+            sleep(min(0.01, remaining))
         return True
 
 
@@ -1627,10 +1634,26 @@ def do_it() -> int:
     if len(args.overlay_rwdir) > 0:
         virtmods.MODALIASES.append("overlay")
 
-    if args.root_disk is not None:
+    if args.net or args.server == "ssh":
+        # Networking must also work without udev to load the driver.
+        virtmods.MODALIASES.append("virtio_net")
+
+    if args.server == "console" or (
+        args.server == "ssh" and can_use_ssh_over_vsock(args.ssh_tcp)
+    ):
+        # The vsock core alone cannot communicate with the host. Include the
+        # virtio transport and its dependencies without relying on coldplug.
+        virtmods.MODALIASES.append("virtio:d00000013v00001AF4")
+
+    # Disks must also show up without udev to load their drivers.
+    if args.disk:
+        virtmods.MODALIASES.extend(["virtio_scsi", "sd_mod"])
+
+    if args.blk_disk or args.root_disk is not None:
         virtmods.MODALIASES.append("virtio_blk")
-        if args.root_fstype is not None:
-            virtmods.MODALIASES.append(f"fs-{args.root_fstype}")
+
+    if args.root_disk is not None and args.root_fstype is not None:
+        virtmods.MODALIASES.append(f"fs-{args.root_fstype}")
 
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles
@@ -2072,6 +2095,10 @@ def do_it() -> int:
     if args.empty_passwords:
         kernelargs.append("virtme_empty_passwords=1")
 
+    if args.fast_boot and not args.systemd:
+        kernelargs.append("virtme_no_udev=1")
+        kernelargs.append("virtme_no_tmpfiles=1")
+
     # Turn on KVM if available
     kvm_ok = can_use_kvm(args)
     if is_native:
@@ -2240,15 +2267,18 @@ def do_it() -> int:
         except FileNotFoundError:
             return None
 
-    def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
-        """Add a chardev, virtio-serial device, and virtserialport for script I/O."""
-        qemuargs.extend(["-chardev", chardev_spec])
-        qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
-        qemuargs.extend(
-            ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
-        )
-
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
+        script_ports = []
+
+        def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
+            """Add a serial port and record the channel expected by the guest."""
+            qemuargs.extend(["-chardev", chardev_spec])
+            qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
+            qemuargs.extend(
+                ["-device", f"virtserialport,name={port_name},chardev={chardev_id}"]
+            )
+            script_ports.append(port_name)
+
         if not args.video:
             if args.nvgpu is None:
                 qemuargs.extend(arch.qemu_nodisplay_args())
@@ -2337,6 +2367,10 @@ def do_it() -> int:
 
         if ret_path is not None:
             add_serial_port(f"file,id=ret,path={ret_path}", "ret", "virtme.ret")
+
+        # Console fallback has no script I/O channels, but may still have a
+        # return-code channel. Only wait for ports actually supplied by QEMU.
+        kernelargs.append(f"virtme_script_ports={','.join(script_ports)}")
 
         # Scripts shouldn't reboot and shouldn't hang on panic: make sure to
         # force an exit condition if a panic happens.
