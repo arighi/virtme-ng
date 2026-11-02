@@ -838,6 +838,14 @@ Troubleshooting
    `Connection refused` and the guest panicking. In this case, try disabling
    ACLs on the root virtiofs export with `--no-root-posix-acl`.
 
+ - A root filesystem owned by the invoking user (e.g. a prebuilt image
+   generated as a regular user with mkosi) is exported with the guest root
+   mapped to that user, so that the guest root matches the ownership of the
+   files. This drops the POSIX ACLs of the root virtiofs export, and files
+   below the top level that are owned by someone else show up as `nobody` in
+   the guest. To keep the previous ownership view, disable the mapping with
+   `--no-root-uid-map`.
+
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:
    ```console

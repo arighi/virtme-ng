@@ -160,6 +160,14 @@ def make_parser() -> "VirtmeArgumentParser":
         ),
     )
     g.add_argument(
+        "--no-root-uid-map",
+        action="store_true",
+        help=(
+            "Do not map the guest root to the owner of a user-owned root "
+            "filesystem (ignored with 9p or --root-disk)"
+        ),
+    )
+    g.add_argument(
         "--gdb",
         action="store",
         nargs="?",
@@ -1645,7 +1653,9 @@ def do_it() -> int:
                 # When sharing the host root (/), --posix-acl breaks UID/GID
                 # translation which causes authentication failures.
                 posix_acl=(has_external_root(args) and not args.no_root_posix_acl),
-                translate_uid=rootfs_needs_uid_translation(args.root),
+                translate_uid=(
+                    rootfs_needs_uid_translation(args.root) and not args.no_root_uid_map
+                ),
             )
             use_virtiofs = export_virtiofs(
                 virt_arch,

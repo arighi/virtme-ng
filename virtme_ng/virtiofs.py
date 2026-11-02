@@ -242,6 +242,10 @@ class VirtioFS:
                     f"--translate-uid=map:0:{os.getuid()}:1",
                     f"--translate-gid=map:0:{os.getgid()}:1",
                 ]
+                sys.stderr.write(
+                    f"virtme-run: mapping guest root to the owner of the "
+                    f"rootfs (uid {os.getuid()}, gid {os.getgid()})\n"
+                )
             else:
                 sys.stderr.write(
                     "virtme-run: virtiofsd does not support --translate-uid/--translate-gid; "

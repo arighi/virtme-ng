@@ -406,7 +406,9 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         # UID translation cannot be combined with POSIX ACLs.
         self.assertNotIn("--posix-acl", self.popen_argv)
         # ... which is announced, as the guest loses getfacl/setfacl semantics.
+        # The mapping itself is announced as well.
         messages = [call.args[0] for call in stderr.write.call_args_list]
+        self.assertTrue(any("mapping guest root" in msg for msg in messages))
         self.assertTrue(any("disabling POSIX ACLs" in msg for msg in messages))
 
     def test_translate_uid_without_translate_gid_is_unsupported(self):
