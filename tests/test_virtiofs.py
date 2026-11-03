@@ -563,7 +563,7 @@ class CleanupTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
 
-    def test_terminates_daemon_and_removes_temp_files(self):
+    def _make_virtio_fs(self):
         virtio_fs = VirtioFS("/nonexistent")
         virtio_fs.sock = os.path.join(self.tempdir.name, "virtme.sock")
         with open(virtio_fs.sock, "w", encoding="utf-8") as fd:
@@ -572,13 +572,31 @@ class CleanupTests(unittest.TestCase):
         # it as well even though it is unused.
         with open(virtio_fs.sock + ".pid", "w", encoding="utf-8") as fd:
             fd.write("4242")
+        return virtio_fs
+
+    def test_terminates_daemon_gracefully_and_removes_temp_files(self):
+        virtio_fs = self._make_virtio_fs()
         virtio_fs.proc = mock.MagicMock()
 
         virtio_fs.shutdown()
 
         virtio_fs.proc.terminate.assert_called_once_with()
+        virtio_fs.proc.kill.assert_not_called()
         self.assertFalse(os.path.exists(virtio_fs.sock))
         self.assertFalse(os.path.exists(virtio_fs.sock + ".pid"))
+
+    def test_kills_daemon_when_terminate_times_out(self):
+        virtio_fs = self._make_virtio_fs()
+        virtio_fs.proc = mock.MagicMock()
+        # Graceful shutdown times out, but the daemon is gone after SIGKILL.
+        virtio_fs.proc.wait.side_effect = [
+            subprocess.TimeoutExpired("virtiofsd", 5),
+            0,
+        ]
+
+        virtio_fs.shutdown()
+
+        virtio_fs.proc.kill.assert_called_once_with()
 
 
 if __name__ == "__main__":
