@@ -435,7 +435,7 @@ class CleanupTests(unittest.TestCase):
             fd.write("4242")
         virtio_fs.proc = mock.MagicMock()
 
-        virtio_fs._cleanup_virtiofs_temp_files()
+        virtio_fs.shutdown()
 
         virtio_fs.proc.terminate.assert_called_once_with()
         self.assertFalse(os.path.exists(virtio_fs.sock))

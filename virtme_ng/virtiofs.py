@@ -51,7 +51,7 @@ class VirtioFS:
         self.proc = None
         self.guest_tools_path = guest_tools_path
 
-    def _cleanup_virtiofs_temp_files(self):
+    def shutdown(self):
         # Make sure to kill virtiofsd instances that are still potentially running
         if self.proc is not None:
             try:
@@ -171,9 +171,9 @@ class VirtioFS:
         sock_fd, self.sock = tempfile.mkstemp(prefix="virtme", suffix=".sock")
         os.close(sock_fd)
 
-        # Make sure to clean up temp files before starting the daemon and at exit.
-        self._cleanup_virtiofs_temp_files()
-        atexit.register(self._cleanup_virtiofs_temp_files)
+        # Make sure to clean up before starting the daemon and at exit.
+        self.shutdown()
+        atexit.register(self.shutdown)
 
         # Export the whole root fs of the host, do not enable sandbox, otherwise we
         # would get permission errors.
