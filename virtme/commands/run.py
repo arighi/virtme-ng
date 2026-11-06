@@ -558,6 +558,7 @@ class Kernel:
         "version",
         "dtb",
         "modfiles",
+        "boot_modfiles",
         "moddir",
         "use_root_mods",
         "config",
@@ -567,6 +568,7 @@ class Kernel:
     version: str
     dtb: str | None
     modfiles: list[str]
+    boot_modfiles: list[str]
     moddir: str | None
     use_root_mods: bool
     config: dict[str, str] | None
@@ -648,6 +650,7 @@ def get_kernel_version(orig_path, img_name: str | None = None):
 def find_kernel_and_mods(arch, args) -> Kernel:
     kernel = Kernel()
     kernel.config = None
+    kernel.boot_modfiles = []
 
     kernel.use_root_mods = False
     if args.installed_kernel is not None:
@@ -752,8 +755,14 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                     modfiles = modfinder.find_modules_from_install(
                         virtmods.MODALIASES, root=mod_path, kver=kver
                     )
+                    boot_modfiles = modfinder.find_modules_from_install(
+                        virtmods.BOOT_MODALIASES, root=mod_path, kver=kver
+                    )
                     # Resolve out of mod_path before it's removed after `with` block
                     kernel.modfiles = [os.path.realpath(path) for path in modfiles]
+                    kernel.boot_modfiles = [
+                        os.path.realpath(path) for path in boot_modfiles
+                    ]
         kernel.dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
@@ -802,6 +811,9 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                 kernel.moddir = os.path.join(virtme_mods, "lib/modules", "0.0.0")
                 kernel.modfiles = modfinder.find_modules_from_install(
                     virtmods.MODALIASES, root=virtme_mods, kver="0.0.0"
+                )
+                kernel.boot_modfiles = modfinder.find_modules_from_install(
+                    virtmods.BOOT_MODALIASES, root=virtme_mods, kver="0.0.0"
                 )
             elif args.root != "/" and args.root_disk is None:
                 kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
@@ -1632,6 +1644,8 @@ def do_it() -> int:
     config = mkinitramfs.Config()
 
     if len(args.overlay_rwdir) > 0:
+        # Overlays are mounted by init before the module directory is set up.
+        virtmods.BOOT_MODALIASES.append("overlay")
         virtmods.MODALIASES.append("overlay")
 
     if args.net or args.server == "ssh":
@@ -1652,12 +1666,18 @@ def do_it() -> int:
     if args.blk_disk or args.root_disk is not None:
         virtmods.MODALIASES.append("virtio_blk")
 
-    if args.root_disk is not None and args.root_fstype is not None:
-        virtmods.MODALIASES.append(f"fs-{args.root_fstype}")
+    if args.root_disk is not None:
+        root_disk_aliases = ["virtio_blk"]
+        if args.root_fstype is not None:
+            root_disk_aliases.append(f"fs-{args.root_fstype}")
+        virtmods.BOOT_MODALIASES.extend(root_disk_aliases)
+        virtmods.MODALIASES.extend(root_disk_aliases)
 
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles
-    if config.modfiles:
+    # An external root is mounted by the kernel itself, so only require an
+    # initramfs if a module is needed before init; the others are loaded later.
+    if kernel.boot_modfiles or (config.modfiles and not has_external_root(args)):
         need_initramfs = True
 
     config.root_disk = args.root_disk is not None and need_initramfs
