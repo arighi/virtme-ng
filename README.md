@@ -257,6 +257,21 @@ Examples
    required drivers are built in or loaded by the initramfs. Omit
    `--fast-boot` if the workload needs the normal setup.
 
+ - Run a command and save the guest kernel serial console to a file:
+   ```console
+   $ vng -r --serial-log /tmp/serial.log -- my-test >out.log 2>err.log
+   $ grep -E 'BUG:|RIP:' /tmp/serial.log
+   ```
+   This is useful to capture kernel warnings, panics and crash reports that
+   would otherwise be discarded when `--verbose` is not used, or mixed with
+   the guest command's stderr when `--verbose` is used. Unlike
+   `vng -v -- my-test 2>serial.log`, the file holds only the guest console:
+   the command's stdout/stderr and QEMU's own diagnostics stay on the host
+   files, and the guest kernel command line is left unchanged (`--verbose`
+   replaces script mode's `quiet loglevel=1` with `loglevel=7`). The option
+   is only available in script mode; use `--verbose` (or pass
+   `ignore_loglevel` with `--append`) to include debug-level messages.
+
  - Test installed kernel 6.2.0-21-generic kernel
    (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
    ```console

@@ -316,7 +316,8 @@ def make_parser() -> "VirtmeArgumentParser":
         description="Using any of the scripting options will run a script in the guest. "
         + "The script's stdin will be attached to virtme-run's stdin and "
         + "the script's stdout and stderr will both be attached to virtme-run's stdout. "
-        + "Kernel logs will go to stderr.  This behaves oddly if stdin is a terminal; "
+        + "Kernel logs will go to stderr (or to the --serial-log file, if specified). "
+        + "This behaves oddly if stdin is a terminal; "
         + "try using 'cat |virtme-run' if you have trouble with script mode.",
     )
     g.add_argument(
@@ -412,6 +413,13 @@ def make_parser() -> "VirtmeArgumentParser":
         "--show-boot-console",
         action="store_true",
         help="Show the boot console when running scripts",
+    )
+    g.add_argument(
+        "--serial-log",
+        action="store",
+        metavar="FILE",
+        help="Write the guest kernel serial console to FILE when running "
+        "scripts (overrides --show-boot-console; FILE is truncated)",
     )
     g.add_argument(
         "--no-virtme-ng-init",
@@ -2120,6 +2128,13 @@ def do_it() -> int:
     if args.graphics is not None and args.script_sh is None:
         args.script_sh = args.graphics
 
+    if (
+        args.serial_log is not None
+        and args.script_sh is None
+        and args.script_exec is None
+    ):
+        arg_fail("--serial-log can only be used when running a script")
+
     if args.script_sh is None and args.script_exec is None:
         qemuargs.extend(["-echr", "1"])
 
@@ -2287,8 +2302,15 @@ def do_it() -> int:
             else:
                 qemuargs.extend(arch.qemu_nodisplay_nvgpu_args())
 
-        # Kernel console: where to send boot/console output.
-        if show_boot_console:
+        # Kernel console: where to send boot/console output.  A serial log
+        # takes precedence over --show-boot-console, so that the console can
+        # be captured without mixing it with the script output.
+        serial_log = None
+        if args.serial_log is not None:
+            serial_log = qemu.quote_optarg(args.serial_log)
+            console_output = serial_log
+            console_args = ()
+        elif show_boot_console:
             console_output = "/proc/self/fd/2"
             console_args = ()
         else:
@@ -2339,7 +2361,9 @@ def do_it() -> int:
                 file=sys.stderr,
                 flush=True,
             )
-            if show_boot_console:
+            if serial_log is not None:
+                qemuargs.extend(["-chardev", f"file,id=console,path={serial_log}"])
+            elif show_boot_console:
                 qemuargs.extend(["-chardev", "stdio,id=console,signal=off,mux=off"])
             else:
                 qemuargs.extend(["-chardev", "file,id=console,path=/dev/null"])
@@ -2348,7 +2372,7 @@ def do_it() -> int:
             kernelargs.extend(arch.earlyconsole_args())
             kernelargs.extend(console_args)
 
-            if not show_boot_console:
+            if not show_boot_console or args.serial_log is not None:
                 # This stdio backend is output-only: script input comes from
                 # /dev/null. Do not let EOF on host stdin disconnect stdout's
                 # virtserialport and block guest writes. Give QEMU an idle
@@ -2631,7 +2655,8 @@ def do_it() -> int:
         kernelargs.append("debug")
     elif args.verbose:
         kernelargs.append("loglevel=7")
-    else:
+    elif args.serial_log is None:
+        # Suppress the console unless it is being logged to a file.
         kernelargs.append("quiet")
         kernelargs.append("loglevel=1")
 
