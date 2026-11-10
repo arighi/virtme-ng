@@ -1,22 +1,25 @@
 [package]
 name = "virtme-ng-init"
 version = "0.1.0"
-edition = "2021"
-rust-version = "1.75.0"
+edition = "2024"
+rust-version = "1.90.0"
 
 [lints.rust]
 missing_docs = { level = "deny", priority = 1 }
 missing_debug_implementations = "warn"
 non_ascii_idents = "warn"
-nonstandard-style = "warn"
+nonstandard_style = "warn"
 trivial_numeric_casts = "warn"
 unstable_features = "warn"
 unused = "warn"
 unused_import_braces = "warn"
 unused_qualifications = "warn"
 
+[profile.release]
+strip = true
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-nix = { version = "0.29", features = ["feature", "fs", "hostname", "mount", "reboot", "user", "process"] }
-base64 = "0.22"
+nix = { version = "0.31", features = ["feature", "fs", "hostname", "mount", "reboot", "user", "process"] }
+base64 = "0.23"

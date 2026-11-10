@@ -11,24 +11,24 @@
 //!
 //! Author: Andrea Righi <andrea.righi@canonical.com>
 
-use base64::engine::general_purpose::STANDARD as BASE64;
 use base64::engine::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 
-use nix::fcntl::{open, OFlag};
+use nix::fcntl::{OFlag, open};
 use nix::libc;
 use nix::sys::reboot;
 use nix::sys::stat::Mode;
 use nix::sys::utsname::uname;
 use nix::sys::wait::wait;
 use nix::unistd::sethostname;
-use nix::unistd::{access, AccessFlags};
+use nix::unistd::{AccessFlags, access};
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
-use std::os::fd::{AsRawFd, OwnedFd};
+use std::os::fd::{AsRawFd, IntoRawFd, OwnedFd};
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
-use std::process::{exit, id, Command, Stdio};
+use std::process::{Command, Stdio, exit, id};
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -231,10 +231,12 @@ fn wait_for_child(child: i32) -> Option<i32> {
 
 fn configure_environment() {
     let defaults = "/run/current-system/sw/bin:/bin:/sbin:/usr/bin:/usr/sbin:/usr/local/bin";
-    match env::var("PATH") {
-        Ok(path) if !path.is_empty() => env::set_var("PATH", format!("{path}:{defaults}")),
-        _ => env::set_var("PATH", defaults),
-    }
+    let path = match env::var("PATH") {
+        Ok(path) if !path.is_empty() => format!("{path}:{defaults}"),
+        _ => defaults.to_string(),
+    };
+    // SAFETY: called at the very beginning of main(), before any other thread is spawned.
+    unsafe { env::set_var("PATH", path) };
 }
 
 fn get_kernel_version(show_machine: bool) -> String {
@@ -281,11 +283,11 @@ fn get_active_console() -> Option<String> {
 }
 
 fn configure_limits() {
-    if let Ok(nr_open) = env::var("nr_open") {
-        if let Ok(mut file) = OpenOptions::new().write(true).open("/proc/sys/fs/nr_open") {
-            file.write_all(nr_open.as_bytes())
-                .expect("Failed to write nr_open");
-        }
+    if let Ok(nr_open) = env::var("nr_open")
+        && let Ok(mut file) = OpenOptions::new().write(true).open("/proc/sys/fs/nr_open")
+    {
+        file.write_all(nr_open.as_bytes())
+            .expect("Failed to write nr_open");
     }
 }
 
@@ -483,10 +485,10 @@ fn can_run_busybox(path: &str) -> bool {
 }
 
 fn find_busybox() -> Option<String> {
-    if let Ok(path) = env::var("virtme_busybox") {
-        if can_run_busybox(&path) {
-            return Some(path);
-        }
+    if let Ok(path) = env::var("virtme_busybox")
+        && can_run_busybox(&path)
+    {
+        return Some(path);
     }
 
     let binaries = ["busybox-static", "busybox"];
@@ -499,10 +501,10 @@ fn find_busybox() -> Option<String> {
 }
 
 fn set_cwd() {
-    if let Ok(dir) = env::var("virtme_chdir") {
-        if let Err(err) = env::set_current_dir(dir) {
-            log!("error changing directory: {}", err);
-        }
+    if let Ok(dir) = env::var("virtme_chdir")
+        && let Err(err) = env::set_current_dir(dir)
+    {
+        log!("error changing directory: {}", err);
     }
 }
 
@@ -563,11 +565,11 @@ fn mount_kernel_filesystems() {
                 // systemd is the current init, skip mounting /run
                 continue;
             }
-            if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                if guest_tools_dir.starts_with("/run") {
-                    log!("/run previously mounted, skipping");
-                    continue;
-                }
+            if let Some(guest_tools_dir) = get_guest_tools_dir()
+                && guest_tools_dir.starts_with("/run")
+            {
+                log!("/run previously mounted, skipping");
+                continue;
             }
             saved_run_symlinks = save_run_symlinks();
         }
@@ -783,7 +785,8 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         Some(handle)
     } else {
         log!("udev disabled or udevd not found; skipping udev");
-        env::set_var("virtme_no_udev", "1");
+        // SAFETY: called at the beginning of main(), before any other thread is spawned.
+        unsafe { env::set_var("virtme_no_udev", "1") };
         create_virtio_port_links();
         create_disk_links();
         None
@@ -954,10 +957,10 @@ fn _get_network_devices_from_entries(entries: std::fs::ReadDir) -> Vec<String> {
         }
         if let Ok(net_entries) = std::fs::read_dir(path.join("net")) {
             // .flatten() ignores lines with reading errors
-            if let Some(entry) = net_entries.flatten().next() {
-                if let Some(fname) = entry.path().file_name() {
-                    vec.push(fname.to_string_lossy().to_string());
-                }
+            if let Some(entry) = net_entries.flatten().next()
+                && let Some(fname) = entry.path().file_name()
+            {
+                vec.push(fname.to_string_lossy().to_string());
             }
         }
     }
@@ -1109,8 +1112,11 @@ fn run_user_script(uid: u32) -> bool {
         }
 
         // Detach the process from the controlling terminal
-        let open_tty =
-            |path| open(path, OFlag::O_RDWR, Mode::empty()).expect("failed to open console.");
+        let open_tty = |path| {
+            open(path, OFlag::O_RDWR, Mode::empty())
+                .expect("failed to open console.")
+                .into_raw_fd()
+        };
         let tty_in = open_tty("/dev/virtio-ports/virtme.stdin");
         let tty_out = open_tty("/dev/virtio-ports/virtme.stdout");
         let tty_err = open_tty("/dev/virtio-ports/virtme.stderr");
@@ -1177,10 +1183,11 @@ fn create_user_script(cmd: &str) {
 fn run_user_script_on_console(consdev: &str, uid: u32) {
     let flags = OFlag::O_RDWR;
     let mode = Mode::empty();
-    let tty_fd = open(consdev, flags, mode).expect("failed to open console for script");
+    let tty_fd = open(consdev, flags, mode)
+        .expect("failed to open console for script")
+        .into_raw_fd();
 
     utils::do_chown(consdev, uid, None).ok();
-    clear_virtme_envs();
 
     let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
     let (cmd, args) = if user.is_empty() {
@@ -1189,6 +1196,7 @@ fn run_user_script_on_console(consdev: &str, uid: u32) {
         ("su", vec!["-c", USER_SCRIPT, "--", user.as_str()])
     };
 
+    clear_virtme_envs();
     log!("starting script (console fallback)");
     unsafe {
         let ret = Command::new(cmd)
@@ -1231,12 +1239,12 @@ fn run_user_script_on_console(consdev: &str, uid: u32) {
 /// Returns true if we are in script mode but could not run the script (script I/O ports missing).
 /// Caller should then run the script on the console and poweroff.
 fn setup_user_script(uid: u32) -> bool {
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if let Some(cmd) = extract_user_script(&cmdline) {
-            create_user_script(&cmd);
-            if env::var("virtme_graphics").is_err() && !run_user_script(uid) {
-                return true; // script mode but ports missing
-            }
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline")
+        && let Some(cmd) = extract_user_script(&cmdline)
+    {
+        create_user_script(&cmd);
+        if env::var("virtme_graphics").is_err() && !run_user_script(uid) {
+            return true; // script mode but ports missing
         }
     }
     false
@@ -1244,20 +1252,30 @@ fn setup_user_script(uid: u32) -> bool {
 
 fn setup_root_home() {
     // Set up a basic environment (unless virtme-ng is running as root on the host)
-    if env::var("virtme_root_user").is_err() {
+    let home = if env::var("virtme_root_user").is_err() {
         utils::do_mkdir("/run/tmp/roothome");
         utils::do_mount("/run/tmp/roothome", "/root", "", libc::MS_BIND as usize, "");
-        env::set_var("HOME", "/run/tmp/roothome");
+        "/run/tmp/roothome"
     } else {
-        env::set_var("HOME", "/root");
-    }
+        "/root"
+    };
+    // SAFETY: only called after all the service threads have been joined. The only thread that
+    // is still running is the vsock proxy (see setup_socat_console()), which doesn't read the
+    // environment itself: it only spawns socat, and std serializes Command::spawn() with
+    // set_var()/remove_var() via its internal environment lock.
+    unsafe { env::set_var("HOME", home) };
 }
 
 fn clear_virtme_envs() {
     // Parameters that start with virtme_* shouldn't pollute the environment.
     for (key, _) in env::vars() {
         if key.starts_with("virtme_") {
-            env::remove_var(key);
+            // SAFETY: only called after all the service threads have been joined. The only
+            // thread that is still running is the vsock proxy (see setup_socat_console()),
+            // which doesn't read the environment itself: it only spawns socat, and std
+            // serializes Command::spawn() with set_var()/remove_var() via its internal
+            // environment lock.
+            unsafe { env::remove_var(key) };
         }
     }
 }
@@ -1349,12 +1367,11 @@ fn run_user_gui(tty_fd: libc::c_int) {
 
     // Check if we need to start the sound system.
     let mut pre_exec_cmd: String = String::new();
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if cmdline.contains("virtme.sound") {
-            if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                pre_exec_cmd = format!("{guest_tools_dir}/virtme-sound-script");
-            }
-        }
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline")
+        && cmdline.contains("virtme.sound")
+        && let Some(guest_tools_dir) = get_guest_tools_dir()
+    {
+        pre_exec_cmd = format!("{guest_tools_dir}/virtme-sound-script");
     }
     if let Err(err) = utils::create_file(
         xinitrc,
@@ -1391,7 +1408,11 @@ fn init_xdg_runtime_dir(uid: u32) {
     let dir = format!("/run/user/{uid}");
     utils::do_mkdir(&dir);
     utils::do_chown(&dir, uid, None).ok();
-    env::set_var("XDG_RUNTIME_DIR", dir);
+    // SAFETY: only called after all the service threads have been joined. The only thread that
+    // is still running is the vsock proxy (see setup_socat_console()), which doesn't read the
+    // environment itself: it only spawns socat, and std serializes Command::spawn() with
+    // set_var()/remove_var() via its internal environment lock.
+    unsafe { env::set_var("XDG_RUNTIME_DIR", dir) };
 }
 
 fn run_user_shell(tty_fd: libc::c_int) {
@@ -1415,7 +1436,9 @@ fn run_user_shell(tty_fd: libc::c_int) {
 fn run_user_session(consdev: &str) {
     let flags = OFlag::O_RDWR | OFlag::O_NONBLOCK;
     let mode = Mode::empty();
-    let tty_fd = open(consdev, flags, mode).expect("failed to open console");
+    let tty_fd = open(consdev, flags, mode)
+        .expect("failed to open console")
+        .into_raw_fd();
 
     if env::var("virtme_graphics").is_ok() {
         run_user_gui(tty_fd);
@@ -1430,7 +1453,12 @@ fn setup_user_session() {
             Some(id) => id,
             None => {
                 log!("user '{}' not found in guest, falling back to root", user);
-                env::remove_var("virtme_user");
+                // SAFETY: only called after all the service threads have been joined. The only
+                // thread that is still running is the vsock proxy (see setup_socat_console()),
+                // which doesn't read the environment itself: it only spawns socat, and std
+                // serializes Command::spawn() with set_var()/remove_var() via its internal
+                // environment lock.
+                unsafe { env::remove_var("virtme_user") };
                 0
             }
         },
@@ -1462,46 +1490,45 @@ fn setup_user_session() {
 }
 
 fn run_sshd() {
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if cmdline.contains("virtme.ssh") {
-            if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                utils::run_cmd(format!("{guest_tools_dir}/virtme-sshd-script"), &[]);
-            }
-        }
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline")
+        && cmdline.contains("virtme.ssh")
+        && let Some(guest_tools_dir) = get_guest_tools_dir()
+    {
+        utils::run_cmd(format!("{guest_tools_dir}/virtme-sshd-script"), &[]);
     }
 }
 
 fn run_snapd() {
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if cmdline.contains("virtme.snapd") {
-            // If snapd is present in the system try to start it, to properly support snaps.
-            let snapd_bin = "/usr/lib/snapd/snapd";
-            if !Path::new(snapd_bin).exists() {
-                return;
-            }
-            let snapd_state = "/var/lib/snapd/state.json";
-            if !Path::new(snapd_state).exists() {
-                return;
-            }
-            if let Some(guest_tools_dir) = get_guest_tools_dir() {
-                utils::run_cmd(format!("{guest_tools_dir}/virtme-snapd-script"), &[]);
-            }
-            Command::new(snapd_bin)
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline")
+        && cmdline.contains("virtme.snapd")
+    {
+        // If snapd is present in the system try to start it, to properly support snaps.
+        let snapd_bin = "/usr/lib/snapd/snapd";
+        if !Path::new(snapd_bin).exists() {
+            return;
+        }
+        let snapd_state = "/var/lib/snapd/state.json";
+        if !Path::new(snapd_state).exists() {
+            return;
+        }
+        if let Some(guest_tools_dir) = get_guest_tools_dir() {
+            utils::run_cmd(format!("{guest_tools_dir}/virtme-snapd-script"), &[]);
+        }
+        Command::new(snapd_bin)
+            .stdin(Stdio::null())
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .ok();
+        let snapd_apparmor_bin = "/usr/lib/snapd/snapd-apparmor";
+        if Path::new(snapd_apparmor_bin).exists() {
+            Command::new(snapd_apparmor_bin)
+                .arg("start")
                 .stdin(Stdio::null())
                 .stdout(Stdio::null())
                 .stderr(Stdio::null())
-                .spawn()
+                .output()
                 .ok();
-            let snapd_apparmor_bin = "/usr/lib/snapd/snapd-apparmor";
-            if Path::new(snapd_apparmor_bin).exists() {
-                Command::new(snapd_apparmor_bin)
-                    .arg("start")
-                    .stdin(Stdio::null())
-                    .stdout(Stdio::null())
-                    .stderr(Stdio::null())
-                    .output()
-                    .ok();
-            }
         }
     }
 }
@@ -1516,27 +1543,30 @@ fn extract_vsock_exec(cmdline: &str) -> Option<String> {
 }
 
 fn setup_socat_console() {
-    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline") {
-        if let Some(exec) = extract_vsock_exec(&cmdline) {
-            thread::spawn(move || {
-                log!("setting up vsock proxy executing {}", exec);
-                let key = "virtme_vsockmount";
-                if let Ok(path) = env::var(key) {
-                    let fstype_key = format!("{key}_fstype");
-                    let access_key = format!("{key}_access");
-                    let fstype = env::var(fstype_key).unwrap_or_else(|_| "9p".to_string());
-                    let access = env::var(access_key).unwrap_or_else(|_| "ro".to_string());
+    if let Ok(cmdline) = std::fs::read_to_string("/proc/cmdline")
+        && let Some(exec) = extract_vsock_exec(&cmdline)
+    {
+        // Read the environment here: this thread is never joined and keeps running while the user
+        // session modifies the environment (see the SAFETY comments on env::set_var() and
+        // env::remove_var()), so it must not read the environment itself.
+        let key = "virtme_vsockmount";
+        let mount = env::var(key).ok().map(|path| {
+            let fstype = env::var(format!("{key}_fstype")).unwrap_or_else(|_| "9p".to_string());
+            let access = env::var(format!("{key}_access")).unwrap_or_else(|_| "ro".to_string());
+            (path, fstype, access)
+        });
+        thread::spawn(move || {
+            log!("setting up vsock proxy executing {}", exec);
+            if let Some((path, fstype, access)) = mount {
+                utils::do_mkdir(&path);
+                mount_hostfs(&key.replace('_', "."), &path, &fstype, &access);
+            }
 
-                    utils::do_mkdir(&path);
-                    mount_hostfs(&key.replace('_', "."), &path, &fstype, &access);
-                }
-
-                let from = "VSOCK-LISTEN:1024,reuseaddr,fork";
-                let to = format!("EXEC:\"{exec}\",pty,stderr,setsid,sigint,sane,echo=0");
-                let args = vec![from, &to];
-                utils::run_cmd("socat", &args);
-            });
-        }
+            let from = "VSOCK-LISTEN:1024,reuseaddr,fork";
+            let to = format!("EXEC:\"{exec}\",pty,stderr,setsid,sigint,sane,echo=0");
+            let args = vec![from, &to];
+            utils::run_cmd("socat", &args);
+        });
     }
 }
 
