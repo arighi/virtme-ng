@@ -53,6 +53,23 @@ from .. import (
 from ..util import SilentError, find_binary_or_raise, get_username
 
 
+class kwargsAppendAction(argparse.Action):
+    def __call__(self, parser, namespace, pairs, option_string=None):
+        assert len(pairs) > 0
+        for pair in pairs:
+            try:
+                key, value = pair.split("=", 1)
+            except ValueError as error:
+                raise argparse.ArgumentError(
+                    self, f'could not parse argument "{pair}" as key=value format'
+                ) from error
+            d = dict(getattr(namespace, self.dest) or {})
+            values = d.get(key, [])
+            values.append(value)
+            d[key] = values
+            setattr(namespace, self.dest, d)
+
+
 def make_parser() -> "VirtmeArgumentParser":
     parser = VirtmeArgumentParser(
         description="Virtualize your system (or another) under a kernel image",
@@ -407,6 +424,19 @@ def make_parser() -> "VirtmeArgumentParser":
         "--save-initramfs",
         action="store",
         help="Save the generated initramfs to the specified path",
+    )
+    g.add_argument(
+        "--confidential-guest",
+        action="store_true",
+        help="Prepare image for confidential guest",
+    )
+    g.add_argument(
+        "--confidential-guest-args",
+        nargs="+",
+        action=kwargsAppendAction,
+        default={},
+        metavar="KEY=VALUE",
+        help="Add key/value params. May appear multiple times.",
     )
     g.add_argument(
         "--show-boot-console",
@@ -2652,8 +2682,29 @@ def do_it() -> int:
     # sure that 'init=' appears directly before '--'.
     kernelargs.extend(initcmds)
 
-    # Load a normal kernel
-    qemuargs.extend(["-kernel", kernel.kimg])
+    kernel_cmdline = " ".join(quote_karg(a) for a in kernelargs)
+    confidential_img = None
+    if args.confidential_guest:
+        try:
+            qemuargs.extend(
+                arch.qemu_confidential_guest_args(is_native=is_native, use_kvm=kvm_ok)
+            )
+            confidential_img = arch.qemu_confidential_guest_img_preparation(
+                kernel=kernel.kimg,
+                cmdline=kernel_cmdline,
+                initrd=initrdpath,
+                dry_run=args.dry_run,
+                verbose=args.verbose,
+                confidential_guest_args=args.confidential_guest_args,
+            )
+        except RuntimeError as err:
+            arg_fail(f"virtme-run: {err}")
+        kimg = confidential_img.name if confidential_img is not None else kernel.kimg
+    else:
+        kimg = kernel.kimg
+
+    # Load the kernel
+    qemuargs.extend(["-kernel", kimg])
     if kernelargs:
         if args.systemd:
             assert serial_getty_dir is not None
@@ -2680,8 +2731,12 @@ ExecStart="""
                     f.write(f"\nExecStart={guest_tools_path}/{virtme_init_cmd}")
                 else:
                     f.write(f"\nExecStart=/run/virtme/guesttools/{virtme_init_cmd}")
-        qemuargs.extend(["-append", " ".join(quote_karg(a) for a in kernelargs)])
-    if initrdpath is not None:
+        if confidential_img is None:
+            qemuargs.extend(["-append", kernel_cmdline])
+    # The kernel command line and the initrd are baked into the confidential
+    # guest image (--parmfile/--ramdisk); passing them again would leak the
+    # plaintext command line and duplicate the initrd.
+    if initrdpath is not None and confidential_img is None:
         qemuargs.extend(["-initrd", initrdpath])
     if kernel.dtb is not None:
         qemuargs.extend(["-dtb", kernel.dtb])
@@ -2705,6 +2760,9 @@ ExecStart="""
                 _spawn_pin_thread(args)
             try:
                 pid, status = os.waitpid(pid, 0)
+                if confidential_img is not None:
+                    # Deletes the temporary confidential guest image.
+                    confidential_img.close()
                 ret = fetch_script_retcode()
                 if ret is not None:
                     return ret
