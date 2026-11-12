@@ -19,9 +19,16 @@ jobs:
       - run: sudo apt-get update
       - run: |
           sudo apt-get install --yes --no-install-recommends \
-             git qemu-kvm udev iproute2 busybox-static coreutils \
+             git qemu-system-x86 udev iproute2 busybox-static coreutils \
              python3-requests python3-argcomplete libvirt-clients kbd kmod \
              file rsync zstd virtiofsd
+
+      # Ubuntu's patched Rust env can reject guest init execution via virtiofs.
+      - name: "Use GNU env when available"
+        run: |
+          if [ -x /usr/bin/gnuenv ]; then
+            sudo ln -sf gnuenv /usr/bin/env
+          fi
 
       ### END DEPENDENCIES ###
 
@@ -46,3 +53,16 @@ jobs:
         run: |
           clocksource="/sys/devices/system/clocksource/clocksource0/current_clocksource"
           [ "$(./vng -r v6.6 -v -- cat "${clocksource}")" = "kvm-clock" ]
+
+      - name: "Python unit tests"
+        timeout-minutes: 10
+        run: |
+          test -x virtme/guest/bin/virtme-ng-init
+
+          # Reuse the downloaded kernel and exercise both guest init implementations.
+          arch=$(dpkg --print-architecture)
+          bzimage=$(printf '%s\n' "$HOME"/.cache/virtme-ng/v*/"${arch}"/boot/vmlinuz-* | sort -V | tail -n1)
+          test -r "${bzimage}"
+
+          VIRTME_TEST_KERNEL="${bzimage}" \
+              python3 -m unittest discover -s tests -v

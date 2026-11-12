@@ -2251,6 +2251,7 @@ def do_it() -> int:
         qemuargs.extend(["-qmp", f"tcp:localhost:{args.qmp},server,nowait"])
 
     ret_path = None
+    script_output_only = False
 
     def cleanup_script_retcode():
         os.unlink(ret_path)
@@ -2268,6 +2269,7 @@ def do_it() -> int:
             return None
 
     def do_script(shellcmd: str, ret_path=None, show_boot_console=False) -> None:
+        nonlocal script_output_only
         script_ports = []
 
         def add_serial_port(chardev_spec: str, chardev_id: str, port_name: str) -> None:
@@ -2347,6 +2349,11 @@ def do_it() -> int:
             kernelargs.extend(console_args)
 
             if not show_boot_console:
+                # This stdio backend is output-only: script input comes from
+                # /dev/null. Do not let EOF on host stdin disconnect stdout's
+                # virtserialport and block guest writes. Give QEMU an idle
+                # input pipe, kept open by the parent until QEMU exits.
+                script_output_only = True
                 add_serial_port("file,id=stdin,path=/dev/null", "stdin", "virtme.stdin")
                 add_serial_port(
                     "stdio,id=stdout,signal=off,mux=off", "stdout", "virtme.stdout"
@@ -2699,8 +2706,11 @@ ExecStart="""
 
     # Go!
     if not args.dry_run:
+        stdin_keepalive = os.pipe() if script_output_only else None
         pid = os.fork()
         if pid:
+            if stdin_keepalive is not None:
+                os.close(stdin_keepalive[0])
             if args.pin:
                 _spawn_pin_thread(args)
             try:
@@ -2717,7 +2727,16 @@ ExecStart="""
             except KeyboardInterrupt:
                 sys.stderr.write("Interrupted.")
                 sys.exit(1)
+            finally:
+                if stdin_keepalive is not None:
+                    os.close(stdin_keepalive[1])
         else:
+            if stdin_keepalive is not None:
+                os.close(stdin_keepalive[1])
+                os.dup2(stdin_keepalive[0], 0)
+                if stdin_keepalive[0] != 0:
+                    os.close(stdin_keepalive[0])
+                os.set_inheritable(0, True)
             os.execv(qemu.qemubin, qemuargs)
     return 0
 
