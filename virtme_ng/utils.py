@@ -24,6 +24,11 @@ CONF_FILE = Path(CONF_PATH, "virtme-ng.conf")
 # for s390x hosts.
 KERNEL_CMDLINE_MAX = 896
 
+# Standard file descriptor numbers.
+STDIN_FILENO = 0
+STDOUT_FILENO = 1
+STDERR_FILENO = 2
+
 # NOTE: this must stay in sync with README.md
 CONF_DEFAULT = {
     "default_opts": {},
