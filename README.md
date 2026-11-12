@@ -957,7 +957,7 @@ Troubleshooting
    [ 1.344221] CPU: 0 UID: 0 PID: 1 Comm: virtme-init Not tainted 7.0.0-22-generic #22-Ubuntu PREEMPT(lazy)
    ```
    That's because of a security patch only applied in Ubuntu, see this
-   [bug report](https://bugs.launchpad.net/ubuntu/+source/rust-coreutils/+bug/2137745).
+   [bug report](https://bugs.launchpad.net/ubuntu/+source/rust-coreutils/+bug/2171960).
    A workaround:
    ```console
    $ sudo ln -sf gnuenv /usr/bin/env
