@@ -2749,8 +2749,8 @@ ExecStart="""
         else:
             if stdin_keepalive is not None:
                 os.close(stdin_keepalive[1])
-                os.dup2(stdin_keepalive[0], STDIN_FILENO)
                 if stdin_keepalive[0] != STDIN_FILENO:
+                    os.dup2(stdin_keepalive[0], STDIN_FILENO)
                     os.close(stdin_keepalive[0])
                 os.set_inheritable(STDIN_FILENO, True)
             os.execv(qemu.qemubin, qemuargs)
