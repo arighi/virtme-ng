@@ -373,9 +373,6 @@ class VirtiofsdLifetimeTests(unittest.TestCase):
         )
         self.assertTrue(outcome.daemon_gone, "virtiofsd outlived virtme-run")
 
-    # Known bug: SIGHUP is not handled, so virtme-run is killed by it without running
-    # its exit handlers and leaves its temporary files behind.
-    @unittest.expectedFailure
     def test_ssh_disconnect_shuts_virtme_run_down_cleanly(self):
         # SIGHUP must be handled like SIGTERM, so that the exit handlers run:
         # virtme-run does not die with a traceback because the terminal is gone and
