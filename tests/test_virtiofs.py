@@ -11,6 +11,7 @@ import tempfile
 import unittest
 from unittest import mock
 
+from virtme.commands.run import rootfs_needs_uid_translation
 from virtme_ng.virtiofs import (
     _VIRTIOFSD_HELP,
     VirtioFS,
@@ -493,6 +494,66 @@ class IsSocketTests(unittest.TestCase):
     def test_false_for_missing_path(self):
         path = os.path.join(self.tempdir.name, "nonexistent")
         self.assertFalse(VirtioFS._is_socket(path))
+
+
+class RootfsNeedsUidTranslationTests(unittest.TestCase):
+    def setUp(self):
+        self.tempdir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.tempdir.cleanup)
+
+    @staticmethod
+    def _stat_as(uid, gid):
+        st = mock.MagicMock()
+        st.st_uid = uid
+        st.st_gid = gid
+        return mock.patch("virtme.commands.run.os.stat", return_value=st)
+
+    def test_user_owned_rootfs_needs_translation(self):
+        with (
+            mock.patch("virtme.commands.run.os.getuid", return_value=1000),
+            mock.patch("virtme.commands.run.os.getgid", return_value=1000),
+            self._stat_as(1000, 1000),
+        ):
+            self.assertTrue(rootfs_needs_uid_translation(self.tempdir.name))
+
+    def test_foreign_owned_rootfs_needs_no_translation(self):
+        with (
+            mock.patch("virtme.commands.run.os.getuid", return_value=1000),
+            mock.patch("virtme.commands.run.os.getgid", return_value=1000),
+            self._stat_as(0, 0),
+        ):
+            self.assertFalse(rootfs_needs_uid_translation(self.tempdir.name))
+
+    def test_mixed_ownership_rootfs_needs_no_translation(self):
+        # The top-level directory belongs to the user, but not its content.
+        os.mkdir(os.path.join(self.tempdir.name, "usr"))
+        foreign = mock.MagicMock(st_uid=0, st_gid=0)
+        with (
+            mock.patch("virtme.commands.run.os.getuid", return_value=1000),
+            mock.patch("virtme.commands.run.os.getgid", return_value=1000),
+            self._stat_as(1000, 1000),
+            mock.patch("virtme.commands.run.os.lstat", return_value=foreign),
+        ):
+            self.assertFalse(rootfs_needs_uid_translation(self.tempdir.name))
+
+    def test_uniformly_user_owned_rootfs_needs_translation(self):
+        os.mkdir(os.path.join(self.tempdir.name, "usr"))
+        owned = mock.MagicMock(st_uid=1000, st_gid=1000)
+        with (
+            mock.patch("virtme.commands.run.os.getuid", return_value=1000),
+            mock.patch("virtme.commands.run.os.getgid", return_value=1000),
+            self._stat_as(1000, 1000),
+            mock.patch("virtme.commands.run.os.lstat", return_value=owned),
+        ):
+            self.assertTrue(rootfs_needs_uid_translation(self.tempdir.name))
+
+    def test_root_invocation_never_needs_translation(self):
+        with mock.patch("virtme.commands.run.os.getuid", return_value=0):
+            self.assertFalse(rootfs_needs_uid_translation(self.tempdir.name))
+
+    def test_missing_path_returns_false(self):
+        path = os.path.join(self.tempdir.name, "nonexistent")
+        self.assertFalse(rootfs_needs_uid_translation(path))
 
 
 class CleanupTests(unittest.TestCase):

@@ -1053,6 +1053,71 @@ def has_external_root(args) -> bool:
     return args.root != "/" or args.root_disk is not None
 
 
+def _rootfs_ownership(path: str) -> tuple[int, int] | None:
+    """Return the (uid, gid) owning the rootfs at PATH.
+
+    Return None when the ownership cannot be determined, or when running
+    as root: the guest root maps onto the host root naturally there, so
+    no ownership heuristic applies.
+    """
+    if os.getuid() == 0:
+        return None
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    return (st.st_uid, st.st_gid)
+
+
+# Entries probed besides the root directory: a rootfs only owned by the user
+# at its top level (e.g. a fakeroot image or a tarball with numeric owners)
+# would not be fixed by mapping the guest root alone.
+_ROOTFS_PROBE_ENTRIES = ("etc", "usr", "bin", "sbin", "lib", "var")
+
+
+def rootfs_needs_uid_translation(path: str) -> bool:
+    """Detect a rootfs that is entirely owned by the invoking user.
+
+    Prebuilt rootfs images generated as a regular user (e.g. with mkosi)
+    are owned by that user instead of root, so the guest's root would not
+    match the files' ownership: map guest root to the owner in that case.
+    Only the root directory and a few well-known top-level entries are
+    checked; the mapping only helps when they all belong to the user. This
+    is a heuristic: files deeper in the tree (e.g. below /home or /opt)
+    owned by someone else show up as nobody in the guest.
+    """
+    owner = (os.getuid(), os.getgid())
+    if _rootfs_ownership(path) != owner:
+        return False
+    for name in _ROOTFS_PROBE_ENTRIES:
+        try:
+            # Do not follow symlinks: absolute ones point to the host.
+            st = os.lstat(os.path.join(path, name))
+        except OSError:
+            continue
+        if (st.st_uid, st.st_gid) != owner:
+            return False
+    return True
+
+
+def warn_rootfs_owner_mismatch(path: str) -> None:
+    """Warn when PATH is owned by anyone but the invoking user or root.
+
+    The guest root can only be mapped onto the owner of the rootfs when
+    the unprivileged virtiofsd is able to act as that user, i.e. when it
+    is the invoking user (uid and gid): any other ownership keeps its
+    original form inside the guest, and the guest root may not match it.
+    """
+    ownership = _rootfs_ownership(path)
+    if ownership is None or ownership in ((os.getuid(), os.getgid()), (0, 0)):
+        return
+    sys.stderr.write(
+        f"virtme-run: rootfs is owned by uid {ownership[0]}, gid {ownership[1]}, "
+        f"but virtme-ng runs as uid {os.getuid()}, gid {os.getgid()}: the "
+        f"guest root may not match the rootfs ownership\n"
+    )
+
+
 def detect_disk_format(path: str, verbose: bool = False) -> str:
     """Return the QEMU image format of PATH, defaulting to raw."""
     try:
@@ -1580,6 +1645,7 @@ def do_it() -> int:
                 # When sharing the host root (/), --posix-acl breaks UID/GID
                 # translation which causes authentication failures.
                 posix_acl=(has_external_root(args) and not args.no_root_posix_acl),
+                translate_uid=rootfs_needs_uid_translation(args.root),
             )
             use_virtiofs = export_virtiofs(
                 virt_arch,
@@ -1588,6 +1654,10 @@ def do_it() -> int:
                 virtiofs_config,
                 verbose=args.verbose,
             )
+            # Only relevant when virtiofsd is actually used: with 9p the
+            # ownership is passed through unchanged.
+            if use_virtiofs and has_external_root(args):
+                warn_rootfs_owner_mismatch(args.root)
         if can_use_microvm(args) and use_virtiofs:
             if args.verbose:
                 sys.stderr.write("virtme: use 'microvm' QEMU architecture\n")
