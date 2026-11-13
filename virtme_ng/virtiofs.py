@@ -53,11 +53,16 @@ class VirtioFSConfig:
         *,
         rw: bool = False,
         posix_acl: bool = False,
+        translate_uid: bool = False,
     ):
         self.path = path
         self.mount_tag = mount_tag
         self.rw = rw
         self.posix_acl = posix_acl
+        # Map guest root to the invoking user (uid/gid). This is meant for a
+        # rootfs entirely owned by the invoking user: the mapping target is
+        # not derived from the owner of the shared directory.
+        self.translate_uid = translate_uid
 
     @property
     def readonly(self) -> bool:
@@ -183,9 +188,15 @@ class VirtioFS:
     def _supports_readonly(path):
         return VirtioFS._supports_flag(path, "--readonly")
 
-    def _report_9p_fallback(self, verbose):
-        if verbose:
+    def _report_9p_fallback(self, verbose, uid_mapped=False):
+        # A lost UID mapping changes what the guest sees, so it is announced
+        # unconditionally.
+        if verbose or uid_mapped:
             sys.stderr.write("virtme-run: failed to start virtiofsd, fallback to 9p\n")
+        if uid_mapped:
+            sys.stderr.write(
+                "virtme-run: the guest root is not mapped to the invoking user\n"
+            )
 
     def start(self, config: VirtioFSConfig, verbose=True):
         virtiofsd_path = self._get_virtiofsd_path()
@@ -211,6 +222,31 @@ class VirtioFS:
         # which causes authentication failures (e.g., unix_chkpwd cannot obtain
         # user info).
         acl_opt = ["--posix-acl"] if config.posix_acl else []
+        # A rootfs entirely owned by the invoking user (e.g. a prebuilt
+        # image generated with mkosi as a regular user) needs the guest's
+        # root to be mapped to that user, otherwise the guest's root does
+        # not match the files' ownership.
+        translate_opt = []
+        if config.translate_uid:
+            if self._supports_flag(
+                virtiofsd_path, "--translate-uid"
+            ) and self._supports_flag(virtiofsd_path, "--translate-gid"):
+                # UID translation cannot be combined with POSIX ACLs:
+                # drop them in this case.
+                if acl_opt:
+                    sys.stderr.write(
+                        "virtme-run: disabling POSIX ACLs for UID translation\n"
+                    )
+                    acl_opt = []
+                translate_opt = [
+                    f"--translate-uid=map:0:{os.getuid()}:1",
+                    f"--translate-gid=map:0:{os.getgid()}:1",
+                ]
+            else:
+                sys.stderr.write(
+                    "virtme-run: virtiofsd does not support --translate-uid/--translate-gid; "
+                    "the guest root is not mapped to the invoking user\n"
+                )
         readonly_opt = (
             ["--readonly"]
             if config.readonly and self._supports_readonly(virtiofsd_path)
@@ -221,6 +257,7 @@ class VirtioFS:
             "--syslog",
             "--no-announce-submounts",
             *acl_opt,
+            *translate_opt,
             *readonly_opt,
             f"--socket-path={self.sock}",
             f"--shared-dir={config.path}",
@@ -245,7 +282,7 @@ class VirtioFS:
         except OSError:
             # The caller expects a graceful fallback to 9p, not an
             # exception (e.g. a fork failure under a low process limit).
-            self._report_9p_fallback(verbose)
+            self._report_9p_fallback(verbose, bool(translate_opt))
             return False
         # Poll for the socket every 10ms, up to a total of 3.1 seconds
         deadline = monotonic() + 3.1
@@ -253,7 +290,7 @@ class VirtioFS:
         while not self._is_socket(self.sock):
             remaining = deadline - monotonic()
             if remaining <= 0 or self.proc.poll() is not None:
-                self._report_9p_fallback(verbose)
+                self._report_9p_fallback(verbose, bool(translate_opt))
                 return False
             if verbose and not waiting_logged:
                 sys.stderr.write("virtme: waiting for virtiofsd to start\n")
@@ -262,7 +299,7 @@ class VirtioFS:
         # The socket path shows up at bind() time: a daemon that exits right
         # after creating it must not be mistaken for a ready one.
         if self.proc.poll() is not None:
-            self._report_9p_fallback(verbose)
+            self._report_9p_fallback(verbose, bool(translate_opt))
             return False
         return True
 

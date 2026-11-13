@@ -117,6 +117,7 @@ class VirtioFSConfigTests(unittest.TestCase):
         self.assertFalse(config.rw)
         self.assertTrue(config.readonly)
         self.assertFalse(config.posix_acl)
+        self.assertFalse(config.translate_uid)
 
         config = VirtioFSConfig(path="/", mount_tag="ROOTFS", rw=True)
         self.assertTrue(config.rw)
@@ -385,6 +386,71 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         self.assertEqual(self.popen_calls, 1)
         messages = [call.args[0] for call in stderr.write.call_args_list]
         self.assertTrue(any("failed to start virtiofsd" in msg for msg in messages))
+
+    def test_translate_uid_maps_guest_root(self):
+        help_result = mock.MagicMock(
+            returncode=0, stdout="--translate-uid\n--translate-gid\n--readonly"
+        )
+        with (
+            mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=help_result),
+            mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
+        ):
+            self.assertTrue(
+                VirtioFS(self.tempdir.name).start(
+                    _rootfs_config(posix_acl=True, translate_uid=True), verbose=False
+                )
+            )
+        self.assertIn(f"--translate-uid=map:0:{os.getuid()}:1", self.popen_argv)
+        self.assertIn(f"--translate-gid=map:0:{os.getgid()}:1", self.popen_argv)
+        # UID translation cannot be combined with POSIX ACLs.
+        self.assertNotIn("--posix-acl", self.popen_argv)
+        # ... which is announced, as the guest loses getfacl/setfacl semantics.
+        messages = [call.args[0] for call in stderr.write.call_args_list]
+        self.assertTrue(any("disabling POSIX ACLs" in msg for msg in messages))
+
+    def test_translate_uid_without_translate_gid_is_unsupported(self):
+        help_result = mock.MagicMock(returncode=0, stdout="--translate-uid")
+        with (
+            mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=help_result),
+            mock.patch("virtme_ng.virtiofs.sys.stderr"),
+        ):
+            self.assertTrue(
+                VirtioFS(self.tempdir.name).start(
+                    _rootfs_config(translate_uid=True), verbose=False
+                )
+            )
+        self.assertFalse(any("--translate" in arg for arg in self.popen_argv))
+
+    def test_lost_uid_mapping_is_announced_when_not_verbose(self):
+        self.create_socket = False
+        help_result = mock.MagicMock(
+            returncode=0, stdout="--translate-uid\n--translate-gid"
+        )
+        with (
+            mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=help_result),
+            mock.patch("virtme_ng.virtiofs.monotonic", side_effect=[0.0, 100.0]),
+            mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
+        ):
+            self.assertFalse(
+                VirtioFS(self.tempdir.name).start(
+                    _rootfs_config(translate_uid=True), verbose=False
+                )
+            )
+        messages = [call.args[0] for call in stderr.write.call_args_list]
+        self.assertTrue(any("fallback to 9p" in msg for msg in messages))
+        self.assertTrue(any("not mapped" in msg for msg in messages))
+
+    def test_translate_uid_unsupported_keeps_acl_and_warns(self):
+        # The default --help mock does not advertise --translate-uid.
+        with mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr:
+            self.assertTrue(
+                VirtioFS(self.tempdir.name).start(
+                    _rootfs_config(posix_acl=True, translate_uid=True), verbose=False
+                )
+            )
+        self.assertIn("--posix-acl", self.popen_argv)
+        self.assertNotIn(f"--translate-uid=map:0:{os.getuid()}:1", self.popen_argv)
+        stderr.write.assert_called()
 
     def test_passes_acl_and_readonly_flags(self):
         result = mock.MagicMock(returncode=0, stdout="--readonly\nusage: virtiofsd")
