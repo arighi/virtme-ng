@@ -16,6 +16,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+from virtme_ng.utils import STDERR_FILENO, STDIN_FILENO, STDOUT_FILENO
+
 ROOT = Path(__file__).resolve().parents[1]
 LAUNCHER = """
 import os
@@ -118,14 +120,14 @@ class ScriptIOTests(unittest.TestCase):
                             shell_init=shell_init,
                             flags=flags,
                             files=files,
-                            inaccessible=0,
+                            inaccessible=STDIN_FILENO,
                         )
                         self.assertEqual(stdout, b"SCRIPT_STDOUT\n")
                         self.assertIn(b"falling back to limited redirection", stderr)
                         self.assertNotIn(b"SCRIPT_STDERR", stderr)
 
     def test_fallback_for_each_inaccessible_fd(self):
-        for fd in (0, 1, 2):
+        for fd in (STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO):
             for input_data in (None, b"unused input\n"):
                 with self.subTest(fd=fd, input_data=input_data):
                     stdout, _ = self.run_guest(inaccessible=fd, input_data=input_data)
@@ -135,7 +137,7 @@ class ScriptIOTests(unittest.TestCase):
         for files in (False, True):
             with self.subTest(files=files):
                 stdout, _ = self.run_guest(
-                    inaccessible=0,
+                    inaccessible=STDIN_FILENO,
                     files=files,
                     script="head -c 1048576 /dev/zero; exit 7",
                 )
@@ -143,7 +145,7 @@ class ScriptIOTests(unittest.TestCase):
 
     def test_microvm_streams(self):
         for shell_init in (False, True):
-            for inaccessible in (None, 0):
+            for inaccessible in (None, STDIN_FILENO):
                 with self.subTest(shell_init=shell_init, inaccessible=inaccessible):
                     stdout, stderr = self.run_guest(
                         microvm=True,
@@ -166,7 +168,7 @@ class ScriptIOTests(unittest.TestCase):
                     stdout, stderr = self.run_guest(
                         shell_init=shell_init,
                         flags=flags,
-                        inaccessible=0,
+                        inaccessible=STDIN_FILENO,
                         # Drain the console before poweroff: this checks I/O
                         # routing independently of the existing console
                         # teardown's ability to flush the final output.

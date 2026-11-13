@@ -36,6 +36,9 @@ from virtme_ng.utils import (
     KERNEL_CMDLINE_MAX,
     SSH_CONF_FILE,
     SSH_DIR,
+    STDERR_FILENO,
+    STDIN_FILENO,
+    STDOUT_FILENO,
     VIRTME_SSH_DESTINATION_NAME,
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
     get_conf,
@@ -2126,13 +2129,15 @@ def do_it() -> int:
         if args.systemd:
             # Do nothing if `--systemd` is used, since it relies on the serial console
             pass
-        elif can_access_file("/proc/self/fd/2"):
+        elif can_access_file(f"/proc/self/fd/{STDERR_FILENO}"):
             # Redirect kernel errors to stderr, creating a separate console.
             #
             # If we don't have access to stderr via procfs (for example when
             # running inside a container), print a warning and implicitly
             # suppress the kernel errors redirection.
-            qemuargs.extend(["-chardev", "file,path=/proc/self/fd/2,id=dmesg"])
+            qemuargs.extend(
+                ["-chardev", f"file,path=/proc/self/fd/{STDERR_FILENO},id=dmesg"]
+            )
             qemuargs.extend(["-device", arch.virtio_dev_type("serial")])
             qemuargs.extend(["-device", "virtconsole,chardev=dmesg"])
             kernelargs.extend(["console=hvc0"])
@@ -2289,13 +2294,16 @@ def do_it() -> int:
 
         # Kernel console: where to send boot/console output.
         if show_boot_console:
-            console_output = "/proc/self/fd/2"
+            console_output = f"/proc/self/fd/{STDERR_FILENO}"
             console_args = ()
         else:
             console_output = "/dev/null"
             console_args = ["quiet", "loglevel=0"]
 
-        fds_accessible = all(can_access_file(f"/proc/self/fd/{i}") for i in (0, 1, 2))
+        fds_accessible = all(
+            can_access_file(f"/proc/self/fd/{i}")
+            for i in (STDIN_FILENO, STDOUT_FILENO, STDERR_FILENO)
+        )
         if fds_accessible:
             # Valid stdin/stdout/stderr: console & script I/O use host fds.
             qemuargs.extend(arch.qemu_serial_console_args())
@@ -2309,18 +2317,22 @@ def do_it() -> int:
             # script stdout/stderr and for direct /dev/stdout/err writes.
             add_serial_port("stdio,id=stdin,signal=on,mux=off", "stdin", "virtme.stdin")
             add_serial_port(
-                "file,id=stdout,path=/proc/self/fd/1", "stdout", "virtme.stdout"
+                f"file,id=stdout,path=/proc/self/fd/{STDOUT_FILENO}",
+                "stdout",
+                "virtme.stdout",
             )
             add_serial_port(
-                "file,id=stderr,path=/proc/self/fd/2", "stderr", "virtme.stderr"
+                f"file,id=stderr,path=/proc/self/fd/{STDERR_FILENO}",
+                "stderr",
+                "virtme.stderr",
             )
             add_serial_port(
-                "file,id=dev_stdout,path=/proc/self/fd/1",
+                f"file,id=dev_stdout,path=/proc/self/fd/{STDOUT_FILENO}",
                 "dev_stdout",
                 "virtme.dev_stdout",
             )
             add_serial_port(
-                "file,id=dev_stderr,path=/proc/self/fd/2",
+                f"file,id=dev_stderr,path=/proc/self/fd/{STDERR_FILENO}",
                 "dev_stderr",
                 "virtme.dev_stderr",
             )
@@ -2391,7 +2403,11 @@ def do_it() -> int:
         # redirect some, but not all, of the tty fds.  Work around it
         # by giving QEMU private copies of the open object if either
         # of them is a terminal.
-        for oldfd, mode in ((0, os.O_RDONLY), (1, os.O_WRONLY), (2, os.O_WRONLY)):
+        for oldfd, mode in (
+            (STDIN_FILENO, os.O_RDONLY),
+            (STDOUT_FILENO, os.O_WRONLY),
+            (STDERR_FILENO, os.O_WRONLY),
+        ):
             if os.isatty(oldfd):
                 try:
                     newfd = os.open(f"/proc/self/fd/{oldfd}", mode)
@@ -2733,10 +2749,10 @@ ExecStart="""
         else:
             if stdin_keepalive is not None:
                 os.close(stdin_keepalive[1])
-                os.dup2(stdin_keepalive[0], 0)
-                if stdin_keepalive[0] != 0:
+                if stdin_keepalive[0] != STDIN_FILENO:
+                    os.dup2(stdin_keepalive[0], STDIN_FILENO)
                     os.close(stdin_keepalive[0])
-                os.set_inheritable(0, True)
+                os.set_inheritable(STDIN_FILENO, True)
             os.execv(qemu.qemubin, qemuargs)
     return 0
 
