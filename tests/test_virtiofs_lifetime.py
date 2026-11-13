@@ -223,9 +223,6 @@ class VirtiofsdLifetimeTests(unittest.TestCase):
         outcome = self.run_vng(lambda _vng, pty_fds: os.close(pty_fds.pop()))
         self.assertTrue(outcome.daemon_gone, "virtiofsd outlived vng")
 
-    # Known bug: SIGHUP is not handled, so vng is killed by it without running
-    # its exit handlers and leaves its temporary files behind.
-    @unittest.expectedFailure
     def test_ssh_disconnect_shuts_vng_down_cleanly(self):
         # SIGHUP must be handled like SIGTERM, so that the exit handlers run:
         # vng does not die with a traceback because the terminal is gone and

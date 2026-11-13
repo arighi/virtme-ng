@@ -2623,6 +2623,12 @@ def restore_terminal_settings(settings):
         old = signal.signal(signal.SIGTTOU, signal.SIG_IGN)
         try:
             termios.tcsetattr(sys.stdin, termios.TCSAFLUSH, settings)
+        except termios.error as exc:
+            # The terminal is gone (e.g. hung up after an ssh disconnect):
+            # there is nothing left to restore. Anything else is a real
+            # problem that must not go unnoticed.
+            if exc.args[0] != errno.EIO:
+                raise
         finally:
             signal.signal(signal.SIGTTOU, old)
 
@@ -2632,10 +2638,13 @@ def signal_handler(_signum, _frame):
 
 
 def main() -> int:
-    # Catch potential signals that may interrupt the execution (SIGTERM) and
-    # make sure the terminal settings are restored on exit.
+    # Catch potential signals that may interrupt the execution (SIGTERM, and
+    # SIGHUP when the terminal goes away, e.g. an ssh disconnect) and make sure
+    # the terminal settings are restored and the exit handlers (e.g., stopping
+    # virtiofsd) run on exit.
     settings = save_terminal_settings()
     signal.signal(signal.SIGTERM, signal_handler)
+    signal.signal(signal.SIGHUP, signal_handler)
     try:
         return do_it()
     except SilentError:
