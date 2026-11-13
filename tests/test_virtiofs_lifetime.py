@@ -244,15 +244,15 @@ class VirtiofsdLifetimeTests(unittest.TestCase):
                     )
                 daemon_start = _start_time(daemon_pid)
                 self.assertIsNotNone(daemon_start, "virtiofsd is gone already")
-                self.assertTrue(_pid_alive(daemon_pid))
 
                 # The daemon must be alive when the disruption hits: one
-                # that crashed on its own before it would make every check
-                # below pass without the signal delivery ever being
-                # exercised. The check has to happen before the disruption:
-                # the Ctrl-C and ssh-disconnect disruptors signal the whole
-                # foreground process group, which reaches the daemon as
-                # long as it shares virtme-run's.
+                # that crashed on its own before would make every check
+                # below pass without virtme-run's exit handling ever being
+                # exercised. The daemon runs in a process group of its own
+                # (a Ctrl-C must not kill it before the guest shuts down),
+                # so no disruption reaches it directly: it can only go
+                # away through virtme-run, which is what the checks below
+                # verify.
                 self.assertTrue(
                     _is_same_process(daemon_pid, daemon_start),
                     "virtiofsd was gone before virtme-run went away",
@@ -283,19 +283,18 @@ class VirtiofsdLifetimeTests(unittest.TestCase):
                 ]
                 return Outcome(returncode, stderr, daemon_gone, files_left)
             finally:
+                # A daemon of unknown PID (virtme-run went away before
+                # reporting it, or it never wrote its pid file) needs no
+                # separate takedown: it is tied to virtme-run via
+                # PR_SET_PDEATHSIG, so the virtme_run.kill() above already
+                # made the kernel tell it to shut down, and it runs in a
+                # process group of its own, so virtme-run's group holds
+                # nothing else to signal.
                 virtme_run.kill()
-                if daemon_pid is None:
-                    # The daemon's PID is unknown (virtme-run went away before
-                    # reporting it, or it never wrote its pid file), but it
-                    # may still be running: it shares virtme-run's process group,
-                    # so take the whole group down instead of orphaning it.
-                    try:
-                        os.killpg(virtme_run.pid, signal.SIGKILL)
-                    except ProcessLookupError:
-                        # The group is gone already: fine.
-                        pass
                 # Never kill a process that merely reuses the daemon's PID.
-                elif _is_same_process(daemon_pid, daemon_start):
+                if daemon_pid is not None and _is_same_process(
+                    daemon_pid, daemon_start
+                ):
                     try:
                         os.kill(daemon_pid, signal.SIGKILL)
                     except ProcessLookupError:
@@ -358,7 +357,8 @@ class VirtiofsdLifetimeTests(unittest.TestCase):
 
     def test_ctrl_c_stops_daemon_and_removes_temp_files(self):
         # Ctrl-C: the terminal sends SIGINT to the whole foreground process
-        # group, which the daemon is a part of.
+        # group. The daemon runs in a process group of its own, so only
+        # virtme-run is hit and has to take the daemon with it on exit.
         outcome = self.run_virtme_run(
             lambda virtme_run, _pty_fds: os.killpg(virtme_run.pid, signal.SIGINT)
         )
