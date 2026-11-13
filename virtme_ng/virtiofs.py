@@ -1,6 +1,7 @@
 """virtme-ng: virtiofsd daemon management and virtio-fs QEMU export arguments."""
 
 import atexit
+import ctypes
 import os
 import signal
 import stat
@@ -14,29 +15,56 @@ from virtme import architectures
 
 _VIRTIOFSD_READONLY_SUPPORT: dict[str, bool | None] = {"value": None}
 
+_PR_SET_PDEATHSIG = 1
+
+
+def _die_with_parent():
+    """Return a function for Popen(preexec_fn=) to tie a child to its parent.
+
+    The child gets SIGTERM as soon as the parent exits, whatever the reason,
+    including a SIGKILL that does not run any exit handler. Note that the
+    kernel ties this to the *thread* that spawned the child, so the child
+    must be spawned from a thread that lives as long as the process (the
+    main thread).
+    """
+    # Load libc here: the returned function runs between fork and exec, where
+    # nothing but already prepared code should be executed.
+    prctl = ctypes.CDLL(None).prctl
+    parent_pid = os.getpid()
+
+    def preexec():
+        # Without the parent-death signal, the daemon would survive a SIGKILLed
+        # vng: do not exec it then. prctl() returns -1 on error.
+        if prctl(_PR_SET_PDEATHSIG, signal.SIGTERM) != 0:
+            os._exit(1)
+        # The parent may have died before the prctl() call took effect.
+        if os.getppid() != parent_pid:
+            os._exit(1)
+
+    return preexec
+
 
 class VirtioFS:
     def __init__(self, guest_tools_path):
         self.sock = None
-        self.pid = None
+        self.proc = None
         self.guest_tools_path = guest_tools_path
 
     def _cleanup_virtiofs_temp_files(self):
         # Make sure to kill virtiofsd instances that are still potentially running
-        if self.pid is not None:
+        if self.proc is not None:
             try:
-                with open(self.pid, encoding="utf-8") as fd:
-                    pid = int(fd.read().strip())
-                    os.kill(pid, signal.SIGTERM)
-            except (FileNotFoundError, ValueError, OSError):
+                self.proc.terminate()
+            except PermissionError:
                 pass
-        # Clean up temp files
-        temp_files = [self.sock, self.pid]
-        for file_path in temp_files:
-            try:
-                os.remove(file_path)
-            except OSError:
-                pass
+        # Clean up temp files (virtiofsd creates a pid file next to the socket
+        # in --socket-path mode; remove it as well, even though it is unused)
+        if self.sock is not None:
+            for file_path in (self.sock, f"{self.sock}.pid"):
+                try:
+                    os.remove(file_path)
+                except OSError:
+                    pass
 
     def _get_virtiofsd_path(self):
         # Define the possible virtiofsd paths.
@@ -109,6 +137,10 @@ class VirtioFS:
         _VIRTIOFSD_READONLY_SUPPORT["value"] = supported
         return supported
 
+    def _report_9p_fallback(self, verbose):
+        if verbose:
+            sys.stderr.write("virtme-run: failed to start virtiofsd, fallback to 9p\n")
+
     def start(
         self, path, verbose=True, cache="always", posix_acl=False, readonly=False
     ):
@@ -118,7 +150,6 @@ class VirtioFS:
 
         # virtiofsd located, try to start the daemon as non-privileged user.
         _, self.sock = tempfile.mkstemp(prefix="virtme")
-        self.pid = self.sock + ".pid"
 
         # Make sure to clean up temp files before starting the daemon and at exit.
         self._cleanup_virtiofs_temp_files()
@@ -126,41 +157,68 @@ class VirtioFS:
 
         # Export the whole root fs of the host, do not enable sandbox, otherwise we
         # would get permission errors.
-        if not verbose:
-            stderr = "2>/dev/null"
+        if verbose:
+            stderr = None
         else:
-            stderr = ""
+            stderr = subprocess.DEVNULL
         # Only enable --posix-acl when using an external root filesystem.
         # When sharing the host root (/), --posix-acl breaks UID/GID translation
         # which causes authentication failures (e.g., unix_chkpwd cannot obtain
         # user info).
-        acl_opt = "--posix-acl " if posix_acl else ""
+        acl_opt = ["--posix-acl"] if posix_acl else []
         readonly_opt = (
-            "--readonly "
+            ["--readonly"]
             if readonly and self._supports_readonly(virtiofsd_path)
-            else ""
+            else []
         )
-        os.system(
-            f"{virtiofsd_path} --syslog --no-announce-submounts {acl_opt}{readonly_opt}"
-            + f"--socket-path {self.sock} --shared-dir {path} "
-            + f"--sandbox none --cache {cache} {stderr} &"
-        )
-        # Keep the previous timeout (0.1 + 0.2 + 0.4 + 0.8 + 1.6 seconds),
-        # but avoid adding a full 100ms delay when the daemon starts quickly.
+        virtiofsd_cmd = [
+            virtiofsd_path,
+            "--syslog",
+            "--no-announce-submounts",
+            *acl_opt,
+            *readonly_opt,
+            f"--socket-path={self.sock}",
+            f"--shared-dir={path}",
+            "--sandbox=none",
+            f"--cache={cache}",
+        ]
+        try:
+            # Do not let the daemon share the terminal's stdin and foreground
+            # process group: an interactive Ctrl-C meant for QEMU must not kill
+            # virtiofsd before the guest shuts down cleanly. Keep it in the
+            # same session (no setsid) and make it die with vng, even when vng
+            # is killed and cannot run its exit handlers. preexec_fn is safe
+            # here: no other thread runs yet, and _die_with_parent() only
+            # calls prctl() and getppid() in the child.
+            self.proc = subprocess.Popen(  # pylint: disable=W1509
+                virtiofsd_cmd,
+                stdin=subprocess.DEVNULL,
+                stderr=stderr,
+                process_group=0,
+                preexec_fn=_die_with_parent(),
+            )
+        except OSError:
+            # The caller expects a graceful fallback to 9p, not an
+            # exception (e.g. a fork failure under a low process limit).
+            self._report_9p_fallback(verbose)
+            return False
+        # Poll for the socket every 10ms, up to a total of 3.1 seconds
         deadline = monotonic() + 3.1
         waiting_logged = False
         while not self._is_socket(self.sock):
             remaining = deadline - monotonic()
-            if remaining <= 0:
-                if verbose:
-                    sys.stderr.write(
-                        "virtme-run: failed to start virtiofsd, fallback to 9p"
-                    )
+            if remaining <= 0 or self.proc.poll() is not None:
+                self._report_9p_fallback(verbose)
                 return False
             if verbose and not waiting_logged:
                 sys.stderr.write("virtme: waiting for virtiofsd to start\n")
                 waiting_logged = True
             sleep(min(0.01, remaining))
+        # The socket path shows up at bind() time: a daemon that exits right
+        # after creating it must not be mistaken for a ready one.
+        if self.proc.poll() is not None:
+            self._report_9p_fallback(verbose)
+            return False
         return True
 
 

@@ -5,7 +5,6 @@
 # pylint: disable=protected-access
 
 import os
-import signal
 import socket
 import subprocess
 import tempfile
@@ -42,8 +41,8 @@ class DaemonPatchMixin:
 
     Creates a real (fake) executable at <tempdir>/bin/virtiofsd so that
     _get_virtiofsd_path() finds it as the first candidate, and patches
-    os.system to simulate the daemon by binding a unix socket at the
-    socket path, which is what the readiness poll waits for.
+    subprocess.Popen to simulate the daemon by binding a unix socket at
+    the socket path, which is what the readiness poll waits for.
     """
 
     def setUp(self):
@@ -60,26 +59,35 @@ class DaemonPatchMixin:
         os.chmod(self.daemon, 0o755)
 
         self.sock = os.path.join(self.tempdir.name, "virtme.sock")
-        self.system_calls = []
+        self.popen_argv = None
+        self.popen_kwargs = {}
+        self.popen_calls = 0
 
-        def system_side_effect(cmd):
-            self.system_calls.append(cmd)
+        def popen_side_effect(argv, **kwargs):
+            self.popen_calls += 1
+            self.popen_argv = argv
+            self.popen_kwargs.update(kwargs)
             if self.create_socket:
                 daemon_sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
                 daemon_sock.bind(self.sock)
                 daemon_sock.close()
-            return 0
+            proc = mock.MagicMock()
+            proc.poll.return_value = self.poll_result
+            return proc
 
         self.create_socket = True
+        self.poll_result = None
         patches = [
             mock.patch("virtme_ng.virtiofs.subprocess.check_call"),
-            # _supports_readonly() must never spawn a real virtiofsd; default
-            # to no --readonly support.
+            # _supports_readonly() must never execute the real subprocess.run
+            # (it would hit the mocked Popen); default to "no --readonly".
             mock.patch(
                 "virtme_ng.virtiofs.subprocess.run",
                 return_value=mock.MagicMock(returncode=0, stdout="usage: virtiofsd"),
             ),
-            mock.patch("virtme_ng.virtiofs.os.system", side_effect=system_side_effect),
+            mock.patch(
+                "virtme_ng.virtiofs.subprocess.Popen", side_effect=popen_side_effect
+            ),
             mock.patch(
                 "virtme_ng.virtiofs.tempfile.mkstemp", return_value=(0, self.sock)
             ),
@@ -155,13 +163,13 @@ class EnsureVirtiofsMemoryTests(unittest.TestCase):
 
 class ExportVirtiofsTests(DaemonPatchMixin, unittest.TestCase):
     def test_unsupported_arch_returns_false(self):
-        with mock.patch("virtme_ng.virtiofs.os.system") as system:
+        with mock.patch("virtme_ng.virtiofs.subprocess.Popen") as popen:
             state = VirtioFSState(self.tempdir.name)
             config = VirtioFSConfig(path="/", mount_tag="ROOTFS")
             self.assertFalse(
                 export_virtiofs(FakeArch(virtiofs=False), [], state, config)
             )
-            system.assert_not_called()
+            popen.assert_not_called()
 
     def test_daemon_unavailable_returns_false(self):
         qemuargs = []
@@ -176,7 +184,7 @@ class ExportVirtiofsTests(DaemonPatchMixin, unittest.TestCase):
             config = VirtioFSConfig(path="/", mount_tag="ROOTFS")
             self.assertFalse(export_virtiofs(FakeArch(), qemuargs, state, config))
         self.assertEqual(qemuargs, [])
-        self.assertEqual(self.system_calls, [])
+        self.assertEqual(self.popen_calls, 0)
 
     def test_appends_chardev_device_and_memory(self):
         qemuargs = []
@@ -195,14 +203,14 @@ class ExportVirtiofsTests(DaemonPatchMixin, unittest.TestCase):
         state = VirtioFSState(self.tempdir.name)
         config = VirtioFSConfig(path="/", mount_tag="ROOTFS", rw=True)
         self.assertTrue(export_virtiofs(FakeArch(), [], state, config))
-        self.assertIn("--cache auto", self.system_calls[0])
-        self.assertNotIn("--cache always", self.system_calls[0])
+        self.assertIn("--cache=auto", self.popen_argv)
+        self.assertNotIn("--cache=always", self.popen_argv)
 
         state = VirtioFSState(self.tempdir.name)
         config = VirtioFSConfig(path="/", mount_tag="ROOTFS")
         self.assertTrue(export_virtiofs(FakeArch(), [], state, config))
-        self.assertIn("--cache always", self.system_calls[1])
-        self.assertNotIn("--cache auto", self.system_calls[1])
+        self.assertIn("--cache=always", self.popen_argv)
+        self.assertNotIn("--cache=auto", self.popen_argv)
 
 
 class GetVirtiofsdPathTests(unittest.TestCase):
@@ -314,26 +322,32 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
             self.assertFalse(VirtioFS("/nonexistent").start("/"))
             mkstemp.assert_not_called()
 
-    def test_spawns_daemon_via_shell_command(self):
+    def test_spawns_daemon_with_argv_list(self):
         self.assertTrue(VirtioFS(self.tempdir.name).start("/", verbose=False))
 
-        self.assertEqual(len(self.system_calls), 1)
-        cmd = self.system_calls[0]
-        self.assertTrue(cmd.startswith(self.daemon))
-        self.assertIn("--syslog", cmd)
-        self.assertIn("--no-announce-submounts", cmd)
-        self.assertIn(f"--socket-path {self.sock}", cmd)
-        self.assertIn("--shared-dir /", cmd)
-        self.assertIn("--sandbox none", cmd)
-        self.assertIn("--cache always", cmd)
-        self.assertIn("2>/dev/null", cmd)
-        self.assertTrue(cmd.endswith("&"))
-        self.assertNotIn("--posix-acl", cmd)
-        self.assertNotIn("--readonly", cmd)
+        self.assertEqual(self.popen_calls, 1)
+        argv = self.popen_argv
+        self.assertIsInstance(argv, list)
+        self.assertEqual(argv[0], self.daemon)
+        for flag in ("--syslog", "--no-announce-submounts"):
+            self.assertIn(flag, argv)
+        self.assertIn(f"--socket-path={self.sock}", argv)
+        self.assertIn("--shared-dir=/", argv)
+        self.assertIn("--sandbox=none", argv)
+        self.assertIn("--cache=always", argv)
+        self.assertNotIn("--posix-acl", argv)
+        self.assertNotIn("--readonly", argv)
+        self.assertEqual(self.popen_kwargs["stderr"], subprocess.DEVNULL)
+        # The daemon must not share the terminal's stdin and process group.
+        self.assertEqual(self.popen_kwargs["stdin"], subprocess.DEVNULL)
+        self.assertEqual(self.popen_kwargs["process_group"], 0)
+        # ... but it must die with vng, even when vng is SIGKILLed.
+        self.assertTrue(callable(self.popen_kwargs["preexec_fn"]))
+        self.assertNotIn("start_new_session", self.popen_kwargs)
 
     def test_verbose_keeps_stderr_inherited(self):
         self.assertTrue(VirtioFS(self.tempdir.name).start("/", verbose=True))
-        self.assertNotIn("2>/dev/null", self.system_calls[0])
+        self.assertIsNone(self.popen_kwargs["stderr"])
 
     def test_timeout_returns_false(self):
         self.create_socket = False
@@ -342,7 +356,7 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
             mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
         ):
             self.assertFalse(VirtioFS(self.tempdir.name).start("/", verbose=True))
-        self.assertEqual(len(self.system_calls), 1)
+        self.assertEqual(self.popen_calls, 1)
         messages = [call.args[0] for call in stderr.write.call_args_list]
         self.assertTrue(any("failed to start virtiofsd" in msg for msg in messages))
 
@@ -354,9 +368,16 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
                     "/", posix_acl=True, readonly=True, verbose=False
                 )
             )
-        cmd = self.system_calls[0]
-        self.assertIn("--posix-acl", cmd)
-        self.assertIn("--readonly", cmd)
+        self.assertIn("--posix-acl", self.popen_argv)
+        self.assertIn("--readonly", self.popen_argv)
+
+    def test_readonly_dropped_when_unsupported(self):
+        result = mock.MagicMock(returncode=0, stdout="usage: virtiofsd")
+        with mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=result):
+            self.assertTrue(
+                VirtioFS(self.tempdir.name).start("/", readonly=True, verbose=False)
+            )
+        self.assertNotIn("--readonly", self.popen_argv)
 
 
 class IsSocketTests(unittest.TestCase):
@@ -387,21 +408,22 @@ class CleanupTests(unittest.TestCase):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
 
-    def test_kills_daemon_and_removes_temp_files(self):
+    def test_terminates_daemon_and_removes_temp_files(self):
         virtio_fs = VirtioFS("/nonexistent")
         virtio_fs.sock = os.path.join(self.tempdir.name, "virtme.sock")
-        virtio_fs.pid = virtio_fs.sock + ".pid"
         with open(virtio_fs.sock, "w", encoding="utf-8") as fd:
             fd.write("")
-        with open(virtio_fs.pid, "w", encoding="utf-8") as fd:
+        # virtiofsd creates a pid file next to the socket; cleanup removes
+        # it as well even though it is unused.
+        with open(virtio_fs.sock + ".pid", "w", encoding="utf-8") as fd:
             fd.write("4242")
+        virtio_fs.proc = mock.MagicMock()
 
-        with mock.patch("virtme_ng.virtiofs.os.kill") as kill:
-            virtio_fs._cleanup_virtiofs_temp_files()
+        virtio_fs._cleanup_virtiofs_temp_files()
 
-        kill.assert_called_once_with(4242, signal.SIGTERM)
+        virtio_fs.proc.terminate.assert_called_once_with()
         self.assertFalse(os.path.exists(virtio_fs.sock))
-        self.assertFalse(os.path.exists(virtio_fs.pid))
+        self.assertFalse(os.path.exists(virtio_fs.sock + ".pid"))
 
 
 if __name__ == "__main__":
