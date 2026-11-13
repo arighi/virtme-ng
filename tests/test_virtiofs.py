@@ -21,6 +21,10 @@ from virtme_ng.virtiofs import (
 )
 
 
+def _rootfs_config(**kwargs):
+    return VirtioFSConfig(path="/", mount_tag="ROOTFS", **kwargs)
+
+
 class FakeArch:
     def __init__(self, virtiofs=True, numa=True):
         self._virtiofs = virtiofs
@@ -335,11 +339,13 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
             ),
             mock.patch("virtme_ng.virtiofs.tempfile.mkstemp") as mkstemp,
         ):
-            self.assertFalse(VirtioFS("/nonexistent").start("/"))
+            self.assertFalse(VirtioFS("/nonexistent").start(_rootfs_config()))
             mkstemp.assert_not_called()
 
     def test_spawns_daemon_with_argv_list(self):
-        self.assertTrue(VirtioFS(self.tempdir.name).start("/", verbose=False))
+        self.assertTrue(
+            VirtioFS(self.tempdir.name).start(_rootfs_config(), verbose=False)
+        )
 
         self.assertEqual(self.popen_calls, 1)
         argv = self.popen_argv
@@ -362,7 +368,9 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         self.assertNotIn("start_new_session", self.popen_kwargs)
 
     def test_verbose_keeps_stderr_inherited(self):
-        self.assertTrue(VirtioFS(self.tempdir.name).start("/", verbose=True))
+        self.assertTrue(
+            VirtioFS(self.tempdir.name).start(_rootfs_config(), verbose=True)
+        )
         self.assertIsNone(self.popen_kwargs["stderr"])
 
     def test_timeout_returns_false(self):
@@ -371,7 +379,9 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
             mock.patch("virtme_ng.virtiofs.monotonic", side_effect=[0.0, 100.0]),
             mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
         ):
-            self.assertFalse(VirtioFS(self.tempdir.name).start("/", verbose=True))
+            self.assertFalse(
+                VirtioFS(self.tempdir.name).start(_rootfs_config(), verbose=True)
+            )
         self.assertEqual(self.popen_calls, 1)
         messages = [call.args[0] for call in stderr.write.call_args_list]
         self.assertTrue(any("failed to start virtiofsd" in msg for msg in messages))
@@ -381,7 +391,7 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         with mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=result):
             self.assertTrue(
                 VirtioFS(self.tempdir.name).start(
-                    "/", posix_acl=True, readonly=True, verbose=False
+                    _rootfs_config(posix_acl=True), verbose=False
                 )
             )
         self.assertIn("--posix-acl", self.popen_argv)
@@ -391,7 +401,7 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         result = mock.MagicMock(returncode=0, stdout="usage: virtiofsd")
         with mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=result):
             self.assertTrue(
-                VirtioFS(self.tempdir.name).start("/", readonly=True, verbose=False)
+                VirtioFS(self.tempdir.name).start(_rootfs_config(), verbose=False)
             )
         self.assertNotIn("--readonly", self.popen_argv)
 

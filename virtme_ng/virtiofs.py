@@ -45,6 +45,33 @@ def _die_with_parent():
     return preexec
 
 
+class VirtioFSConfig:
+    def __init__(
+        self,
+        path: str,
+        mount_tag: str,
+        *,
+        rw: bool = False,
+        posix_acl: bool = False,
+    ):
+        self.path = path
+        self.mount_tag = mount_tag
+        self.rw = rw
+        self.posix_acl = posix_acl
+
+    @property
+    def readonly(self) -> bool:
+        # The readonly export mode is just the absence of rw.
+        return not self.rw
+
+
+class VirtioFSState:
+    def __init__(self, guest_tools_path, memory=None, memory_configured=False):
+        self.guest_tools_path = guest_tools_path
+        self.memory = memory
+        self.memory_configured = memory_configured
+
+
 class VirtioFS:
     def __init__(self, guest_tools_path):
         self.sock = None
@@ -160,9 +187,7 @@ class VirtioFS:
         if verbose:
             sys.stderr.write("virtme-run: failed to start virtiofsd, fallback to 9p\n")
 
-    def start(
-        self, path, verbose=True, cache="always", posix_acl=False, readonly=False
-    ):
+    def start(self, config: VirtioFSConfig, verbose=True):
         virtiofsd_path = self._get_virtiofsd_path()
         if virtiofsd_path is None:
             return False
@@ -185,10 +210,10 @@ class VirtioFS:
         # When sharing the host root (/), --posix-acl breaks UID/GID translation
         # which causes authentication failures (e.g., unix_chkpwd cannot obtain
         # user info).
-        acl_opt = ["--posix-acl"] if posix_acl else []
+        acl_opt = ["--posix-acl"] if config.posix_acl else []
         readonly_opt = (
             ["--readonly"]
-            if readonly and self._supports_readonly(virtiofsd_path)
+            if config.readonly and self._supports_readonly(virtiofsd_path)
             else []
         )
         virtiofsd_cmd = [
@@ -198,9 +223,9 @@ class VirtioFS:
             *acl_opt,
             *readonly_opt,
             f"--socket-path={self.sock}",
-            f"--shared-dir={path}",
+            f"--shared-dir={config.path}",
             "--sandbox=none",
-            f"--cache={cache}",
+            f"--cache={'auto' if config.rw else 'always'}",
         ]
         try:
             # Do not let the daemon share the terminal's stdin and foreground
@@ -242,28 +267,6 @@ class VirtioFS:
         return True
 
 
-class VirtioFSConfig:
-    def __init__(
-        self,
-        path: str,
-        mount_tag: str,
-        rw=False,
-        posix_acl=False,
-    ):
-        self.path = path
-        self.mount_tag = mount_tag
-        self.rw = rw
-        self.posix_acl = posix_acl
-        self.readonly = not rw
-
-
-class VirtioFSState:
-    def __init__(self, guest_tools_path, memory=None, memory_configured=False):
-        self.guest_tools_path = guest_tools_path
-        self.memory = memory
-        self.memory_configured = memory_configured
-
-
 def ensure_virtiofs_memory(
     arch: architectures.Arch,
     qemuargs: list[str],
@@ -291,17 +294,9 @@ def export_virtiofs(
     if not arch.virtiofs_support():
         return False
 
-    cache = "auto" if config.rw else "always"
-
     # Try to start virtiofsd daemon
     virtio_fs = VirtioFS(state.guest_tools_path)
-    ret = virtio_fs.start(
-        config.path,
-        verbose,
-        cache,
-        config.posix_acl,
-        config.readonly,
-    )
+    ret = virtio_fs.start(config, verbose=verbose)
     if not ret:
         return False
 
