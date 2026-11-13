@@ -516,6 +516,13 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     )
 
     parser.add_argument(
+        "--serial-log",
+        action="store",
+        metavar="FILE",
+        help="Write the guest kernel serial console to FILE when running a script.",
+    )
+
+    parser.add_argument(
         "--qemu-opts",
         "-o",
         action="append",
@@ -1352,6 +1359,14 @@ class KernelSource:
         else:
             self.virtme_param["verbose"] = ""
 
+    def _get_virtme_serial_log(self, args):
+        if args.serial_log is not None:
+            self.virtme_param["serial_log"] = (
+                f"--serial-log {shlex.quote(args.serial_log)}"
+            )
+        else:
+            self.virtme_param["serial_log"] = ""
+
     def _get_virtme_append(self, args):
         append = []
 
@@ -1524,6 +1539,7 @@ class KernelSource:
         self._get_virtme_initramfs(args)
         self._get_virtme_graphics(args)
         self._get_virtme_verbose(args)
+        self._get_virtme_serial_log(args)
         self._get_virtme_append(args)
         self._get_virtme_cpus(args)
         self._get_virtme_memory(args)
@@ -1583,6 +1599,7 @@ class KernelSource:
             + f"{self.virtme_param['force_initramfs']} "
             + f"{self.virtme_param['graphics']} "
             + f"{self.virtme_param['verbose']} "
+            + f"{self.virtme_param['serial_log']} "
             + f"{self.virtme_param['append']} "
             + f"{self.virtme_param['cpus']} "
             + f"{self.virtme_param['memory']} "

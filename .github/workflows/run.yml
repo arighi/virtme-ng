@@ -54,6 +54,19 @@ jobs:
           clocksource="/sys/devices/system/clocksource/clocksource0/current_clocksource"
           [ "$(./vng -r v6.6 -v -- cat "${clocksource}")" = "kvm-clock" ]
 
+      # Capture the guest serial console to a file (KVM is available here)
+      - name: "Check --serial-log"
+        run: |
+          rm -f /tmp/serial.log /tmp/stdout.log
+          ./vng -r v6.6 --serial-log /tmp/serial.log -- \
+            sh -c 'echo marker-ok' > /tmp/stdout.log
+          # the log contains the boot log ...
+          grep -q 'Linux version' /tmp/serial.log
+          # ... the command output stays on stdout ...
+          grep -q '^marker-ok$' /tmp/stdout.log
+          # ... and the two are not mixed together
+          ! grep -q 'marker-ok' /tmp/serial.log
+
       - name: "Python unit tests"
         timeout-minutes: 10
         run: |
