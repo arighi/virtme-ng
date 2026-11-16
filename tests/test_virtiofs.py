@@ -15,6 +15,7 @@ from unittest import mock
 from virtme.commands.run import make_parser, rootfs_ownership
 from virtme_ng.virtiofs import (
     _VIRTIOFSD_HELP,
+    _VIRTIOFSD_PATH,
     VirtioFS,
     VirtioFSConfig,
     VirtioFSState,
@@ -56,6 +57,7 @@ class DaemonPatchMixin:
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
         _VIRTIOFSD_HELP.clear()
+        _VIRTIOFSD_PATH.clear()
         self.addCleanup(self._reset_readonly_cache)
 
         self.daemon = os.path.join(self.tempdir.name, "bin", "virtiofsd")
@@ -111,6 +113,7 @@ class DaemonPatchMixin:
 
     def _reset_readonly_cache(self):
         _VIRTIOFSD_HELP.clear()
+        _VIRTIOFSD_PATH.clear()
 
 
 class VirtioFSConfigTests(unittest.TestCase):
@@ -306,6 +309,8 @@ class GetVirtiofsdPathTests(unittest.TestCase):
     def setUp(self):
         self.tempdir = tempfile.TemporaryDirectory()
         self.addCleanup(self.tempdir.cleanup)
+        _VIRTIOFSD_PATH.clear()
+        self.addCleanup(_VIRTIOFSD_PATH.clear)
         # Determinism: any candidate probe that actually runs must fail, so
         # that fixed paths like /usr/libexec/virtiofsd (which may exist on the
         # test machine) never make a test pass by accident.
@@ -357,6 +362,57 @@ class GetVirtiofsdPathTests(unittest.TestCase):
         with mock.patch("virtme_ng.virtiofs.which", return_value=None):
             # check_call raises for every candidate (setUp default).
             self.assertIsNone(VirtioFS(self.tempdir.name)._get_virtiofsd_path())
+
+    def test_explicit_path_is_used(self):
+        explicit = os.path.join(self.tempdir.name, "custom", "virtiofsd")
+        guest_binary = os.path.join(self.tempdir.name, "bin", "virtiofsd")
+        self._make_executable(explicit)
+        self._make_executable(guest_binary)
+        with mock.patch("virtme_ng.virtiofs.subprocess.check_call") as check_call:
+            self.assertEqual(
+                VirtioFS(self.tempdir.name, explicit)._get_virtiofsd_path(), explicit
+            )
+            check_call.assert_called_once()
+
+    def test_explicit_path_has_no_fallback(self):
+        guest_binary = os.path.join(self.tempdir.name, "bin", "virtiofsd")
+        self._make_executable(guest_binary)
+        with (
+            mock.patch("virtme_ng.virtiofs.subprocess.check_call") as check_call,
+            mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
+        ):
+            self.assertIsNone(
+                VirtioFS(
+                    self.tempdir.name, "/nonexistent/virtiofsd"
+                )._get_virtiofsd_path()
+            )
+            check_call.assert_not_called()
+            stderr.write.assert_called_once()
+
+    def test_empty_explicit_path_is_reported_unusable(self):
+        # An empty --virtiofsd (e.g. an unset shell variable) is an explicit
+        # request: it must not silently re-enable the auto-detection.
+        with (
+            mock.patch("virtme_ng.virtiofs.which", return_value=None),
+            mock.patch("virtme_ng.virtiofs.subprocess.check_call") as check_call,
+            mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
+        ):
+            self.assertIsNone(VirtioFS(self.tempdir.name, "")._get_virtiofsd_path())
+        check_call.assert_not_called()
+        stderr.write.assert_called_once()
+
+    def test_unusable_path_warns_only_once(self):
+        with (
+            mock.patch("virtme_ng.virtiofs.which", return_value=None),
+            mock.patch("virtme_ng.virtiofs.subprocess.check_call") as check_call,
+            mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
+        ):
+            fs1 = VirtioFS(self.tempdir.name, "/nonexistent/virtiofsd")
+            fs2 = VirtioFS(self.tempdir.name, "/nonexistent/virtiofsd")
+            self.assertIsNone(fs1._get_virtiofsd_path())
+            self.assertIsNone(fs2._get_virtiofsd_path())
+        check_call.assert_not_called()
+        stderr.write.assert_called_once()
 
 
 class SupportsReadonlyTests(unittest.TestCase):

@@ -130,7 +130,10 @@ Requirements
    binary somewhere in your path.
 
  * Optionally, you may need virtiofsd 1.7.0 (or higher) for better filesystem
-   performance inside the virtme-ng guests.
+   performance inside the virtme-ng guests. Use `--virtiofsd /path/to/virtiofsd`
+   to select a specific binary instead of the auto-detected one. If the given
+   binary is not usable, a warning is printed and the 9p filesystem is used
+   instead.
 
  * Optionally, you may need `socat` for the `--console` and
    `--console-client` options, and the host's kernel should support VSOCK

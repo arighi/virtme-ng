@@ -14,6 +14,7 @@ from time import monotonic, sleep
 
 from virtme import architectures
 
+_VIRTIOFSD_PATH: dict[tuple[str, str | None], str | None] = {}
 _VIRTIOFSD_HELP: dict[str, str] = {}
 
 _PR_SET_PDEATHSIG = 1
@@ -74,17 +75,25 @@ class VirtioFSConfig:
 
 
 class VirtioFSState:
-    def __init__(self, guest_tools_path, memory=None, memory_configured=False):
+    def __init__(
+        self,
+        guest_tools_path,
+        memory=None,
+        memory_configured=False,
+        virtiofsd_path=None,
+    ):
         self.guest_tools_path = guest_tools_path
         self.memory = memory
         self.memory_configured = memory_configured
+        self.virtiofsd_path = virtiofsd_path
 
 
 class VirtioFS:
-    def __init__(self, guest_tools_path):
+    def __init__(self, guest_tools_path, virtiofsd_path=None):
         self.sock = None
         self.proc = None
         self.guest_tools_path = guest_tools_path
+        self.virtiofsd_path = virtiofsd_path
 
     def shutdown(self):
         # Make sure to stop virtiofsd instances that are still potentially
@@ -123,6 +132,10 @@ class VirtioFS:
         return self._get_virtiofsd_path() is not None
 
     def _get_virtiofsd_path(self):
+        cache_key = (self.guest_tools_path, self.virtiofsd_path)
+        if cache_key in _VIRTIOFSD_PATH:
+            return _VIRTIOFSD_PATH[cache_key]
+
         # Define the possible virtiofsd paths.
         #
         # NOTE: do not use the C implementation of qemu's virtiofsd, because it
@@ -144,14 +157,20 @@ class VirtioFS:
         # We can detect if the qemu implementation is installed in /usr/lib/qemu,
         # simply by running the command with --version as non-root. If it returns
         # an error it means that we are using the qemu daemon and we just skip it.
-        possible_paths = (
-            f"{self.guest_tools_path}/bin/virtiofsd",
-            which("virtiofsd"),
-            "/usr/libexec/virtiofsd",
-            "/usr/lib/virtiofsd/virtiofsd",
-            "/usr/lib/virtiofsd",
-            "/usr/lib/qemu/virtiofsd",
-        )
+        #
+        # An explicitly requested daemon is the only candidate: silently
+        # using a different one would be surprising.
+        if self.virtiofsd_path is not None:
+            possible_paths = (self.virtiofsd_path,)
+        else:
+            possible_paths = (
+                f"{self.guest_tools_path}/bin/virtiofsd",
+                which("virtiofsd"),
+                "/usr/libexec/virtiofsd",
+                "/usr/lib/virtiofsd/virtiofsd",
+                "/usr/lib/virtiofsd",
+                "/usr/lib/qemu/virtiofsd",
+            )
         for path in possible_paths:
             if path and os.path.exists(path) and os.access(path, os.X_OK):
                 try:
@@ -160,9 +179,15 @@ class VirtioFS:
                         stdout=subprocess.DEVNULL,
                         stderr=subprocess.DEVNULL,
                     )
+                    _VIRTIOFSD_PATH[cache_key] = path
                     return path
-                except subprocess.CalledProcessError:
+                except (subprocess.CalledProcessError, OSError):
                     pass
+        if self.virtiofsd_path is not None:
+            sys.stderr.write(
+                f"virtme-run: '{self.virtiofsd_path}' is not a usable virtiofsd\n"
+            )
+        _VIRTIOFSD_PATH[cache_key] = None
         return None
 
     @staticmethod
@@ -405,7 +430,7 @@ def export_virtiofs(
         return False
 
     # Try to start virtiofsd daemon
-    virtio_fs = VirtioFS(state.guest_tools_path)
+    virtio_fs = VirtioFS(state.guest_tools_path, state.virtiofsd_path)
     ret = virtio_fs.start(config, verbose=verbose)
     if not ret:
         return False

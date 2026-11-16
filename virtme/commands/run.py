@@ -378,6 +378,16 @@ def make_parser() -> "VirtmeArgumentParser":
         "--qemu-bin", action="store", default=None, help="Use specified QEMU binary."
     )
     g.add_argument(
+        "--virtiofsd",
+        action="store",
+        metavar="PATH",
+        default=None,
+        help=(
+            "Use specified virtiofsd binary (if it is not usable, a warning "
+            "is printed and 9p is used instead)"
+        ),
+    )
+    g.add_argument(
         "-q",
         "--qemu-opt",
         action="append",
@@ -1616,6 +1626,7 @@ def do_it() -> int:
             guest_tools_path,
             memory=args.memory,
             memory_configured=bool(args.numa),
+            virtiofsd_path=args.virtiofsd,
         )
         # Try to switch to 'microvm' on x86_64, but only if virtio-fs can be
         # used for now.

@@ -270,6 +270,16 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument("--qemu", action="store", help="Use the specified QEMU binary")
 
     parser.add_argument(
+        "--virtiofsd",
+        action="store",
+        metavar="PATH",
+        help=(
+            "Use the specified virtiofsd binary (if it is not usable, a "
+            "warning is printed and 9p is used instead)"
+        ),
+    )
+
+    parser.add_argument(
         "--name",
         action="store",
         default="virtme-ng",
@@ -1471,6 +1481,14 @@ class KernelSource:
         else:
             self.virtme_param["qemu"] = ""
 
+    def _get_virtme_virtiofsd(self, args):
+        if args.virtiofsd is not None:
+            self.virtme_param["virtiofsd"] = (
+                f"--virtiofsd {shlex.quote(args.virtiofsd)}"
+            )
+        else:
+            self.virtme_param["virtiofsd"] = ""
+
     def _get_virtme_cpus(self, args):
         if args.cpus is None:
             cpus = self.cpus
@@ -1555,6 +1573,7 @@ class KernelSource:
         self._get_virtme_nvgpu(args)
         self._get_virtme_vfio_pci(args)
         self._get_virtme_qemu(args)
+        self._get_virtme_virtiofsd(args)
         self._get_virtme_qemu_opts(args)
 
         # Start VM using virtme-run
@@ -1614,6 +1633,7 @@ class KernelSource:
             + f"{self.virtme_param['nvgpu']} "
             + f"{self.virtme_param['vfio_pci']} "
             + f"{self.virtme_param['qemu']} "
+            + f"{self.virtme_param['virtiofsd']} "
             + f"{self.virtme_param['qemu_opts']} "
             # Important: qemu_opts has to be the last one
         )
