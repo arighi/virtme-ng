@@ -71,7 +71,7 @@ Installation
   $ pip install virtme-ng
   ```
 
-  You will need to install the dependences manually, see the
+  You will need to install the dependencies manually, see the
   [Requirements](#requirements) section.
 
 * Install from source
@@ -84,7 +84,7 @@ Installation
   $ BUILD_VIRTME_NG_INIT=1 pip3 install .
   ```
 
-  There are some extra dependences on top of the ones mentioned in the
+  There are some extra dependencies on top of the ones mentioned in the
   [Requirements](#requirements) section. If you are on Debian/Ubuntu, you may
   need to install the following packages to build virtme-ng from source properly:
   ```console
@@ -179,8 +179,36 @@ Configuration
   }
   ```
 
+Default options
+---------------
+
+Typically, if you always use virtme-ng with an external build server (e.g.,
+`vng --build --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you
+don't always want to specify these options, so instead, you can simply define
+them in your configuration file (see above) under `default_opts` and then
+simply run `vng --build`.
+
+Example (always use an external build server called `kathleen` and run make
+inside a build chroot called `chroot:lunar-amd64`). To do so, add the
+`default_opts` section in your configuration file as following:
+```json
+{
+    "default_opts": {
+        "build_host": "kathleen",
+        "build_host_exec_prefix": "schroot -c chroot:lunar-amd64 --"
+    }
+}
+```
+
+Now you can simply run `vng --build` to build your kernel from the current
+working directory using the external build host, prepending the exec prefix
+command when running make.
+
 Examples
 ========
+
+Building kernels
+----------------
 
  - Build a kernel from a clean local kernel source directory (if a `.config` is
    not available virtme-ng will automatically create a minimum `.config` with
@@ -204,110 +232,11 @@ Examples
    $ vng --kconfig --dry-run
    ```
 
- - Run a kernel previously compiled from a local git repository in the current
-   working directory:
-   ```console
-   $ vng
-   ```
-
- - Use `kexec` inside an x86 virtme-ng guest to reboot into the same kernel.
-   Start the guest with an initramfs and retain it after boot:
-   ```console
-   $ vng --force-initramfs --append retain_initrd
-   ```
-   Then, inside the guest, load and execute the kernel using the retained
-   initramfs:
-   ```console
-   $ sudo kexec --load arch/x86/boot/bzImage \
-       --initrd=/sys/firmware/initrd --reuse-cmdline
-   $ sudo kexec --exec
-   ```
-   The retained initramfs must be compatible with the kernel being loaded. This
-   is the case here because `vng` boots `arch/x86/boot/bzImage` by default.
-   This requires `CONFIG_KEXEC=y` and `CONFIG_BLK_DEV_INITRD=y`, which are both
-   enabled in the default virtme-ng kernel configuration.
-
- - Run an interactive virtme-ng session using the same kernel as the host:
-   ```console
-   $ vng -r
-   ```
-
- - Use a fast boot preset for small test workloads:
-   ```console
-   $ vng -r --fast-boot -- uname -r
-   ```
-   `--fast-boot` can also be written as `-F`. This skips `udev` and `tmpfiles`
-   setup and defaults to 4 CPUs.  It works with both guest inits and requires
-   kernel `devtmpfs` support.  An explicit CPU setting overrides the preset
-   regardless of argument order:
-   ```console
-   $ vng -r --fast-boot --cpus host -m 8G --network user --ssh
-   ```
-   With `--systemd`, `udev` and `tmpfiles` setup stay enabled. With `--numa`,
-   the preset leaves CPU sizing at its normal default unless supplied
-   explicitly, so it does not change the requested topology.
-
-   In fast boot mode, device permission rules, `udev` module loading and
-   hotplug rules are unavailable, and files, directories, permissions, and
-   symlinks normally configured by `tmpfiles` may be missing.
-
-   virtme-ng creates script I/O and `/dev/disk/by-id` links, and preloads
-   the virtio disk drivers for `--disk` and the virtio network and vsock
-   drivers for networking, SSH, or the remote console. Ensure other
-   required drivers are built in or loaded by the initramfs. Omit
-   `--fast-boot` if the workload needs the normal setup.
-
- - Test installed kernel 6.2.0-21-generic kernel
-   (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
-   ```console
-   $ vng -r 6.2.0-21-generic
-   ```
-
- - Run a pre-compiled vanilla v6.6 kernel fetched from the Ubuntu mainline
-   builds repository (useful to test a specific kernel version directly and
-   save a lot of build time):
-   ```console
-   $ vng -r v6.6
-   ```
-
- - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
-   ```console
-   $ mkdir test
-   $ cd test
-   $ apt download linux-image-6.2.0-1003-lowlatency linux-modules-6.2.0-1003-lowlatency
-   $ for d in *.deb; do dpkg -x $d .; done
-   $ vng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
-   ```
-
  - Build the tip of the latest kernel on a remote build host called "builder",
    running make inside a specific build chroot (managed remotely by schroot):
    ```console
    $ vng --build --build-host builder \
      --build-host-exec-prefix "schroot -c chroot:kinetic-amd64 -- "
-   ```
-
- - Run the previously compiled kernel from the current working directory and
-   enable networking:
-   ```console
-   $ vng --net user
-   ```
-
- - Run the previously compiled kernel adding an additional virtio-blk device:
-   ```console
-   $ qemu-img create -f qcow2 /tmp/disk.img 8G
-   $ vng --disk /tmp/disk.img
-   ```
-
- - Use a disk VM built using Nix as a package manager (example [here](tools))
-   and containing tools, e.g. to run the tests in a more reproducible way:
-
-   ```console
-   # mkdir -p /nix/store
-   $ vng -r --disk nix-store.erofs.disk
-   > sudo mount /dev/vda /nix/store
-   > PATH="/nix/store/tools/bin:${PATH}"
-   > hello
-   Hello, world!
    ```
 
  - Recompile the kernel passing some env variables to enable Rust support
@@ -342,6 +271,84 @@ Examples
        vng --build
    # or export the two variables before, see 'man ccache' for more details
    ```
+
+Running kernels
+---------------
+
+ - Run a kernel previously compiled from a local git repository in the current
+   working directory:
+   ```console
+   $ vng
+   ```
+
+ - Run an interactive virtme-ng session using the same kernel as the host:
+   ```console
+   $ vng -r
+   ```
+
+ - Test installed kernel 6.2.0-21-generic kernel
+   (NOTE: /boot/vmlinuz-6.2.0-21-generic needs to be accessible):
+   ```console
+   $ vng -r 6.2.0-21-generic
+   ```
+
+ - Run a pre-compiled vanilla v6.6 kernel fetched from the Ubuntu mainline
+   builds repository (useful to test a specific kernel version directly and
+   save a lot of build time):
+   ```console
+   $ vng -r v6.6
+   ```
+
+ - Download and test kernel 6.2.0-1003-lowlatency from deb packages:
+   ```console
+   $ mkdir test
+   $ cd test
+   $ apt download linux-image-6.2.0-1003-lowlatency linux-modules-6.2.0-1003-lowlatency
+   $ for d in *.deb; do dpkg -x $d .; done
+   $ vng -r ./boot/vmlinuz-6.2.0-1003-lowlatency
+   ```
+
+ - Use a fast boot preset for small test workloads:
+   ```console
+   $ vng -r --fast-boot -- uname -r
+   ```
+   `--fast-boot` can also be written as `-F`. This skips `udev` and `tmpfiles`
+   setup and defaults to 4 CPUs.  It works with both guest inits and requires
+   kernel `devtmpfs` support.  An explicit CPU setting overrides the preset
+   regardless of argument order:
+   ```console
+   $ vng -r --fast-boot --cpus host -m 8G --network user --ssh
+   ```
+   With `--systemd`, `udev` and `tmpfiles` setup stay enabled. With `--numa`,
+   the preset leaves CPU sizing at its normal default unless supplied
+   explicitly, so it does not change the requested topology.
+
+   In fast boot mode, device permission rules, `udev` module loading and
+   hotplug rules are unavailable, and files, directories, permissions, and
+   symlinks normally configured by `tmpfiles` may be missing.
+
+   virtme-ng creates script I/O and `/dev/disk/by-id` links, and preloads
+   the virtio disk drivers for `--disk` and the virtio network and vsock
+   drivers for networking, SSH, or the remote console. Ensure other
+   required drivers are built in or loaded by the initramfs. Omit
+   `--fast-boot` if the workload needs the normal setup.
+
+ - Use `kexec` inside an x86 virtme-ng guest to reboot into the same kernel.
+   Start the guest with an initramfs and retain it after boot:
+   ```console
+   $ vng --force-initramfs --append retain_initrd
+   ```
+   Then, inside the guest, load and execute the kernel using the retained
+   initramfs:
+   ```console
+   $ sudo kexec --load arch/x86/boot/bzImage \
+       --initrd=/sys/firmware/initrd --reuse-cmdline
+   $ sudo kexec --exec
+   ```
+   The retained initramfs must be compatible with the kernel being loaded. This
+   is the case here because `vng` boots `arch/x86/boot/bzImage` by default.
+   This requires `CONFIG_KEXEC=y` and `CONFIG_BLK_DEV_INITRD=y`, which are both
+   enabled in the default virtme-ng kernel configuration.
 
  - Execute `uname -r` inside a kernel recompiled in the current directory and
    send the output to cowsay on the host:
@@ -384,6 +391,9 @@ Examples
    user    0m8.425s
    sys     0m8.806s
    ```
+
+Root filesystems and disks
+--------------------------
 
  - Run the vanilla v6.7-rc5 kernel with an Ubuntu 22.04 rootfs:
    ```console
@@ -487,6 +497,116 @@ Examples
    >     --busybox /path/to/static/riscv64-busybox
    ```
 
+ - Run the previously compiled kernel adding an additional virtio-blk device:
+   ```console
+   $ qemu-img create -f qcow2 /tmp/disk.img 8G
+   $ vng --disk /tmp/disk.img
+   ```
+
+ - Use a disk VM built using Nix as a package manager (example [here](tools))
+   and containing tools, e.g. to run the tests in a more reproducible way:
+
+   ```console
+   # mkdir -p /nix/store
+   $ vng -r --disk nix-store.erofs.disk
+   > sudo mount /dev/vda /nix/store
+   > PATH="/nix/store/tools/bin:${PATH}"
+   > hello
+   Hello, world!
+   ```
+
+Networking and remote access
+----------------------------
+
+ - Run the previously compiled kernel from the current working directory and
+   enable networking:
+   ```console
+   $ vng --net user
+   ```
+
+ - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
+   ```console
+   # Start the vng instance with server support:
+   $ vng --console
+
+   # In a separate terminal run the following command to connect to a remote shell:
+   $ vng --console-client
+   ```
+
+ - Enable SSH in the vng guest:
+   ```console
+   # Start the vng instance with ssh server support:
+   $ vng --ssh
+
+   # Connect to the vng guest from the host via ssh:
+   $ vng --ssh-client
+   ```
+
+ - Generate some results inside the vng guest and copy them back to the
+   host using SCP:
+   ```console
+   # Start the vng instance with SSH server support:
+   arighi@host~> vng --ssh
+   ...
+   arighi@virtme-ng~> ./run.sh > result.txt
+
+   # In another terminal, copy result.txt from the guest to the host using scp:
+   arighi@host~> scp -F ~/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng%2222:~/result.txt .
+
+   # The SSH command can be printed using this command, and easily adapted later:
+   arighi@host~> vng --ssh-client --dry-run
+   ssh -F /home/arighi/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng%2222
+
+   # With systemd >= 256, it is possible to use the 'vsock/<CID>' hostname directly:
+   arighi@host~> ssh vsock/2222
+   arighi@virtme-ng~>
+   ```
+
+Debugging
+---------
+
+ - Generate a memory dump of a running instance and read 'jiffies' from the
+   memory dump using the `drgn` debugger:
+   ```console
+   # Start the vng instance in debug mode
+   $ vng --debug
+
+   # In a separate shell session trigger the memory dump to /tmp/vmcore.img
+   $ vng --dump /tmp/vmcore.img
+
+   # Use drgn to read 'jiffies' from the memory dump:
+   $ echo "print(prog['jiffies'])" | drgn -q -s vmlinux -c /tmp/vmcore.img
+   drgn 0.0.23 (using Python 3.11.6, elfutils 0.189, with libkdumpfile)
+   For help, type help(drgn).
+   >>> import drgn
+   >>> from drgn import NULL, Object, cast, container_of, execscript, offsetof, reinterpret, sizeof
+   >>> from drgn.helpers.common import *
+   >>> from drgn.helpers.linux import *
+   >>> (volatile unsigned long)4294675464
+   ```
+
+ - Attach a GDB session to a running instance started with `--debug`:
+   ```console
+   # Start the vng instance in debug mode
+   $ vng --debug
+
+   # In a separate terminal run the following command to attach the gdb session:
+   $ vng --gdb
+   kernel version = 6.9.0-virtme
+   Reading symbols from vmlinux...
+   Remote debugging using localhost:1234
+   native_irq_disable () at ./arch/x86/include/asm/irqflags.h:37
+   37		asm volatile("cli": : :"memory");
+   (gdb)
+
+   # NOTE: a vmlinux must be present in the current working directory in order
+   # to resolve symbols, otherwise vng # will automatically search for a
+   # vmlinux available in the system.
+   ```
+
+Guest hardware
+--------------
+
  - Mirror the available host CPU socket/core/thread layout in the guest and
    pin each guest vCPU to the corresponding host CPU:
    ```console
@@ -550,6 +670,29 @@ Examples
       3:   41   61   11   10
    ```
 
+ - Run virtme-ng with GPU passthrough:
+   ```console
+   # Confirm host kernel has VFIO and IOMMU support
+   # Check if NVIDIA module is installed on the host
+   $ modinfo nvidia
+   # If the nvidia module is installed, blacklist the nvidia modules
+   $ sudo bash -c 'echo -e "blacklist nvidia\nblacklist nvidia-drm\nblacklist nvidia-modeset\nblacklist nvidia-peermem\nblacklist nvidia-uvm" > /etc/modprobe.d/blacklist-nvidia.conf'
+   # Host will need to be rebooted for blacklist to take effect.
+   # Get GPU device ID
+   $ lspci -nn | grep NVIDIA
+     0000:01:00.0 VGA compatible controller [0300]: NVIDIA Corporation AD104GLM [RTX 3500 Ada Generation Laptop GPU] [10de:27bb] (rev a1)
+     0000:01:00.1 Audio device [0403]: NVIDIA Corporation Device [10de:22bc] (rev a1))
+   # Configure VFIO for device passthrough
+   $ sudo bash -c 'options vfio-pci ids=10de:27bb,10de:22bc' > /etc/modprobe.d/vfio.conf
+   # Load VFIO module
+   $ sudo modprobe vfio-pci
+   # Pass PCI address to virtme-ng
+   $ sudo vng --nvgpu "01:00.0" -r linux
+   ```
+
+Graphical sessions and containers
+---------------------------------
+
  - Run `glxgears` inside a kernel recompiled in the current directory:
    ```console
    $ vng -g -- glxgears
@@ -573,82 +716,6 @@ Examples
    (virtme-ng is started in graphical mode)
    ```
 
- - Generate a memory dump of a running instance and read 'jiffies' from the
-   memory dump using the `drgn` debugger:
-   ```console
-   # Start the vng instance in debug mode
-   $ vng --debug
-
-   # In a separate shell session trigger the memory dump to /tmp/vmcore.img
-   $ vng --dump /tmp/vmcore.img
-
-   # Use drgn to read 'jiffies' from the memory dump:
-   $ echo "print(prog['jiffies'])" | drgn -q -s vmlinux -c /tmp/vmcore.img
-   drgn 0.0.23 (using Python 3.11.6, elfutils 0.189, with libkdumpfile)
-   For help, type help(drgn).
-   >>> import drgn
-   >>> from drgn import NULL, Object, cast, container_of, execscript, offsetof, reinterpret, sizeof
-   >>> from drgn.helpers.common import *
-   >>> from drgn.helpers.linux import *
-   >>> (volatile unsigned long)4294675464
-   ```
-
- - Attach a GDB session to a running instance started with `--debug`:
-   ```console
-   # Start the vng instance in debug mode
-   $ vng --debug
-
-   # In a separate terminal run the following command to attach the gdb session:
-   $ vng --gdb
-   kernel version = 6.9.0-virtme
-   Reading symbols from vmlinux...
-   Remote debugging using localhost:1234
-   native_irq_disable () at ./arch/x86/include/asm/irqflags.h:37
-   37		asm volatile("cli": : :"memory");
-   (gdb)
-
-   # NOTE: a vmlinux must be present in the current working directory in order
-   # to resolve symbols, otherwise vng # will automatically search for a
-   # vmlinux available in the system.
-   ```
-
- - Connect to a simple remote shell (`socat` is required, VSOCK will be used):
-   ```console
-   # Start the vng instance with server support:
-   $ vng --console
-
-   # In a separate terminal run the following command to connect to a remote shell:
-   $ vng --console-client
-   ```
-
- - Enable SSH in the vng guest:
-   ```console
-   # Start the vng instance with ssh server support:
-   $ vng --ssh
-
-   # Connect to the vng guest from the host via ssh:
-   $ vng --ssh-client
-   ```
- - Generate some results inside the vng guest and copy them back to the
-   host using SCP:
-   ```console
-   # Start the vng instance with SSH server support:
-   arighi@host~> vng --ssh
-   ...
-   arighi@virtme-ng~> ./run.sh > result.txt
-
-   # In another terminal, copy result.txt from the guest to the host using scp:
-   arighi@host~> scp -F ~/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng%2222:~/result.txt .
-
-   # The SSH command can be printed using this command, and easily adapted later:
-   arighi@host~> vng --ssh-client --dry-run
-   ssh -F /home/arighi/.cache/virtme-ng/.ssh/virtme-ng-ssh.conf virtme-ng%2222
-
-   # With systemd >= 256, it is possible to use the 'vsock/<CID>' hostname directly:
-   arighi@host~> ssh vsock/2222
-   arighi@virtme-ng~>
-   ```
-
  - Run virtme-ng inside a docker container:
    ```console
    $ docker run -it --privileged ubuntu:latest /bin/bash
@@ -664,26 +731,6 @@ Examples
    ```
    See also: `.github/workflows/run.yml` as a practical example on how to use
    virtme-ng inside docker.
-
- - Run virtme-ng with GPU passthrough:
-   ```console
-   # Confirm host kernel has VFIO and IOMMU support
-   # Check if NVIDIA module is installed on the host
-   $ modinfo nvidia
-   # If the nvidia module is installed, blacklist the nvidia modules
-   $ sudo bash -c 'echo -e "blacklist nvidia\nblacklist nvidia-drm\nblacklist nvidia-modeset\nblacklist nvidia-peermem\nblacklist nvidia-uvm" > /etc/modprobe.d/blacklist-nvidia.conf'
-   # Host will need to be rebooted for blacklist to take effect.
-   # Get GPU device ID
-   $ lspci -nn | grep NVIDIA
-     0000:01:00.0 VGA compatible controller [0300]: NVIDIA Corporation AD104GLM [RTX 3500 Ada Generation Laptop GPU] [10de:27bb] (rev a1)
-     0000:01:00.1 Audio device [0403]: NVIDIA Corporation Device [10de:22bc] (rev a1))
-   # Configure VFIO for device passthrough
-   $ sudo bash -c 'options vfio-pci ids=10de:27bb,10de:22bc' > /etc/modprobe.d/vfio.conf
-   # Load VFIO module
-   $ sudo modprobe vfio-pci
-   # Pass PCI address to virtme-ng
-   $ sudo vng --nvgpu "01:00.0" -r linux
-   ```
 
 Implementation details
 ======================
@@ -722,31 +769,6 @@ External kernel modules
 It is possible to recompile and test out-of-tree kernel modules inside the
 virtme-ng kernel, simply by building them against the local directory of the
 kernel git repository that was used to build and run the kernel.
-
-Default options
-===============
-
-Typically, if you always use virtme-ng with an external build server (e.g.,
-`vng --build --build-host REMOTE_SERVER --build-host-exec-prefix CMD`) you
-don't always want to specify these options, so instead, you can simply define
-them in your configuration file (refer to the [Configuration](#configuration)
-section) under `default_opts` and then simply run `vng --build`.
-
-Example (always use an external build server called `kathleen` and run make
-inside a build chroot called `chroot:lunar-amd64`). To do so, add the
-`default_opts` section in your configuration file as following:
-```json
-{
-    "default_opts": {
-        "build_host": "kathleen",
-        "build_host_exec_prefix": "schroot -c chroot:lunar-amd64 --"
-    }
-}
-```
-
-Now you can simply run `vng --build` to build your kernel from the current
-working directory using the external build host, prepending the exec prefix
-command when running make.
 
 AI Agent Integration (MCP Server)
 ==================================
@@ -888,7 +910,7 @@ Troubleshooting
 
  - Systemd support (`--systemd`) is still experimental. If something does not
    work for you, try masking the unit that is freezing, e.g. `--append
-   "systemd.mask=$PROBLEMATIC_UNIT"` (refer to the
+   "systemd.mask=$PROBLEMATIC_UNIT"` (see the
    [Configuration](#configuration) section for a more permanent setup). Be
    aware that you might also need `--user root`, or if you're using your own
    `/` as ROOTFS, you may need to run vng itself as root.
