@@ -967,18 +967,9 @@ Troubleshooting
 Contributing
 ============
 
-Please see DCO-1.1.txt.
-
-virtme-ng uses [pre-commit](https://pre-commit.com/) to perform some checks,
-e.g. code formatting and linting. Therefore it is recommended to set up
-pre-commit for development:
-
-```console
-$ cd "$VIRTME_NG"
-$ # Activate pre-commit hooks for virtme-ng
-$ pre-commit install
-pre-commit installed at .git/hooks/pre-commit
-```
+Contributions are welcome! Please see [CONTRIBUTING.md](CONTRIBUTING.md) for
+the development setup, the sign-off (DCO) requirements and some non-obvious
+pitfalls.
 
 Additional resources
 ====================
