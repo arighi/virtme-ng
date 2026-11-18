@@ -561,6 +561,7 @@ class Kernel:
         "version",
         "dtb",
         "modfiles",
+        "alias_modfiles",
         "moddir",
         "use_root_mods",
         "config",
@@ -570,6 +571,7 @@ class Kernel:
     version: str
     dtb: str | None
     modfiles: list[str]
+    alias_modfiles: dict[str, list[str]]
     moddir: str | None
     use_root_mods: bool
     config: dict[str, str] | None
@@ -651,6 +653,7 @@ def get_kernel_version(orig_path, img_name: str | None = None):
 def find_kernel_and_mods(arch, args) -> Kernel:
     kernel = Kernel()
     kernel.config = None
+    kernel.alias_modfiles = {}
 
     kernel.use_root_mods = False
     if args.installed_kernel is not None:
@@ -752,11 +755,17 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                                 f"modules.dep for {kernel.moddir} (exit {ret}); "
                                 "module auto-detection may not work\n"
                             )
-                    modfiles = modfinder.find_modules_from_install(
+                    alias_modfiles = modfinder.find_modules_by_alias(
                         virtmods.MODALIASES, root=mod_path, kver=kver
                     )
                     # Resolve out of mod_path before it's removed after `with` block
-                    kernel.modfiles = [os.path.realpath(path) for path in modfiles]
+                    kernel.alias_modfiles = {
+                        alias: [os.path.realpath(path) for path in paths]
+                        for alias, paths in alias_modfiles.items()
+                    }
+                    kernel.modfiles = modfinder.merge_mods(
+                        kernel.alias_modfiles.values()
+                    )
         kernel.dtb = None  # For now
     elif args.kdir is not None:
         kimg = os.path.join(args.kdir, arch.kimg_path())
@@ -783,16 +792,9 @@ def find_kernel_and_mods(arch, args) -> Kernel:
         if modmode == "none":
             pass
         elif modmode in ("use", "auto"):
-            if args.root != "/":
-                kernel.use_root_mods = True
-                kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
-                if not os.path.exists(kernel.moddir):
-                    kernel.moddir = f"{args.root}/lib/modules/{kernel.version}"
-                    if not os.path.exists(kernel.moddir):
-                        kernel.modfiles = []
-                        kernel.moddir = None
-            # Check if modules.order exists, otherwise fallback to mods=none
-            elif os.path.exists(mod_file):
+            # Prefer modules from the build directory, then modules installed in
+            # a --root directory, otherwise fallback to mods=none
+            if os.path.exists(mod_file):
                 # Check if virtme's kernel modules directory needs to be updated
                 if not os.path.exists(virtme_mod_file) or is_file_more_recent(
                     mod_file, virtme_mod_file
@@ -810,10 +812,18 @@ def find_kernel_and_mods(arch, args) -> Kernel:
                         except subprocess.CalledProcessError as exc:
                             raise SilentError() from exc
                 kernel.moddir = os.path.join(virtme_mods, "lib/modules", "0.0.0")
-                kernel.modfiles = modfinder.find_modules_from_install(
+                kernel.alias_modfiles = modfinder.find_modules_by_alias(
                     virtmods.MODALIASES, root=virtme_mods, kver="0.0.0"
                 )
-            else:
+                kernel.modfiles = modfinder.merge_mods(kernel.alias_modfiles.values())
+            elif args.root != "/" and args.root_disk is None:
+                kernel.moddir = f"{args.root}/usr/lib/modules/{kernel.version}"
+                if not os.path.exists(kernel.moddir):
+                    kernel.moddir = f"{args.root}/lib/modules/{kernel.version}"
+                    if not os.path.exists(kernel.moddir):
+                        kernel.moddir = None
+                kernel.use_root_mods = kernel.moddir is not None
+            if kernel.moddir is None:
                 sys.stderr.write(
                     f"\n{mod_file} not found: kernel modules not enabled or kernel not compiled properly, "
                     + "kernel modules disabled\n\n"
@@ -1276,6 +1286,23 @@ def has_external_root(args) -> bool:
     return args.root != "/" or args.root_disk is not None
 
 
+def get_boot_modaliases(args, qemuargs: list[str]) -> list[str]:
+    """Return the aliases of the modules needed before init runs."""
+    aliases = list(virtmods.BOOT_MODALIASES)
+    if any("vhost-user-fs" in arg for arg in qemuargs):
+        aliases += virtmods.VIRTIOFS_MODALIASES
+    if "-fsdev" in qemuargs:
+        aliases += virtmods.NINEP_MODALIASES
+    # Overlays are mounted by init before the module directory is set up.
+    if args.overlay_rwdir:
+        aliases.append("overlay")
+    if args.root_disk is not None:
+        aliases.append("virtio_blk")
+        if args.root_fstype is not None:
+            aliases.append(f"fs-{args.root_fstype}")
+    return aliases
+
+
 def detect_disk_format(path: str, verbose: bool = False) -> str:
     """Return the QEMU image format of PATH, defaulting to raw."""
     try:
@@ -1660,17 +1687,6 @@ def do_it() -> int:
 
     kernel = find_kernel_and_mods(arch, args)
     config.modfiles = kernel.modfiles
-    if config.modfiles:
-        need_initramfs = True
-
-    config.root_disk = args.root_disk is not None and need_initramfs
-
-    if config.root_disk and not is_native and args.busybox is None:
-        arg_fail(
-            "--root-disk needs an explicit --busybox for a foreign --arch: "
-            "there is no guest rootfs to find one in, and the host's own "
-            "busybox does not run in the guest"
-        )
 
     if args.gdb is not None:
         if kernel.version:
@@ -1945,10 +1961,11 @@ def do_it() -> int:
                 f"mount --bind {fstab_path} /etc/fstab",
             ]
         )
-        if args.root_disk is not None and kernel.moddir is not None:
-            # A disk image is unrelated to the kernel under test, so its
-            # modules cannot be reached through the guest root and need a
-            # mount of their own.
+        if kernel.moddir is not None and (
+            args.root_disk is not None
+            or get_guest_relative_path(kernel.moddir, args.root) is None
+        ):
+            # Modules outside the guest root need a mount of their own.
             if args.kdir is not None and not kernel.use_root_mods:
                 # virtme-prep-kdir-mods fills kernel.moddir with symlinks
                 # pointing back into the kdir, which would dangle at the mount
@@ -2573,6 +2590,22 @@ def do_it() -> int:
         )
 
     initrdpath: str | None
+
+    # The root is mounted by the kernel itself, so only modules needed before
+    # init require an initramfs; the guest loads the others later.
+    need_initramfs |= any(
+        kernel.alias_modfiles.get(alias)
+        for alias in get_boot_modaliases(args, qemuargs)
+    )
+
+    config.root_disk = args.root_disk is not None and need_initramfs
+
+    if config.root_disk and not is_native and args.busybox is None:
+        arg_fail(
+            "--root-disk needs an explicit --busybox for a foreign --arch: "
+            "there is no guest rootfs to find one in, and the host's own "
+            "busybox does not run in the guest"
+        )
 
     if need_initramfs:
         if args.busybox is not None:

@@ -72,6 +72,10 @@ def find_modules_from_install(aliases, root=None, kver=None, moddir=None):
     )
 
 
+def find_modules_by_alias(aliases, root=None, kver=None) -> dict[str, list[str]]:
+    return {a: resolve_dep(a, root=root, kver=kver) for a in aliases}
+
+
 @contextlib.contextmanager
 def get_mod_path(moddir, kver):
     """
