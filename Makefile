@@ -70,7 +70,7 @@ endif
 # Cross-build the init for a non-native guest, e.g. `make init-riscv64`.
 # Create $(GUEST_DIR)/bin first: on a fresh checkout it does not exist yet
 # and cargo install has only staged into $(INIT_INSTALL_ROOT).
-init-%: RUST_TARGET = $(or $(RUST_TARGET_$*),$*-unknown-linux-musl)
+init-%: RUST_TARGET ?= $(or $(RUST_TARGET_$*),$*-unknown-linux-musl)
 init-%: FORCE
 	cd $(INIT_DIR) && $(CARGO) install --path . --root $(INIT_INSTALL_ROOT)/$* --force $(CARGO_INSTALL_ARGS) --target $(RUST_TARGET)
 	mkdir -p $(GUEST_DIR)/bin
