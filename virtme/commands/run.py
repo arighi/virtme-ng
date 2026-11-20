@@ -17,6 +17,7 @@ import re
 import shlex
 import signal
 import socket
+import stat
 import subprocess
 import sys
 import tempfile
@@ -43,7 +44,12 @@ from virtme_ng.utils import (
     VIRTME_SSH_HOSTNAME_CID_SEPARATORS,
     get_conf,
 )
-from virtme_ng.virtiofs import VirtioFSConfig, VirtioFSState, export_virtiofs
+from virtme_ng.virtiofs import (
+    VirtioFS,
+    VirtioFSConfig,
+    VirtioFSState,
+    export_virtiofs,
+)
 
 from .. import (
     architectures,
@@ -1056,6 +1062,42 @@ def has_external_root(args) -> bool:
     return args.root != "/" or args.root_disk is not None
 
 
+# Entries probed besides the root directory: a rootfs only owned by the user
+# at its top level (e.g. a fakeroot image or a tarball with numeric owners)
+# would not be fixed by mapping the guest root alone.
+_ROOTFS_PROBE_ENTRIES = ("etc", "usr", "bin", "sbin", "lib", "var")
+
+
+def rootfs_ownership(path: str) -> tuple[int, int] | None:
+    """Return the uniform (uid, gid) owning the rootfs at PATH.
+
+    Only the root directory and a few well-known top-level entries are
+    checked; symlinks among them are skipped, as their owner says
+    nothing about the image (a `chown -R` without `-h` leaves the
+    merged-usr symlinks bin, sbin and lib behind as root-owned) and
+    their targets are covered by the other entries. Return None if the
+    ownership cannot be determined or if the top-level entries have
+    mixed ownership. This is a heuristic snapshot taken during startup;
+    files deeper in the tree with different ownership are not covered.
+    """
+    try:
+        st = os.stat(path)
+    except OSError:
+        return None
+    owner = (st.st_uid, st.st_gid)
+    for name in _ROOTFS_PROBE_ENTRIES:
+        try:
+            # Do not follow symlinks: absolute ones point to the host.
+            st = os.lstat(os.path.join(path, name))
+        except OSError:
+            continue
+        if stat.S_ISLNK(st.st_mode):
+            continue
+        if (st.st_uid, st.st_gid) != owner:
+            return None
+    return owner
+
+
 def detect_disk_format(path: str, verbose: bool = False) -> str:
     """Return the QEMU image format of PATH, defaulting to raw."""
     try:
@@ -1574,6 +1616,19 @@ def do_it() -> int:
         else:
             virt_arch = arch
         if args.root_disk is None:
+            translate_uid = None
+            translate_gid = None
+            owner = rootfs_ownership(args.root)
+            if owner is not None and owner != (0, 0):
+                if VirtioFS.may_translate_owner(owner):
+                    translate_uid, translate_gid = owner
+                else:
+                    owner_uid, owner_gid = owner
+                    sys.stderr.write(
+                        f"virtme-run: rootfs is owned by uid {owner_uid}, gid {owner_gid}, "
+                        f"but virtme-ng runs as uid {os.getuid()}, gid {os.getgid()}: "
+                        "the guest root is not mapped to the rootfs owner\n"
+                    )
             virtiofs_config = VirtioFSConfig(
                 path=args.root,
                 mount_tag="ROOTFS",
@@ -1583,6 +1638,8 @@ def do_it() -> int:
                 # When sharing the host root (/), --posix-acl breaks UID/GID
                 # translation which causes authentication failures.
                 posix_acl=(has_external_root(args) and not args.no_root_posix_acl),
+                translate_uid=translate_uid,
+                translate_gid=translate_gid,
             )
             use_virtiofs = export_virtiofs(
                 virt_arch,
