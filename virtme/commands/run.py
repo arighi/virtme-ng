@@ -169,6 +169,14 @@ def make_parser() -> "VirtmeArgumentParser":
         ),
     )
     g.add_argument(
+        "--no-root-uid-map",
+        action="store_true",
+        help=(
+            "Do not map the guest root to the owner of a user-owned root "
+            "filesystem (ignored with 9p or --root-disk)"
+        ),
+    )
+    g.add_argument(
         "--gdb",
         action="store",
         nargs="?",
@@ -1618,17 +1626,18 @@ def do_it() -> int:
         if args.root_disk is None:
             translate_uid = None
             translate_gid = None
-            owner = rootfs_ownership(args.root)
-            if owner is not None and owner != (0, 0):
-                if VirtioFS.may_translate_owner(owner):
-                    translate_uid, translate_gid = owner
-                else:
-                    owner_uid, owner_gid = owner
-                    sys.stderr.write(
-                        f"virtme-run: rootfs is owned by uid {owner_uid}, gid {owner_gid}, "
-                        f"but virtme-ng runs as uid {os.getuid()}, gid {os.getgid()}: "
-                        "the guest root is not mapped to the rootfs owner\n"
-                    )
+            if not args.no_root_uid_map:
+                owner = rootfs_ownership(args.root)
+                if owner is not None and owner != (0, 0):
+                    if VirtioFS.may_translate_owner(owner):
+                        translate_uid, translate_gid = owner
+                    else:
+                        owner_uid, owner_gid = owner
+                        sys.stderr.write(
+                            f"virtme-run: rootfs is owned by uid {owner_uid}, gid {owner_gid}, "
+                            f"but virtme-ng runs as uid {os.getuid()}, gid {os.getgid()}: "
+                            "the guest root is not mapped to the rootfs owner\n"
+                        )
             virtiofs_config = VirtioFSConfig(
                 path=args.root,
                 mount_tag="ROOTFS",

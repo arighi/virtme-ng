@@ -12,7 +12,7 @@ import tempfile
 import unittest
 from unittest import mock
 
-from virtme.commands.run import rootfs_ownership
+from virtme.commands.run import make_parser, rootfs_ownership
 from virtme_ng.virtiofs import (
     _VIRTIOFSD_HELP,
     VirtioFS,
@@ -493,6 +493,31 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         self.assertTrue(any("mapping guest root" in msg for msg in messages))
         self.assertTrue(any("disabling POSIX ACLs" in msg for msg in messages))
 
+    def test_unset_translate_keeps_acl_and_does_not_announce_mapping(self):
+        # Without a uid/gid translation (what --no-root-uid-map makes do_it()
+        # pass down): the guest root is not mapped to the rootfs owner, so
+        # the POSIX ACLs are kept and nothing is announced.
+        help_result = mock.MagicMock(
+            returncode=0, stdout="--translate-uid\n--translate-gid\n--readonly"
+        )
+        with (
+            mock.patch("virtme_ng.virtiofs.subprocess.run", return_value=help_result),
+            mock.patch("virtme_ng.virtiofs.sys.stderr") as stderr,
+        ):
+            self.assertTrue(
+                VirtioFS(self.tempdir.name).start(
+                    _rootfs_config(
+                        posix_acl=True, translate_uid=None, translate_gid=None
+                    ),
+                    verbose=False,
+                )
+            )
+        self.assertIn("--posix-acl", self.popen_argv)
+        self.assertFalse(any("--translate" in arg for arg in self.popen_argv))
+        messages = [call.args[0] for call in stderr.write.call_args_list]
+        self.assertFalse(any("mapping guest root" in msg for msg in messages))
+        self.assertFalse(any("disabling POSIX ACLs" in msg for msg in messages))
+
     def test_translate_uid_without_translate_gid_is_unsupported(self):
         help_result = mock.MagicMock(returncode=0, stdout="--translate-uid")
         with (
@@ -737,6 +762,18 @@ class CleanupTests(unittest.TestCase):
         virtio_fs.proc.terminate.assert_called_once_with()
         self.assertFalse(os.path.exists(virtio_fs.sock))
         self.assertFalse(os.path.exists(virtio_fs.sock + ".pid"))
+
+
+class NoRootUidMapCliTests(unittest.TestCase):
+    def test_parser_defaults_to_false(self):
+        parser = make_parser()
+        args = parser.parse_args(["--mods", "none"])
+        self.assertFalse(args.no_root_uid_map)
+
+    def test_parser_accepts_flag(self):
+        parser = make_parser()
+        args = parser.parse_args(["--mods", "none", "--no-root-uid-map"])
+        self.assertTrue(args.no_root_uid_map)
 
 
 if __name__ == "__main__":
