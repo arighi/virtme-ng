@@ -812,6 +812,23 @@ class KernelSource:
                 dry_run=args.dry_run,
             )
 
+    def _warn_ignored_config(self, args):
+        """Warn that an existing .config makes --config/--configitem no-ops."""
+        if not args.config and not args.configitem:
+            return
+        # Same lookup as virtme-configkernel: O= takes precedence over
+        # KBUILD_OUTPUT.
+        config_dir = os.environ.get("KBUILD_OUTPUT")
+        for var in args.envs:
+            if var.startswith("O="):
+                config_dir = var[2:]
+        config = os.path.join(config_dir or ".", ".config")
+        if os.path.exists(config):
+            sys.stderr.write(
+                f"warning: {config} already exists, --config and --configitem "
+                "are not applied; run 'vng --kconfig' with them to regenerate it\n"
+            )
+
     def config(self, args):
         """Perform a make config operation on a kernel source directory."""
         arch = args.arch
@@ -823,6 +840,7 @@ class KernelSource:
             cmd.append("--verbose")
         if not args.force and not args.kconfig:
             cmd.append("--no-update")
+            self._warn_ignored_config(args)
         if arch is not None:
             if arch not in ARCH_MAPPING:
                 arg_fail(f"unsupported architecture: {arch}")
