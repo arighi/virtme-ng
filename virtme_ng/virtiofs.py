@@ -294,9 +294,9 @@ class VirtioFS:
         # Export the whole root fs of the host, do not enable sandbox, otherwise we
         # would get permission errors.
         if verbose:
-            stderr = None
+            stdout = stderr = None
         else:
-            stderr = subprocess.DEVNULL
+            stdout = stderr = subprocess.DEVNULL
         # Only enable --posix-acl when using an external root filesystem.
         # When sharing the host root (/), --posix-acl breaks UID/GID translation
         # which causes authentication failures (e.g., unix_chkpwd cannot obtain
@@ -366,6 +366,7 @@ class VirtioFS:
             self.proc = subprocess.Popen(  # pylint: disable=W1509
                 virtiofsd_cmd,
                 stdin=subprocess.DEVNULL,
+                stdout=stdout,
                 stderr=stderr,
                 process_group=0,
                 preexec_fn=_die_with_parent(),

@@ -497,6 +497,7 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         self.assertNotIn("--posix-acl", argv)
         self.assertNotIn("--readonly", argv)
         self.assertEqual(self.popen_kwargs["stderr"], subprocess.DEVNULL)
+        self.assertEqual(self.popen_kwargs["stdout"], subprocess.DEVNULL)
         # The daemon must not share the terminal's stdin and process group.
         self.assertEqual(self.popen_kwargs["stdin"], subprocess.DEVNULL)
         self.assertEqual(self.popen_kwargs["process_group"], 0)
@@ -504,10 +505,11 @@ class VirtioFSStartTests(DaemonPatchMixin, unittest.TestCase):
         self.assertTrue(callable(self.popen_kwargs["preexec_fn"]))
         self.assertNotIn("start_new_session", self.popen_kwargs)
 
-    def test_verbose_keeps_stderr_inherited(self):
+    def test_verbose_keeps_stdout_and_stderr_inherited(self):
         self.assertTrue(
             VirtioFS(self.tempdir.name).start(_rootfs_config(), verbose=True)
         )
+        self.assertIsNone(self.popen_kwargs["stdout"])
         self.assertIsNone(self.popen_kwargs["stderr"])
 
     def test_timeout_returns_false(self):
