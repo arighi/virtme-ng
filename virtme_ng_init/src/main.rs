@@ -1111,15 +1111,14 @@ fn run_user_script(uid: u32) -> bool {
             utils::do_symlink(src, dst);
         }
 
-        // Detach the process from the controlling terminal
-        let open_tty = |path| {
+        let open_port = |path| {
             open(path, OFlag::O_RDWR, Mode::empty())
-                .expect("failed to open console.")
+                .unwrap_or_else(|err| panic!("failed to open {path}: {err}"))
                 .into_raw_fd()
         };
-        let tty_in = open_tty("/dev/virtio-ports/virtme.stdin");
-        let tty_out = open_tty("/dev/virtio-ports/virtme.stdout");
-        let tty_err = open_tty("/dev/virtio-ports/virtme.stderr");
+        let stdin_port = open_port("/dev/virtio-ports/virtme.stdin");
+        let stdout_port = open_port("/dev/virtio-ports/virtme.stdout");
+        let stderr_port = open_port("/dev/virtio-ports/virtme.stderr");
 
         // Determine if we need to switch to a different user, or if we can run the script as root.
         let user = env::var("virtme_user").unwrap_or_else(|_| String::new());
@@ -1134,26 +1133,28 @@ fn run_user_script(uid: u32) -> bool {
             let child = Command::new(cmd)
                 .args(&args)
                 .pre_exec(move || {
+                    // Detach the process from the controlling terminal
                     libc::setsid();
                     libc::close(libc::STDIN_FILENO);
                     libc::close(libc::STDOUT_FILENO);
                     libc::close(libc::STDERR_FILENO);
-                    // Make stdin a controlling tty.
-                    let stdin_fd = libc::dup2(tty_in, libc::STDIN_FILENO);
-                    libc::ioctl(stdin_fd, libc::TIOCSCTTY, 1);
-                    libc::dup2(tty_out, libc::STDOUT_FILENO);
-                    libc::dup2(tty_err, libc::STDERR_FILENO);
-                    libc::close(tty_in);
-                    libc::close(tty_out);
-                    libc::close(tty_err);
+                    // The virtio-serial ports are not terminals: there is
+                    // no controlling terminal to acquire for the script.
+                    // TODO Add pseudo-tty support
+                    libc::dup2(stdin_port, libc::STDIN_FILENO);
+                    libc::dup2(stdout_port, libc::STDOUT_FILENO);
+                    libc::dup2(stderr_port, libc::STDERR_FILENO);
+                    libc::close(stdin_port);
+                    libc::close(stdout_port);
+                    libc::close(stderr_port);
                     Ok(())
                 })
                 .spawn()
                 .expect("Failed to start user script process");
 
-            libc::close(tty_in);
-            libc::close(tty_out);
-            libc::close(tty_err);
+            libc::close(stdin_port);
+            libc::close(stdout_port);
+            libc::close(stderr_port);
 
             let ret = wait_for_child(child.id() as i32);
 
