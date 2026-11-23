@@ -139,6 +139,25 @@ Requirements
  * Optionally, you may need `sshd` installed for the `--ssh` and
    `--ssh-client` options.
 
+ * Building a kernel (`vng --build`) requires `git` (the kernel source must
+   be a git repository), `make` and a C compiler toolchain. `ccache` is used
+   automatically when it is present in `$PATH`.
+
+ * Remote builds (`--build-host`) additionally require `ssh` and `rsync` on
+   the local host, and `git`, `bash` and `make` on the build host.
+
+ * Optionally, `--root-disk` uses `qemu-img` to detect the disk image
+   format; without it the image is assumed to be raw.
+
+ * Optionally, `--ssh` and `--ssh-client` also require `ssh-keygen` on the
+   host.
+
+ * Optionally, `file` and `strings` are used to detect the version of a
+   kernel image; when neither is available, the detection may fail.
+
+ * A few other tools (`getfacl`, `lsb_release` on remote build hosts) are
+   used opportunistically and degrade gracefully when missing.
+
  * Optionally, if the shell completion is not available (e.g. when installed
    from pip or from source), you can install `shtab` and run:
    ```console
