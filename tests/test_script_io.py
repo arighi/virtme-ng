@@ -563,13 +563,10 @@ class ScriptIOTests(unittest.TestCase):
                 self.assertCountEqual(self._lines(stdout), expected_out + expected_err)
                 self.assertEqual(stderr, b"")
 
-    # Direct /dev/stdout and /dev/stderr writes on a regular-file stdout
-    # go through chardevs that open the same file as the script's own
-    # stdout and stderr: each open has its own offset, so the writers
-    # overwrite each other's output. Expected to fail until the chardevs
-    # open the file with O_APPEND.
-    @unittest.expectedFailure
     def test_stdio_modes_file_output(self):
+        # Host stdout and stderr as regular files: the direct /dev/stdout
+        # and /dev/stderr writes go through chardevs that open the same
+        # file as the script's own stdout and stderr.
         for shell_init in (False, True):
             with self.subTest(shell_init=shell_init):
                 stdout, stderr = self.run_guest(
@@ -587,23 +584,26 @@ class ScriptIOTests(unittest.TestCase):
         # Console mode has no file-stdin variant: it requires host stdin to
         # be inaccessible (see STDIO_MODES).
         for payload in (b"payload\n", b""):
-            for shell_init in (False, True):
-                with self.subTest(payload=payload, shell_init=shell_init):
-                    with tempfile.TemporaryFile() as input_file:
-                        input_file.write(payload)
-                        input_file.seek(0)
-                        stdout, stderr = self.run_guest(
-                            script=MATRIX_SCRIPT,
-                            input_data=input_file,
-                            files=False,
-                            shell_init=shell_init,
+            for files in (False, True):
+                for shell_init in (False, True):
+                    with self.subTest(
+                        payload=payload, files=files, shell_init=shell_init
+                    ):
+                        with tempfile.TemporaryFile() as input_file:
+                            input_file.write(payload)
+                            input_file.seek(0)
+                            stdout, stderr = self.run_guest(
+                                script=MATRIX_SCRIPT,
+                                input_data=input_file,
+                                files=files,
+                                shell_init=shell_init,
+                            )
+                        self._assert_mode_output(
+                            "ports",
+                            stdout,
+                            stderr,
+                            b"READ:payload" if payload else b"READ:EOF",
                         )
-                    self._assert_mode_output(
-                        "ports",
-                        stdout,
-                        stderr,
-                        b"READ:payload" if payload else b"READ:EOF",
-                    )
 
     def test_large_input(self):
         # 1 MiB of stdin through the virtio port, well over the pipe

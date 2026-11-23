@@ -2306,8 +2306,16 @@ def do_it() -> int:
         )
         if fds_accessible:
             # Valid stdin/stdout/stderr: console & script I/O use host fds.
+            # Several chardevs below open the same host file through
+            # /proc/self/fd/<N>: without O_APPEND each open would have its
+            # own offset and they would overwrite each other's output
+            # whenever the fd is a regular file. append=on is a no-op for
+            # the other fd types (pipes, FIFOs, character devices have no
+            # file offset, so O_APPEND is ignored), so it is always safe.
             qemuargs.extend(arch.qemu_serial_console_args())
-            qemuargs.extend(["-chardev", f"file,id=console,path={console_output}"])
+            qemuargs.extend(
+                ["-chardev", f"file,id=console,path={console_output},append=on"]
+            )
             kernelargs.extend(["console=" + arg for arg in arch.serial_console_args()])
             kernelargs.extend(arch.earlyconsole_args())
             kernelargs.extend(console_args)
@@ -2317,22 +2325,22 @@ def do_it() -> int:
             # script stdout/stderr and for direct /dev/stdout/err writes.
             add_serial_port("stdio,id=stdin,signal=on,mux=off", "stdin", "virtme.stdin")
             add_serial_port(
-                f"file,id=stdout,path=/proc/self/fd/{STDOUT_FILENO}",
+                f"file,id=stdout,path=/proc/self/fd/{STDOUT_FILENO},append=on",
                 "stdout",
                 "virtme.stdout",
             )
             add_serial_port(
-                f"file,id=stderr,path=/proc/self/fd/{STDERR_FILENO}",
+                f"file,id=stderr,path=/proc/self/fd/{STDERR_FILENO},append=on",
                 "stderr",
                 "virtme.stderr",
             )
             add_serial_port(
-                f"file,id=dev_stdout,path=/proc/self/fd/{STDOUT_FILENO}",
+                f"file,id=dev_stdout,path=/proc/self/fd/{STDOUT_FILENO},append=on",
                 "dev_stdout",
                 "virtme.dev_stdout",
             )
             add_serial_port(
-                f"file,id=dev_stderr,path=/proc/self/fd/{STDERR_FILENO}",
+                f"file,id=dev_stderr,path=/proc/self/fd/{STDERR_FILENO},append=on",
                 "dev_stderr",
                 "virtme.dev_stderr",
             )
