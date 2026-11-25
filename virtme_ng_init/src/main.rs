@@ -785,7 +785,10 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         Some(handle)
     } else {
         log!("udev disabled or udevd not found; skipping udev");
-        // SAFETY: called at the beginning of main(), before any other thread is spawned.
+        // SAFETY: The only other thread that may be running is the vsock proxy
+        // (see setup_socat_console()), which doesn't read the environment itself:
+        // it only spawns socat, and std serializes Command::spawn() with
+        // set_var()/remove_var() via its internal environment lock.
         unsafe { env::set_var("virtme_no_udev", "1") };
         create_virtio_port_links();
         create_disk_links();
