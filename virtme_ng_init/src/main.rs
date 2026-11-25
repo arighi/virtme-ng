@@ -26,6 +26,7 @@ use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
 use std::os::fd::{AsRawFd, IntoRawFd, OwnedFd};
+use std::os::unix::fs::PermissionsExt;
 use std::os::unix::process::CommandExt;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Stdio, exit, id};
@@ -311,6 +312,11 @@ fn configure_hostname() {
 fn run_systemd_tmpfiles() {
     if env::var("virtme_no_tmpfiles").as_deref() == Ok("1") {
         log!("systemd-tmpfiles disabled; skipping tmpfiles setup");
+        // The /tmp overlay starts with mode 0755; tmpfiles normally fixes it.
+        if let Err(err) = std::fs::set_permissions("/tmp", std::fs::Permissions::from_mode(0o1777))
+        {
+            log!("failed to set /tmp permissions: {}", err);
+        }
         return;
     }
 
