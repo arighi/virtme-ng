@@ -270,6 +270,8 @@ mount_virtme_initmounts() {
 run_systemd_tmpfiles() {
     if [[ ${virtme_no_tmpfiles:-} == 1 ]]; then
         log "systemd-tmpfiles disabled; skipping tmpfiles setup"
+        # The /tmp overlay starts with mode 0755; tmpfiles normally fixes it.
+        chmod 1777 /tmp || log "failed to set /tmp permissions"
         return
     fi
 
