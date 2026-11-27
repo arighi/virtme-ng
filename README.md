@@ -130,7 +130,10 @@ Requirements
    binary somewhere in your path.
 
  * Optionally, you may need virtiofsd 1.7.0 (or higher) for better filesystem
-   performance inside the virtme-ng guests.
+   performance inside the virtme-ng guests. Use `--virtiofsd /path/to/virtiofsd`
+   to select a specific binary instead of the auto-detected one. If the given
+   binary is not usable, a warning is printed and the 9p filesystem is used
+   instead.
 
  * Optionally, you may need `socat` for the `--console` and
    `--console-client` options, and the host's kernel should support VSOCK
@@ -878,6 +881,15 @@ Troubleshooting
    mount apparently succeeding, followed by `switch_root` failing with
    `Connection refused` and the guest panicking. In this case, try disabling
    ACLs on the root virtiofs export with `--no-root-posix-acl`.
+
+ - A root filesystem owned by the invoking user (e.g. a prebuilt image
+   generated as a regular user with mkosi) is exported with the guest root
+   mapped to that user, so that the guest root matches the ownership of the
+   files. When running as root (e.g. with `sudo`), a root filesystem entirely
+   owned by a single non-root user is mapped the same way. This drops the POSIX
+   ACLs of the root virtiofs export, and files below the top level that are
+   owned by someone else show up as `nobody` in the guest. To keep the previous
+   ownership view, disable the mapping with `--no-root-uid-map`.
 
  - If you get permission denied when starting qemu, make sure that your
    username is assigned to the group `kvm` or `libvirt`:

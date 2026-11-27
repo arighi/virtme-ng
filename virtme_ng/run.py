@@ -270,6 +270,16 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
     parser.add_argument("--qemu", action="store", help="Use the specified QEMU binary")
 
     parser.add_argument(
+        "--virtiofsd",
+        action="store",
+        metavar="PATH",
+        help=(
+            "Use the specified virtiofsd binary (if it is not usable, a "
+            "warning is printed and 9p is used instead)"
+        ),
+    )
+
+    parser.add_argument(
         "--name",
         action="store",
         default="virtme-ng",
@@ -341,6 +351,15 @@ virtme-ng is based on virtme, written by Andy Lutomirski <luto@kernel.org>.
         help=(
             "Disable POSIX ACL support for external root virtiofs exports "
             "(ignored with 9p, host root, or --root-disk)"
+        ),
+    )
+
+    parser.add_argument(
+        "--no-root-uid-map",
+        action="store_true",
+        help=(
+            "Do not map the guest root to the owner of a user-owned root "
+            "filesystem (ignored with 9p or --root-disk)"
         ),
     )
 
@@ -1123,6 +1142,12 @@ class KernelSource:
         else:
             self.virtme_param["no_root_posix_acl"] = ""
 
+    def _get_virtme_no_root_uid_map(self, args):
+        if args.no_root_uid_map:
+            self.virtme_param["no_root_uid_map"] = "--no-root-uid-map"
+        else:
+            self.virtme_param["no_root_uid_map"] = ""
+
     def _get_virtme_cwd(self, args):
         if args.cwd is not None:
             self.virtme_param["cwd"] = "--cwd " + args.cwd
@@ -1474,6 +1499,14 @@ class KernelSource:
         else:
             self.virtme_param["qemu"] = ""
 
+    def _get_virtme_virtiofsd(self, args):
+        if args.virtiofsd is not None:
+            self.virtme_param["virtiofsd"] = (
+                f"--virtiofsd {shlex.quote(args.virtiofsd)}"
+            )
+        else:
+            self.virtme_param["virtiofsd"] = ""
+
     def _get_virtme_cpus(self, args):
         if args.cpus is None:
             cpus = self.cpus
@@ -1514,6 +1547,7 @@ class KernelSource:
         self._get_virtme_systemd(args)
         self._get_virtme_rw(args)
         self._get_virtme_no_root_posix_acl(args)
+        self._get_virtme_no_root_uid_map(args)
         self._get_virtme_rodir(args)
         self._get_virtme_rwdir(args)
         self._get_virtme_overlay_rwdir(args)
@@ -1557,6 +1591,7 @@ class KernelSource:
         self._get_virtme_nvgpu(args)
         self._get_virtme_vfio_pci(args)
         self._get_virtme_qemu(args)
+        self._get_virtme_virtiofsd(args)
         self._get_virtme_qemu_opts(args)
 
         # Start VM using virtme-run
@@ -1572,6 +1607,7 @@ class KernelSource:
             + f"{self.virtme_param['systemd']} "
             + f"{self.virtme_param['rw']} "
             + f"{self.virtme_param['no_root_posix_acl']} "
+            + f"{self.virtme_param['no_root_uid_map']} "
             + f"{self.virtme_param['rodir']} "
             + f"{self.virtme_param['rwdir']} "
             + f"{self.virtme_param['overlay_rwdir']} "
@@ -1615,6 +1651,7 @@ class KernelSource:
             + f"{self.virtme_param['nvgpu']} "
             + f"{self.virtme_param['vfio_pci']} "
             + f"{self.virtme_param['qemu']} "
+            + f"{self.virtme_param['virtiofsd']} "
             + f"{self.virtme_param['qemu_opts']} "
             # Important: qemu_opts has to be the last one
         )
