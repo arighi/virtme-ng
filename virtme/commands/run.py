@@ -1626,7 +1626,7 @@ def do_it() -> int:
     arch = architectures.get(args.arch)
     is_native = arch.is_native()
 
-    qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
+    qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname, is_native)
     qemu.probe()
 
     # Check if initramfs is required.

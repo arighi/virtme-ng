@@ -4,7 +4,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from virtme import architectures
+from virtme import architectures, qemu_helpers
 from virtme.commands import run
 from virtme_ng import run as vng_run
 
@@ -79,6 +79,22 @@ class MicrovmTests(unittest.TestCase):
 
     def test_other_arch(self):
         self.assertFalse(self.can_use_microvm("aarch64", arch="aarch64"))
+
+
+class QemuTests(unittest.TestCase):
+    def test_kvm_fallback(self):
+        which = {"qemu-kvm": "/usr/bin/qemu-kvm"}
+        with on_host("arm64"), mock.patch("shutil.which", which.get):
+            is_native = architectures.get("aarch64").is_native()
+            qemu = qemu_helpers.Qemu(None, "aarch64", is_native)
+        self.assertEqual(qemu.qemubin, "/usr/bin/qemu-kvm")
+
+    def test_no_kvm_fallback_for_foreign_arch(self):
+        which = {"qemu-kvm": "/usr/bin/qemu-kvm"}
+        with on_host("x86_64"), mock.patch("shutil.which", which.get):
+            is_native = architectures.get("aarch64").is_native()
+            with self.assertRaises(ValueError):
+                qemu_helpers.Qemu(None, "aarch64", is_native)
 
 
 if __name__ == "__main__":
