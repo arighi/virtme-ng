@@ -332,7 +332,7 @@ def do_it():
     args = _ARGPARSER.parse_args()
 
     arch = architectures.get(args.arch)
-    is_native = args.arch == platform.machine()
+    is_native = arch.is_native()
 
     # Determine if an initial config is present
     config = ".config"

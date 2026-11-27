@@ -13,10 +13,42 @@ def on_host(machine):
 
 
 class ArchitectureTests(unittest.TestCase):
-    @unittest.expectedFailure
     def test_arm64_is_an_alias_of_aarch64(self):
         self.assertIs(architectures.get("arm64"), architectures.get("aarch64"))
         self.assertEqual(architectures.get("arm64").virtmename, "aarch64")
+
+    def test_native_arch(self):
+        for host, guest in [
+            ("x86_64", "x86_64"),
+            ("aarch64", "aarch64"),
+            ("aarch64", "arm64"),
+            ("arm64", "aarch64"),
+            ("arm64", "arm64"),
+            ("ppc64le", "ppc64le"),
+            ("s390x", "s390x"),
+            ("i386", "i386"),
+            ("arm", "arm"),
+            ("ppc64", "ppc64"),
+            ("riscv64", "riscv64"),
+            ("sparc64", "sparc64"),
+        ]:
+            with self.subTest(host=host, guest=guest), on_host(host):
+                self.assertTrue(architectures.get(guest).is_native())
+
+    def test_non_native_arch(self):
+        for host, guest in [
+            ("x86_64", "aarch64"),
+            ("aarch64", "x86_64"),
+            ("ppc64le", "ppc64"),
+            ("s390x", "x86_64"),
+            ("x86_64", "s390x"),
+            ("x86_64", "i386"),
+            ("aarch64", "arm"),
+            ("x86_64", "riscv64"),
+            ("x86_64", "sparc64"),
+        ]:
+            with self.subTest(host=host, guest=guest), on_host(host):
+                self.assertFalse(architectures.get(guest).is_native())
 
 
 class MicrovmTests(unittest.TestCase):

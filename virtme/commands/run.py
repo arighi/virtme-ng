@@ -1624,7 +1624,7 @@ def do_it() -> int:
         serial_getty_file = serial_getty_dir.joinpath("virtme-ng.conf")
 
     arch = architectures.get(args.arch)
-    is_native = args.arch == platform.machine()
+    is_native = arch.is_native()
 
     qemu = qemu_helpers.Qemu(args.qemu_bin, arch.qemuname)
     qemu.probe()
