@@ -769,6 +769,7 @@ def get_host_arch():
     arch_map = {
         "x86_64": "amd64",
         "aarch64": "arm64",
+        "arm64": "arm64",  # macOS
         "armv7l": "armhf",
         "ppc64le": "ppc64el",
         "riscv64": "riscv64",

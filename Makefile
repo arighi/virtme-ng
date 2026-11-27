@@ -30,7 +30,7 @@ endif
 # rename it, so it cannot install it as virtme-ng-init-<arch> directly
 # (installing into $(GUEST_DIR) and renaming from there would clobber the
 # native init). Each arch gets its own root, so that parallel invocations
-# (make -j init-arm64 init-riscv64) cannot race for the staging binary.
+# (make -j init-aarch64 init-riscv64) cannot race for the staging binary.
 # Absolute, because cargo is invoked from $(INIT_DIR), and under target/ so
 # that it is covered by the virtme_ng_init/target gitignore entry.
 INIT_INSTALL_ROOT := $(abspath $(INIT_DIR)/target/install)
@@ -40,7 +40,7 @@ INIT_INSTALL_ROOT := $(abspath $(INIT_DIR)/target/install)
 # here default to <arch>-unknown-linux-musl. s390x has no official musl
 # target, so it uses gnu. Override with RUST_TARGET=<target>.
 RUST_TARGET_arm     := arm-unknown-linux-musleabihf
-RUST_TARGET_arm64   := aarch64-unknown-linux-musl
+RUST_TARGET_aarch64 := aarch64-unknown-linux-musl
 RUST_TARGET_i386    := i686-unknown-linux-musl
 RUST_TARGET_ppc64   := powerpc64-unknown-linux-musl
 RUST_TARGET_ppc64le := powerpc64le-unknown-linux-musl
@@ -60,21 +60,27 @@ init:
 	cd $(INIT_DIR) && $(CARGO) install --path . --root ../$(GUEST_DIR) --force $(CARGO_INSTALL_ARGS)
 	@echo "Version: $(GIT_DESCRIBE)"
 
+# Translate an architecture name to the one used by `vng --arch`: arm64 is an
+# alias of aarch64 (macOS reports arm64). Usage: $(call normalize_arch,<arch>)
+normalize_arch = $(patsubst arm64,aarch64,$(1))
+
 # On macOS, cross-compile the init to a Linux musl target. Only the native
 # init gets this default: init-<arch> always passes its own --target and
 # cargo rejects more than one.
 ifeq ($(shell uname -s),Darwin)
-init: CARGO_INSTALL_ARGS += --target $(patsubst arm64,aarch64,$(shell uname -m))-unknown-linux-musl
+init: CARGO_INSTALL_ARGS += --target $(call normalize_arch,$(shell uname -m))-unknown-linux-musl
 endif
 
-# Cross-build the init for a non-native guest, e.g. `make init-riscv64`.
+# Cross-build the init for a guest architecture, e.g. `make init-riscv64`, or
+# `make init-$(uname -m)` for the host.
 # Create $(GUEST_DIR)/bin first: on a fresh checkout it does not exist yet
 # and cargo install has only staged into $(INIT_INSTALL_ROOT).
-init-%: RUST_TARGET ?= $(or $(RUST_TARGET_$*),$*-unknown-linux-musl)
+init-%: INIT_ARCH = $(call normalize_arch,$*)
+init-%: RUST_TARGET ?= $(or $(RUST_TARGET_$(INIT_ARCH)),$(INIT_ARCH)-unknown-linux-musl)
 init-%: FORCE
-	cd $(INIT_DIR) && $(CARGO) install --path . --root $(INIT_INSTALL_ROOT)/$* --force $(CARGO_INSTALL_ARGS) --target $(RUST_TARGET)
+	cd $(INIT_DIR) && $(CARGO) install --path . --root $(INIT_INSTALL_ROOT)/$(INIT_ARCH) --force $(CARGO_INSTALL_ARGS) --target $(RUST_TARGET)
 	mkdir -p $(GUEST_DIR)/bin
-	mv $(INIT_INSTALL_ROOT)/$*/bin/virtme-ng-init $(INIT_BIN)-$*
+	mv $(INIT_INSTALL_ROOT)/$(INIT_ARCH)/bin/virtme-ng-init $(INIT_BIN)-$(INIT_ARCH)
 	@echo "Version: $(GIT_DESCRIBE)"
 
 # init-<arch> must always invoke cargo

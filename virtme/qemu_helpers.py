@@ -6,7 +6,6 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 import os
-import platform
 import re
 import shutil
 import subprocess
@@ -16,7 +15,7 @@ class Qemu:
     qemubin: str
     version: str | None
 
-    def __init__(self, qemubin, arch) -> None:
+    def __init__(self, qemubin, arch, is_native) -> None:
         self.arch = arch
         self.has_multidevs = None
         self.cannot_overmount_virtfs = None
@@ -24,7 +23,7 @@ class Qemu:
 
         if not qemubin:
             qemubin = shutil.which(f"qemu-system-{arch}")
-            if qemubin is None and arch == platform.machine():
+            if qemubin is None and is_native:
                 qemubin = shutil.which("qemu-kvm")
             if qemubin is None:
                 raise ValueError(f"cannot find qemu for {arch}")

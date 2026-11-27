@@ -6,6 +6,9 @@
 # 8177f97513213526df2cf6184d8ff986c675afb514d4e68a404010521b880643
 
 
+import platform
+
+
 class Arch:
     def __init__(self, name) -> None:
         self.virtmename = name
@@ -14,6 +17,10 @@ class Arch:
         self.gccname = name
 
     defconfig_target = "defconfig"
+
+    def is_native(self) -> bool:
+        """Whether this is the host architecture."""
+        return self.virtmename == get(platform.machine()).virtmename
 
     @staticmethod
     def virtiofs_support() -> bool:
@@ -507,7 +514,6 @@ ARCHES = {
         Arch_x86("i386"),
         Arch_arm(),
         Arch_aarch64("aarch64"),
-        Arch_aarch64("arm64"),
         Arch_ppc("ppc64"),
         Arch_ppc("ppc64le"),
         Arch_riscv64(),
@@ -517,7 +523,13 @@ ARCHES = {
 }
 
 
+# Alternative names accepted for an architecture. macOS reports arm64 for
+# aarch64, for instance.
+ALIASES = {"arm64": "aarch64"}
+
+
 def get(arch: str) -> Arch:
+    arch = ALIASES.get(arch, arch)
     if arch in ARCHES:
         return ARCHES[arch]
     return Arch_unknown(arch)

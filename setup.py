@@ -15,6 +15,7 @@ from setuptools import setup
 from setuptools.command.build_py import build_py
 from setuptools.command.egg_info import egg_info
 
+from virtme import architectures
 from virtme_ng.version import get_version_string
 
 os.environ["__VNG_LOCAL"] = "1"
@@ -51,9 +52,9 @@ class BuildPy(build_py):
         if build_virtme_ng_init:
             args = ["cargo", "install", "--path", ".", "--root", "../virtme/guest"]
             if platform.system() == "Darwin":
-                machine = platform.machine()
-                if machine == "arm64":
-                    machine = "aarch64"
+                # arm64 -> aarch64. The virtme-ng names of the Mac architectures
+                # (aarch64, x86_64) happen to be the Rust ones as well.
+                machine = architectures.get(platform.machine()).virtmename
                 args.extend(["--target", f"{machine}-unknown-linux-musl"])
             subprocess.check_call(args, cwd="virtme_ng_init")
 
