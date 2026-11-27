@@ -6,6 +6,7 @@ from unittest import mock
 
 from virtme import architectures
 from virtme.commands import run
+from virtme_ng import run as vng_run
 
 
 def on_host(machine):
@@ -49,6 +50,18 @@ class ArchitectureTests(unittest.TestCase):
         ]:
             with self.subTest(host=host, guest=guest), on_host(host):
                 self.assertFalse(architectures.get(guest).is_native())
+
+
+class HostArchTests(unittest.TestCase):
+    def test_get_host_arch(self):
+        for host, expected in [
+            ("x86_64", "amd64"),
+            ("aarch64", "arm64"),
+            ("arm64", "arm64"),
+            ("foo", None),
+        ]:
+            with self.subTest(host=host), on_host(host):
+                self.assertEqual(vng_run.get_host_arch(), expected)
 
 
 class MicrovmTests(unittest.TestCase):
