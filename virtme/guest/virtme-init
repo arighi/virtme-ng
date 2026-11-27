@@ -350,9 +350,32 @@ run_udevd() {
     else
         log "udev disabled or udevd not found; skipping udev"
         virtme_no_udev=1
+        coldplug_modules
         create_virtio_port_links
         create_disk_links
     fi
+}
+
+# Without udev nothing loads the drivers of the devices present at boot, so
+# do what its coldplug does, until loading them exposes no new devices.
+coldplug_modules() {
+    local -A seen=()
+    local -a new
+    local alias found
+
+    command -v modprobe > /dev/null || return
+    while :; do
+        new=()
+        # /dev/fd may not exist yet, so avoid process substitution.
+        found=$(find /sys/devices -name modalias -exec cat {} + 2> /dev/null)
+        while read -r alias; do
+            [[ -n $alias && -z ${seen[$alias]:-} ]] || continue
+            seen[$alias]=1
+            new+=("$alias")
+        done <<< "$found"
+        ((${#new[@]})) || break
+        modprobe -a -q "${new[@]}" > /dev/null 2>&1
+    done
 }
 
 # Without udev nothing creates the /dev/virtio-ports/<name> links that the

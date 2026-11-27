@@ -22,6 +22,7 @@ use nix::sys::utsname::uname;
 use nix::sys::wait::wait;
 use nix::unistd::sethostname;
 use nix::unistd::{AccessFlags, access};
+use std::collections::HashSet;
 use std::env;
 use std::fs::{File, OpenOptions};
 use std::io::{self, BufRead, BufReader, BufWriter, Write};
@@ -796,9 +797,51 @@ fn run_udevd() -> Option<thread::JoinHandle<()>> {
         // it only spawns socat, and std serializes Command::spawn() with
         // set_var()/remove_var() via its internal environment lock.
         unsafe { env::set_var("virtme_no_udev", "1") };
+        coldplug_modules();
         create_virtio_port_links();
         create_disk_links();
         None
+    }
+}
+
+// Without udev nothing loads the drivers of the devices present at boot, so
+// do what its coldplug does, until loading them exposes no new devices.
+fn coldplug_modules() {
+    let mut seen = HashSet::new();
+    loop {
+        let mut aliases = Vec::new();
+        collect_modaliases(Path::new("/sys/devices"), &mut aliases);
+        aliases.retain(|alias| seen.insert(alias.clone()));
+        if aliases.is_empty() {
+            break;
+        }
+        let _ = Command::new("modprobe")
+            .args(["-a", "-q"])
+            .args(&aliases)
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .status();
+    }
+}
+
+fn collect_modaliases(dir: &Path, aliases: &mut Vec<String>) {
+    let Ok(entries) = std::fs::read_dir(dir) else {
+        return;
+    };
+    for entry in entries.flatten() {
+        let Ok(file_type) = entry.file_type() else {
+            continue;
+        };
+        if file_type.is_dir() {
+            collect_modaliases(&entry.path(), aliases);
+        } else if entry.file_name() == "modalias"
+            && let Ok(alias) = std::fs::read_to_string(entry.path())
+        {
+            let alias = alias.trim();
+            if !alias.is_empty() {
+                aliases.push(alias.to_string());
+            }
+        }
     }
 }
 
