@@ -1,6 +1,8 @@
 """Tests for architecture names and native guest detection."""
 
+import tempfile
 import unittest
+from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
@@ -79,6 +81,34 @@ class MicrovmTests(unittest.TestCase):
 
     def test_other_arch(self):
         self.assertFalse(self.can_use_microvm("aarch64", arch="aarch64"))
+
+
+class FindVirtmeInitTests(unittest.TestCase):
+    def find(self, files, guest, host="x86_64"):
+        with tempfile.TemporaryDirectory() as tools, on_host(host):
+            (Path(tools) / "bin").mkdir()
+            for name in files:
+                (Path(tools) / "bin" / name).touch()
+            return run.find_virtme_init(tools, architectures.get(guest))
+
+    def test_arch_specific_init_is_preferred(self):
+        files = ["virtme-ng-init-x86_64", "virtme-ng-init"]
+        self.assertEqual(self.find(files, "x86_64"), "bin/virtme-ng-init-x86_64")
+
+    def test_native_falls_back_to_virtme_ng_init(self):
+        self.assertEqual(self.find(["virtme-ng-init"], "x86_64"), "bin/virtme-ng-init")
+
+    def test_alias_finds_the_canonical_init(self):
+        self.assertEqual(
+            self.find(["virtme-ng-init-aarch64"], "arm64"),
+            "bin/virtme-ng-init-aarch64",
+        )
+
+    def test_non_native_does_not_fall_back(self):
+        self.assertEqual(self.find(["virtme-ng-init"], "aarch64"), "virtme-init")
+
+    def test_no_init(self):
+        self.assertEqual(self.find([], "x86_64"), "virtme-init")
 
 
 class QemuTests(unittest.TestCase):

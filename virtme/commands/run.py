@@ -1215,6 +1215,20 @@ def can_use_microvm(args):
     )
 
 
+def find_virtme_init(guest_tools_path, arch):
+    """Return the guest init, preferring the faster virtme-ng-init.
+
+    Prefer virtme-ng-init-<arch>; native guests may fall back to virtme-ng-init.
+    """
+    candidates = [f"bin/virtme-ng-init-{arch.virtmename}"]
+    if arch.is_native():
+        candidates.append("bin/virtme-ng-init")
+    for cmd in candidates:
+        if os.path.exists(os.path.join(guest_tools_path, cmd)):
+            return cmd
+    return "virtme-init"
+
+
 def has_read_acl(username, file_path):
     try:
         # Execute the `getfacl` command and capture the output
@@ -1827,19 +1841,14 @@ def do_it() -> int:
         )
         export_virtfs(qemu, arch, qemuargs, virtfs_config)
 
-    # Use the faster virtme-ng-init if one is available for the guest
-    # architecture. The native build is bin/virtme-ng-init; static builds for
-    # other architectures can be installed as bin/virtme-ng-init-<arch>.
-    if is_native:
-        ng_init_cmd = "bin/virtme-ng-init"
-    else:
-        ng_init_cmd = f"bin/virtme-ng-init-{arch.virtmename}"
-    if not args.no_virtme_ng_init and os.path.exists(
-        os.path.join(guest_tools_path, ng_init_cmd)
-    ):
-        virtme_init_cmd = ng_init_cmd
-    else:
+    if args.no_virtme_ng_init:
         virtme_init_cmd = "virtme-init"
+    else:
+        # WORKAROUND: Use the requested guest architecture, as arch may have
+        # become microvm.
+        virtme_init_cmd = find_virtme_init(
+            guest_tools_path, architectures.get(args.arch)
+        )
 
     if args.systemd:
         # disable systemd-cryptsetup-generator so it doesn't wait for encrypted disks
