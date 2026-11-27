@@ -27,7 +27,7 @@ jobs:
         # Both build and runtime deps. This is the price of using pip.
         pip install 'argparse-manpage[setuptools]' argcomplete requests
 
-        pip install  pylint flake8
+        pip install  pylint flake8 pytest
     - name: Analysing the code with pylint
       run: |
         set -euxo pipefail

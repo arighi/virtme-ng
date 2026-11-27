@@ -20,7 +20,7 @@ jobs:
       - run: |
           sudo apt-get install --yes --no-install-recommends \
              git qemu-system-x86 udev iproute2 busybox-static coreutils \
-             python3-requests python3-argcomplete libvirt-clients kbd kmod \
+             python3-requests python3-argcomplete python3-pytest libvirt-clients kbd kmod \
              file rsync zstd virtiofsd
 
       # Ubuntu's patched Rust env can reject guest init execution via virtiofs.
@@ -65,4 +65,4 @@ jobs:
           test -r "${bzimage}"
 
           VIRTME_TEST_KERNEL="${bzimage}" \
-              python3 -m unittest discover -s tests -v
+              python3 -m pytest tests -v
