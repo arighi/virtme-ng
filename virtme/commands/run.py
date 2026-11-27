@@ -1211,6 +1211,7 @@ def can_use_microvm(args):
         not args.disable_microvm
         and not args.numa
         and args.arch == "x86_64"
+        and architectures.get(args.arch).is_native()
         and can_use_kvm(args)
     )
 

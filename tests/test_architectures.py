@@ -75,7 +75,6 @@ class MicrovmTests(unittest.TestCase):
     def test_native_x86_64(self):
         self.assertTrue(self.can_use_microvm("x86_64"))
 
-    @unittest.expectedFailure
     def test_non_native_x86_64(self):
         self.assertFalse(self.can_use_microvm("aarch64"))
 
