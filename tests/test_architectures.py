@@ -1,130 +1,122 @@
 """Tests for architecture names and native guest detection."""
 
-import tempfile
-import unittest
-from pathlib import Path
 from types import SimpleNamespace
-from unittest import mock
+
+import pytest
 
 from virtme import architectures, qemu_helpers
 from virtme.commands import run
 from virtme_ng import run as vng_run
 
 
-def on_host(machine):
-    return mock.patch("platform.machine", return_value=machine)
+def test_arm64_is_an_alias_of_aarch64():
+    assert architectures.get("arm64") is architectures.get("aarch64")
+    assert architectures.get("arm64").virtmename == "aarch64"
 
 
-class ArchitectureTests(unittest.TestCase):
-    def test_arm64_is_an_alias_of_aarch64(self):
-        self.assertIs(architectures.get("arm64"), architectures.get("aarch64"))
-        self.assertEqual(architectures.get("arm64").virtmename, "aarch64")
-
-    def test_native_arch(self):
-        for host, guest in [
-            ("x86_64", "x86_64"),
-            ("aarch64", "aarch64"),
-            ("aarch64", "arm64"),
-            ("arm64", "aarch64"),
-            ("arm64", "arm64"),
-            ("ppc64le", "ppc64le"),
-            ("s390x", "s390x"),
-            ("i386", "i386"),
-            ("arm", "arm"),
-            ("ppc64", "ppc64"),
-            ("riscv64", "riscv64"),
-            ("sparc64", "sparc64"),
-        ]:
-            with self.subTest(host=host, guest=guest), on_host(host):
-                self.assertTrue(architectures.get(guest).is_native())
-
-    def test_non_native_arch(self):
-        for host, guest in [
-            ("x86_64", "aarch64"),
-            ("aarch64", "x86_64"),
-            ("ppc64le", "ppc64"),
-            ("s390x", "x86_64"),
-            ("x86_64", "s390x"),
-            ("x86_64", "i386"),
-            ("aarch64", "arm"),
-            ("x86_64", "riscv64"),
-            ("x86_64", "sparc64"),
-        ]:
-            with self.subTest(host=host, guest=guest), on_host(host):
-                self.assertFalse(architectures.get(guest).is_native())
+@pytest.mark.parametrize(
+    "host, guest",
+    [
+        ("x86_64", "x86_64"),
+        ("aarch64", "aarch64"),
+        ("aarch64", "arm64"),
+        ("arm64", "aarch64"),
+        ("arm64", "arm64"),
+        ("ppc64le", "ppc64le"),
+        ("s390x", "s390x"),
+        ("i386", "i386"),
+        ("arm", "arm"),
+        ("ppc64", "ppc64"),
+        ("riscv64", "riscv64"),
+        ("sparc64", "sparc64"),
+    ],
+)
+def test_native_arch(monkeypatch, host, guest):
+    monkeypatch.setattr("platform.machine", lambda: host)
+    assert architectures.get(guest).is_native()
 
 
-class HostArchTests(unittest.TestCase):
-    def test_get_host_arch(self):
-        for host, expected in [
-            ("x86_64", "amd64"),
-            ("aarch64", "arm64"),
-            ("arm64", "arm64"),
-            ("foo", None),
-        ]:
-            with self.subTest(host=host), on_host(host):
-                self.assertEqual(vng_run.get_host_arch(), expected)
+@pytest.mark.parametrize(
+    "host, guest",
+    [
+        ("x86_64", "aarch64"),
+        ("aarch64", "x86_64"),
+        ("ppc64le", "ppc64"),
+        ("s390x", "x86_64"),
+        ("x86_64", "s390x"),
+        ("x86_64", "i386"),
+        ("aarch64", "arm"),
+        ("x86_64", "riscv64"),
+        ("x86_64", "sparc64"),
+    ],
+)
+def test_non_native_arch(monkeypatch, host, guest):
+    monkeypatch.setattr("platform.machine", lambda: host)
+    assert not architectures.get(guest).is_native()
 
 
-class MicrovmTests(unittest.TestCase):
-    def can_use_microvm(self, host, arch="x86_64"):
-        args = SimpleNamespace(disable_microvm=False, numa=None, arch=arch)
-        with on_host(host), mock.patch.object(run, "can_use_kvm", return_value=True):
-            return run.can_use_microvm(args)
-
-    def test_native_x86_64(self):
-        self.assertTrue(self.can_use_microvm("x86_64"))
-
-    def test_non_native_x86_64(self):
-        self.assertFalse(self.can_use_microvm("aarch64"))
-
-    def test_other_arch(self):
-        self.assertFalse(self.can_use_microvm("aarch64", arch="aarch64"))
+def can_use_microvm(monkeypatch, host, arch="x86_64"):
+    monkeypatch.setattr("platform.machine", lambda: host)
+    monkeypatch.setattr(run, "can_use_kvm", lambda args: True)
+    args = SimpleNamespace(disable_microvm=False, numa=None, arch=arch)
+    return run.can_use_microvm(args)
 
 
-class FindVirtmeInitTests(unittest.TestCase):
-    def find(self, files, guest, host="x86_64"):
-        with tempfile.TemporaryDirectory() as tools, on_host(host):
-            (Path(tools) / "bin").mkdir()
-            for name in files:
-                (Path(tools) / "bin" / name).touch()
-            return run.find_virtme_init(tools, architectures.get(guest))
-
-    def test_arch_specific_init_is_preferred(self):
-        files = ["virtme-ng-init-x86_64", "virtme-ng-init"]
-        self.assertEqual(self.find(files, "x86_64"), "bin/virtme-ng-init-x86_64")
-
-    def test_native_falls_back_to_virtme_ng_init(self):
-        self.assertEqual(self.find(["virtme-ng-init"], "x86_64"), "bin/virtme-ng-init")
-
-    def test_alias_finds_the_canonical_init(self):
-        self.assertEqual(
-            self.find(["virtme-ng-init-aarch64"], "arm64"),
-            "bin/virtme-ng-init-aarch64",
-        )
-
-    def test_non_native_does_not_fall_back(self):
-        self.assertEqual(self.find(["virtme-ng-init"], "aarch64"), "virtme-init")
-
-    def test_no_init(self):
-        self.assertEqual(self.find([], "x86_64"), "virtme-init")
+def test_microvm_native_x86_64(monkeypatch):
+    assert can_use_microvm(monkeypatch, "x86_64")
 
 
-class QemuTests(unittest.TestCase):
-    def test_kvm_fallback(self):
-        which = {"qemu-kvm": "/usr/bin/qemu-kvm"}
-        with on_host("arm64"), mock.patch("shutil.which", which.get):
-            is_native = architectures.get("aarch64").is_native()
-            qemu = qemu_helpers.Qemu(None, "aarch64", is_native)
-        self.assertEqual(qemu.qemubin, "/usr/bin/qemu-kvm")
-
-    def test_no_kvm_fallback_for_foreign_arch(self):
-        which = {"qemu-kvm": "/usr/bin/qemu-kvm"}
-        with on_host("x86_64"), mock.patch("shutil.which", which.get):
-            is_native = architectures.get("aarch64").is_native()
-            with self.assertRaises(ValueError):
-                qemu_helpers.Qemu(None, "aarch64", is_native)
+def test_microvm_non_native_x86_64(monkeypatch):
+    assert not can_use_microvm(monkeypatch, "aarch64")
 
 
-if __name__ == "__main__":
-    unittest.main()
+def test_microvm_other_arch(monkeypatch):
+    assert not can_use_microvm(monkeypatch, "aarch64", arch="aarch64")
+
+
+@pytest.mark.parametrize(
+    "files, guest, expected",
+    [
+        (["x86_64", "native"], "x86_64", "bin/virtme-ng-init-x86_64"),
+        (["native"], "x86_64", "bin/virtme-ng-init"),
+        (["aarch64"], "arm64", "bin/virtme-ng-init-aarch64"),
+        (["native"], "aarch64", "virtme-init"),
+        ([], "x86_64", "virtme-init"),
+    ],
+)
+def test_find_virtme_init(tmp_path, monkeypatch, files, guest, expected):
+    monkeypatch.setattr("platform.machine", lambda: "x86_64")
+    (tmp_path / "bin").mkdir()
+    for name in files:
+        suffix = "" if name == "native" else f"-{name}"
+        (tmp_path / "bin" / f"virtme-ng-init{suffix}").touch()
+    init = run.find_virtme_init(str(tmp_path), architectures.get(guest))
+    assert init == expected
+
+
+@pytest.mark.parametrize(
+    "host, qemuname, found",
+    [
+        ("arm64", "aarch64", "/usr/bin/qemu-kvm"),
+        ("x86_64", "aarch64", None),
+    ],
+)
+def test_qemu_kvm_fallback(monkeypatch, host, qemuname, found):
+    monkeypatch.setattr("platform.machine", lambda: host)
+    which = {"qemu-kvm": "/usr/bin/qemu-kvm"}
+    monkeypatch.setattr("shutil.which", which.get)
+    is_native = architectures.get(qemuname).is_native()
+    if found is None:
+        with pytest.raises(ValueError):
+            qemu_helpers.Qemu(None, qemuname, is_native)
+    else:
+        assert qemu_helpers.Qemu(None, qemuname, is_native).qemubin == found
+
+
+@pytest.mark.parametrize(
+    "host, expected",
+    [("x86_64", "amd64"), ("aarch64", "arm64"), ("arm64", "arm64"), ("foo", None)],
+)
+def test_get_host_arch(monkeypatch, host, expected):
+    monkeypatch.setattr("platform.machine", lambda: host)
+    assert vng_run.get_host_arch() == expected
