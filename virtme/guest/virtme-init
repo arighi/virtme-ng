@@ -549,6 +549,25 @@ get_network_devices() {
     return 1
 }
 
+wait_for_interface() {
+    local name=$1
+    local attempt line
+
+    # The interface shows in sysfs before the kernel lists it by name:
+    # register_netdevice() adds its kobject before list_netdevice(). In that
+    # window "ip link" and udhcpc fail with "No such device", and the guest
+    # boots with no network. Wait until it is listed. The check uses only
+    # builtins (the header lines have no ":"), so it forks nothing.
+    for ((attempt = 0; attempt < 100; attempt++)); do
+        while read -r line; do
+            [[ ${line%%:*} == "$name" ]] && return 0
+        done < /proc/net/dev
+        sleep 0.05
+    done
+    log "network device ${name} is not registered; skipping DHCP"
+    return 1
+}
+
 setup_network() {
     local pids=()
 
@@ -570,6 +589,7 @@ setup_network() {
         # udev is liable to rename the interface out from under us.
         for d in "${net_devices[@]}"; do
             virtme_net=$(basename -- "${d}")
+            wait_for_interface "$virtme_net" || continue
             ip link set dev "$virtme_net" up
             udhcpc_opts=(-i "$virtme_net" -n -q -f -s "$(dirname -- "$0")/virtme-udhcpc-script")
             if [[ -n $virtme_hostname ]]; then

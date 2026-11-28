@@ -1006,6 +1006,30 @@ fn wait_for_network_devices(virtio_net_dir: &Path, timeout: Duration) -> Vec<Str
     }
 }
 
+fn proc_net_dev_lists(content: &str, name: &str) -> bool {
+    // "  eth0: <counters>" for each listed interface; the two header lines
+    // have no ":", so they never match.
+    content
+        .lines()
+        .any(|line| line.split(':').next().map(str::trim) == Some(name))
+}
+
+fn wait_for_interface(proc_net_dev: &Path, name: &str, timeout: Duration) -> bool {
+    let deadline = Instant::now() + timeout;
+    loop {
+        if let Ok(content) = std::fs::read_to_string(proc_net_dev)
+            && proc_net_dev_lists(&content, name)
+        {
+            return true;
+        }
+        let remaining = deadline.saturating_duration_since(Instant::now());
+        if remaining.is_zero() {
+            return false;
+        }
+        thread::sleep(remaining.min(Duration::from_millis(50)));
+    }
+}
+
 fn get_network_handle(
     network_dev: String,
     guest_tools_dir: Option<String>,
@@ -1013,6 +1037,21 @@ fn get_network_handle(
 ) -> Option<thread::JoinHandle<()>> {
     log!("setting up network device {}", network_dev);
     Some(thread::spawn(move || {
+        // The interface shows in sysfs before the kernel lists it by name:
+        // register_netdevice() adds its kobject before list_netdevice(). In
+        // that window "ip link" and udhcpc fail with "No such device", and
+        // the guest boots with no network. Wait until it is listed.
+        if !wait_for_interface(
+            Path::new("/proc/net/dev"),
+            &network_dev,
+            Duration::from_secs(5),
+        ) {
+            log!(
+                "network device {} is not registered; skipping DHCP",
+                network_dev
+            );
+            return;
+        }
         utils::run_cmd("ip", &["link", "set", "dev", &network_dev, "up"]);
         let script = format!("{}/virtme-udhcpc-script", guest_tools_dir.unwrap());
         let mut args = vec![
